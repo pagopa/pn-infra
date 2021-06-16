@@ -1,0 +1,20 @@
+Parameters:
+  EnvName:
+    Type: String
+    Description: Nome dell'ambiente destinazione
+  EnvNumber:
+    Type: String
+    Description: Second byte from the left for VPC CIDR
+  
+Resources:
+  # First, a VPC:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Join ['', ["10.", !Ref "EnvNumber", ".0.0/16" ]]
+      EnableDnsSupport: false
+      EnableDnsHostnames: false
+      Tags:
+      - Key: Name
+        Value:  !Join ['', [!Ref "EnvName", "-VPC" ]]
+

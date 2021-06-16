@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  ExternalId:
+    NoEcho: true
+    Type: String
+    Description: Secret token for role impersonation
+  EnvName:
+    Type: String
+    Description: Nome dell'ambiente destinazione
+  CiCdAccount:
+    Type: String
+    Description: Account di CI/CD
+
+Resources:
+  CiCdRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Join [ "", [ "arn:aws:iam::", {Ref: CiCdAccount}, ":root" ] ]
+            Action:
+              - 'sts:AssumeRole'
+            Condition: 
+              StringEquals:
+                "sts:ExternalId": 
+                  Ref: ExternalId
+      Path: /
+      Policies:
+        - PolicyName: !Join [ "-", [ {Ref: EnvName}, "CiCd-Policy" ] ]
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - "cloudformation:DeleteStackInstances"
+                  - "cloudformation:ListExports"
+                  - "cloudformation:ListStackInstances"
+                  - "cloudformation:DescribeStackResource"
+                  - "cloudformation:UpdateStackSet"
+                  - "cloudformation:CreateChangeSet"
+                  - "cloudformation:ListTypeRegistrations"
+                  - "cloudformation:ContinueUpdateRollback"
+                  - "cloudformation:ListStackSetOperationResults"
+                  - "cloudformation:DescribeStackEvents"
+                  - "cloudformation:UpdateStack"
+                  - "cloudformation:DescribeChangeSet"
+                  - "cloudformation:CreateStackSet"
+                  - "cloudformation:ExecuteChangeSet"
+                  - "cloudformation:ListStackResources"
+                  - "cloudformation:DescribeStackInstance"
+                  - "cloudformation:DescribeStackResources"
+                  - "cloudformation:SignalResource"
+                  - "cloudformation:DescribeStacks"
+                  - "cloudformation:DescribeStackResourceDrifts"
+                  - "cloudformation:GetStackPolicy"
+                  - "cloudformation:GetTemplate"
+                  - "cloudformation:DeleteStack"
+                  - "cloudformation:ValidateTemplate"
+                  - "cloudformation:ListTypeVersions"
+                  - "cloudformation:DetectStackSetDrift"
+                  - "cloudformation:DescribeStackDriftDetectionStatus"
+                  - "cloudformation:DetectStackDrift"
+                  - "cloudformation:CancelUpdateStack"
+                  - "cloudformation:UpdateStackInstances"
+                  - "cloudformation:ListStackSetOperations"
+                  - "cloudformation:ListTypes"
+                  - "cloudformation:UpdateTerminationProtection"
+                  - "cloudformation:RecordHandlerProgress"
+                  - "cloudformation:CreateStackInstances"
+                  - "cloudformation:DeleteChangeSet"
+                  - "cloudformation:DetectStackResourceDrift"
+                  - "cloudformation:DescribeStackSetOperation"
+                  - "cloudformation:StopStackSetOperation"
+                  - "cloudformation:ListStacks"
+                  - "cloudformation:DescribeType"
+                  - "cloudformation:ListImports"
+                  - "cloudformation:DeleteStackSet"
+                  - "cloudformation:DescribeTypeRegistration"
+                  - "cloudformation:GetTemplateSummary"
+                  - "cloudformation:DescribeStackSet"
+                  - "cloudformation:ListStackSets"
+                  - "cloudformation:CreateStack"
+                  - "cloudformation:ListChangeSets"
+                Resource: '*'
+              - Effect: Allow
+                Action: 
+                  - 'ec2:createVPC'
+                  - 'ec2:describeVPCs'
+                  - 'ec2:ModifyVpcAttribute'
+                  - 'ec2:createTags'
+                Resource: '*'
+
+Outputs:
+  CreatedRole:
+    Description: The CI/CD role's ARN for the <EnvName> environment
+    Value: 
+      "Fn::GetAtt": ["CiCdRole", "Arn"]
+
