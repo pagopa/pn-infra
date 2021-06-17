@@ -16,7 +16,7 @@ Parameters:
   RepoName:
     Description: Name of the Project
     Type: String
-    Default: pn-infra
+    Default: marco-vit-pagopa/prove-connessione-aws
   S3Bucket:
     Description: S3 Bucket, which will hold the artifacts
     Type: String
@@ -139,10 +139,11 @@ Resources:
                 Category: Source
                 Owner: AWS
                 Version: 1
-                Provider: CodeCommit
+                Provider: CodeStarSourceConnection
               Configuration:
-                RepositoryName: !Ref RepoName
-                BranchName: master
+                ConnectionArn: arn:aws:codestar-connections:eu-central-1:911845998067:connection/eff2c3e4-b6dc-4164-8879-76b8053ec4bd
+                FullRepositoryId: !Ref RepoName
+                BranchName: main
               OutputArtifacts:
                 - Name: SCCheckoutArtifact
               RunOrder: 1
@@ -166,8 +167,8 @@ Resources:
                 ActionMode: CREATE_UPDATE
                 StackName: !Sub ${ProjectName}-test
                 Capabilities: CAPABILITY_NAMED_IAM
-                TemplatePath: SCCheckoutArtifact::010_generic_environment/vpc.cfn.yaml
-                TemplateConfiguration: SCCheckoutArtifact::010_generic_environment/beta-configuration.json
+                TemplatePath: SCCheckoutArtifact::vpc.cfn.yaml
+                TemplateConfiguration: SCCheckoutArtifact::beta-configuration.json
                 #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
                 RoleArn:
                   Fn::If:
