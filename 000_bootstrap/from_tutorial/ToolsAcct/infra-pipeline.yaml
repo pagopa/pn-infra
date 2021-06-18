@@ -9,18 +9,14 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: CodePipeline for the Sample Lambda Function
 Parameters:
-  ProjectName:
-    Description: Name of the Project
+  EnvName:
+    Description: Name of the Project or project branch
     Type: String
-    Default: simple-infra
+    Default: pn-infra
   RepoName:
-    Description: Name of the Project
+    Description: Name of the Github Repository
     Type: String
-    Default: marco-vit-pagopa/prove-connessione-aws
-  S3Bucket:
-    Description: S3 Bucket, which will hold the artifacts
-    Type: String
-    Default: pre-reqs-artifactbucket-zttj4v44ig3j
+    Default: pagopa/pn-infra
   DevAccount:
     Description: AWS AccountNumber for dev
     Type: Number
@@ -33,15 +29,29 @@ Parameters:
     Description: AWS AccountNumber for production
     Type: Number
     Default: 558518206506
-  CMKARN:
-    Description: ARN of the KMS CMK creates in Tools account
+  TemplatePath:
+    Description: Cloudformation architectute template 
     Type: String
-    Default: arn:aws:kms:eu-central-1:911845998067:key/e27e5352-a612-4937-bcd8-23190baef9cc
+    Default: runtime-infra/vpc.cfn.yaml
+  BetaEnvConfiguration:
+    Description: Cloudformation template configuration for Beta stage
+    Type: String
+    Default: runtime-infra/beta-cfg.json
+  GithubConnection:
+    Description: ARN of GithubConnection
+    Type: String
+    Default: arn:aws:codestar-connections:eu-central-1:911845998067:connection/6e29af2d-57a2-425e-84b7-ab9100184f4b
   CrossAccountCondition:
     Description: Conditionally creates the resources for cross account access
     Type: String
     Default: false
-
+  S3Bucket:
+    Description: S3 Bucket, which will hold the artifacts
+    Type: String
+  CMKARN:
+    Description: ARN of the KMS CMK creates in CI/CD account
+    Type: String
+  
 Conditions:
   AddCodeBuildResource: !Equals [ !Ref CrossAccountCondition, true ]
 
@@ -50,7 +60,7 @@ Resources:
   PipeLineRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub ${ProjectName}-codepipeline-role
+      RoleName: !Sub ${EnvName}-codepipeline-role
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -66,7 +76,7 @@ Resources:
     Type: AWS::IAM::Policy
     DependsOn: S3BucketPolicy
     Properties:
-      PolicyName: !Sub ${ProjectName}-codepipeline-policy
+      PolicyName: !Sub ${EnvName}-codepipeline-policy
       PolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -141,7 +151,7 @@ Resources:
                 Version: 1
                 Provider: CodeStarSourceConnection
               Configuration:
-                ConnectionArn: arn:aws:codestar-connections:eu-central-1:911845998067:connection/eff2c3e4-b6dc-4164-8879-76b8053ec4bd
+                ConnectionArn: !Ref GithubConnection
                 FullRepositoryId: !Ref RepoName
                 BranchName: main
               OutputArtifacts:
@@ -162,13 +172,13 @@ Resources:
                 Version: 1
                 Provider: CloudFormation
               Configuration:
-                #ChangeSetName: !Sub ${ProjectName}-test
+                #ChangeSetName: !Sub ${EnvName}-test
                 #ActionMode: CHANGE_SET_REPLACE
                 ActionMode: CREATE_UPDATE
-                StackName: !Sub ${ProjectName}-test
+                StackName: !Sub ${EnvName}-test
                 Capabilities: CAPABILITY_NAMED_IAM
-                TemplatePath: SCCheckoutArtifact::vpc.cfn.yaml
-                TemplateConfiguration: SCCheckoutArtifact::beta-configuration.json
+                TemplatePath: !Sub SCCheckoutArtifact::${TemplatePath}
+                TemplateConfiguration: !Sub SCCheckoutArtifact::${BetaEnvConfiguration}
                 #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
                 RoleArn:
                   Fn::If:
