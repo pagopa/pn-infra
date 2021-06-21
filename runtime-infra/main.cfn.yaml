@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  EnvName:
+    Type: String
+    Description: Nome dell'ambiente destinazione
+  EnvNumber:
+    Type: String
+    Description: Second byte from the left for VPC CIDR
+  
+Mappings:
+  Region2S3WebsiteSuffix:
+    eu-central-1:
+      Suffix: .s3-website.eu-central-1.amazonaws.com
+    eu-south-1:
+      Suffix: .s3-website.eu-south-1.amazonaws.com
+
+Resources:
+  # - WebApp S3 Bucket
+  S3BucketForWebsiteContent:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+  
+  # - WebApp CDN
+  WebsiteCDN:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: CDN for S3-backed website
+        Enabled: 'true'
+        DefaultCacheBehavior:
+          ForwardedValues:
+            QueryString: 'true'
+          TargetOriginId: only-origin
+          ViewerProtocolPolicy: allow-all
+        DefaultRootObject: index.html
+        Origins:
+        - CustomOriginConfig:
+            HTTPPort: '80'
+            HTTPSPort: '443'
+            OriginProtocolPolicy: http-only
+          DomainName: !Join ['', [!Ref 'S3BucketForWebsiteContent', !FindInMap [Region2S3WebsiteSuffix,
+                !Ref 'AWS::Region', Suffix]]]
+          Id: only-origin
+
+  # Microservices VPC:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Join ['', ["10.", !Ref "EnvNumber", ".0.0/16" ]]
+      EnableDnsSupport: false
+      EnableDnsHostnames: false
+      Tags:
+      - Key: Name
+        Value:  !Join ['', [!Ref "EnvName", "-VPC" ]]
+
+Outputs:
+  # - WebApp Outputs
+  WebAppBucketName:
+    Value: !Ref 'S3BucketForWebsiteContent'
+    Description: Name of S3 bucket to hold website content
+  WebAppCdnUrl:
+    Value:  !Join ['', ['https://', !GetAtt WebsiteCDN.DomainName]] 
+    Description: Site access URL
