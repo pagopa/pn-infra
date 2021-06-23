@@ -16,15 +16,58 @@ Mappings:
       Suffix: .s3-website.eu-south-1.amazonaws.com
 
 Resources:
+  # - CloudFront User used for WebApp S3 Bucket access
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub 'CloudFront OAI for ${EnvName} WebApp'
   # - WebApp S3 Bucket
   S3BucketForWebsiteContent:
     Type: AWS::S3::Bucket
     Properties:
-      AccessControl: PublicRead
-      WebsiteConfiguration:
-        IndexDocument: index.html
-        ErrorDocument: error.html
-  
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  # - Webapp S3 Bucket policy
+  S3BucketForWebsiteContentPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref 'S3BucketForWebsiteContent'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Action:
+          - s3:GetObject
+          Effect: Allow
+          Resource: !Sub '${S3BucketForWebsiteContent.Arn}/*'
+          Principal:
+            CanonicalUser:
+              Fn::GetAtt:
+              - CloudFrontOriginAccessIdentity
+              - S3CanonicalUserId
+  # - WebApp caching policy
+  WebsiteCDNCachingPolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub '${EnvName}-WebsiteCDNCachingPolicy'
+        Comment: 'Keep cache for one minute. TODO: one minute is fine for non versioned files; versioned files must live forever'
+        DefaultTTL: 30
+        MaxTTL: 60
+        MinTTL: 10
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingBrotli: true
+          EnableAcceptEncodingGzip: true
+          CookiesConfig:
+            CookieBehavior: none
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: all
   # - WebApp CDN
   WebsiteCDN:
     Type: AWS::CloudFront::Distribution
@@ -33,19 +76,25 @@ Resources:
         Comment: CDN for S3-backed website
         Enabled: 'true'
         DefaultCacheBehavior:
-          ForwardedValues:
-            QueryString: 'true'
-          TargetOriginId: only-origin
-          ViewerProtocolPolicy: allow-all
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
+            - GET
+            - HEAD
+          TargetOriginId: !Sub 'S3-${S3BucketForWebsiteContent}'
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: !Ref WebsiteCDNCachingPolicy
         DefaultRootObject: index.html
         Origins:
-        - CustomOriginConfig:
-            HTTPPort: '80'
-            HTTPSPort: '443'
-            OriginProtocolPolicy: http-only
-          DomainName: !Join ['', [!Ref 'S3BucketForWebsiteContent', !FindInMap [Region2S3WebsiteSuffix,
-                !Ref 'AWS::Region', Suffix]]]
-          Id: only-origin
+        - DomainName: !Sub '${S3BucketForWebsiteContent.DomainName}'
+          Id: !Sub 'S3-${S3BucketForWebsiteContent}'
+          S3OriginConfig:
+            OriginAccessIdentity:
+              Fn::Join:
+              - ''
+              - - origin-access-identity/cloudfront/
+                - Ref: CloudFrontOriginAccessIdentity
 
   # Microservices VPC:
   VPC:
@@ -66,3 +115,4 @@ Outputs:
   WebAppCdnUrl:
     Value:  !Join ['', ['https://', !GetAtt WebsiteCDN.DomainName]] 
     Description: Site access URL
+
