@@ -89,9 +89,13 @@ Resources:
               - apigateway:PATCH # Update API resources.
               - apigateway:DELETE # Delete API incase of rollback. - iam:AttachRolePolicy
               - cloudformation:*
+              - cloudfront:CreateCachePolicy
+              - cloudfront:CreateCloudFrontOriginAccessIdentity
               - cloudfront:CreateDistribution
               - cloudfront:CreateDistributionWithTags
               - cloudfront:CreateInvalidation
+              - cloudfront:DeleteCachePolicy
+              - cloudfront:DeleteCloudFrontOriginAccessIdentity
               - cloudfront:DeleteDistribution
               - cloudfront:GetCachePolicy
               - cloudfront:GetCachePolicyConfig
@@ -122,6 +126,7 @@ Resources:
               - lambda:UnTagResource
               - s3:CreateBucket
               - s3:DeleteBucket
+              - s3:DeleteBucketPolicy
               - s3:GetAccountPublicAccessBlock
               - s3:GetBucketAcl
               - s3:GetBucketCORS
@@ -144,11 +149,11 @@ Resources:
               - s3:GetReplicationConfiguration
               - s3:ListBucket
               - s3:ListAccessPoints
-              - s3:PutAccountPublicAccessBlock
               - s3:PutBucketAcl
               - s3:PutBucketPolicy
               - s3:PutBucketTagging
               - s3:PutBucketWebsite
+              - s3:PutBucketPublicAccessBlock
             Resource: "*"
           -
             Effect: Allow
