@@ -12,11 +12,15 @@ Parameters:
   EnvName:
     Description: Name of the Project or project branch
     Type: String
-    Default: pn-infra
-  RepoName:
+    Default: pn
+  InfraRepoName:
     Description: Name of the Github Repository
     Type: String
     Default: pagopa/pn-infra
+  ApiGwRepoName:
+    Description: Name of the Github Repository
+    Type: String
+    Default: pagopa/pn-api-gw
   DevAccount:
     Description: AWS AccountNumber for dev
     Type: Number
@@ -29,10 +33,14 @@ Parameters:
     Description: AWS AccountNumber for production
     Type: Number
     Default: 558518206506
-  TemplatePath:
+  InfraTemplatePath:
     Description: Cloudformation architectute template 
     Type: String
     Default: runtime-infra/main.cfn.yaml
+  ApiGwTemplatePath:
+    Description: Cloudformation api-gw template 
+    Type: String
+    Default: api-gw.cfn.yaml
   BetaEnvConfiguration:
     Description: Cloudformation template configuration for Beta stage
     Type: String
@@ -136,11 +144,11 @@ Resources:
       Roles:
         -
           !Ref PipeLineRole
-  Pipeline:
+  InfraPipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
       RoleArn: !GetAtt PipeLineRole.Arn
-      Name: !Ref AWS::StackName
+      Name: !Sub '${EnvName}-infra'
       Stages:
         - Name: Source
           Actions:
@@ -152,7 +160,7 @@ Resources:
                 Provider: CodeStarSourceConnection
               Configuration:
                 ConnectionArn: !Ref GithubConnection
-                FullRepositoryId: !Ref RepoName
+                FullRepositoryId: !Ref InfraRepoName
                 BranchName: main
               OutputArtifacts:
                 - Name: SCCheckoutArtifact
@@ -172,12 +180,10 @@ Resources:
                 Version: 1
                 Provider: CloudFormation
               Configuration:
-                #ChangeSetName: !Sub ${EnvName}-beta
-                #ActionMode: CHANGE_SET_REPLACE
                 ActionMode: CREATE_UPDATE
-                StackName: !Sub ${EnvName}-beta
+                StackName: !Sub ${EnvName}-infra
                 Capabilities: CAPABILITY_NAMED_IAM
-                TemplatePath: !Sub SCCheckoutArtifact::${TemplatePath}
+                TemplatePath: !Sub SCCheckoutArtifact::${InfraTemplatePath}
                 TemplateConfiguration: !Sub SCCheckoutArtifact::${BetaEnvConfiguration}
                 #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
                 RoleArn:
@@ -220,4 +226,68 @@ Resources:
                 - !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
                 - !Sub arn:aws:iam::${ProductionAccount}:role/ToolsAcctCodePipelineCloudFormationRole
                 - !Sub arn:aws:iam::${ProductionAccount}:role/cloudformationdeployer-role
+
+
+  ### INIZIO DEFINIZIONE API-GATEWAY ###
+
+  ApiGwPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt PipeLineRole.Arn
+      Name: !Sub ${EnvName}-apigw
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: App
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: CodeStarSourceConnection
+              Configuration:
+                ConnectionArn: !Ref GithubConnection
+                FullRepositoryId: !Ref ApiGwRepoName
+                BranchName: main
+              OutputArtifacts:
+                - Name: SCCheckoutArtifact
+              RunOrder: 1
+              RoleArn:
+                  Fn::If:
+                  - AddCodeBuildResource
+                  - !Sub arn:aws:iam::${DevAccount}:role/ToolsAcctCodePipelineCodeCommitRole
+                  - !Ref AWS::NoValue
+        - Name: DeployToTest
+          Actions:
+            - Name: DeployTest
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub ${EnvName}-api-gw
+                TemplatePath: !Sub SCCheckoutArtifact::${ApiGwTemplatePath}
+                TemplateConfiguration: !Sub SCCheckoutArtifact::beta-cfg.json
+                #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
+                RoleArn:
+                  Fn::If:
+                  - AddCodeBuildResource
+                  - !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
+                  - !Ref AWS::NoValue
+              InputArtifacts:
+                - Name: SCCheckoutArtifact
+              RunOrder: 1
+              #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
+              RoleArn:
+                  Fn::If:
+                  - AddCodeBuildResource
+                  - !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
+                  - !Ref AWS::NoValue
+      ArtifactStore:
+        Type: S3
+        Location: !Ref S3Bucket
+        EncryptionKey:
+          Id: !Ref CMKARN
+          Type: KMS
 
