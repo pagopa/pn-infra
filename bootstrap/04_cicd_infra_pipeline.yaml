@@ -165,7 +165,7 @@ Resources:
                 Provider: CloudFormation
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: !Sub ${ProductName}-${BranchName}-infra
+                StackName: !Sub ${ProductName}-${BranchName}-infra-vpc
                 Capabilities: CAPABILITY_NAMED_IAM
                 TemplatePath: !Sub SCCheckoutArtifact::${InfraTemplatePath01}
                 TemplateConfiguration: !Sub SCCheckoutArtifact::${BetaEnvConfiguration}
@@ -192,7 +192,7 @@ Resources:
                 Provider: CloudFormation
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: !Sub ${ProductName}-${BranchName}-infra
+                StackName: !Sub ${ProductName}-${BranchName}-infra-cdn
                 Capabilities: CAPABILITY_NAMED_IAM
                 TemplatePath: !Sub SCCheckoutArtifact::${InfraTemplatePath02}
                 TemplateConfiguration: !Sub SCCheckoutArtifact::${BetaEnvConfiguration}
@@ -205,6 +205,33 @@ Resources:
               InputArtifacts:
                 - Name: SCCheckoutArtifact
               RunOrder: 1
+              #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
+              RoleArn:
+                  Fn::If:
+                  - AddCodeBuildResource
+                  - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cicd-role
+                  - !Ref AWS::NoValue
+            - Name: DeployTestApiGw
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub ${ProductName}-${BranchName}-infra-cdn
+                Capabilities: CAPABILITY_NAMED_IAM
+                TemplatePath: !Sub SCCheckoutArtifact::${InfraTemplatePath03}
+                TemplateConfiguration: !Sub SCCheckoutArtifact::${BetaEnvConfiguration}
+                #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
+                RoleArn:
+                  Fn::If:
+                  - AddCodeBuildResource
+                  - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cloudformationdeployer-role
+                  - !Ref AWS::NoValue
+              InputArtifacts:
+                - Name: SCCheckoutArtifact
+              RunOrder: 2
               #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
               RoleArn:
                   Fn::If:

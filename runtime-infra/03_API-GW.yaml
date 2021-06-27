@@ -1,10 +1,147 @@
-AWSTemplateFormatVersion: 2010-09-09
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Hello World served from API gateway
 
 Parameters:
   EnvName:
     Type: String
     Description: Nome dell'ambiente destinazione
-  EnvNumber:
-    Type: String
-    Description: Second byte from the left for VPC CIDR
- 
+
+Resources:
+  ApiGatewayApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub '${EnvName}-public-api'
+      Description: !Sub '${EnvName}-public-api'
+      FailOnWarnings: true
+      EndpointConfiguration:
+        Types: 
+          - REGIONAL
+      Body:
+        swagger: "2.0"
+        info:
+          title: 'Hello world API'
+          version: '0.0.1'
+        basePath: "/hello"
+        schemes:
+          - "https"
+        securityDefinitions:
+          api_key:
+            type: apiKey
+            name: x-api-key
+            in: header
+        paths:
+          /v1/:
+            get:
+              summary: "Greet"
+              description: ""
+              operationId: "greet"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "Ok"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+              security:
+                - api_key: []
+              x-amazon-apigateway-integration:
+                type: mock
+                httpMethod: GET
+                passthroughBehavior: when_no_match
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: 200
+                    responseTemplates:
+                      application/json: '{ "message":"Hello World!! By API-GW" }'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,HEAD,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: !Join ['', ["'", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-cdn-url'}}, "'"]]
+            options:
+              summary: "Greet"
+              description: ""
+              operationId: "greetOpt"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "Ok"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                httpMethod: OPTIONS
+                passthroughBehavior: when_no_match
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: 200
+                    responseTemplates:
+                      application/json: ''
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,HEAD,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: !Join ['', ["'", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-cdn-url'}}, "'"]]
+
+  ApiKeyPaPoC:
+    Type: AWS::ApiGateway::ApiKey
+    Properties: 
+      Name: PocPaApiKey
+      Description: PoC API-Key used by PA 
+      Enabled: true
+  
+  ApiGatewayDeploymentBeta:
+    Type: AWS::ApiGateway::Deployment
+    Properties: 
+      RestApiId: !Ref ApiGatewayApi
+  ApiGatewayStageBeta:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      Description: Beta stage for testing
+      RestApiId: !Ref ApiGatewayApi
+      DeploymentId: !Ref ApiGatewayDeploymentBeta
+      StageName: beta
+  BetaUsagePlan:
+    Type: 'AWS::ApiGateway::UsagePlan'
+    Properties:
+      ApiStages:
+        - ApiId: !Ref ApiGatewayApi
+          Stage: !Ref ApiGatewayStageBeta
+      Description: Beta Plan
+      Throttle:
+        BurstLimit: 20
+        RateLimit: 10
+  ApiKeyPaPoCBeta:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties: 
+      KeyType: API_KEY
+      KeyId: !Ref ApiKeyPaPoC
+      UsagePlanId: !Ref BetaUsagePlan
+
+  
+Outputs:
+  # - API Gateway access informations
+  ApiGatewayUrlBeta:
+    Value: !Sub 'https://${ApiGatewayApi}.execute-api.${AWS::Region}.amazonaws.com/beta/'
+    Description: Base URL for API Requests
+    Export:
+      Name: !Sub '${EnvName}-api-gw-url'
+  ApiKeyId:
+    Value: !Sub '${ApiKeyPaPoC.APIKeyId}'
+    Description: API Key ID. Use it to look for secret token to memorize in your browser
+    Export:
+      Name: !Sub '${EnvName}-api-key-id'
+
