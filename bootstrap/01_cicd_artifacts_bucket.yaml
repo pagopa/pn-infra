@@ -1,0 +1,153 @@
+#  Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#  Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance with
+#  the License. A copy of the License is located at
+#      http://aws.amazon.com/apache2.0/
+#  or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+#  CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and
+#  limitations under the License.
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates a CMK in KMS and grants access to other accounts
+Parameters:
+  GithubConnectionArn:
+    Description: ARN of GitHub connection  
+    Type: String
+    Default: arn:aws:codestar-connections:eu-central-1:911845998067:connection/6e29af2d-57a2-425e-84b7-ab9100184f4b
+  BetaAccount:
+    Description: AWS AccountNumber for test
+    Type: Number
+    Default: 558518206506
+  ProductName:
+    Description: Name of the Project
+    Type: String
+    Default: pn
+  BranchName:
+    Description: Name of the Project
+    Type: String
+    Default: main
+  
+Resources:
+  FromGithubToBucketRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProductName}-${BranchName}-from-github-to-s3-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub ${AWS::AccountId}
+            Action:
+              - sts:AssumeRole
+      Path: /
+
+  FromGithubToBucketPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProductName}-${BranchName}-from-github-to-s3-policy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Action:
+              - codecommit:BatchGetRepositories
+              - codecommit:Get*
+              - codecommit:GitPull
+              - codecommit:List*
+              - codecommit:CancelUploadArchive
+              - codecommit:UploadArchive
+              - s3:*
+            Resource: "*"
+          -
+            Effect: Allow
+            Action:
+              - kms:*
+            Resource: !GetAtt [KMSKey,Arn]
+          -
+            Effect: Allow
+            Action:
+              - codestar-connections:ListTagsForResource
+              - codestar-connections:UseConnection
+              - codestar-connections:GetConnection
+            Resource: !Ref GithubConnectionArn
+      Roles:
+        -
+          !Ref FromGithubToBucketRole
+  KMSKey:
+    Type: AWS::KMS::Key
+    DependsOn: FromGithubToBucketRole
+    Properties:
+      Description: Used by Assumed Roles in Dev/Test/Prod accounts to Encrypt/Decrypt code
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: !Ref AWS::StackName
+        Statement:
+          -
+            Sid: Allows admin of the key
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action:
+              - "kms:Create*"
+              - "kms:Describe*"
+              - "kms:Enable*"
+              - "kms:List*"
+              - "kms:Put*"
+              - "kms:Update*"
+              - "kms:Revoke*"
+              - "kms:Disable*"
+              - "kms:Get*"
+              - "kms:Delete*"
+              - "kms:ScheduleKeyDeletion"
+              - "kms:CancelKeyDeletion"
+            Resource: "*"
+          -
+            Sid: Allow use of the key for CryptoGraphy Lambda
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub arn:aws:iam::${AWS::AccountId}:root
+                - !Sub arn:aws:iam::${BetaAccount}:root
+                - !Sub arn:aws:iam::${AWS::AccountId}:role/${ProductName}-${BranchName}-from-github-to-s3-role
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+            Resource: "*"
+  KMSAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub alias/${ProductName}-${BranchName}-KMS-key-alias
+      TargetKeyId: !Ref KMSKey
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Sub ${ProductName}-${BranchName}-build-artifact-bucket
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+Outputs:
+  CMKARN:
+    Value: !GetAtt [KMSKey,Arn]
+    Export:
+      Name: !Sub '${ProductName}-${BranchName}-CMK-arn'
+  ArtifactBucket:
+    Value: !Ref ArtifactBucket
+    Export:
+      Name: !Sub '${ProductName}-${BranchName}-build-artifacts-buket-name'
+  GithubConnectionArn:
+    Value: !Ref GithubConnectionArn
+    Export:
+      Name: !Sub '${ProductName}-${BranchName}-github-connection'
+
+

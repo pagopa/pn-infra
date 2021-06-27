@@ -9,56 +9,34 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: CodePipeline for the Sample Lambda Function
 Parameters:
-  EnvName:
-    Description: Name of the Project or project branch
+  ProductName:
+    Description: Name of the Project
     Type: String
     Default: pn
+  BranchName:
+    Description: Name of the Project
+    Type: String
+    Default: main
   InfraRepoName:
-    Description: Name of the Github Repository
+    Description: Name of the Github Repository infra
     Type: String
     Default: pagopa/pn-infra
-  ApiGwRepoName:
-    Description: Name of the Github Repository
-    Type: String
-    Default: pagopa/pn-api-gw
-  DevAccount:
-    Description: AWS AccountNumber for dev
-    Type: Number
-    Default: 911845998067
-  TestAccount:
+  BetaAccount:
     Description: AWS AccountNumber for test
-    Type: Number
-    Default: 558518206506
-  ProductionAccount:
-    Description: AWS AccountNumber for production
     Type: Number
     Default: 558518206506
   InfraTemplatePath:
     Description: Cloudformation architectute template 
     Type: String
     Default: runtime-infra/main.cfn.yaml
-  ApiGwTemplatePath:
-    Description: Cloudformation api-gw template 
-    Type: String
-    Default: api-gw.cfn.yaml
   BetaEnvConfiguration:
     Description: Cloudformation template configuration for Beta stage
     Type: String
     Default: runtime-infra/beta-cfg.json
-  GithubConnection:
-    Description: ARN of GithubConnection
-    Type: String
-    Default: arn:aws:codestar-connections:eu-central-1:911845998067:connection/6e29af2d-57a2-425e-84b7-ab9100184f4b
   CrossAccountCondition:
     Description: Conditionally creates the resources for cross account access
     Type: String
     Default: false
-  S3Bucket:
-    Description: S3 Bucket, which will hold the artifacts
-    Type: String
-  CMKARN:
-    Description: ARN of the KMS CMK creates in CI/CD account
-    Type: String
   
 Conditions:
   AddCodeBuildResource: !Equals [ !Ref CrossAccountCondition, true ]
@@ -68,7 +46,7 @@ Resources:
   PipeLineRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub ${EnvName}-codepipeline-role
+      RoleName: !Sub ${ProductName}-${BranchName}-codepipeline-role
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -82,9 +60,8 @@ Resources:
       Path: /
   PipelinePolicy:
     Type: AWS::IAM::Policy
-    DependsOn: S3BucketPolicy
     Properties:
-      PolicyName: !Sub ${EnvName}-codepipeline-policy
+      PolicyName: !Sub ${ProductName}-${BranchName}-codepipeline-policy
       PolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -121,7 +98,7 @@ Resources:
             Effect: Allow
             Action:
               - kms:Decrypt
-            Resource: !Ref CMKARN
+            Resource: { "Fn::ImportValue": {"Fn::Sub": "${ProductName}-${BranchName}-CMK-arn"}}
           -
             Effect: Allow
             Action:
@@ -130,16 +107,15 @@ Resources:
               - s3:GetObject
               - s3:ListBucket
             Resource:
-             - !Join ['',['arn:aws:s3:::',!Ref S3Bucket, '/*']]
-             - !Join ['',['arn:aws:s3:::',!Ref S3Bucket]]
+             - !Join ['',['arn:aws:s3:::', { "Fn::ImportValue": {"Fn::Sub": "${ProductName}-${BranchName}-build-artifacts-buket-name"}}, '/*']]
+             - !Join ['',['arn:aws:s3:::', { "Fn::ImportValue": {"Fn::Sub": "${ProductName}-${BranchName}-build-artifacts-buket-name"}} ]]
           -
             Effect: Allow
             Action:
               - sts:AssumeRole
             Resource:
-              - !Sub arn:aws:iam::${DevAccount}:role/ToolsAcctCodePipelineCodeCommitRole
-              - !Sub arn:aws:iam::${ProductionAccount}:role/ToolsAcctCodePipelineCloudFormationRole
-              - !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
+              - !Sub arn:aws:iam::${AWS::AccountId}:role/${ProductName}-${BranchName}-from-github-to-s3-role
+              - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cicd-role
 
       Roles:
         -
@@ -148,7 +124,7 @@ Resources:
     Type: AWS::CodePipeline::Pipeline
     Properties:
       RoleArn: !GetAtt PipeLineRole.Arn
-      Name: !Sub '${EnvName}-infra'
+      Name: !Sub '${ProductName}-${BranchName}-infra'
       Stages:
         - Name: Source
           Actions:
@@ -159,9 +135,9 @@ Resources:
                 Version: 1
                 Provider: CodeStarSourceConnection
               Configuration:
-                ConnectionArn: !Ref GithubConnection
+                ConnectionArn: { "Fn::ImportValue": {"Fn::Sub": "${ProductName}-${BranchName}-github-connection"}} 
                 FullRepositoryId: !Ref InfraRepoName
-                BranchName: main
+                BranchName: !Ref BranchName
               OutputArtifacts:
                 - Name: SCCheckoutArtifact
               RunOrder: 1
@@ -169,7 +145,7 @@ Resources:
               RoleArn:
                   Fn::If:
                   - AddCodeBuildResource
-                  - !Sub arn:aws:iam::${DevAccount}:role/ToolsAcctCodePipelineCodeCommitRole
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/${ProductName}-${BranchName}-from-github-to-s3-role
                   - !Ref AWS::NoValue
         - Name: DeployToTest
           Actions:
@@ -181,7 +157,7 @@ Resources:
                 Provider: CloudFormation
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: !Sub ${EnvName}-infra
+                StackName: !Sub ${ProductName}-${BranchName}-infra
                 Capabilities: CAPABILITY_NAMED_IAM
                 TemplatePath: !Sub SCCheckoutArtifact::${InfraTemplatePath}
                 TemplateConfiguration: !Sub SCCheckoutArtifact::${BetaEnvConfiguration}
@@ -189,7 +165,7 @@ Resources:
                 RoleArn:
                   Fn::If:
                   - AddCodeBuildResource
-                  - !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
+                  - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cloudformationdeployer-role
                   - !Ref AWS::NoValue
               InputArtifacts:
                 - Name: SCCheckoutArtifact
@@ -198,96 +174,12 @@ Resources:
               RoleArn:
                   Fn::If:
                   - AddCodeBuildResource
-                  - !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
+                  - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cicd-role
                   - !Ref AWS::NoValue
       ArtifactStore:
         Type: S3
-        Location: !Ref S3Bucket
+        Location: { "Fn::ImportValue": {"Fn::Sub": "${ProductName}-${BranchName}-build-artifacts-buket-name"}}
         EncryptionKey:
-          Id: !Ref CMKARN
-          Type: KMS
-  S3BucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref S3Bucket
-      PolicyDocument:
-        Statement:
-          -
-            Action:
-              - s3:*
-            Effect: Allow
-            Resource:
-              - !Sub arn:aws:s3:::${S3Bucket}
-              - !Sub arn:aws:s3:::${S3Bucket}/*
-            Principal:
-              AWS:
-                - !Sub arn:aws:iam::${DevAccount}:role/ToolsAcctCodePipelineCodeCommitRole
-                - !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
-                - !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
-                - !Sub arn:aws:iam::${ProductionAccount}:role/ToolsAcctCodePipelineCloudFormationRole
-                - !Sub arn:aws:iam::${ProductionAccount}:role/cloudformationdeployer-role
-
-
-  ### INIZIO DEFINIZIONE API-GATEWAY ###
-
-  ApiGwPipeline:
-    Type: AWS::CodePipeline::Pipeline
-    Properties:
-      RoleArn: !GetAtt PipeLineRole.Arn
-      Name: !Sub ${EnvName}-apigw
-      Stages:
-        - Name: Source
-          Actions:
-            - Name: App
-              ActionTypeId:
-                Category: Source
-                Owner: AWS
-                Version: 1
-                Provider: CodeStarSourceConnection
-              Configuration:
-                ConnectionArn: !Ref GithubConnection
-                FullRepositoryId: !Ref ApiGwRepoName
-                BranchName: main
-              OutputArtifacts:
-                - Name: SCCheckoutArtifact
-              RunOrder: 1
-              RoleArn:
-                  Fn::If:
-                  - AddCodeBuildResource
-                  - !Sub arn:aws:iam::${DevAccount}:role/ToolsAcctCodePipelineCodeCommitRole
-                  - !Ref AWS::NoValue
-        - Name: DeployToTest
-          Actions:
-            - Name: DeployTest
-              ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Version: 1
-                Provider: CloudFormation
-              Configuration:
-                ActionMode: CREATE_UPDATE
-                StackName: !Sub ${EnvName}-api-gw
-                TemplatePath: !Sub SCCheckoutArtifact::${ApiGwTemplatePath}
-                TemplateConfiguration: !Sub SCCheckoutArtifact::beta-cfg.json
-                #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
-                RoleArn:
-                  Fn::If:
-                  - AddCodeBuildResource
-                  - !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
-                  - !Ref AWS::NoValue
-              InputArtifacts:
-                - Name: SCCheckoutArtifact
-              RunOrder: 1
-              #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
-              RoleArn:
-                  Fn::If:
-                  - AddCodeBuildResource
-                  - !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
-                  - !Ref AWS::NoValue
-      ArtifactStore:
-        Type: S3
-        Location: !Ref S3Bucket
-        EncryptionKey:
-          Id: !Ref CMKARN
+          Id:  { "Fn::ImportValue": {"Fn::Sub": "${ProductName}-${BranchName}-CMK-arn"}}
           Type: KMS
 
