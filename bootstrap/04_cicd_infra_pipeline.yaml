@@ -280,9 +280,9 @@ Resources:
                 Version: 1
                 Provider: S3
               Configuration:
-                ObjectKey: !Sub ${ProductName}-${BranchName}-beta-infrastructure-deploy-outputs.json
+                ObjectKey: !Sub ${ProductName}-${BranchName}-beta-infrastructure-deploy-outputs
                 Extract: true
-                BucketName: !Sub '${ProductName}-${BranchName}-build-artifacts-buket-name'
+                BucketName: { "Fn::ImportValue": {"Fn::Sub": "${ProductName}-${BranchName}-build-artifacts-buket-name"}}
               InputArtifacts:
                 - Name: InfraOutputs
               RunOrder: 2
