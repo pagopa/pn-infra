@@ -130,6 +130,8 @@ Resources:
     DeletionPolicy: Retain
     Properties:
       BucketName: !Sub ${ProductName}-${BranchName}-build-artifact-bucket
+      VersioningConfiguration: # Usato perchè la pipeline di preparazione infrastruttura salva gli output su questo bucket
+        Status: Enabled
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
