@@ -96,25 +96,16 @@ Resources:
               - - origin-access-identity/cloudfront/
                 - Ref: CloudFrontOriginAccessIdentity
 
-  # Microservices VPC:
-  VPC:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: !Join ['', ["10.", !Ref "EnvNumber", ".0.0/16" ]]
-      EnableDnsSupport: false
-      EnableDnsHostnames: false
-      Tags:
-      - Key: Name
-        Value:  !Join ['', [!Ref "EnvName", "-VPC" ]]
-
 Outputs:
   # - WebApp Outputs
   WebAppBucketName:
     Value: !Ref 'S3BucketForWebsiteContent'
     Description: Name of S3 bucket to hold website content
+    Export:
+      Name: !Sub '${EnvName}-website-bucket-name'
   WebAppCdnUrl:
     Value:  !Join ['', ['https://', !GetAtt WebsiteCDN.DomainName]] 
     Description: Site access URL
     Export:
-      Name: !Sub '${EnvName}-cdn'
+      Name: !Sub '${EnvName}-cdn-url'
 
