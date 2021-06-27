@@ -37,6 +37,10 @@ Parameters:
     Description: Cloudformation architectute template 03
     Type: String
     Default: runtime-infra/03_API-GW.yaml
+  InfraTemplatePath99:
+    Description: Cloudformation architectute template 03
+    Type: String
+    Default: runtime-infra/99_collect_params.yaml
   BetaEnvConfiguration:
     Description: Cloudformation template configuration for Beta stage
     Type: String
@@ -238,6 +242,50 @@ Resources:
                   - AddCodeBuildResource
                   - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cicd-role
                   - !Ref AWS::NoValue
+        - Name: Output2Bucket
+          Actions:
+            - Name: Collect
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub ${ProductName}-${BranchName}-infra-outputs
+                OutputFileName: InfrastructureOutputs.json
+                TemplatePath: !Sub SCCheckoutArtifact::${InfraTemplatePath99}
+                TemplateConfiguration: !Sub SCCheckoutArtifact::${BetaEnvConfiguration}
+                #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
+                RoleArn:
+                  Fn::If:
+                  - AddCodeBuildResource
+                  - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cloudformationdeployer-role
+                  - !Ref AWS::NoValue
+              InputArtifacts:
+                - Name: SCCheckoutArtifact
+              OutputArtifacts:
+                - Name: InfraOutputs
+              RunOrder: 1
+              #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
+              RoleArn:
+                  Fn::If:
+                  - AddCodeBuildResource
+                  - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cicd-role
+                  - !Ref AWS::NoValue
+            - Name: Save
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: S3
+              Configuration:
+                ObjectKey: !Sub ${ProductName}-${BranchName}-beta-infrastructure-deploy-outputs.json
+                Extract: true
+                BucketName: !Sub '${ProductName}-${BranchName}-build-artifacts-buket-name'
+              InputArtifacts:
+                - Name: InfraOutputs
+              RunOrder: 2
       ArtifactStore:
         Type: S3
         Location: { "Fn::ImportValue": {"Fn::Sub": "${ProductName}-${BranchName}-build-artifacts-buket-name"}}
