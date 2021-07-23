@@ -57,6 +57,15 @@ Resources:
               - cloudformation:*
               - s3:*
               - iam:PassRole
+              - ecr:GetAuthorizationToken
+              - ecr:InitiateLayerUpload
+              - ecr:BatchCheckLayerAvailability
+              - ecr:BatchGetImage
+              - ecr:CompleteLayerUpload
+              - ecr:PutImage
+              - ecr:UploadLayerPart
+              - ecr:DescribeRepositories
+              - ecr:CreateRepository
             Resource: "*"
           -
             Effect: Allow
@@ -92,6 +101,7 @@ Resources:
             Effect: Allow
             Action:
               - apigateway:POST # Create API.
+              - apigateway:PUT # Update API definition
               - apigateway:GET # Get API info.
               - apigateway:PATCH # Update API resources.
               - apigateway:DELETE # Delete API incase of rollback. - iam:AttachRolePolicy
