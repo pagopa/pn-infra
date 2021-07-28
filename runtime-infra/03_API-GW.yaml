@@ -10,11 +10,14 @@ Parameters:
     Description: Second byte from the left for VPC CIDR
 
 Resources:
-  ApiGatewayApi:
+  #############################################################################
+  ###                            HELLO WORLD API                            ###
+  #############################################################################
+  HelloWorldApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Name: !Sub '${EnvName}-public-api'
-      Description: !Sub '${EnvName}-public-api'
+      Name: !Sub '${EnvName}-helloworld-api'
+      Description: API pubbliche hello world
       FailOnWarnings: true
       EndpointConfiguration:
         Types: 
@@ -98,7 +101,104 @@ Resources:
                       method.response.header.Access-Control-Allow-Methods: "'GET,HEAD,OPTIONS'"
                       method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
                       method.response.header.Access-Control-Allow-Origin: !Join ['', ["'", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-cdn-url'}}, "'"]]
+  HelloWorldApiDeploymentBeta:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref HelloWorldApi
+  HelloWorldApiStageBeta:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      Description: Beta stage of helloworld api
+      RestApiId: !Ref HelloWorldApi
+      DeploymentId: !Ref HelloWorldApiDeploymentBeta
+      StageName: beta
 
+
+  #############################################################################
+  ###                         PROXY TO DELIVERY API                         ###
+  #############################################################################
+  ApiGwRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub '${EnvName}-public-api'
+      Description: Api che effettuano proxy ai microservizi di back-end
+      FailOnWarnings: true
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+  ApiGwRestApiDeliveryRes:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGwRestApi
+      ParentId: !GetAtt ApiGwRestApi.RootResourceId
+      PathPart: delivery
+  ApiGwRestApiDeliveryRes2:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGwRestApi
+      ParentId: !Ref ApiGwRestApiDeliveryRes
+      PathPart: '{proxy+}'
+  ApiGwRestApiDeliveryAnyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      OperationName: proxy to delivery
+      RestApiId: !Ref ApiGwRestApi
+      ResourceId: !Ref ApiGwRestApiDeliveryRes2
+      HttpMethod: ANY
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.proxy: true
+        method.request.header.X-PagoPA-PN-PA: true
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+            method.response.header.X-Prova: false
+      Integration:
+        ConnectionType: VPC_LINK
+        ConnectionId: !ImportValue
+          "Fn::Sub": '${EnvName}-nlb-link-id'
+        IntegrationHttpMethod: ANY
+        Type: HTTP
+        #Uri: !Sub 'http://${PrivateApplicationLoadBalancer.DNSName}:8080/delivery/{proxy}'
+        Uri: !Join ['', ["http://", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-alb-domain'}}, ":8080/delivery/{proxy}"]]
+        RequestParameters:
+          integration.request.path.proxy: method.request.path.proxy
+          integration.request.header.X-PagoPA-PN-PA: method.request.header.X-PagoPA-PN-PA
+        PassthroughBehavior: "WHEN_NO_MATCH"
+        TimeoutInMillis: 29000
+        IntegrationResponses:
+          - StatusCode: 200
+            SelectionPattern: ""
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'*'"
+              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-cdn-url'}}, "'"]]
+              method.response.header.X-Prova: "'*'"
+            ResponseTemplates:
+              application/json: ""
+  ApiGwRestApiBetaDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGwRestApiDeliveryAnyMethod
+    Properties:
+      RestApiId: !Ref ApiGwRestApi
+      Description: 'Beta deployment for rest api gw'
+  ApiGwRestApiBetaStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref ApiGwRestApi
+      StageName: beta
+      DeploymentId: !Ref ApiGwRestApiBetaDeployment
+      Description: 'Beta stage for rest api gw'
+
+
+  #############################################################################
+  ###                        API KEYS AND USAGE PLANS                       ###
+  #############################################################################
   ApiKeyPaPoC:
     Type: AWS::ApiGateway::ApiKey
     Properties: 
@@ -106,23 +206,14 @@ Resources:
       Description: PoC API-Key used by PA 
       Enabled: true
   
-  ApiGatewayDeploymentBeta:
-    Type: AWS::ApiGateway::Deployment
-    Properties: 
-      RestApiId: !Ref ApiGatewayApi
-  ApiGatewayStageBeta:
-    Type: AWS::ApiGateway::Stage
-    Properties:
-      Description: Beta stage for testing
-      RestApiId: !Ref ApiGatewayApi
-      DeploymentId: !Ref ApiGatewayDeploymentBeta
-      StageName: beta
   BetaUsagePlan:
     Type: 'AWS::ApiGateway::UsagePlan'
     Properties:
       ApiStages:
-        - ApiId: !Ref ApiGatewayApi
-          Stage: !Ref ApiGatewayStageBeta
+        - ApiId: !Ref HelloWorldApi
+          Stage: !Ref HelloWorldApiStageBeta
+        - ApiId: !Ref ApiGwRestApi
+          Stage: !Ref ApiGwRestApiBetaStage
       Description: Beta Plan
       Throttle:
         BurstLimit: 20
@@ -138,7 +229,7 @@ Resources:
 Outputs:
   # - API Gateway access informations
   ApiGatewayUrlBeta:
-    Value: !Sub 'https://${ApiGatewayApi}.execute-api.${AWS::Region}.amazonaws.com/beta/'
+    Value: !Sub 'https://${HelloWorldApi}.execute-api.${AWS::Region}.amazonaws.com/beta/'
     Description: Base URL for API Requests
     Export:
       Name: !Sub '${EnvName}-api-gw-url'

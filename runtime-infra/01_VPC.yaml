@@ -97,22 +97,6 @@ Resources:
           ToPort: 8080
           CidrIp: "0.0.0.0/0"
       VpcId: !Ref VPC
-  WebappAndSshSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Sub ${EnvName}-webapp-and-ssh-security-group
-      GroupDescription: "ingres tcp 8080 and ssh, egress all"
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: "0.0.0.0/0"
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: "0.0.0.0/0"
-      VpcId: !Ref VPC
-
   # Application load balancer
   PrivateApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -155,289 +139,58 @@ Resources:
   #      - !Ref PublicSubnet1
   #      - !Ref PublicSubnet2
 
-
-
-
-  ApiGwRestApi:
-    Type: AWS::ApiGateway::RestApi
+  # STORAGES
+  NewNotificationsQueue:
+    Type: AWS::SQS::Queue
     Properties:
-      Name: !Sub '${EnvName}-public-api-rest'
-      Description: !Sub '${EnvName}-public-api'
-      FailOnWarnings: true
-      EndpointConfiguration:
-        Types:
-          - REGIONAL
-  ApiGwRestApiDeliveryRes:
-    Type: AWS::ApiGateway::Resource
+      QueueName: new_notification_evt
+      DelaySeconds: 2
+      MessageRetentionPeriod: 36000 # 10h
+      ReceiveMessageWaitTimeSeconds: 5
+      VisibilityTimeout: 30 # half a minute
+  SendPecRequestQueue:
+    Type: AWS::SQS::Queue
     Properties:
-      RestApiId: !Ref ApiGwRestApi
-      ParentId: !GetAtt ApiGwRestApi.RootResourceId
-      PathPart: delivery
-  ApiGwRestApiDeliveryRes2:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref ApiGwRestApi
-      ParentId: !Ref ApiGwRestApiDeliveryRes
-      PathPart: '{proxy+}'
-  ApiGwRestApiDeliveryAnyMethod:
-    # Aggiungere in richiesta header X-PagoPA-PN-PA
-    # Aggiunger header CORS in risposta
-    #     ...-headers *
-    #     .... methdos *
-    #      ...-origin: = esportazione pn-main-beta-cdn-url
-    # pretendere API-key
-    Type: AWS::ApiGateway::Method
-    Properties:
-      OperationName: proxy to delivery
-      RestApiId: !Ref ApiGwRestApi
-      ResourceId: !Ref ApiGwRestApiDeliveryRes2
-      HttpMethod: ANY
-      ApiKeyRequired: true
-      AuthorizationType: NONE
-      RequestParameters:
-        method.request.path.proxy: true
-        method.request.header.X-PagoPA-PN-PA: true
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: false
-            method.response.header.Access-Control-Allow-Methods: false
-            method.response.header.Access-Control-Allow-Origin: false
-            method.response.header.X-Prova: false
-      Integration:
-        ConnectionType: VPC_LINK
-        ConnectionId: !Ref PrivateNlbLink
-        IntegrationHttpMethod: ANY
-        Type: HTTP
-        Uri: !Sub 'http://${PrivateApplicationLoadBalancer.DNSName}:8080/delivery/{proxy}'
-        RequestParameters:
-          integration.request.path.proxy: method.request.path.proxy
-          integration.request.header.X-PagoPA-PN-PA: method.request.header.X-PagoPA-PN-PA
-        PassthroughBehavior: "WHEN_NO_MATCH"
-        TimeoutInMillis: 29000
-        IntegrationResponses:
-          - StatusCode: 200
-            SelectionPattern: ""
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'*'"
-              method.response.header.Access-Control-Allow-Methods: "'*'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.X-Prova: "'*'"
-            ResponseTemplates:
-              application/json: ""
+      QueueName: send_pec_request
+      DelaySeconds: 2
+      MessageRetentionPeriod: 36000 # 10h
+      ReceiveMessageWaitTimeSeconds: 5
+      VisibilityTimeout: 30 # half a minute
 
-  ApiGwRestApiBetaDeployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - ApiGwRestApiDeliveryAnyMethod
-    Properties:
-      RestApiId: !Ref ApiGwRestApi
-      #StageName: beta
-      Description: 'Beta deployment for rest api gw'
-      #StageDescription:
-      #  MethodSettings:
-      #    - ResourcePath: /delivery/{proxy+}
-      #      HttpMethod: ANY
-  ApiGwRestApiBetaStage:
-    Type: AWS::ApiGateway::Stage
-    Properties:
-      RestApiId: !Ref ApiGwRestApi
-      StageName: beta2
-      DeploymentId: !Ref ApiGwRestApiBetaDeployment
-      Description: 'Beta stage for rest api gw'
-
-
-  #ApiGwHttpApi:
-  #  Type: AWS::ApiGatewayV2::Api
-  #  Properties:
-  #    Name: !Sub '${EnvName}-public-api-http'
-  #    ProtocolType: HTTP
-  #ApiGwHttpApiStage:
-  #  Type: AWS::ApiGatewayV2::Stage
-  #  Properties:
-  #    ApiId: !Ref ApiGwHttpApi
-  #    StageName: '$default'
-  #    AutoDeploy: true
-  #    Description: 'Unico stage di default automatico'
-
-
-
-
-
-
-
-  # PN DELIVERY INFRASTRUCTURE PART
-  InstanceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub ${EnvName}-instance-role
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - ec2.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      Path: /
-  InstancePolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: !Sub ${EnvName}-instance-policy
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Action:
-              - ecr:GetAuthorizationToken
-              - ecr:BatchCheckLayerAvailability
-              - ecr:BatchGetImage
-              - ecr:DescribeRepositories
-              - ecr:GetDownloadUrlForLayer
-            Resource: "*"
-      Roles:
-        - !Ref InstanceRole
-  InstanceProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      InstanceProfileName: simple-instance-profile
-      Path: /
-      Roles:
-        - !Ref InstanceRole
-  Instance1:
-    Type: 'AWS::EC2::Instance'
-    Properties:
-      ImageId: 'ami-00f22f6155d6d92c5' # amazon linux Francoforte
-      InstanceType: 't2.small'
-      KeyName: 'PerProveFf'
-      SubnetId: !Ref PublicSubnet1
-      SecurityGroupIds:
-        - !Ref WebappAndSshSecurityGroup
-      IamInstanceProfile: !Ref InstanceProfile
-      UserData:
-        Fn::Base64:
-          Fn::Join:
-            - "\n"
-            - - "#!/bin/bash -xe"
-              - echo ciao >> /home/ec2-user/log.txt
-              - exec > >(tee /var/log/user-data.log) 2>&1
-              - "sudo sed -i /etc/resolv.conf -e 's/nameserver.*/nameserver 8.8.8.8/'"
-              - sudo yum -y install docker
-              - sudo systemctl enable docker
-              - sudo systemctl start docker
-              - sudo yum -y install docker
-              - !Sub "export ECR_REGION=${AWS::Region}"
-              - !Sub "export ECR_ACCOUNT_ID=${AWS::AccountId}"
-              - export ECR_URL=${ECR_ACCOUNT_ID}.dkr.ecr.${ECR_REGION}.amazonaws.com
-              - aws ecr get-login-password --region $ECR_REGION | sudo docker login --username AWS --password-stdin $ECR_URL
-              - sudo docker run -p 8080:8080 --rm --name pn-delivery -d $ECR_URL/pn-delivery:latest
-  Instance2:
-    Type: 'AWS::EC2::Instance'
-    Properties:
-      ImageId: 'ami-00f22f6155d6d92c5' # amazon linux Francoforte
-      InstanceType: 't2.small'
-      KeyName: 'PerProveFf'
-      SubnetId: !Ref PublicSubnet2
-      SecurityGroupIds:
-        - !Ref WebappAndSshSecurityGroup
-      IamInstanceProfile: !Ref InstanceProfile
-      UserData:
-        Fn::Base64:
-          Fn::Join:
-            - "\n"
-            - - "#!/bin/bash -xe"
-              - echo ciao >> /home/ec2-user/log.txt
-              - exec > >(tee /var/log/user-data.log) 2>&1
-              - "sudo sed -i /etc/resolv.conf -e 's/nameserver.*/nameserver 8.8.8.8/'"
-              - sudo yum -y install docker
-              - sudo systemctl enable docker
-              - sudo systemctl start docker
-              - sudo yum -y install docker
-              - !Sub "export ECR_REGION=${AWS::Region}"
-              - !Sub "export ECR_ACCOUNT_ID=${AWS::AccountId}"
-              - export ECR_URL=${ECR_ACCOUNT_ID}.dkr.ecr.${ECR_REGION}.amazonaws.com
-              - aws ecr get-login-password --region $ECR_REGION | sudo docker login --username AWS --password-stdin $ECR_URL
-              - sudo docker run -p 8080:8080 --rm --name pn-delivery -d $ECR_URL/pn-delivery:latest
-
-  DeliveryTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Name: !Sub ${EnvName}-delivery-target-group
-      TargetType: instance
-      Protocol: HTTP
-      Port: 8080
-      HealthCheckEnabled: true
-      HealthCheckIntervalSeconds: 10
-      HealthCheckPath: /delivery/
-      HealthCheckPort: 8080
-      HealthCheckProtocol: HTTP
-      Matcher:
-        HttpCode: 303
-      Targets:
-        - Id: !Ref Instance1
-          Port: 8080
-        - Id: !Ref Instance2
-          Port: 8080
-      VpcId: !Ref VPC
-
-  DeliveryLoadBalancerListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      LoadBalancerArn: !Ref PrivateApplicationLoadBalancer
-      Protocol: HTTP
-      Port: 8080
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref DeliveryTargetGroup
-          Order: 1
-
-
-  DeliveryNetTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Name: !Sub ${EnvName}-delivery-nlb-tg
-      TargetType: instance
-      Protocol: TCP
-      Port: 8080
-      #HealthCheckEnabled: true
-      #HealthCheckIntervalSeconds: 10
-      #HealthCheckPath: /
-      #HealthCheckPort: 8080
-      #HealthCheckProtocol: HTTP
-      #Matcher:
-      #  HttpCode: 303
-      Targets:
-        - Id: !Ref Instance1
-          Port: 8080
-        - Id: !Ref Instance2
-          Port: 8080
-      VpcId: !Ref VPC
-  DeliveryNetLoadBalancerListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      LoadBalancerArn: !Ref PrivateNetworkLoadBalancer
-      Protocol: TCP
-      Port: 8080
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref DeliveryNetTargetGroup
-          Order: 1
-
-  DeliveryHttpApiIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref ApiGwHttpApi
-      ConnectionType: VPC_LINK
-      ConnectionId: !Ref PrivateAlbLink
-      IntegrationType: HTTP_PROXY
-      IntegrationUri: !Ref DeliveryLoadBalancerListener
-      IntegrationMethod: ANY
-      PayloadFormatVersion: 1.0
-  DeliveryHttpIntegRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref ApiGwHttpApi
-      RouteKey: ANY /delivery/{proxy+}
-      Target: !Sub 'integrations/${DeliveryHttpApiIntegration}'
-
+Outputs:
+  # - API Gateway access informations
+  PrivateNetworkLoadBalancer:
+    Value: !Ref PrivateNetworkLoadBalancer
+    Description: Identificativo VPC Network Load Balancer
+    Export:
+      Name: !Sub '${EnvName}-nlb-id'
+  PrivateApplicationLoadBalancer:
+    Value: !Ref PrivateApplicationLoadBalancer
+    Description: Identificativo VPC Application Load Balancer
+    Export:
+      Name: !Sub '${EnvName}-alb-id'
+  PrivateNlbLink:
+    Value: !Ref PrivateNlbLink
+    Description: Used by API-Gw to connect into VPC
+    Export:
+      Name: !Sub '${EnvName}-nlb-link-id'
+  PrivateApplicationLoadBalancerDomain:
+    Value: !Sub '${PrivateApplicationLoadBalancer.DNSName}'
+    Description: Identificativo VPC Application Load Balancer
+    Export:
+      Name: !Sub '${EnvName}-alb-domain'
+  VpcId:
+    Value: !Ref VPC
+    Description: Id della VPC
+    Export:
+      Name: !Sub '${EnvName}-vpc-id'
+  PublicSubnet1Id:
+    Value: !Ref PublicSubnet1
+    Description: Id subnet 1
+    Export:
+      Name: !Sub '${EnvName}-subnet1'
+  PublicSubnet2Id:
+    Value: !Ref PublicSubnet2
+    Description: Id subnet 2
+    Export:
+      Name: !Sub '${EnvName}-subnet2'

@@ -133,6 +133,7 @@ Resources:
         -
           !Ref PipeLineRole
   InfraPipeline:
+    # - Cancellare outputs all'inizio e ricrearlo alla fine
     Type: AWS::CodePipeline::Pipeline
     Properties:
       RoleArn: !GetAtt PipeLineRole.Arn
@@ -161,6 +162,28 @@ Resources:
                   - !Ref AWS::NoValue
         - Name: DeployToTest
           Actions:
+            - Name: CleanOutputs
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: DELETE_ONLY
+                StackName: !Sub ${ProductName}-${BranchName}-infra-outputs
+                TemplatePath: !Sub SCCheckoutArtifact::${InfraTemplatePath99}
+                TemplateConfiguration: !Sub SCCheckoutArtifact::${BetaEnvConfiguration}
+                #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
+                RoleArn:
+                  Fn::If:
+                    - AddCodeBuildResource
+                    - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cloudformationdeployer-role
+                    - !Ref AWS::NoValue
+              InputArtifacts:
+                - Name: SCCheckoutArtifact
+              #OutputArtifacts:
+              #  - Name: None
+              RunOrder: 1
             - Name: DeployTestVpc
               ActionTypeId:
                 Category: Deploy
@@ -181,7 +204,7 @@ Resources:
                   - !Ref AWS::NoValue
               InputArtifacts:
                 - Name: SCCheckoutArtifact
-              RunOrder: 1
+              RunOrder: 2
               #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
               RoleArn:
                   Fn::If:
@@ -208,7 +231,7 @@ Resources:
                   - !Ref AWS::NoValue
               InputArtifacts:
                 - Name: SCCheckoutArtifact
-              RunOrder: 1
+              RunOrder: 2
               #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
               RoleArn:
                   Fn::If:
@@ -235,7 +258,7 @@ Resources:
                   - !Ref AWS::NoValue
               InputArtifacts:
                 - Name: SCCheckoutArtifact
-              RunOrder: 2
+              RunOrder: 3
               #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
               RoleArn:
                   Fn::If:
