@@ -228,8 +228,13 @@ Resources:
   
 Outputs:
   # - API Gateway access informations
-  ApiGatewayUrlBeta:
+  HelloApiGatewayUrlBeta:
     Value: !Sub 'https://${HelloWorldApi}.execute-api.${AWS::Region}.amazonaws.com/beta/'
+    Description: Base URL for API Requests
+    Export:
+      Name: !Sub '${EnvName}-hello-api-gw-url'
+  ApiGatewayUrlBeta:
+    Value: !Sub 'https://${ApiGwRestApi}.execute-api.${AWS::Region}.amazonaws.com/beta/'
     Description: Base URL for API Requests
     Export:
       Name: !Sub '${EnvName}-api-gw-url'
