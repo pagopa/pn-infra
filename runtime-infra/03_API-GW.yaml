@@ -180,6 +180,42 @@ Resources:
               method.response.header.X-Prova: "'*'"
             ResponseTemplates:
               application/json: ""
+  ApiGwRestApiDeliveryCORSMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      OperationName: CORS for delivery
+      RestApiId: !Ref ApiGwRestApi
+      ResourceId: !Ref ApiGwRestApiDeliveryRes2
+      HttpMethod: OPTIONS
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.proxy: true
+        method.request.header.X-PagoPA-PN-PA: true
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          ResponseModels:
+            application/json: Empty
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: "{\"statusCode\": 200}"
+        PassthroughBehavior: "WHEN_NO_MATCH"
+        TimeoutInMillis: 29000
+        CacheNamespace: "w053mc"
+        CacheKeyParameters: [ ]
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: '*'
+              method.response.header.Access-Control-Allow-Methods: '*'
+              method.response.header.Access-Control-Allow-Origin": !Join ['', ["'", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-cdn-url'}}, "'"]]
+            ResponseTemplates:
+              application/json: ""
   ApiGwRestApiBetaDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
