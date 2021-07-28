@@ -128,10 +128,8 @@ Resources:
             Resource:
               - !Sub arn:aws:iam::${AWS::AccountId}:role/${ProductName}-${BranchName}-from-github-to-s3-role
               - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cicd-role
-
       Roles:
-        -
-          !Ref PipeLineRole
+        - !Ref PipeLineRole
   InfraPipeline:
     # - Cancellare outputs all'inizio e ricrearlo alla fine
     Type: AWS::CodePipeline::Pipeline
@@ -173,7 +171,6 @@ Resources:
                 StackName: !Sub ${ProductName}-${BranchName}-infra-outputs
                 TemplatePath: !Sub SCCheckoutArtifact::${InfraTemplatePath99}
                 TemplateConfiguration: !Sub SCCheckoutArtifact::${BetaEnvConfiguration}
-                #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
                 RoleArn:
                   Fn::If:
                     - AddCodeBuildResource
@@ -181,9 +178,12 @@ Resources:
                     - !Ref AWS::NoValue
               InputArtifacts:
                 - Name: SCCheckoutArtifact
-              #OutputArtifacts:
-              #  - Name: None
               RunOrder: 1
+              RoleArn:
+                Fn::If:
+                  - AddCodeBuildResource
+                  - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cicd-role
+                  - !Ref AWS::NoValue
             - Name: DeployTestVpc
               ActionTypeId:
                 Category: Deploy
