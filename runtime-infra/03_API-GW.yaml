@@ -112,7 +112,13 @@ Resources:
       RestApiId: !Ref HelloWorldApi
       DeploymentId: !Ref HelloWorldApiDeploymentBeta
       StageName: beta
-
+      AccessLogSetting:
+        DestinationArn: !GetAtt "HelloWorldApiLogGroup.Arn"
+        Format: '{"requestTime":"$context.requestTime","requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","routeKey":"$context.routeKey","status":$context.status,"responseLatency":$context.responseLatency}'
+  HelloWorldApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 2
 
   #############################################################################
   ###                         PROXY TO DELIVERY API                         ###
@@ -230,7 +236,13 @@ Resources:
       StageName: beta
       DeploymentId: !Ref ApiGwRestApiBetaDeployment
       Description: 'Beta stage for rest api gw'
-
+      AccessLogSetting:
+        DestinationArn: !GetAtt "PublicApiLogGroup.Arn"
+        Format: '{"requestTime":"$context.requestTime","requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","routeKey":"$context.routeKey","status":$context.status,"responseLatency":$context.responseLatency}'
+  PublicApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 2
 
   #############################################################################
   ###                        API KEYS AND USAGE PLANS                       ###
