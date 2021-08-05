@@ -7,7 +7,7 @@
 #  limitations under the License.
 
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CodePipeline for the Sample Lambda Function
+Description: Bucket policy for artifact bucket
 Parameters:
   ProductName:
     Description: Name of the Project
@@ -42,3 +42,4 @@ Resources:
                 - !Sub arn:aws:iam::${AWS::AccountId}:role/${ProductName}-${BranchName}-from-github-to-s3-role
                 - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cicd-role
                 - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cloudformationdeployer-role
+
