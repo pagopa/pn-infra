@@ -7,7 +7,7 @@
 #  limitations under the License.
 
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CodePipeline for the Sample Lambda Function
+Description: 'CodePipeline for pn-infra: VPC and base infrastructure'
 Parameters:
   ProductName:
     Description: Name of the Project
@@ -296,7 +296,7 @@ Resources:
                   - AddCodeBuildResource
                   - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cicd-role
                   - !Ref AWS::NoValue
-            - Name: Save
+            - Name: SaveToS3
               ActionTypeId:
                 Category: Deploy
                 Owner: AWS
