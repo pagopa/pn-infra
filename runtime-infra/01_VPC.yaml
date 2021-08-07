@@ -139,23 +139,32 @@ Resources:
   #      - !Ref PublicSubnet1
   #      - !Ref PublicSubnet2
 
-  # STORAGES
-  NewNotificationsQueue:
+  # Inter microservice comunication queue
+  DeliveryPushInputsQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: new_notification_evt
+      QueueName: delivery_push_inputs
       DelaySeconds: 2
       MessageRetentionPeriod: 36000 # 10h
       ReceiveMessageWaitTimeSeconds: 5
-      VisibilityTimeout: 20 # seconds
-  SendPecRequestQueue:
+      VisibilityTimeout: 10 # seconds
+  ExternalChannelsInputsQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: send_pec_request
+      QueueName: external_channel_inputs
       DelaySeconds: 2
       MessageRetentionPeriod: 36000 # 10h
       ReceiveMessageWaitTimeSeconds: 5
-      VisibilityTimeout: 20 # seconds
+      VisibilityTimeout: 10 # seconds
+  ExternalChannelsOutputsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: external_channel_outputs
+      DelaySeconds: 2
+      MessageRetentionPeriod: 36000 # 10h
+      ReceiveMessageWaitTimeSeconds: 5
+      VisibilityTimeout: 10 # seconds
+
 
 Outputs:
   # - API Gateway access informations
@@ -194,3 +203,18 @@ Outputs:
     Description: Id subnet 2
     Export:
       Name: !Sub '${EnvName}-subnet2'
+  DeliveryPushInputsQueueArn:
+    Value: !Sub '${DeliveryPushInputsQueue.Arn}'
+    Description: 'workflow input events queue ARN'
+    Export:
+      Name: !Sub '${EnvName}-delpush-input-queue-arn'
+  ExternalChannelsInputsQueueArn:
+    Value: !Sub '${ExternalChannelsInputsQueue.Arn}'
+    Description: 'external channel input events queue ARN'
+    Export:
+      Name: !Sub '${EnvName}-extchannel-input-queue-arn'
+  ExternalChannelsOutputsQueueArn:
+    Value: !Sub '${ExternalChannelsOutputsQueue.Arn}'
+    Description: 'external channel output events queue ARN'
+    Export:
+      Name: !Sub '${EnvName}-extchannel-output-queue-arn'
