@@ -7,7 +7,7 @@
 #  limitations under the License.
 
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Creates a CMK in KMS and grants access to other accounts
+Description: Code Artifact and Artifact Bucket with export for CI/CD Pipeline
 Parameters:
   GithubConnectionArn:
     Description: ARN of GitHub connection  
@@ -25,8 +25,15 @@ Parameters:
     Description: Name of the Project
     Type: String
     Default: main
+  #CodeArtifactDomain:
+    #  Description: Code Artifact repository url domain suffix
+    # Type: String
+    # Default: pn
   
 Resources:
+  # GITHUB ACCESS
+  ###############
+
   FromGithubToBucketRole:
     Type: AWS::IAM::Role
     Properties:
@@ -76,6 +83,9 @@ Resources:
       Roles:
         -
           !Ref FromGithubToBucketRole
+
+  # ARTIFACT BUCKET
+  #################
   KMSKey:
     Type: AWS::KMS::Key
     DependsOn: FromGithubToBucketRole
@@ -138,6 +148,76 @@ Resources:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
 
+
+  # MAVEN ARTIFACTS REPOSITORY
+  #############################
+  CodeArtifactDomain:
+    Type: AWS::CodeArtifact::Domain
+    Properties:
+      DomainName: !Sub "${AWS::StackName}-domain"
+  CodeArtifactUpstreamRepository:
+    Type: AWS::CodeArtifact::Repository
+    Properties:
+      DomainName: !GetAtt CodeArtifactDomain.Name
+      RepositoryName: !Sub "${AWS::StackName}-upstream-repo"
+      ExternalConnections:
+        - public:maven-central
+  CodeArtifactRepository:
+    Type: AWS::CodeArtifact::Repository
+    Properties:
+      DomainName: !GetAtt CodeArtifactDomain.Name
+      RepositoryName: !Sub "${AWS::StackName}-repo"
+      Upstreams:
+        - !GetAtt CodeArtifactUpstreamRepository.Name
+
+  CodeArtifactReadOnlyPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: CodeArtifactPolicy
+      Groups:
+        - !Ref CodeArtifactReadOnlyGroup
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: CodeArtifactBearerTokenPolicy
+            Effect: Allow
+            Action:
+              - sts:GetServiceBearerToken
+            Resource: "*"
+            Condition:
+              StringEquals:
+                'sts:AWSServiceName': codeartifact.amazonaws.com
+          - Sid: CodeArtifactGetAuthorizationTokenPolicy
+            Effect: Allow
+            Action:
+              - codeartifact:GetAuthorizationToken
+            Resource:
+              - !Sub "arn:aws:codeartifact:${AWS::Region}:${AWS::AccountId}:domain/${CodeArtifactDomain.Name}"
+          - Sid: CodeArtifactReadOnlyPolicy
+            Effect: Allow
+            Action:
+              - 'codeartifact:List*'
+              - 'codeartifact:Describe*'
+              - 'codeartifact:Get*'
+              - 'codeartifact:Read*'
+            Resource:
+              - !Sub "arn:aws:codeartifact:${AWS::Region}:${AWS::AccountId}:package/${CodeArtifactDomain.Name}/${CodeArtifactRepository.Name}/*"
+              - !Sub "arn:aws:codeartifact:${AWS::Region}:${AWS::AccountId}:domain/${CodeArtifactDomain.Name}"
+              - !Sub "arn:aws:codeartifact:${AWS::Region}:${AWS::AccountId}:repository/${CodeArtifactDomain.Name}/${CodeArtifactRepository.Name}"
+  CodeArtifactReadOnlyGroup:
+    Type: AWS::IAM::Group
+  CodeArtifactReadOnlyUser:
+    Type: AWS::IAM::User
+    Properties:
+      Groups:
+        - !Sub '${CodeArtifactReadOnlyGroup}'
+  CodeArtifactReadOnlyUserKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      Serial: 1
+      Status: Active
+      UserName: !Ref CodeArtifactReadOnlyUser
+
 Outputs:
   CMKARN:
     Value: !GetAtt [KMSKey,Arn]
@@ -151,5 +231,16 @@ Outputs:
     Value: !Ref GithubConnectionArn
     Export:
       Name: !Sub '${ProductName}-${BranchName}-github-connection'
-
-
+  CodeArtifactDomainName:
+    Description: The CodeArtifact Domain Name
+    Value: !GetAtt CodeArtifactDomain.Name
+    Export:
+      Name: !Sub "${AWS::StackName}-CodeArtifactDomainName"
+  CodeArtifactRepositoryName:
+    Description: The CodeArtifact Repository Name
+    Value: !GetAtt CodeArtifactRepository.Name
+    Export:
+      Name: !Sub "${AWS::StackName}-CodeArtifactRepositoryName"
+  CodeArtifactReadOnlyGroupArn:
+    Description: The CodeArtifact ReadOnly Group ARN
+    Value: !GetAtt CodeArtifactReadOnlyGroup.Arn
