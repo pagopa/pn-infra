@@ -41,10 +41,6 @@ Parameters:
     Description: Cloudformation architectute template 03
     Type: String
     Default: runtime-infra/99_collect_params.yaml
-  BetaEnvConfiguration:
-    Description: Cloudformation template configuration for Beta stage
-    Type: String
-    Default: runtime-infra/beta-cfg.json
   CrossAccountCondition:
     Description: Conditionally creates the resources for cross account access
     Type: String
@@ -170,7 +166,7 @@ Resources:
                 ActionMode: DELETE_ONLY
                 StackName: !Sub ${ProductName}-${BranchName}-infra-outputs
                 TemplatePath: !Sub SCCheckoutArtifact::${InfraTemplatePath99}
-                TemplateConfiguration: !Sub SCCheckoutArtifact::${BetaEnvConfiguration}
+                TemplateConfiguration: !Sub SCCheckoutArtifact::runtime-infra/${ProductName}-${BranchName}-beta-cfg.json
                 RoleArn:
                   Fn::If:
                     - AddCodeBuildResource
@@ -195,7 +191,7 @@ Resources:
                 StackName: !Sub ${ProductName}-${BranchName}-infra-vpc
                 Capabilities: CAPABILITY_NAMED_IAM
                 TemplatePath: !Sub SCCheckoutArtifact::${InfraTemplatePath01}
-                TemplateConfiguration: !Sub SCCheckoutArtifact::${BetaEnvConfiguration}
+                TemplateConfiguration: !Sub SCCheckoutArtifact::runtime-infra/${ProductName}-${BranchName}-beta-cfg.json
                 #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
                 RoleArn:
                   Fn::If:
@@ -222,7 +218,7 @@ Resources:
                 StackName: !Sub ${ProductName}-${BranchName}-infra-cdn
                 Capabilities: CAPABILITY_NAMED_IAM
                 TemplatePath: !Sub SCCheckoutArtifact::${InfraTemplatePath02}
-                TemplateConfiguration: !Sub SCCheckoutArtifact::${BetaEnvConfiguration}
+                TemplateConfiguration: !Sub SCCheckoutArtifact::runtime-infra/${ProductName}-${BranchName}-beta-cfg.json
                 #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
                 RoleArn:
                   Fn::If:
@@ -249,7 +245,7 @@ Resources:
                 StackName: !Sub ${ProductName}-${BranchName}-infra-apigw
                 Capabilities: CAPABILITY_NAMED_IAM
                 TemplatePath: !Sub SCCheckoutArtifact::${InfraTemplatePath03}
-                TemplateConfiguration: !Sub SCCheckoutArtifact::${BetaEnvConfiguration}
+                TemplateConfiguration: !Sub SCCheckoutArtifact::runtime-infra/${ProductName}-${BranchName}-beta-cfg.json
                 #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
                 RoleArn:
                   Fn::If:
@@ -278,7 +274,7 @@ Resources:
                 StackName: !Sub ${ProductName}-${BranchName}-infra-outputs
                 OutputFileName: InfrastructureOutputs.json
                 TemplatePath: !Sub SCCheckoutArtifact::${InfraTemplatePath99}
-                TemplateConfiguration: !Sub SCCheckoutArtifact::${BetaEnvConfiguration}
+                TemplateConfiguration: !Sub SCCheckoutArtifact::runtime-infra/${ProductName}-${BranchName}-beta-cfg.json
                 #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
                 RoleArn:
                   Fn::If:

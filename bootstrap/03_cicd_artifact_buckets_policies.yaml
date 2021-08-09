@@ -21,6 +21,10 @@ Parameters:
     Description: AWS AccountNumber for test
     Type: Number
     Default: 558518206506
+  ProdAccount:
+    Description: AWS AccountNumber for test
+    Type: Number
+    Default: 946373734005
   
 Resources:
   S3BucketPolicy:
@@ -42,4 +46,5 @@ Resources:
                 - !Sub arn:aws:iam::${AWS::AccountId}:role/${ProductName}-${BranchName}-from-github-to-s3-role
                 - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cicd-role
                 - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cloudformationdeployer-role
-
+#                - !Sub arn:aws:iam::${ProdAccount}:role/${ProductName}-${BranchName}-cicd-role
+#                - !Sub arn:aws:iam::${ProdAccount}:role/${ProductName}-${BranchName}-cloudformationdeployer-role

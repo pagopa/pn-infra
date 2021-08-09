@@ -17,6 +17,10 @@ Parameters:
     Description: AWS AccountNumber for test
     Type: Number
     Default: 558518206506
+  ProdAccount:
+    Description: AWS AccountNumber for test
+    Type: Number
+    Default: 946373734005
   ProductName:
     Description: Name of the Project
     Type: String
@@ -122,6 +126,7 @@ Resources:
               AWS:
                 - !Sub arn:aws:iam::${AWS::AccountId}:root
                 - !Sub arn:aws:iam::${BetaAccount}:root
+                - !Sub arn:aws:iam::${ProdAccount}:root
                 - !Sub arn:aws:iam::${AWS::AccountId}:role/${ProductName}-${BranchName}-from-github-to-s3-role
             Action:
               - kms:Encrypt
