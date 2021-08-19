@@ -143,6 +143,9 @@ Resources:
         - !Ref PublicSubnet1
         - !Ref PublicSubnet2
       VpcId: !Ref VPC
+    DependsOn: 
+      - !Ref 'PublicRouteTable1'
+      - !Ref 'PublicRouteTable2'
   SQSInterfaceEndpoint:
     Type: 'AWS::EC2::VPCEndpoint'
     Properties:
@@ -155,6 +158,9 @@ Resources:
         - !Ref PublicSubnet1
         - !Ref PublicSubnet2
       VpcId: !Ref VPC
+    DependsOn: 
+      - !Ref 'PublicRouteTable1'
+      - !Ref 'PublicRouteTable2'
 
   # Network security groups
   WebappSecurityGroup:
