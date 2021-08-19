@@ -22,6 +22,20 @@ Resources:
       - Key: Name
         Value: !Sub ${EnvName}-VPC
 
+  InterfaceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Controls Inbound Access to the VPC Interface Endpoint from within the VPC'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - FromPort: '0'
+          ToPort: '65535'
+          IpProtocol: tcp
+          CidrIp: !Join ['', ["10.", !Ref "EnvNumber", ".0.0/16" ]]
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvName}-Interface-Endpoint-SecGrp'
+
   # Internet connections
   InternetGateway:
     Type: AWS::EC2::InternetGateway
@@ -58,7 +72,7 @@ Resources:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
       CidrBlock: !Join ['', ["10.", !Ref "EnvNumber", ".1.0/24" ]]
-      MapPublicIpOnLaunch: true
+      MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
           Value: !Sub ${EnvName} Public Subnet (AZ1)
@@ -75,7 +89,7 @@ Resources:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
       CidrBlock: !Join [ '', [ "10.", !Ref "EnvNumber", ".2.0/24" ] ]
-      MapPublicIpOnLaunch: true
+      MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
           Value: !Sub ${EnvName} Public Subnet (AZ2)
@@ -84,6 +98,38 @@ Resources:
     Properties:
       RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref PublicSubnet2
+
+  # Connection to AWS Services
+  S3VPCGatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action: '*'
+            Effect: Allow
+            Resource: '*'
+            Principal: '*'
+      RouteTableIds:
+        - !Ref 'PublicRouteTable'
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcId: !Ref VPC
+  InterfaceEndpoint:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Join
+        - ''
+        - - com.amazonaws.
+          - !Ref "AWS::Region"
+          - .cassandra
+      SubnetIds:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC
 
   # Network security groups
   WebappSecurityGroup:
@@ -233,4 +279,3 @@ Outputs:
     Description: 'external channel output events queue Name'
     Export:
       Name: !Sub '${EnvName}-extchannel-output-queue-name'
-
