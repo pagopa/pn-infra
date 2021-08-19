@@ -131,21 +131,21 @@ Resources:
         - !Ref 'PublicRouteTable2'
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
       VpcId: !Ref VPC
-  CassandraInterfaceEndpoint:
-    Type: 'AWS::EC2::VPCEndpoint'
-    Properties:
-      VpcEndpointType: Interface
-      PrivateDnsEnabled: true
-      SecurityGroupIds:
-        - !Ref InterfaceSecurityGroup
-      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.cassandra'
-      SubnetIds:
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
-      VpcId: !Ref VPC
-    DependsOn: 
-      - PublicRouteTable1
-      - PublicRouteTable2
+  #CassandraInterfaceEndpoint:
+  #  Type: 'AWS::EC2::VPCEndpoint'
+  #  Properties:
+  #    VpcEndpointType: Interface
+  #    PrivateDnsEnabled: true
+  #    SecurityGroupIds:
+  #      - !Ref InterfaceSecurityGroup
+  #    ServiceName: !Sub 'com.amazonaws.${AWS::Region}.cassandra'
+  #    SubnetIds:
+  #      - !Ref PublicSubnet1
+  #      - !Ref PublicSubnet2
+  #    VpcId: !Ref VPC
+  #  DependsOn: 
+  #    - PublicRouteTable1
+  #    - PublicRouteTable2
   SQSInterfaceEndpoint:
     Type: 'AWS::EC2::VPCEndpoint'
     Properties:
