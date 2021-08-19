@@ -50,20 +50,7 @@ Resources:
       VpcId: !Ref VPC
 
   # Public subnets commons
-  PublicRouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvName} Public Routes
-  DefaultPublicRoute:
-    Type: AWS::EC2::Route
-    DependsOn: InternetGatewayAttachment
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
+  
 
   # Public subnet 1
   PublicSubnet1:
@@ -79,8 +66,22 @@ Resources:
   PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PublicRouteTable
+      RouteTableId: !Ref PublicRouteTable1
       SubnetId: !Ref PublicSubnet1
+  PublicRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName} Public Routes
+  DefaultPublicRoute1:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
 
   # Public subnet 2
   PublicSubnet2:
@@ -96,8 +97,22 @@ Resources:
   PublicSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PublicRouteTable
+      RouteTableId: !Ref PublicRouteTable2
       SubnetId: !Ref PublicSubnet2
+  PublicRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName} Public Routes
+  DefaultPublicRoute2:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
 
   # Connection to AWS Services
   S3VPCGatewayEndpoint:
@@ -112,7 +127,8 @@ Resources:
             Resource: '*'
             Principal: '*'
       RouteTableIds:
-        - !Ref 'PublicRouteTable'
+        - !Ref 'PublicRouteTable1'
+        - !Ref 'PublicRouteTable2'
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
       VpcId: !Ref VPC
   CassandraInterfaceEndpoint:
