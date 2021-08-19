@@ -103,6 +103,7 @@ Resources:
   S3VPCGatewayEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
+      VpcEndpointType: Gateway
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -114,21 +115,29 @@ Resources:
         - !Ref 'PublicRouteTable'
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
       VpcId: !Ref VPC
-  InterfaceEndpoint:
+  CassandraInterfaceEndpoint:
     Type: 'AWS::EC2::VPCEndpoint'
     Properties:
+      VpcEndpointType: Interface
       PrivateDnsEnabled: true
       SecurityGroupIds:
         - !Ref InterfaceSecurityGroup
-      ServiceName: !Join
-        - ''
-        - - com.amazonaws.
-          - !Ref "AWS::Region"
-          - .cassandra
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.cassandra'
       SubnetIds:
         - !Ref PublicSubnet1
         - !Ref PublicSubnet2
+      VpcId: !Ref VPC
+  SQSInterfaceEndpoint:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
       VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.sqs'
+      SubnetIds:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
       VpcId: !Ref VPC
 
   # Network security groups
