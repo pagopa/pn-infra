@@ -1,0 +1,189 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AddressBook mock
+
+Resources:
+  #############################################################################
+  ###                         ADDRESS BOOK MOCK API                         ###
+  #############################################################################
+  AddressBookApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: 'address-book-api'
+      Description: |
+        Mock of Address Book used for PoC. Url con risposta: 
+        /develop/addresses/CGNNMO80A01H501M 
+        /develop/addresses/CGNNMO80A02H501R
+        /demo/addresses/CGNNMO80A01H501M 
+        /demo/addresses/CGNNMO80A02H501R
+      FailOnWarnings: true
+      EndpointConfiguration:
+        Types: 
+          - REGIONAL
+      Body:
+        swagger: "2.0"
+        info:
+          title: 'Addressbook mock API'
+          version: '0.0.1'
+        basePath: "/addressbook"
+        schemes:
+          - "https"
+        paths:
+          # DEVELOP
+          /develop/addresses/CGNNMO80A01H501M:
+            get:
+              operationId: "getTaxId1"
+              description: "risponde con un indirizzo di piattaforma che fallisce al primo tentativo e un indirizzo generale che fallisce sempre"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "Ok"
+              x-amazon-apigateway-integration:
+                type: mock
+                httpMethod: GET
+                passthroughBehavior: when_no_match
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: 200
+                    responseTemplates:
+                      application/json: '{ "digitalAddresses": { "platform":{"type":"PEC","address":"nome1.cognome1@fail-first.develop.it"}, "general":{"type":"PEC","address":"nome1.cognome1@fail-both.develop.it"}}}'
+          /develop/addresses/CGNNMO80A02H501R:
+            get:
+              operationId: "getTaxId2"
+              description: "risponde con un indirizzo di piattaforma che fallisce al primo tentativo e un indirizzo generale che funziona sempre"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "Ok"
+              x-amazon-apigateway-integration:
+                type: mock
+                httpMethod: GET
+                passthroughBehavior: when_no_match
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: 200
+                    responseTemplates:
+                      application/json: '{ "digitalAddresses": { "platform":{"type":"PEC","address":"nome2.cognome2@fail-first.develop.it"}, "general":{"type":"PEC","address":"nome1.cognome1@works.develop.it"}}}'
+          # DEVELOP default
+          /develop/addresses/{taxId}:
+            get:
+              operationId: "getTaxIdOthers"
+              parameters:
+                - in: path
+                  name: taxId
+                  schema:
+                    type: string
+                  required: true
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "Ok"
+              x-amazon-apigateway-integration:
+                type: mock
+                httpMethod: GET
+                passthroughBehavior: when_no_match
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: 200
+                    responseTemplates:
+                      application/json: '{ "digitalAddresses": null }'
+          # DEMO
+          /demo/addresses/CGNNMO80A01H501M:
+            get:
+              operationId: "getTaxId1"
+              description: "risponde con un indirizzo di piattaforma che fallisce al primo tentativo e un indirizzo generale che fallisce sempre"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "Ok"
+              x-amazon-apigateway-integration:
+                type: mock
+                httpMethod: GET
+                passthroughBehavior: when_no_match
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: 200
+                    responseTemplates:
+                      application/json: '{ "digitalAddresses": { "platform":{"type":"PEC","address":"nome1.cognome1@fail-first.demo.it"}, "general":{"type":"PEC","address":"nome1.cognome1@fail-both.demo.it"}}}'
+          /demo/addresses/CGNNMO80A02H501R:
+            get:
+              operationId: "getTaxId2"
+              description: "risponde con un indirizzo di piattaforma che fallisce al primo tentativo e un indirizzo generale che funziona sempre"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "Ok"
+              x-amazon-apigateway-integration:
+                type: mock
+                httpMethod: GET
+                passthroughBehavior: when_no_match
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: 200
+                    responseTemplates:
+                      application/json: '{ "digitalAddresses": { "platform":{"type":"PEC","address":"nome2.cognome2@fail-first.demo.it"}, "general":{"type":"PEC","address":"nome1.cognome1@works.demo.it"}}}'
+          # DEMO default
+          /demo/addresses/{taxId}:
+            get:
+              operationId: "getTaxIdOthers"
+              parameters:
+                - in: path
+                  name: taxId
+                  schema:
+                    type: string
+                  required: true
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "Ok"
+              x-amazon-apigateway-integration:
+                type: mock
+                httpMethod: GET
+                passthroughBehavior: when_no_match
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: 200
+                    responseTemplates:
+                      application/json: '{ "digitalAddresses": null }'
+
+  AddressBookApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref AddressBookApi
+  AddressBookApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      Description: Mock has only a stage
+      RestApiId: !Ref AddressBookApi
+      DeploymentId: !Ref AddressBookApiDeployment
+      StageName: mock
+  
+Outputs:
+  # - API Gateway access informations
+  AddressBookApiUrlMock4Develop:
+    Value: !Sub 'https://${AddressBookApi}.execute-api.${AWS::Region}.amazonaws.com/mock/develop/addresses/'
+    Description: Base URL for API Requests
+    Export:
+      Name: !Sub 'pn-develop-addressbook-api-gw-url'
+  AddressBookApiUrlMock4Demo:
+    Value: !Sub 'https://${AddressBookApi}.execute-api.${AWS::Region}.amazonaws.com/mock/demo/addresses/'
+    Description: Base URL for API Requests
+    Export:
+      Name: !Sub 'demo-main-addressbook-api-gw-url'
