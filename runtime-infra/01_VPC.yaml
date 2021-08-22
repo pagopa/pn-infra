@@ -225,6 +225,14 @@ Resources:
       MessageRetentionPeriod: 36000 # 10h
       ReceiveMessageWaitTimeSeconds: 5
       VisibilityTimeout: 10 # seconds
+  DeliveryPushActionsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${EnvName}-delivery_push_actions'
+      DelaySeconds: 2
+      MessageRetentionPeriod: 36000 # 10h
+      ReceiveMessageWaitTimeSeconds: 5
+      VisibilityTimeout: 10 # seconds
   ExternalChannelsInputsQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -290,6 +298,16 @@ Outputs:
     Description: 'workflow input events queue Name'
     Export:
       Name: !Sub '${EnvName}-delpush-input-queue-name'
+  DeliveryPushActionsQueueArn:
+    Value: !Sub '${DeliveryPushActionsQueue.Arn}'
+    Description: 'workflow actions queue ARN'
+    Export:
+      Name: !Sub '${EnvName}-delpush-actions-queue-arn'
+  DeliveryPushActionsQueueName:
+    Value: !Sub '${DeliveryPushActionsQueue.QueueName}'
+    Description: 'workflow actions queue Name'
+    Export:
+      Name: !Sub '${EnvName}-delpush-actions-queue-name'
   ExternalChannelsInputsQueueArn:
     Value: !Sub '${ExternalChannelsInputsQueue.Arn}'
     Description: 'external channel input events queue ARN'
