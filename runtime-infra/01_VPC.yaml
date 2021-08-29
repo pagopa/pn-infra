@@ -250,6 +250,20 @@ Resources:
       ReceiveMessageWaitTimeSeconds: 5
       VisibilityTimeout: 10 # seconds
 
+  AttachmentsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      # No default retentin neither legal hold.
+      # Can define retention period or legal hold when upload new object or version
+      ObjectLockEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
 
 Outputs:
   # - API Gateway access informations
@@ -328,3 +342,8 @@ Outputs:
     Description: 'external channel output events queue Name'
     Export:
       Name: !Sub '${EnvName}-extchannel-output-queue-name'
+  AttachmentsBucketName:
+    Value: !Sub '${AttachmentsBucket}'
+    Description: 'Attachments bucket Name'
+    Export:
+      Name: !Sub '${EnvName}-attachments-bucket-name'
