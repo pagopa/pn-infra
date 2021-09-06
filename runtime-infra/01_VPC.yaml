@@ -17,10 +17,24 @@ Resources:
     Properties:
       CidrBlock: !Join ['', ["10.", !Ref "EnvNumber", ".0.0/16" ]]
       EnableDnsSupport: true
-      EnableDnsHostnames: false
+      EnableDnsHostnames: true
       Tags:
       - Key: Name
         Value: !Sub ${EnvName}-VPC
+
+  InterfaceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Controls Inbound Access to the VPC Interface Endpoint from within the VPC'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - FromPort: '0'
+          ToPort: '65535'
+          IpProtocol: tcp
+          CidrIp: !Join ['', ["10.", !Ref "EnvNumber", ".0.0/16" ]]
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvName}-Interface-Endpoint-SecGrp'
 
   # Internet connections
   InternetGateway:
@@ -36,20 +50,7 @@ Resources:
       VpcId: !Ref VPC
 
   # Public subnets commons
-  PublicRouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvName} Public Routes
-  DefaultPublicRoute:
-    Type: AWS::EC2::Route
-    DependsOn: InternetGatewayAttachment
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
+  
 
   # Public subnet 1
   PublicSubnet1:
@@ -58,15 +59,29 @@ Resources:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
       CidrBlock: !Join ['', ["10.", !Ref "EnvNumber", ".1.0/24" ]]
-      MapPublicIpOnLaunch: true
+      MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
           Value: !Sub ${EnvName} Public Subnet (AZ1)
   PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PublicRouteTable
+      RouteTableId: !Ref PublicRouteTable1
       SubnetId: !Ref PublicSubnet1
+  PublicRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName} Public Routes
+  DefaultPublicRoute1:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
 
   # Public subnet 2
   PublicSubnet2:
@@ -75,15 +90,77 @@ Resources:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
       CidrBlock: !Join [ '', [ "10.", !Ref "EnvNumber", ".2.0/24" ] ]
-      MapPublicIpOnLaunch: true
+      MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
           Value: !Sub ${EnvName} Public Subnet (AZ2)
   PublicSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PublicRouteTable
+      RouteTableId: !Ref PublicRouteTable2
       SubnetId: !Ref PublicSubnet2
+  PublicRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName} Public Routes
+  DefaultPublicRoute2:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  # Connection to AWS Services
+  S3VPCGatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Gateway
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action: '*'
+            Effect: Allow
+            Resource: '*'
+            Principal: '*'
+      RouteTableIds:
+        - !Ref 'PublicRouteTable1'
+        - !Ref 'PublicRouteTable2'
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcId: !Ref VPC
+  CassandraInterfaceEndpoint:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.cassandra'
+      SubnetIds:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      VpcId: !Ref VPC
+    DependsOn: 
+      - PublicRouteTable1
+      - PublicRouteTable2
+  SQSInterfaceEndpoint:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.sqs'
+      SubnetIds:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      VpcId: !Ref VPC
+    DependsOn: 
+      - PublicRouteTable1
+      - PublicRouteTable2
 
   # Network security groups
   WebappSecurityGroup:
@@ -148,6 +225,14 @@ Resources:
       MessageRetentionPeriod: 36000 # 10h
       ReceiveMessageWaitTimeSeconds: 5
       VisibilityTimeout: 10 # seconds
+  DeliveryPushActionsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${EnvName}-delivery_push_actions'
+      DelaySeconds: 2
+      MessageRetentionPeriod: 36000 # 10h
+      ReceiveMessageWaitTimeSeconds: 5
+      VisibilityTimeout: 10 # seconds
   ExternalChannelsInputsQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -165,6 +250,20 @@ Resources:
       ReceiveMessageWaitTimeSeconds: 5
       VisibilityTimeout: 10 # seconds
 
+  AttachmentsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      # No default retentin neither legal hold.
+      # Can define retention period or legal hold when upload new object or version
+      ObjectLockEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
 
 Outputs:
   # - API Gateway access informations
@@ -213,6 +312,16 @@ Outputs:
     Description: 'workflow input events queue Name'
     Export:
       Name: !Sub '${EnvName}-delpush-input-queue-name'
+  DeliveryPushActionsQueueArn:
+    Value: !Sub '${DeliveryPushActionsQueue.Arn}'
+    Description: 'workflow actions queue ARN'
+    Export:
+      Name: !Sub '${EnvName}-delpush-actions-queue-arn'
+  DeliveryPushActionsQueueName:
+    Value: !Sub '${DeliveryPushActionsQueue.QueueName}'
+    Description: 'workflow actions queue Name'
+    Export:
+      Name: !Sub '${EnvName}-delpush-actions-queue-name'
   ExternalChannelsInputsQueueArn:
     Value: !Sub '${ExternalChannelsInputsQueue.Arn}'
     Description: 'external channel input events queue ARN'
@@ -233,4 +342,13 @@ Outputs:
     Description: 'external channel output events queue Name'
     Export:
       Name: !Sub '${EnvName}-extchannel-output-queue-name'
-
+  AttachmentsBucketName:
+    Value: !Sub '${AttachmentsBucket}'
+    Description: 'Attachments bucket Name'
+    Export:
+      Name: !Sub '${EnvName}-attachments-bucket-name'
+  AttachmentsBucketArn:
+    Value: !Sub '${AttachmentsBucket.Arn}'
+    Description: 'Attachments bucket ARN'
+    Export:
+      Name: !Sub '${EnvName}-attachments-bucket-arn'
