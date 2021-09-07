@@ -234,11 +234,17 @@ Resources:
     Properties:
       RestApiId: !Ref ApiGwRestApi
       StageName: beta
+      TracingEnabled: true
       DeploymentId: !Ref ApiGwRestApiBetaDeployment
       Description: 'Beta stage for rest api gw'
       AccessLogSetting:
         DestinationArn: !GetAtt "PublicApiLogGroup.Arn"
         Format: '{"requestTime":"$context.requestTime","requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","routeKey":"$context.routeKey","status":$context.status,"responseLatency":$context.responseLatency}'
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          MetricsEnabled: 'true'
+          DataTraceEnabled: 'false'
   PublicApiLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
