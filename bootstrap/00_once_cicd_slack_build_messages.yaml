@@ -65,7 +65,7 @@ Resources:
   BuildNotificationChatbot:
     Type: AWS::Chatbot::SlackChannelConfiguration
     Properties:
-      ConfigurationName: !Sub 'notifications-chatbot'
+      ConfigurationName: 'notifications-chatbot'
       IamRoleArn: 
         Fn::GetAtt: [ BuildNotificationChatbotIAMRole, Arn ]
       LoggingLevel: INFO
@@ -96,4 +96,4 @@ Outputs:
     Description: ARN of SNS Topic for build notification
     Value: !Ref BuildNotificationSNSTopic
     Export:
-      Name: !Sub "build-msg-topic"
+      Name: "build-msg-topic"
