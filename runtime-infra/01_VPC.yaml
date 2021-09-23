@@ -250,6 +250,16 @@ Resources:
       ReceiveMessageWaitTimeSeconds: 5
       VisibilityTimeout: 10 # seconds
 
+  # External comunication queue
+  DeliveryPushActionsDoneQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${EnvName}-delivery_push_actions-done'
+      DelaySeconds: 2
+      MessageRetentionPeriod: 36000 # 10h
+      ReceiveMessageWaitTimeSeconds: 5
+      VisibilityTimeout: 10 # seconds
+
   AttachmentsBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
@@ -342,6 +352,16 @@ Outputs:
     Description: 'external channel output events queue Name'
     Export:
       Name: !Sub '${EnvName}-extchannel-output-queue-name'
+  DeliveryPushActionsDoneQueueArn:
+    Value: !Sub '${DeliveryPushActionsDoneQueue.Arn}'
+    Description: 'workflow actions done queue ARN'
+    Export:
+      Name: !Sub '${EnvName}-delpush-actions-done-queue-arn'
+  DeliveryPushActionsDoneQueueName:
+    Value: !Sub '${DeliveryPushActionsDoneQueue.QueueName}'
+    Description: 'workflow actions done queue Name'
+    Export:
+      Name: !Sub '${EnvName}-delpush-actions-done-queue-name'
   AttachmentsBucketName:
     Value: !Sub '${AttachmentsBucket}'
     Description: 'Attachments bucket Name'
