@@ -216,12 +216,12 @@ Resources:
   #      - !Ref PublicSubnet1
   #      - !Ref PublicSubnet2
 
-  # Inter microservice comunication queue
+  # Comunication queues
   DeliveryPushInputsQueue:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub '${EnvName}-delivery_push_inputs'
-      DelaySeconds: 2
+      DelaySeconds: 1
       MessageRetentionPeriod: 36000 # 10h
       ReceiveMessageWaitTimeSeconds: 5
       VisibilityTimeout: 10 # seconds
@@ -229,7 +229,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub '${EnvName}-delivery_push_actions'
-      DelaySeconds: 2
+      DelaySeconds: 1
       MessageRetentionPeriod: 36000 # 10h
       ReceiveMessageWaitTimeSeconds: 5
       VisibilityTimeout: 10 # seconds
@@ -237,7 +237,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub '${EnvName}-external_channel_inputs'
-      DelaySeconds: 2
+      DelaySeconds: 1
       MessageRetentionPeriod: 36000 # 10h
       ReceiveMessageWaitTimeSeconds: 5
       VisibilityTimeout: 10 # seconds
@@ -245,7 +245,31 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub '${EnvName}-external_channel_outputs'
-      DelaySeconds: 2
+      DelaySeconds: 1
+      MessageRetentionPeriod: 36000 # 10h
+      ReceiveMessageWaitTimeSeconds: 5
+      VisibilityTimeout: 10 # seconds
+  ExternalChannelsElabResQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${EnvName}-external_channel_elab_res'
+      DelaySeconds: 1
+      MessageRetentionPeriod: 36000 # 10h
+      ReceiveMessageWaitTimeSeconds: 5
+      VisibilityTimeout: 10 # seconds
+  ExternalChannelsStatusQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${EnvName}-external_channel_status'
+      DelaySeconds: 1
+      MessageRetentionPeriod: 36000 # 10h
+      ReceiveMessageWaitTimeSeconds: 5
+      VisibilityTimeout: 10 # seconds
+  ExternalChannelsErrorQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${EnvName}-external_channel_error'
+      DelaySeconds: 1
       MessageRetentionPeriod: 36000 # 10h
       ReceiveMessageWaitTimeSeconds: 5
       VisibilityTimeout: 10 # seconds
@@ -342,6 +366,36 @@ Outputs:
     Description: 'external channel output events queue Name'
     Export:
       Name: !Sub '${EnvName}-extchannel-output-queue-name'
+  ExternalChannelsElabResQueueArn:
+    Value: !Sub '${ExternalChannelsElabResQueue.Arn}'
+    Description: 'external channel ElabRes events queue ARN'
+    Export:
+      Name: !Sub '${EnvName}-extchannel-elabres-queue-arn'
+  ExternalChannelsElabResQueueName:
+    Value: !Sub '${ExternalChannelsElabResQueue.QueueName}'
+    Description: 'external channel ElabRes events queue Name'
+    Export:
+      Name: !Sub '${EnvName}-extchannel-elabres-queue-name'
+  ExternalChannelsStatusQueueArn:
+    Value: !Sub '${ExternalChannelsStatusQueue.Arn}'
+    Description: 'external channel Status events queue ARN'
+    Export:
+      Name: !Sub '${EnvName}-extchannel-status-queue-arn'
+  ExternalChannelsStatusQueueName:
+    Value: !Sub '${ExternalChannelsStatusQueue.QueueName}'
+    Description: 'external channel Status events queue Name'
+    Export:
+      Name: !Sub '${EnvName}-extchannel-status-queue-name'
+  ExternalChannelsErrorQueueArn:
+    Value: !Sub '${ExternalChannelsErrorQueue.Arn}'
+    Description: 'external channel Error events queue ARN'
+    Export:
+      Name: !Sub '${EnvName}-extchannel-error-queue-arn'
+  ExternalChannelsErrorQueueName:
+    Value: !Sub '${ExternalChannelsErrorQueue.QueueName}'
+    Description: 'external channel Error events queue Name'
+    Export:
+      Name: !Sub '${EnvName}-extchannel-error-queue-name'
   AttachmentsBucketName:
     Value: !Sub '${AttachmentsBucket}'
     Description: 'Attachments bucket Name'
@@ -352,3 +406,4 @@ Outputs:
     Description: 'Attachments bucket ARN'
     Export:
       Name: !Sub '${EnvName}-attachments-bucket-arn'
+
