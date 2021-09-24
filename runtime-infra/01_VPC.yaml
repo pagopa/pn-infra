@@ -257,22 +257,6 @@ Resources:
       MessageRetentionPeriod: 36000 # 10h
       ReceiveMessageWaitTimeSeconds: 5
       VisibilityTimeout: 10 # seconds
-  ExternalChannelsStatusQueue:
-    Type: AWS::SQS::Queue
-    Properties:
-      QueueName: !Sub '${EnvName}-external_channel_status'
-      DelaySeconds: 1
-      MessageRetentionPeriod: 36000 # 10h
-      ReceiveMessageWaitTimeSeconds: 5
-      VisibilityTimeout: 10 # seconds
-  ExternalChannelsErrorQueue:
-    Type: AWS::SQS::Queue
-    Properties:
-      QueueName: !Sub '${EnvName}-external_channel_error'
-      DelaySeconds: 1
-      MessageRetentionPeriod: 36000 # 10h
-      ReceiveMessageWaitTimeSeconds: 5
-      VisibilityTimeout: 10 # seconds
 
   AttachmentsBucket:
     Type: AWS::S3::Bucket
@@ -381,21 +365,6 @@ Outputs:
     Description: 'external channel Status events queue ARN'
     Export:
       Name: !Sub '${EnvName}-extchannel-status-queue-arn'
-  ExternalChannelsStatusQueueName:
-    Value: !Sub '${ExternalChannelsStatusQueue.QueueName}'
-    Description: 'external channel Status events queue Name'
-    Export:
-      Name: !Sub '${EnvName}-extchannel-status-queue-name'
-  ExternalChannelsErrorQueueArn:
-    Value: !Sub '${ExternalChannelsErrorQueue.Arn}'
-    Description: 'external channel Error events queue ARN'
-    Export:
-      Name: !Sub '${EnvName}-extchannel-error-queue-arn'
-  ExternalChannelsErrorQueueName:
-    Value: !Sub '${ExternalChannelsErrorQueue.QueueName}'
-    Description: 'external channel Error events queue Name'
-    Export:
-      Name: !Sub '${EnvName}-extchannel-error-queue-name'
   AttachmentsBucketName:
     Value: !Sub '${AttachmentsBucket}'
     Description: 'Attachments bucket Name'
