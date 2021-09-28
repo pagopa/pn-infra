@@ -159,8 +159,14 @@ Resources:
       AuthorizationType: NONE
       RequestParameters:
         method.request.path.proxy: true
-        method.request.header.X-PagoPA-PN-PA: true
-        method.request.header.X-PagoPA-User-Id: true
+        method.request.header.X-PagoPA-PN-PA: false
+        method.request.header.X-PagoPA-User-Id: false
+        method.request.querystring.recipientId: false
+        method.request.querystring.senderId: false
+        method.request.querystring.startDate: false
+        method.request.querystring.endDate: false
+        method.request.querystring.status: false
+        method.request.querystring.subjectRegExp: false
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
@@ -182,6 +188,12 @@ Resources:
           integration.request.path.proxy: method.request.path.proxy
           integration.request.header.X-PagoPA-PN-PA: method.request.header.X-PagoPA-PN-PA
           integration.request.header.X-PagoPA-User-Id: method.request.header.X-PagoPA-User-Id
+          integration.request.querystring.recipientId: method.request.querystring.recipientId
+          integration.request.querystring.senderId: method.request.querystring.senderId
+          integration.request.querystring.startDate: method.request.querystring.startDate
+          integration.request.querystring.endDate: method.request.querystring.endDate
+          integration.request.querystring.status: method.request.querystring.status
+          integration.request.querystring.subjectRegExp: method.request.querystring.subjectRegExp
         PassthroughBehavior: "WHEN_NO_MATCH"
         TimeoutInMillis: 29000
         IntegrationResponses:
