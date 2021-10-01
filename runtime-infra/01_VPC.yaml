@@ -285,7 +285,7 @@ Resources:
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders:
-              - "*"
+              - !Join ['', ["'", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-cdn-url'}}, "'"]]
             AllowedMethods:
               - GET
               - PUT
