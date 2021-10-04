@@ -282,6 +282,21 @@ Resources:
         RestrictPublicBuckets: true
       VersioningConfiguration:
         Status: Enabled
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - !Join ['', ["'", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-cdn-url'}}, "'"]]
+            AllowedMethods:
+              - GET
+              - PUT
+              - POST
+              - DELETE
+              - HEAD
+            AllowedOrigins:
+              - "*"
+            ExposedHeaders:
+              - "x-amz-version-id"
+
 
 Outputs:
   # - API Gateway access informations
