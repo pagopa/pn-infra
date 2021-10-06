@@ -176,6 +176,15 @@ Resources:
             method.response.header.X-Prova: false
             method.response.header.Content-Type: false
             method.response.header.Content-Disposition: false
+        - StatusCode: 307
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+            method.response.header.X-Prova: false
+            method.response.header.Content-Type: false
+            method.response.header.Content-Disposition: false
+            method.response.header.location: false
       Integration:
         ConnectionType: VPC_LINK
         ConnectionId: !ImportValue
@@ -206,6 +215,18 @@ Resources:
               method.response.header.X-Prova: "'*'"
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
+            ResponseTemplates:
+              application/json: ""
+          - StatusCode: 307
+            SelectionPattern: ""
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'*'"
+              method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              method.response.header.X-Prova: "'*'"
+              method.response.header.Content-Type: integration.response.header.Content-Type
+              method.response.header.Content-Disposition: integration.response.header.Content-Disposition
+              method.response.header.location: integration.response.header.location
             ResponseTemplates:
               application/json: ""
   ApiGwRestApiDeliveryCORSMethod:
