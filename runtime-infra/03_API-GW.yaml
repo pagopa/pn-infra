@@ -142,6 +142,18 @@ Resources:
       RestApiId: !Ref ApiGwRestApi
       ParentId: !GetAtt ApiGwRestApi.RootResourceId
       PathPart: delivery
+  ApiGwRestApiDeliveryResV3:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGwRestApi
+      ParentId: !Ref ApiGwRestApiDeliveryRes
+      PathPart: v3
+  ApiGwRestApiDeliveryResV3ApiDocs:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGwRestApi
+      ParentId: !Ref ApiGwRestApiDeliveryResV3
+      PathPart: api-docs
   ApiGwRestApiDeliveryRes2:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -264,6 +276,73 @@ Resources:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
               method.response.header.Access-Control-Allow-Origin: !Join ['', ["'", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-cdn-url'}}, "'"]]
+            ResponseTemplates:
+              application/json: ""
+  ApiGwRestApiDeliveryApiDocsGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      OperationName: get documentation
+      RestApiId: !Ref ApiGwRestApi
+      ResourceId: !Ref ApiGwRestApiDeliveryResV3ApiDocs
+      HttpMethod: GET
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+      Integration:
+        ConnectionType: VPC_LINK
+        ConnectionId: !ImportValue
+          "Fn::Sub": '${EnvName}-nlb-link-id'
+        IntegrationHttpMethod: GET
+        Type: HTTP
+        #Uri: !Sub 'http://${PrivateApplicationLoadBalancer.DNSName}:8080/delivery/{proxy}'
+        Uri: !Join ['', ["http://", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-alb-domain'}}, ":8080/delivery/v3/api-docs"]]
+        PassthroughBehavior: "WHEN_NO_MATCH"
+        TimeoutInMillis: 29000
+        IntegrationResponses:
+          - StatusCode: 200
+            SelectionPattern: ""
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ""
+  ApiGwRestApiDeliveryApiDocsCORSMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      OperationName: CORS for delivery
+      RestApiId: !Ref ApiGwRestApi
+      ResourceId: !Ref ApiGwRestApiDeliveryResV3ApiDocs
+      HttpMethod: OPTIONS
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          ResponseModels:
+            application/json: Empty
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: "{\"statusCode\": 200}"
+        PassthroughBehavior: "WHEN_NO_MATCH"
+        TimeoutInMillis: 29000
+        CacheNamespace: "w053mc"
+        CacheKeyParameters: [ ]
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
             ResponseTemplates:
               application/json: ""
   ApiGwRestApiBetaDeployment:
