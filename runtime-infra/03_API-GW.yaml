@@ -173,12 +173,15 @@ Resources:
         method.request.path.proxy: true
         method.request.header.X-PagoPA-PN-PA: false
         method.request.header.X-PagoPA-User-Id: false
+        method.request.header.X-PagoPA-User-Secret: false
+        method.request.header.user_secret: false
         method.request.querystring.recipientId: false
         method.request.querystring.senderId: false
         method.request.querystring.startDate: false
         method.request.querystring.endDate: false
         method.request.querystring.status: false
         method.request.querystring.subjectRegExp: false
+        method.request.querystring.token: false
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
@@ -189,6 +192,15 @@ Resources:
             method.response.header.Content-Type: false
             method.response.header.Content-Disposition: false
         - StatusCode: 307
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+            method.response.header.X-Prova: false
+            method.response.header.Content-Type: false
+            method.response.header.Content-Disposition: false
+            method.response.header.Location: false
+        - StatusCode: 401
           ResponseParameters:
             method.response.header.Access-Control-Allow-Headers: false
             method.response.header.Access-Control-Allow-Methods: false
@@ -209,12 +221,15 @@ Resources:
           integration.request.path.proxy: method.request.path.proxy
           integration.request.header.X-PagoPA-PN-PA: method.request.header.X-PagoPA-PN-PA
           integration.request.header.X-PagoPA-User-Id: method.request.header.X-PagoPA-User-Id
+          integration.request.header.X-PagoPA-User-Secret: method.request.header.X-PagoPA-User-Secret
+          integration.request.header.user_secret: method.request.header.user_secret
           integration.request.querystring.recipientId: method.request.querystring.recipientId
           integration.request.querystring.senderId: method.request.querystring.senderId
           integration.request.querystring.startDate: method.request.querystring.startDate
           integration.request.querystring.endDate: method.request.querystring.endDate
           integration.request.querystring.status: method.request.querystring.status
           integration.request.querystring.subjectRegExp: method.request.querystring.subjectRegExp
+          integration.request.querystring.token: method.request.querystring.token
         PassthroughBehavior: "WHEN_NO_MATCH"
         TimeoutInMillis: 29000
         IntegrationResponses:
@@ -231,6 +246,18 @@ Resources:
               application/json: ""
           - StatusCode: 307
             SelectionPattern: 307
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'*'"
+              method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              method.response.header.X-Prova: "'*'"
+              method.response.header.Content-Type: integration.response.header.Content-Type
+              method.response.header.Content-Disposition: integration.response.header.Content-Disposition
+              method.response.header.Location: integration.response.header.Location
+            ResponseTemplates:
+              application/json: ""
+          - StatusCode: 401
+            SelectionPattern: 401
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
