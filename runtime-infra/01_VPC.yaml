@@ -198,6 +198,28 @@ Resources:
         - !Ref PublicSubnet1
         - !Ref PublicSubnet2
 
+  ExtChaPrivateApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internal
+      IpAddressType: ipv4
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      SecurityGroups:
+        - !Ref WebappSecurityGroup
+
+  ExtChaPrivateNetworkLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: network
+      Scheme: internal
+      IpAddressType: ipv4
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+
   # API Gateway integrations
   PrivateNlbLink:
     Type: AWS::ApiGateway::VpcLink
@@ -206,6 +228,14 @@ Resources:
       Description: "API-GW link to Network load balancer"
       TargetArns:
         - !Ref PrivateNetworkLoadBalancer
+
+  ExtChaPrivateNlbLink:
+    Type: AWS::ApiGateway::VpcLink
+    Properties:
+      Name: !Sub '${EnvName}-extcha-priv-nlb-link'
+      Description: "API-GW link to External Channel Network load balancer"
+      TargetArns:
+        - !Ref ExtChaPrivateNetworkLoadBalancer
   #PrivateAlbLink:
   #  Type: AWS::ApiGatewayV2::VpcLink
   #  Properties:
@@ -316,11 +346,31 @@ Outputs:
     Description: Used by API-Gw to connect into VPC
     Export:
       Name: !Sub '${EnvName}-nlb-link-id'
+  ExtChaPrivateNlbLink:
+    Value: !Ref ExtChaPrivateNlbLink
+    Description: Used by API-Gw to connect into VPC
+    Export:
+      Name: !Sub '${EnvName}-extcha-nlb-link-id'
+  ExtChaPrivateNetworkLoadBalancer:
+    Value: !Ref ExtChaPrivateNetworkLoadBalancer
+    Description: Id VPC External Channel nlb
+    Export:
+      Name: !Sub '${EnvName}-extcha-nlb-id'
+  ExtChaPrivateApplicationLoadBalancer:
+    Value: !Ref ExtChaPrivateApplicationLoadBalancer
+    Description: Id VPC External Channel alb
+    Export:
+      Name: !Sub '${EnvName}-extcha-alb-id'
   PrivateApplicationLoadBalancerDomain:
     Value: !Sub '${PrivateApplicationLoadBalancer.DNSName}'
     Description: Identificativo VPC Application Load Balancer
     Export:
       Name: !Sub '${EnvName}-alb-domain'
+  ExtChaPrivateApplicationLoadBalancerDomain:
+    Value: !Sub '${ExtChaPrivateApplicationLoadBalancer.DNSName}'
+    Description: Identificativo VPC Application Load Balancer
+    Export:
+      Name: !Sub '${EnvName}-extcha-alb-domain'
   VpcId:
     Value: !Ref VPC
     Description: Id della VPC
