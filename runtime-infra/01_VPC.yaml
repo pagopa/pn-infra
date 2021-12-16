@@ -59,7 +59,7 @@ Resources:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
       CidrBlock: !Join ['', ["10.", !Ref "EnvNumber", ".1.0/24" ]]
-      MapPublicIpOnLaunch: false
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: !Sub ${EnvName} Public Subnet (AZ1)
@@ -90,7 +90,7 @@ Resources:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
       CidrBlock: !Join [ '', [ "10.", !Ref "EnvNumber", ".2.0/24" ] ]
-      MapPublicIpOnLaunch: false
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: !Sub ${EnvName} Public Subnet (AZ2)
