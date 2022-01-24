@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Contains SNS topics configured to send message to DevOps Engineer. At the current state has only
+  one "alarm" channel sending messages to slack channel
+
+
+Parameters:
+  EnvName:
+    Type: String
+    Description: The name of the installation devel, beta, uat, preprod, ...
+
+  SlackInfo:
+    Type: String
+    Description: <slack workspace id>:<slack channel id>. 'team_notifiche_dev_alarm' by default
+    Default: TQSBH3ZS4:C02V0SRC4TV
+
+Conditions:
+  SlakOn: { Fn::Equals : [ '1', '1'] }
+
+Resources:
+
+  # - Everything written to this topic is an alarm
+  AlarmSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub '${EnvName} alarm topic'
+
+  # - Event Bridge events that generate an alarm
+  # "ACM Certificate Approaching Expiration": alarm
+  CertificateExpiringIsAlarmEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "EventRule"
+      EventPattern:
+        source: [ "aws.acm" ]
+        detail-type: [ "ACM Certificate Approaching Expiration" ]
+      Targets:
+        - Arn: !Ref AlarmSNSTopic
+          Id: "AlarmSnsTopic"
+
+  # - List services allowed to publish alarm messages
+  #   EventBridge: events.amazonaws.com
+  CanPublishAlarmTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Sid: AllowServices
+            Effect: Allow
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+            Action:
+              - 'sns:Publish'
+            Resource:
+              - !Ref AlarmSNSTopic
+      Topics:
+        - !Ref AlarmSNSTopic
+
+  # - Send alarm messages to CharBot
+  AlarmToChatbot:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlarmSNSTopic
+      Endpoint: "https://global.sns-api.chatbot.amazonaws.com"
+      Protocol: https
+
+  # - Define Chatbot service configuration: send to slack channel defined by the SlackInfo parameter
+  DevOpsChatbot:
+    Condition: SlakOn
+    Type: AWS::Chatbot::SlackChannelConfiguration
+    Properties:
+      ConfigurationName: !Sub '${EnvName}-DevOps-chatbot'
+      IamRoleArn:
+        Fn::GetAtt: [ DevOpsChatbotIAMRole, Arn ]
+      LoggingLevel: INFO
+      SlackChannelId:
+        Fn::Select:
+          - '1'
+          - Fn::Split:
+              - ":"
+              - Ref: SlackInfo
+      SlackWorkspaceId:
+        Fn::Select:
+          - '0'
+          - Fn::Split:
+              - ":"
+              - Ref: SlackInfo
+      SnsTopicArns:
+        - Ref: AlarmSNSTopic
+
+
+  # - Authorize Chatbot service to read from the alarm topic
+  DevOpsChatbotIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: !Sub 'Role for DevOps chatbot of ${EnvName} environment'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - chatbot.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/service_role/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess
+
+
+Outputs:
+  MySnsTopicName:
+    Description: DevOps alarms SNS topic name
+    Value: !GetAtt AlarmSNSTopic.TopicName
+  MySnsTopicArn:
+    Description: DevOps alarms SNS topic ARN
+    Value: !Ref AlarmSNSTopic
+
