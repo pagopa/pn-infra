@@ -113,7 +113,7 @@ if ( [ "PENDING_VALIDATION" = "$certificateStatus" ] ) then
       --hosted-zone-id "${hostedZoneId}" --change-batch file:///tmp/route53RecordSetChanges.json
 
   echo "Wait for Automatic Validation"
-  certificateStatus=$( echo "$certificateDescription" | jq '.Certificate.Status' | tr -d '"' )
+  certificateStatus=$( echo "$certificateDescription" | jq -r '.Certificate.Status' )
   counter=1
   while ( [  "$certificateStatus" != "ISSUED" -a $counter -lt 30 ] )
   do
@@ -122,7 +122,7 @@ if ( [ "PENDING_VALIDATION" = "$certificateStatus" ] ) then
     counter=$[ $counter + 1 ]
     certificateDescription=$( aws acm --profile $profile --region $certificateRegion describe-certificate \
                                   --certificate-arn $certificateArn )
-    certificateStatus=$( echo "$certificateDescription" | jq '.Certificate.Status' | tr -d '"' )
+    certificateStatus=$( echo "$certificateDescription" | jq -r '.Certificate.Status' )
   done
   echo ""
   echo "Certificate status = $certificateStatus"

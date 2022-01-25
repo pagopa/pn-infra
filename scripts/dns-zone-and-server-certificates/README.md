@@ -29,7 +29,7 @@ generate DNS zones needed by Piattafoma Notifiche.
    api.pn.pagopa.it, webapi.pn.pagopa.it, portale.pn.pagopa.it, ... .
    Check the script for exact list.
  - *create-or-update-all-test-dns-zones.sh* create DNS zones for all non production
-   environments: devel, uat, beta, ... . This script also create and validate
+   environments: dev, uat, beta, ... . This script also create and validate
    needed server certificates like api.beta.pn.pagopa.it, 
    portale.uat.pn.pagopa.it, ... . Check the script for exact list.
    
