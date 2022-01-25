@@ -17,6 +17,15 @@ They are created by the script *create-or-update-all-test-dns-zones.sh*.
 
 Open the script to see the full list of subdomains and certificates that are created.
 
+# Certificate Renewal 
+The generated certificates are issued from AWC Certificate manager (ACM)
+as "public trusted" certificates. They are automatically renewed as described in
+[AWS Documentation](https://docs.aws.amazon.com/acm/latest/userguide/dns-renewal-validation.html).
+In case of automatic renewal issues ACM triggers an alarm: we handle it in 
+CloudFormation template (devops-msg-sns-topics.yaml); more details and improvement 
+in [PN-29](https://pagopa.atlassian.net/browse/PN-629).
+
+
 
 # Folder content
 This folder contains shell scripts and related cloudformation template to 
