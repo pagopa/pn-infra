@@ -14,8 +14,6 @@ Parameters:
     Description: <slack workspace id>:<slack channel id>. 'team_notifiche_dev_alarm' by default
     Default: TQSBH3ZS4:C02V0SRC4TV
 
-Conditions:
-  SlakOn: { Fn::Equals : [ '1', '1'] }
 
 Resources:
 
@@ -23,7 +21,7 @@ Resources:
   AlarmSNSTopic:
     Type: AWS::SNS::Topic
     Properties:
-      DisplayName: !Sub '${EnvName} alarm topic'
+      DisplayName: !Sub '${EnvName} alarms topic'
 
   # - Event Bridge events that generate an alarm
   # "ACM Certificate Approaching Expiration": alarm
@@ -67,7 +65,6 @@ Resources:
 
   # - Define Chatbot service configuration: send to slack channel defined by the SlackInfo parameter
   DevOpsChatbot:
-    Condition: SlakOn
     Type: AWS::Chatbot::SlackChannelConfiguration
     Properties:
       ConfigurationName: !Sub '${EnvName}-DevOps-chatbot'
