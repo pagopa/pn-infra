@@ -48,7 +48,7 @@ function createOrUpdateStack() {
     echo "Start stack ${stackName} creation"
     aws --profile $profile --region $region cloudformation create-stack \
         --stack-name ${stackName} \
-        --template-body file://${scriptDir}/${templateFile} \
+        --template-body file://${scriptDir}/cnf-templates/${templateFile} \
         --parameters $@
     echo "Wait for creation"
     aws --profile $profile --region $region cloudformation wait stack-create-complete \
@@ -58,7 +58,7 @@ function createOrUpdateStack() {
     echo "Start stack ${stackName} update"
     aws --profile $profile --region $region cloudformation update-stack \
         --stack-name ${stackName} \
-        --template-body file://${scriptDir}/${templateFile} \
+        --template-body file://${scriptDir}/cnf-templates/${templateFile} \
         --parameters $@
     updateNotNeeded=$?
     if ( [ "$updateNotNeeded" -eq 0 ] ) then
