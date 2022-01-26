@@ -8,6 +8,16 @@ Parameters:
   EnvNumber:
     Type: String
     Description: Second byte from the left for VPC CIDR
+  APIDomain:
+    Description: "Domain for API"
+    Type: String
+    #TODO Aggiungere WebDomain e WebCertificateArn
+  APICertificateArn:
+    Description: "ACM API Certificate ARN"
+    Type: String
+  HostedZoneId:
+    Description: "Hosted Zone Id in which you want to add record"
+    Type: String
 
 Resources:
   #############################################################################
@@ -26,6 +36,25 @@ Resources:
       EndpointConfiguration:
         Types:
           - REGIONAL
+  ApiGWAPICustomDomain:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName: !Ref APIDomain
+      RegionalCertificateArn: !Ref APICertificateArn
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      SecurityPolicy: TLS_1_2
+  Route53RecordSetGroup:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Ref APIDomain
+      Type: A
+      HostedZoneId: !Ref HostedZoneId
+      AliasTarget:
+        DNSName: !GetAtt ApiGWAPICustomDomain.RegionalDomainName
+        EvaluateTargetHealth: false
+        HostedZoneId: !GetAtt ApiGWAPICustomDomain.RegionalHostedZoneId
   ApiGwRestApiDeliveryRes:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -150,6 +179,7 @@ Resources:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
               method.response.header.Access-Control-Allow-Origin: !Join ['', ["'", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-cdn-url'}}, "'"]]
+              #TODO aggiungere WebDomain
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
             ResponseTemplates:
@@ -160,6 +190,7 @@ Resources:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
               method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              #TODO aggiungere WebDomain
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
@@ -171,6 +202,7 @@ Resources:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
               method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              #TODO aggiungere WebDomain
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
@@ -182,6 +214,7 @@ Resources:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
               method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              #TODO aggiungere WebDomain
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
@@ -193,6 +226,7 @@ Resources:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
               method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              #TODO aggiungere WebDomain
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
@@ -204,6 +238,7 @@ Resources:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
               method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              #TODO aggiungere WebDomain
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
@@ -244,6 +279,7 @@ Resources:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
               method.response.header.Access-Control-Allow-Origin: !Join ['', ["'", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-cdn-url'}}, "'"]]
+              #TODO aggiungere WebDomain
             ResponseTemplates:
               application/json: ""
   ApiGwRestApiDeliveryApiDocsGetMethod:
@@ -339,6 +375,14 @@ Resources:
           HttpMethod: '*'
           MetricsEnabled: 'true'
           DataTraceEnabled: 'false'
+  APIMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    DependsOn: Route53RecordSetGroup
+    Properties:
+      #BasePath: product
+      DomainName: !Ref APIDomain
+      RestApiId: !Ref ApiGwRestApi
+      Stage: !Ref ApiGwRestApiBetaStage
   PublicApiLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
