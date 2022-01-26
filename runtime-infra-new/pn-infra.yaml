@@ -1,0 +1,27 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+
+Description: >
+  This template deploys the base infra for PN
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Nome dell'ambiente destinazione
+  EnvNumber:
+    Type: String
+    Description: Second byte from the left for VPC CIDR
+
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: >
+      The S3 bucket from which to fetch the templates used by this stack.
+
+Resources:
+  VPC:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/VPC.yaml"
+      Parameters:
+        EnvName: !Ref ProjectName
+        EnvNumber: !Ref EnvNumber
