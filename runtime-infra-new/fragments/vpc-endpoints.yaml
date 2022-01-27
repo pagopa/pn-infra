@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: 2010-09-09
-
+Description: 'Configure connection to AWS services on private AWS networks'
 
 Parameters:
-  EnvName:
+  VpcName:
     Type: String
     Description: Nome dell'ambiente destinazione
   VpcNumber:
@@ -11,17 +11,18 @@ Parameters:
 
   VpcId:
     Type: AWS::EC2::VPC::Id
-
   Subnets:
     Type: List<AWS::EC2::Subnet::Id>
-
   RouteTableIds:
     Type: List<String>
 
 
 Resources:
 
-  # Connection to AWS Services
+  ###                  PRIVATE CONNECTIONS CONFIGURATIONS                  ###
+  ############################################################################
+
+  ### to S3 service ###
   S3VPCGatewayEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -36,6 +37,8 @@ Resources:
       RouteTableIds: !Ref RouteTableIds
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
       VpcId: !Ref VpcId
+
+  ### to CASSANDRA service ###
   CassandraInterfaceEndpoint:
     Type: 'AWS::EC2::VPCEndpoint'
     Properties:
@@ -47,6 +50,7 @@ Resources:
       SubnetIds: !Ref Subnets
       VpcId: !Ref VpcId
 
+  ### to SQS service ###
   SQSInterfaceEndpoint:
     Type: 'AWS::EC2::VPCEndpoint'
     Properties:
@@ -58,6 +62,9 @@ Resources:
       SubnetIds: !Ref Subnets
       VpcId: !Ref VpcId
 
+
+  ###         ALLOW ACCESS TO SERVICES ELASTIC NETWORK INTERFACES         ###
+  ###########################################################################
   InterfaceSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
@@ -70,7 +77,5 @@ Resources:
           CidrIp: !Join ['', ["10.", !Ref "VpcNumber", ".0.0/16" ]]
       Tags:
         - Key: Name
-          Value: !Sub '${EnvName}-Interface-Endpoint-SecGrp'
-
-
+          Value: !Sub '${VpcName}-Interface-Endpoint-SecGrp'
 

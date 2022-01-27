@@ -1,4 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
+Description: 'Define a VPC with 3 subnets in 3 different AZ. N.B: now subnets are public'
+# TODO: add a parameter to define if subnets are public or private
 
 Parameters:
   VpcName:
@@ -11,7 +13,8 @@ Parameters:
 
 Resources:
 
-  # Microservices VPC:
+  ###                            VPC DEFINITION                            ###
+  ############################################################################
   VPC:
     Type: AWS::EC2::VPC
     Properties:
