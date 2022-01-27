@@ -49,7 +49,7 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${EnvName} Subnet 1(AZ1)
+          Value: !Sub ${VpcName} Subnet 1(AZ1)
   Subnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -61,7 +61,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${EnvName} Subnet 1 routes
+          Value: !Sub ${VpcName} Subnet 1 routes
   DefaultPublicRoute1:
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
@@ -81,7 +81,7 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${EnvName} Subnet 2 (AZ2)
+          Value: !Sub ${VpcName} Subnet 2 (AZ2)
   Subnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -93,7 +93,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${EnvName} Subnet 2 Routes
+          Value: !Sub ${VpcName} Subnet 2 Routes
   DefaultPublicRoute2:
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
@@ -114,7 +114,7 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${EnvName} Subnet 3 (AZ3)
+          Value: !Sub ${VpcName} Subnet 3 (AZ3)
   Subnet3RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -126,7 +126,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${EnvName} Subnet 3 routes
+          Value: !Sub ${VpcName} Subnet 3 routes
   DefaultPublicRoute3:
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
