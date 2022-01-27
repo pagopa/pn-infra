@@ -7,7 +7,7 @@ Parameters:
     Description: Name of the microservice logical group
 
 Resources:
-  Cluster:
+  ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Sub ${MacroServiceName}-ecs-cluster
@@ -15,8 +15,8 @@ Resources:
 Outputs:
   ClusterName:
     Description: ECS cluster name
-    Value: !Ref Cluster
+    Value: !Ref ECSCluster
 
   CluserArn:
     Description: ECS cluster ARN
-    Value: !Sub '${Cluster.Arn}'
+    Value: !Sub '${ECSCluster.Arn}'
