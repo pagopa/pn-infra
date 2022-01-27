@@ -28,16 +28,16 @@ Resources:
         VpcName: !Ref ProjectName
         VpcNumber: !Ref VpcNumber
 
-  #VPCEndpoints:
-  #  Type: AWS::CloudFormation::Stack
-  #  Properties:
-  #    TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/vpc-endpoints.yaml"
-  #    Parameters:
-  #      VpcName: !Ref ProjectName
-  #      VpcNumber: !Ref VpcNumber
-  #      Subnets: !GetAtt VPC.Outputs.PublicSubnetsIds
-  #      RouteTableIds: !GetAtt VPC.Outputs.PublicRouteTables
-  #      VpcId: !GetAtt VPC.Outputs.VpcId
+  VPCEndpoints:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/vpc-endpoints.yaml"
+      Parameters:
+        VpcName: !Ref ProjectName
+        VpcNumber: !Ref VpcNumber
+        Subnets: !GetAtt VPC.Outputs.PublicSubnetsIds
+        RouteTableIds: !GetAtt VPC.Outputs.PublicRouteTables
+        VpcId: !GetAtt VPC.Outputs.VpcId
 
   ### SQS ###
   DeliveryPushInputsQueue:
