@@ -148,37 +148,37 @@ Outputs:
     Value:
       Fn::Join:
         - ","
-        - - !GetAtt VPC.Outputs.PublicSubnet1Id
-          - !GetAtt VPC.Outputs.PublicSubnet2Id
-          - !GetAtt VPC.Outputs.PublicSubnet3Id
+        - - !GetAtt VPC.Outputs.Subnet1Id
+          - !GetAtt VPC.Outputs.Subnet2Id
+          - !GetAtt VPC.Outputs.Subnet3Id
     Description: Subnets ids joined with comma separator
 
   PublicRouteTables:
     Value:
       Fn::Join:
         - ","
-        - - !GetAtt VPC.Outputs.PublicRouteTable1
-          - !GetAtt VPC.Outputs.PublicRouteTable2
-          - !GetAtt VPC.Outputs.PublicRouteTable3
+        - - !GetAtt VPC.Outputs.RouteTable1
+          - !GetAtt VPC.Outputs.RouteTable2
+          - !GetAtt VPC.Outputs.RouteTable3
     Description: Routing tables joined with comma separator
 
 
   PublicSubnet1Id:
-    Value: !Ref PublicSubnet1
+    Value: !Ref Subnet1
     Description: Id subnet 1
   PublicSubnet2Id:
-    Value: !Ref PublicSubnet2
+    Value: !Ref Subnet2
     Description: Id subnet 2
   PublicSubnet3Id:
-    Value: !Ref PublicSubnet3
+    Value: !Ref Subnet3
     Description: Id subnet 3
   
   PublicRouteTable1:
-    Value: !Ref PublicRouteTable1
+    Value: !Ref RouteTable1
     Description: Routing table for subnet 1
   PublicRouteTable2:
-    Value: !Ref PublicRouteTable2
+    Value: !Ref RouteTable2
     Description: Routing table for subnet 2
   PublicRouteTable3:
-    Value: !Ref PublicRouteTable3
+    Value: !Ref RouteTable3
     Description: Routing table for subnet 3
