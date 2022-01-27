@@ -148,18 +148,18 @@ Outputs:
     Value:
       Fn::Join:
         - ","
-        - - !GetAtt VPC.Outputs.Subnet1Id
-          - !GetAtt VPC.Outputs.Subnet2Id
-          - !GetAtt VPC.Outputs.Subnet3Id
+        - - !Ref Subnet1
+          - !Ref Subnet2
+          - !Ref Subnet3
     Description: Subnets ids joined with comma separator
 
   PublicRouteTables:
     Value:
       Fn::Join:
         - ","
-        - - !GetAtt VPC.Outputs.RouteTable1
-          - !GetAtt VPC.Outputs.RouteTable2
-          - !GetAtt VPC.Outputs.RouteTable3
+        - - !Ref RouteTable1
+          - !Ref RouteTable2
+          - !Ref RouteTable3
     Description: Routing tables joined with comma separator
 
 
