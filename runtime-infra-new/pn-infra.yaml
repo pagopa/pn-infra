@@ -19,7 +19,10 @@ Parameters:
 
 Resources:
 
-  ### VPC ###
+  ###                       VPC BASE CONFIGURATIONS                       ###
+  ###########################################################################
+
+  # VPC and subnets
   VPC:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -28,6 +31,7 @@ Resources:
         VpcName: !Ref ProjectName
         VpcNumber: !Ref VpcNumber
 
+  # Private connection from subnets to AWS services
   VPCEndpoints:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -38,6 +42,37 @@ Resources:
         Subnets: !GetAtt VPC.Outputs.PublicSubnetsIds
         RouteTableIds: !GetAtt VPC.Outputs.PublicRouteTables
         VpcId: !GetAtt VPC.Outputs.VpcId
+
+  # LoadBalancer
+  LoadBalancer:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/load-balancer.yaml"
+      Parameters:
+        LoadBalancerName: !Ref ProjectName
+        Subnets: !GetAtt VPC.Outputs.PublicSubnetsIds
+        VpcId: !GetAtt VPC.Outputs.VpcId
+
+  ###                             ECS CLUSTER                             ###
+  ###########################################################################
+  #
+  ECSCluster:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs_cluster.yaml"
+      Parameters:
+        MacroServiceName: !Sub '${EnvName}-core'
+
+
+
+
+
+
+
+
+
+  ###                     MESSAGE ORIENTED MIDDLEWARE                     ###
+  ###########################################################################
 
   ### SQS ###
   DeliveryPushInputsQueue:

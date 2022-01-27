@@ -1,24 +1,22 @@
----
 AWSTemplateFormatVersion: 2010-09-09
-
+Description: ECS cluster definition for use with fargate
 
 Parameters:
-  EnvName:
+  MacroServiceName:
     Type: String
-    Description: Nome dell'ambiente destinazione
+    Description: Name of the microservice logical group
 
 Resources:
   Cluster:
     Type: AWS::ECS::Cluster
     Properties:
-      ClusterName: !Sub ${EnvName}-ecs-cluster
+      ClusterName: !Sub ${MacroServiceName}-ecs-cluster
 
 Outputs:
   ClusterName:
-      Value: !Ref Cluster
-      Export:
-        Name: !Sub '${EnvName}-ecs-cluster-name'
+    Description: ECS cluster name
+    Value: !Ref Cluster
 
   CluserArn:
-    Description: ARN del cluster fargate
+    Description: ECS cluster ARN
     Value: !Sub '${Cluster.Arn}'
