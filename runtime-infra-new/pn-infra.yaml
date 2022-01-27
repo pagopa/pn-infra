@@ -25,3 +25,10 @@ Resources:
       Parameters:
         EnvName: !Ref ProjectName
         EnvNumber: !Ref VpcNumber
+
+  NewNotificationsQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub "${ProjectName}-NewNotificationsQueue"
