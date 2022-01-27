@@ -18,17 +18,74 @@ Parameters:
       The S3 bucket from which to fetch the templates used by this stack.
 
 Resources:
+
+  ### VPC ###
   VPC:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/VPC.yaml"
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/vpc.yaml"
       Parameters:
-        EnvName: !Ref ProjectName
-        EnvNumber: !Ref VpcNumber
+        VpcName: !Ref ProjectName
+        VpcNumber: !Ref VpcNumber
 
-  NewNotificationsQueue:
+  VPCEndpoints:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/vpc-endpoints.yaml"
+      Parameters:
+        VpcName: !Ref EnvName
+        VpcNumber: !Ref EnvNumber
+        Subnets: !GetAtt VPC.Outputs.PublicSubnetsIds
+        RouteTableIds: !GetAtt VPC.Outputs.PublicRouteTables
+        VpcId: !GetAtt VPC.Outputs.VpcId
+
+  ### SQS ###
+  DeliveryPushInputsQueue:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
-        QueueName: !Sub "${ProjectName}-NewNotificationsQueue"
+        QueueName: !Sub '${EnvName}-delivery_push_inputs'
+        DelaySeconds: 1
+
+  DeliveryPushActionsQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${EnvName}-delivery_push_actions'
+        DelaySeconds: 1
+
+  ExternalChannelsInputsQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${EnvName}-external_channel_inputs'
+        DelaySeconds: 1
+
+  ExternalChannelsOutputsQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${EnvName}-external_channel_outputs'
+        DelaySeconds: 1
+
+  ExternalChannelsElabResQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${EnvName}-external_channel_elab_res'
+        DelaySeconds: 1
+
+  DeliveryPushActionsDoneQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${EnvName}-delivery_push_actions-done'
+        DelaySeconds: 2
+
+
