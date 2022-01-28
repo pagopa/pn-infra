@@ -18,6 +18,12 @@ Parameters:
     Type: String
     Description: Container image URI
 
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+
+
   ExposeAPIGW:
     Type: String
     Default: 'NO'
@@ -185,25 +191,13 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: !Join [ '', [ !Ref EnvName, !Ref MicroServiceName, ContSecGrp ] ]
-      VpcId: !ImportValue
-        "Fn::Sub": '${EnvName}-vpc-id'
+      VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 8080
           ToPort: 8080
           CidrIp: 0.0.0.0/0
-          #SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
-  LoadBalancerSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: !Join [ '', [ !Ref EnvName, !Ref MicroServiceName, LbSecGrp ] ]
-      VpcId: !ImportValue
-        "Fn::Sub": '${EnvName}-vpc-id'
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: 0.0.0.0/0
+
   ECSService:
     Type: AWS::ECS::Service
     DependsOn:
@@ -228,9 +222,7 @@ Resources:
         AwsvpcConfiguration:
           # change to DISABLED if you're using private subnets that have access to a NAT gateway
           AssignPublicIp: ENABLED
-          Subnets:
-            - !ImportValue { "Fn::Sub": '${EnvName}-subnet1' }
-            - !ImportValue { "Fn::Sub": '${EnvName}-subnet2' }
+          Subnets: !Ref Subnets
           SecurityGroups:
             - !Ref ContainerSecurityGroup
       LoadBalancers:
@@ -261,41 +253,7 @@ Resources:
       VpcId: !ImportValue
         "Fn::Sub": '${EnvName}-vpc-id'
 
-  WebappSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Sub ${EnvName}-${MicroServiceName}-webapp-security-group
-      GroupDescription: "ingres tcp 8080, egress all"
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: "0.0.0.0/0"
-      VpcId: !ImportValue
-        "Fn::Sub": '${EnvName}-vpc-id'
 
-  PrivateApplicationLoadBalancer:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-    Properties:
-      Type: application
-      Scheme: internal
-      IpAddressType: ipv4
-      Subnets:
-        - !ImportValue { "Fn::Sub": '${EnvName}-subnet1' }
-        - !ImportValue { "Fn::Sub": '${EnvName}-subnet2' }
-      SecurityGroups:
-        - !Ref WebappSecurityGroup
-
-  LoadBalancerListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      LoadBalancerArn: !Ref PrivateApplicationLoadBalancer
-      Protocol: HTTP
-      Port: 8080
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref TargetGroup
-          Order: 1
 
   NetTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -310,26 +268,6 @@ Resources:
       VpcId: !ImportValue
         "Fn::Sub": '${EnvName}-vpc-id'
 
-  PrivateNetworkLoadBalancer:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-    Properties:
-      Type: network
-      Scheme: internal
-      IpAddressType: ipv4
-      Subnets:
-        - !ImportValue { "Fn::Sub": '${EnvName}-subnet1' }
-        - !ImportValue { "Fn::Sub": '${EnvName}-subnet2' }
-
-  NetLoadBalancerListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      LoadBalancerArn: !Ref PrivateNetworkLoadBalancer
-      Protocol: TCP
-      Port: 8080
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref NetTargetGroup
-          Order: 1
 
   LogGroup:
     Type: AWS::Logs::LogGroup

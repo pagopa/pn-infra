@@ -91,6 +91,16 @@ Resources:
         QueueName: !Sub '${ProjectName}-delivery_push_actions'
         DelaySeconds: 1
 
+  DeliveryPushActionsDoneQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-delivery_push_actions-done'
+        DelaySeconds: 2
+
+
+
   ExternalChannelsInputsQueue:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -115,12 +125,5 @@ Resources:
         QueueName: !Sub '${ProjectName}-external_channel_elab_res'
         DelaySeconds: 1
 
-  DeliveryPushActionsDoneQueue:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
-      Parameters:
-        QueueName: !Sub '${ProjectName}-delivery_push_actions-done'
-        DelaySeconds: 2
 
 
