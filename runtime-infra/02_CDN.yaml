@@ -110,6 +110,22 @@ Resources:
               - ''
               - - origin-access-identity/cloudfront/
                 - Ref: CloudFrontOriginAccessIdentity
+        ViewerCertificate:
+          AcmCertificateArn: !Ref WebCertificateArn
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+
+  Route53RecordSetGroup:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Ref WebDomain
+      Type: A
+      HostedZoneId: !Ref HostedZoneId
+      AliasTarget:
+        DNSName: !GetAtt WebsiteCDN.DomainName
+        EvaluateTargetHealth: false
+        HostedZoneId: Z2FDTNDATAQYW2
+
 
 Outputs:
   # - WebApp Outputs
