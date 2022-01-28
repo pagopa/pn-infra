@@ -69,8 +69,8 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-service.yaml"
       Parameters:
         MicroServiceUniqueName: !Sub '${ProjectName}-delivery'
-        ContainerImageURI: !Sub '911845998067.dkr.ecr.eu-central-1.amazonaws.com/pn-delivery:latest'
-        ECSClusterName: !GettAtt ECSCluster.Outputs.ClusterName
+        ContainerImageURI: '911845998067.dkr.ecr.eu-central-1.amazonaws.com/pn-delivery:latest'
+        ECSClusterName: !GetAtt ECSCluster.Outputs.ClusterName
         Subnets: !GetAtt VPC.Outputs.PublicSubnetsIds
         VpcId: !GetAtt VPC.Outputs.VpcId
 
