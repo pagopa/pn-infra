@@ -137,7 +137,7 @@ Resources:
               - sqs:SendMessage
               - sqs:SendMessageBatch
             Resource:
-              - 'sqs-arn'
+              - '*'
           - Effect: Allow
             Action:
               - s3:GetObject
@@ -154,21 +154,18 @@ Resources:
               - s3:PutObjectTagging
               - s3:PutObjectVersionTagging
             Resource:
-              - !Join
-                - '/'
-                - - 'bucketArn'
-                  - '*'
+              - '*'
           - Effect: Allow
             Action:
               - s3:ListBucket
             Resource:
-              - 'bucketArn'
+              - '*'
           - Effect: Allow
             Action:
               - cassandra:Modify
               - cassandra:Select
             Resource:
-              - !Sub "arn:aws:cassandra:*:${AWS::AccountId}:/keyspace/*/table/*"
+              - '*'
       Roles:
         - !Ref TaskRole
 
