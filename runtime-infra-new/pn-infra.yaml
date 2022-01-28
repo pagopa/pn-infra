@@ -69,7 +69,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-service.yaml"
       Parameters:
         MicroServiceUniqueName: !Sub '${ProjectName}-delivery'
-        ContainerImageURI: '558518206506.dkr.ecr.eu-central-1.amazonaws.com/pn-develop-pn-delivery'
+        ContainerImageURI: 'wordpress:5.9.0-php7.4'
         ECSClusterName: !GetAtt ECSCluster.Outputs.ClusterName
         Subnets: !GetAtt VPC.Outputs.PublicSubnetsIds
         VpcId: !GetAtt VPC.Outputs.VpcId
