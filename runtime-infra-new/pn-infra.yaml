@@ -1,21 +1,19 @@
----
 AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys the base infra for PN'
 
-
-Description: >
-  This template deploys the base infra for PN
 Parameters:
   ProjectName:
     Type: String
-    Description: Nome dell'ambiente destinazione
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
   VpcNumber:
     Type: String
     Description: Second byte from the left for VPC CIDR
 
   TemplateBucketBaseUrl:
     Type: String
-    Description: >
-      The S3 bucket from which to fetch the templates used by this stack.
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
 
 Resources:
 
@@ -55,19 +53,26 @@ Resources:
 
   ###                             ECS CLUSTER                             ###
   ###########################################################################
-  #
+
   ECSCluster:
+    DependsOn: LoadBalancer
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-cluster.yaml"
       Parameters:
         MacroServiceName: !Sub '${ProjectName}-core'
 
-
-
-
-
-
+  # PN-Core Delivery
+  PnDeliveryMicroservice:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-service.yaml"
+      Parameters:
+        MicroServiceUniqueName: !Sub '${ProjectName}-delivery'
+        ContainerImageURI: !Sub '911845998067.dkr.ecr.eu-central-1.amazonaws.com/pn-delivery:latest'
+        ECSClusterName: !GettAtt ECSCluster.Outputs.ClusterName
+        Subnets: !GetAtt VPC.Outputs.PublicSubnetsIds
+        VpcId: !GetAtt VPC.Outputs.VpcId
 
 
 
