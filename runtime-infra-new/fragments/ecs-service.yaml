@@ -22,6 +22,7 @@ Parameters:
 
 Resources:
 
+  # ECS Service
   ECSService:
     Type: AWS::ECS::Service
     Properties:
@@ -41,15 +42,17 @@ Resources:
           AssignPublicIp: ENABLED
           Subnets: !Ref Subnets
           SecurityGroups:
-            - !Ref ContainerSecurityGroup
+            - !Ref EcsServiceSecurityGroup
 #      LoadBalancers:
 #        - ContainerName: !Sub '${MicroServiceUniqueName}'
 #          ContainerPort: 8080
 #          TargetGroupArn: !Ref TargetGroup
-  ContainerSecurityGroup:
+
+  # ECS Service
+  EcsServiceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: !Sub '${MicroServiceUniqueName}-ContSecGrp'
+      GroupDescription: !Sub '${MicroServiceUniqueName}-EcsSvcSecGrp'
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -57,6 +60,7 @@ Resources:
           ToPort: 8080
           CidrIp: 0.0.0.0/0
 
+  # ECS Task
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
     # Makes sure the log group is created before it is used.
@@ -104,6 +108,12 @@ Resources:
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: ecs
 
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/${MicroServiceUniqueName}'
+      RetentionInDays: 3
+
   # A role needed by ECS
   ExecutionRole:
     Type: AWS::IAM::Role
@@ -117,6 +127,7 @@ Resources:
             Action: 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+
   # A role for the containers
   TaskRole:
     Type: AWS::IAM::Role
@@ -133,6 +144,8 @@ Resources:
     Type: AWS::IAM::Policy
     Properties:
       PolicyName: !Sub '${MicroServiceUniqueName}-TaskPolicy'
+      Roles:
+        - !Ref TaskRole
       PolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -177,8 +190,6 @@ Resources:
               - cassandra:Select
             Resource:
               - '*'
-      Roles:
-        - !Ref TaskRole
 
 
 #  TargetGroup:
@@ -200,11 +211,7 @@ Resources:
 #      VpcId: !Ref VpcId
 
 
-  LogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub '/ecs/${MicroServiceUniqueName}'
-      RetentionInDays: 3
+
 
 #  # A role needed for auto scaling
 #  AutoScalingRole:
