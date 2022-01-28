@@ -2,6 +2,8 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: 'Create application load balancer, network load balancer and VPC link for
 API gateway integration'
 
+# See https://aws.amazon.com/it/blogs/networking-and-content-delivery/application-load-balancer-type-target-group-for-network-load-balancer/
+
 Parameters:
   LoadBalancerName:
     Type: String
@@ -43,6 +45,20 @@ Resources:
             MessageBody: "{ \"error\": \"404\", \"message\": \"Load balancer rule not configured\" }"
           Order: 1
 
+  # Application security groups
+  WebappSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${LoadBalancerName}-webapp-security-group
+      GroupDescription: "ingres tcp 8080, egress all"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: "0.0.0.0/0"
+      VpcId: !Ref VpcId
+
+
   ###                         NETWORK LOAD BALANCER                         ###
   #############################################################################
 
@@ -63,24 +79,22 @@ Resources:
       Protocol: TCP
       Port: 8080
       DefaultActions:
-        - Type: fixed-response
-          FixedResponseConfig:
-            StatusCode: 404
-            ContentType: "application/json"
-            MessageBody: "{ \"error\": \"404\", \"message\": \"Load balancer rule not configured\" }"
+        - Type: forward
+          TargetGroupArn:
           Order: 1
 
-  # Network security groups
-  WebappSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
+  # Network load balancer forward to application load balancer
+  NetworkToApplicationLoadBalancerTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      GroupName: !Sub ${LoadBalancerName}-webapp-security-group
-      GroupDescription: "ingres tcp 8080, egress all"
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: "0.0.0.0/0"
+      TargetType: alb
+      Protocol: TCP
+      Port: 8080
+      Targets:
+        - Id: !Ref ApplicationLoadBalancer
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60 # default is 300
       VpcId: !Ref VpcId
 
 
