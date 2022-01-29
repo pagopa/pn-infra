@@ -109,7 +109,7 @@ Resources:
             - Name: AWS_REGIONCODE
               Value: !Ref AWS::Region
             - Name: PN_DELIVERY_TOPICS_NEWNOTIFICATIONS
-              Value: 'pippo3'
+              Value: 'pippo4'
           PortMappings:
             - ContainerPort: 8080
           # Send logs to CloudWatch Logs
@@ -152,6 +152,7 @@ Resources:
               Service: ecs-tasks.amazonaws.com
             Action: 'sts:AssumeRole'
 
+  # Role policy needed to access the ECR registry of the CiCd account
   EcrAccessTaskPolicy:
     Type: AWS::IAM::Policy
     Properties:
@@ -170,56 +171,6 @@ Resources:
             Resource:
               - '*'
 
-  CustomTaskPolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: !Sub '${MicroServiceUniqueName}-CustomTaskPolicy'
-      Roles:
-        - !Ref TaskRole
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Action:
-              - sqs:ChangeMessageVisibility
-              - sqs:ChangeMessageVisibilityBatch
-              - sqs:DeleteMessage
-              - sqs:DeleteMessageBatch
-              - sqs:GetQueueAttributes
-              - sqs:GetQueueUrl
-              - sqs:ReceiveMessage
-              - sqs:SendMessage
-              - sqs:SendMessageBatch
-            Resource:
-              - '*'
-          - Effect: Allow
-            Action:
-              - s3:GetObject
-              - s3:GetObjectAcl
-              - s3:GetObjectLegalHold
-              - s3:GetObjectRetention
-              - s3:GetObjectTagging
-              - s3:GetObjectVersion
-              - s3:GetObjectVersionAcl
-              - s3:GetObjectVersionTagging
-              - s3:PutObject
-              - s3:PutObjectLegalHold
-              - s3:PutObjectRetention
-              - s3:PutObjectTagging
-              - s3:PutObjectVersionTagging
-            Resource:
-              - '*'
-          - Effect: Allow
-            Action:
-              - s3:ListBucket
-            Resource:
-              - '*'
-          - Effect: Allow
-            Action:
-              - cassandra:Modify
-              - cassandra:Select
-            Resource:
-              - '*'
 
 
   TargetGroup:
@@ -261,4 +212,7 @@ Outputs:
   ServiceARN:
     Description: Service ARN
     Value: !Sub '${ECSService.ServiceArn}'
+  TaskRoleName:
+    Description: Container execution role name, useful to attach custom policies
+    Value: !Ref TaskRole
 

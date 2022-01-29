@@ -79,6 +79,59 @@ Resources:
         VpcId: !GetAtt VPC.Outputs.VpcId
         LoadBalancerListenerArn: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerListenerArn
 
+  # Grant operational rights to PN-Core Delivery microservice
+  PnDeliveryTaskPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub '${ProjectName}-delivery-CustomTaskPolicy'
+      Roles:
+        - !Ref PnDeliveryMicroservice.Outputs.TaskRoleName
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - sqs:ChangeMessageVisibility
+              - sqs:ChangeMessageVisibilityBatch
+              - sqs:DeleteMessage
+              - sqs:DeleteMessageBatch
+              - sqs:GetQueueAttributes
+              - sqs:GetQueueUrl
+              - sqs:ReceiveMessage
+              - sqs:SendMessage
+              - sqs:SendMessageBatch
+            Resource:
+              - '*'
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:GetObjectAcl
+              - s3:GetObjectLegalHold
+              - s3:GetObjectRetention
+              - s3:GetObjectTagging
+              - s3:GetObjectVersion
+              - s3:GetObjectVersionAcl
+              - s3:GetObjectVersionTagging
+              - s3:PutObject
+              - s3:PutObjectLegalHold
+              - s3:PutObjectRetention
+              - s3:PutObjectTagging
+              - s3:PutObjectVersionTagging
+            Resource:
+              - '*'
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - '*'
+          - Effect: Allow
+            Action:
+              - cassandra:Modify
+              - cassandra:Select
+            Resource:
+              - '*'
+
+
   # Expose PN-Core Delivery public API with API-GW
   PnDeliveryPublicAPI:
     Type: AWS::CloudFormation::Stack
