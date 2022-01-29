@@ -126,18 +126,18 @@ Resources:
           Environment:
             - 'Fn::If':
                 - Env1Exist
-                - - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry1 ] ]
-                    Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry1 ] ]
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry1 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry1 ] ]
                 - !Ref "AWS::NoValue"
             - 'Fn::If':
                 - Env2Exist
-                - - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry2 ] ]
-                    Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry2 ] ]
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry2 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry2 ] ]
                 - !Ref "AWS::NoValue"
             - 'Fn::If':
                 - Env3Exist
-                - - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry3 ] ]
-                    Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry3 ] ]
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry3 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry3 ] ]
                 - !Ref "AWS::NoValue"
           PortMappings:
             - ContainerPort: 8080
