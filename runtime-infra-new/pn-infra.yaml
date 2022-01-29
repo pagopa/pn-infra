@@ -72,6 +72,7 @@ Resources:
         #ContainerImageURI: 'wordpress:5.9.0-php7.4'
         #ContainerImageURI: '558518206506.dkr.ecr.eu-west-3.amazonaws.com/api-first-springboot:latest'
         ContainerImageURI: '911845998067.dkr.ecr.eu-west-3.amazonaws.com/api-first-springboot:latest'
+        ContainerEnvironmentMap: !Sub '{ "PROJECT_NAME": "${ProjectName}", "QUEUE_NAME": "${DeliveryPushInputsQueue.Outputs.QueueURL}" }'
         MappedPaths: '/delivery/*,/delivery-private/*'
         ECSClusterName: !GetAtt ECSCluster.Outputs.ClusterName
         Subnets: !GetAtt VPC.Outputs.PublicSubnetsIds
