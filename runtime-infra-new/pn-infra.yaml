@@ -76,6 +76,16 @@ Resources:
         VpcId: !GetAtt VPC.Outputs.VpcId
         LoadBalancerListenerArn: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerListenerArn
 
+  # Expose PN-Core Delivery public API with API-GW
+  PnDeliveryPublicAPI:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-expose-service.yaml"
+      Parameters:
+        MicroServiceUniqueName: !Sub '${ProjectName}-delivery'
+        ServiceApiPath: 'delivery'
+        NetworkLoadBalancerLink: !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink
+        ApplicationLoadBalancerDomain: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain
 
 
   ###                     MESSAGE ORIENTED MIDDLEWARE                     ###

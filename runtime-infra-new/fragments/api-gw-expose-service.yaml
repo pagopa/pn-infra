@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Expose to the internet the API of a service with API-GW
+
+Parameters:
+
+  MicroServiceUniqueName:
+    Type: String
+    Description: Microservice unique name
+
+  ServiceApiPath:
+    Type: String
+    Description: path of the exposed API
+
+  NetworkLoadBalancerLink:
+    Type: String
+    Description: Link inside the VPC
+  ApplicationLoadBalancerDomain:
+    Type: String
+      Description: Application load balancer that dispatch request to microserveces
+
+Resources:
+
+  PublicRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      #Name: !Sub '${MicroServiceUniqueName}-public-api'
+      Description: !Sub '${MicroServiceUniqueName} public API proxy'
+      FailOnWarnings: true
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  PublicApiBasepathResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref PublicRestApi
+      ParentId: !GetAtt PublicRestApi.RootResourceId
+      PathPart: !Ref ServiceApiPath
+
+  PublicApiProxyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref PublicRestApi
+      ParentId: !Ref PublicApiBasepathResource
+      PathPart: '{proxy+}'
+
+  PublicApiProxyAnyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      OperationName: !Sub 'Proxy to ${MicroServiceUniqueName} public API'
+      RestApiId: !Ref PublicRestApi
+      ResourceId: !Ref PublicApiProxyResource
+      HttpMethod: ANY
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.proxy: true
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Content-Type: false
+        - StatusCode: 503
+          ResponseParameters:
+            method.response.header.Content-Type: false
+      Integration:
+        ConnectionType: VPC_LINK
+        ConnectionId: !Ref NetworkLoadBalancerLink
+        IntegrationHttpMethod: ANY
+        Type: HTTP
+        Uri: !Sub 'http://${ApplicationLoadBalancerDomain}:8080/${ServiceApiPath}/{proxy}'
+        RequestParameters:
+          integration.request.path.proxy: method.request.path.proxy
+        PassthroughBehavior: "WHEN_NO_MATCH"
+        TimeoutInMillis: 29000
+        IntegrationResponses:
+          - StatusCode: 200
+            SelectionPattern: ""
+            ResponseParameters:
+              method.response.header.Content-Type: integration.response.header.Content-Type
+            ResponseTemplates:
+              application/json: ""
+          - StatusCode: 503
+            SelectionPattern: ""
+            ResponseParameters:
+              method.response.header.Content-Type: integration.response.header.Content-Type
+            ResponseTemplates:
+              application/json: ""
+
+
+Outputs:
+
