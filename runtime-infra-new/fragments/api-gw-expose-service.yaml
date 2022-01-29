@@ -86,6 +86,40 @@ Resources:
             ResponseTemplates:
               application/json: ""
 
+  PublicRestApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - PublicApiProxyAnyMethod
+    Properties:
+      RestApiId: !Ref PublicRestApi
+    Description: !Sub 'API-GW deployment for ${MicroServiceUniqueName} public API'
+
+  PublicRestApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref PublicRestApi
+      StageName: unique
+      TracingEnabled: true
+      DeploymentId: !Ref PublicRestApiDeployment
+      Description: !Sub 'Unique stage for ${MicroServiceUniqueName} public API'
+      AccessLogSetting:
+        DestinationArn: !GetAtt "PublicApiLogGroup.Arn"
+        Format: '{"requestTime":"$context.requestTime","requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","routeKey":"$context.routeKey","status":$context.status,"responseLatency":$context.responseLatency}'
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          MetricsEnabled: 'true'
+          DataTraceEnabled: 'false'
+
+  PublicApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 1
 
 Outputs:
 
+  # - Public API URL
+  ApiGatewayUrlBeta:
+    Value: !Sub 'https://${PublicRestApi}.execute-api.${AWS::Region}.amazonaws.com/unique/'
+    Description: Base URL for API Requests
+    
