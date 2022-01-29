@@ -3,21 +3,54 @@ Description: ECS Service
 
 Parameters:
 
+  # Logical parameters
   MicroServiceUniqueName:
     Type: String
-    Description: Microservice unique name
+    Description: Microservice unique (logical) name
 
   ECSClusterName:
     Type: String
-    Description: ECS Cluster Name
+    Description: ECS Cluster Name where the service is going to be deployed
 
   MappedPaths:
     Type: List<String>
+    Description: Comma separated list of application load balancer listener rule path pattern
 
   ContainerImageURI:
     Type: String
     Description: Container image URI
 
+  # 256 (.25 vCPU) - Available memory values: 0.5GB, 1GB, 2GB
+  # 512 (.5 vCPU) - Available memory values: 1GB, 2GB, 3GB, 4GB
+  # 1024 (1 vCPU) - Available memory values: 2GB, 3GB, 4GB, 5GB, 6GB, 7GB, 8GB
+  # 2048 (2 vCPU) - Available memory values: Between 4GB and 16GB in 1GB increments
+  # 4096 (4 vCPU) - Available memory values: Between 8GB and 30GB in 1GB increments
+  CpuValue:
+    Type: Number
+    Description: Fargate virtual CPU quantity 1024 equals one vCPU
+
+  # 0.5GB, 1GB, 2GB - Available cpu values: 256 (.25 vCPU)
+  # 1GB, 2GB, 3GB, 4GB - Available cpu values: 512 (.5 vCPU)
+  # 2GB, 3GB, 4GB, 5GB, 6GB, 7GB, 8GB - Available cpu values: 1024 (1 vCPU)
+  # Between 4GB and 16GB in 1GB increments - Available cpu values: 2048 (2 vCPU)
+  # Between 8GB and 30GB in 1GB increments - Available cpu values: 4096 (4 vCPU)
+  MemoryAmount:
+    Type: String
+    Description: memory amount reserved to the task pod
+
+
+  # Technical parameters
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: the VPC id of the vpc where's the cluster containing the current service is deployed
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: the subnets where the service is going to be deployed
+  LoadBalancerListenerArn:
+    Type: String
+    Description: Application load balancer listener ARN
+
+  # Container environment map, maximum 30 entry
   ContainerEnvEntry1:
     Description: 1st container environment entry in the form key=value
     Type: String
@@ -34,21 +67,144 @@ Parameters:
     Description: 4th container environment entry in the form key=value
     Type: String
     Default: ''
-
-
-  VpcId:
-    Type: AWS::EC2::VPC::Id
-  Subnets:
-    Type: List<AWS::EC2::Subnet::Id>
-  LoadBalancerListenerArn:
+  ContainerEnvEntry5:
+    Description: 5th container environment entry in the form key=value
     Type: String
-    Description: Application load balancer listener ARN
+    Default: ''
+  ContainerEnvEntry6:
+    Description: 6th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry7:
+    Description: 7th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry8:
+    Description: 8th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry9:
+    Description: 9th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry10:
+    Description: 10th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry11:
+    Description: 11th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry12:
+    Description: 12th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry13:
+    Description: 13th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry14:
+    Description: 14th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry15:
+    Description: 15th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry16:
+    Description: 16th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry17:
+    Description: 17th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry18:
+    Description: 18th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry19:
+    Description: 19th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry20:
+    Description: 20th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry21:
+    Description: 21st container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry22:
+    Description: 22nd container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry23:
+    Description: 23rd container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry24:
+    Description: 24th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry25:
+    Description: 25th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry26:
+    Description: 26th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry27:
+    Description: 27th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry28:
+    Description: 28th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry29:
+    Description: 29th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry30:
+    Description: 30th container environment entry in the form key=value
+    Type: String
+    Default: ''
+
 
 Conditions:
   Env1Exist: !Not [ !Equals [!Ref ContainerEnvEntry1, '']]
   Env2Exist: !Not [ !Equals [!Ref ContainerEnvEntry2, '']]
   Env3Exist: !Not [ !Equals [!Ref ContainerEnvEntry3, '']]
   Env4Exist: !Not [ !Equals [!Ref ContainerEnvEntry4, '']]
+  Env5Exist: !Not [ !Equals [!Ref ContainerEnvEntry5, '']]
+  Env6Exist: !Not [ !Equals [!Ref ContainerEnvEntry6, '']]
+  Env7Exist: !Not [ !Equals [!Ref ContainerEnvEntry7, '']]
+  Env8Exist: !Not [ !Equals [!Ref ContainerEnvEntry8, '']]
+  Env9Exist: !Not [ !Equals [!Ref ContainerEnvEntry9, '']]
+  Env10Exist: !Not [ !Equals [!Ref ContainerEnvEntry10, '']]
+  Env11Exist: !Not [ !Equals [!Ref ContainerEnvEntry11, '']]
+  Env12Exist: !Not [ !Equals [!Ref ContainerEnvEntry12, '']]
+  Env13Exist: !Not [ !Equals [!Ref ContainerEnvEntry13, '']]
+  Env14Exist: !Not [ !Equals [!Ref ContainerEnvEntry14, '']]
+  Env15Exist: !Not [ !Equals [!Ref ContainerEnvEntry15, '']]
+  Env16Exist: !Not [ !Equals [!Ref ContainerEnvEntry16, '']]
+  Env17Exist: !Not [ !Equals [!Ref ContainerEnvEntry17, '']]
+  Env18Exist: !Not [ !Equals [!Ref ContainerEnvEntry18, '']]
+  Env19Exist: !Not [ !Equals [!Ref ContainerEnvEntry19, '']]
+  Env20Exist: !Not [ !Equals [!Ref ContainerEnvEntry20, '']]
+  Env21Exist: !Not [ !Equals [ !Ref ContainerEnvEntry21, '' ] ]
+  Env22Exist: !Not [ !Equals [ !Ref ContainerEnvEntry22, '' ] ]
+  Env23Exist: !Not [ !Equals [ !Ref ContainerEnvEntry23, '' ] ]
+  Env24Exist: !Not [ !Equals [ !Ref ContainerEnvEntry24, '' ] ]
+  Env25Exist: !Not [ !Equals [ !Ref ContainerEnvEntry25, '' ] ]
+  Env26Exist: !Not [ !Equals [ !Ref ContainerEnvEntry26, '' ] ]
+  Env27Exist: !Not [ !Equals [ !Ref ContainerEnvEntry27, '' ] ]
+  Env28Exist: !Not [ !Equals [ !Ref ContainerEnvEntry28, '' ] ]
+  Env29Exist: !Not [ !Equals [ !Ref ContainerEnvEntry29, '' ] ]
+  Env30Exist: !Not [ !Equals [ !Ref ContainerEnvEntry30, '' ] ]
+
 
 Resources:
 
@@ -78,7 +234,7 @@ Resources:
           ContainerPort: 8080
           TargetGroupArn: !Ref TargetGroup
 
-  # ECS Service
+  # ECS Service security group
   EcsServiceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -102,18 +258,8 @@ Resources:
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
-      # 256 (.25 vCPU) - Available memory values: 0.5GB, 1GB, 2GB
-      # 512 (.5 vCPU) - Available memory values: 1GB, 2GB, 3GB, 4GB
-      # 1024 (1 vCPU) - Available memory values: 2GB, 3GB, 4GB, 5GB, 6GB, 7GB, 8GB
-      # 2048 (2 vCPU) - Available memory values: Between 4GB and 16GB in 1GB increments
-      # 4096 (4 vCPU) - Available memory values: Between 8GB and 30GB in 1GB increments
-      Cpu: 1024
-      # 0.5GB, 1GB, 2GB - Available cpu values: 256 (.25 vCPU)
-      # 1GB, 2GB, 3GB, 4GB - Available cpu values: 512 (.5 vCPU)
-      # 2GB, 3GB, 4GB, 5GB, 6GB, 7GB, 8GB - Available cpu values: 1024 (1 vCPU)
-      # Between 4GB and 16GB in 1GB increments - Available cpu values: 2048 (2 vCPU)
-      # Between 8GB and 30GB in 1GB increments - Available cpu values: 4096 (4 vCPU)
-      Memory: 2GB
+      Cpu: !Ref CpuValue
+      Memory: !Ref MemoryAmount
       # A role needed by ECS.
       # "The ARN of the task execution role that containers in this task can assume. All containers in this task are granted the permissions that are specified in this role."
       # "There is an optional task execution IAM role that you can specify with Fargate to allow your Fargate tasks to make API calls to Amazon ECR."
@@ -138,6 +284,141 @@ Resources:
                 - Env3Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry3 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry3 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env4Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry4 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry4 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env5Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry5 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry5 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env6Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry6 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry6 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env7Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry7 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry7 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env8Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry8 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry8 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env9Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry9 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry9 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env10Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry10 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry10 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env11Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry11 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry11 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env12Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry12 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry12 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env13Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry13 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry13 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env14Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry14 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry14 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env15Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry15 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry15 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env16Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry16 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry16 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env17Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry17 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry17 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env18Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry18 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry18 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env19Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry19 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry19 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env20Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry20 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry20 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env21Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry21 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry21 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env22Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry22 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry22 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env23Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry23 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry23 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env24Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry24 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry24 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env25Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry25 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry25 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env26Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry26 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry26 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env27Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry27 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry27 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env28Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry28 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry28 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env29Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry29 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry29 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env30Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry30 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry30 ] ]
                 - !Ref "AWS::NoValue"
           PortMappings:
             - ContainerPort: 8080
@@ -200,8 +481,7 @@ Resources:
             Resource:
               - '*'
 
-
-
+  # Load balancer target group
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -220,6 +500,7 @@ Resources:
           Value: 60 # default is 300
       VpcId: !Ref VpcId
 
+  # Load balancer forward rule; forward only path pattern defined with MappedPaths
   LoadBalancerRoutingRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
