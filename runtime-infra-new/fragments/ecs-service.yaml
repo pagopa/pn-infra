@@ -11,16 +11,29 @@ Parameters:
     Type: String
     Description: ECS Cluster Name
 
+  MappedPaths:
+    Type: List<String>
+
   ContainerImageURI:
     Type: String
     Description: Container image URI
 
-  ContainerEnvironmentMap:
+  ContainerEnvEntry1:
+    Description: 1st container environment entry in the form key=value
     Type: String
-    Description: Map of environment variables passed to the application container
-
-  MappedPaths:
-    Type: List<String>
+    Default: ''
+  ContainerEnvEntry2:
+    Description: 2nd container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry3:
+    Description: 3rd container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry4:
+    Description: 4th container environment entry in the form key=value
+    Type: String
+    Default: ''
 
 
   VpcId:
@@ -31,6 +44,11 @@ Parameters:
     Type: String
     Description: Application load balancer listener ARN
 
+Conditions:
+  Env1Exist: !Not [ !Equals [!Ref ContainerEnvEntry1, '']]
+  Env2Exist: !Not [ !Equals [!Ref ContainerEnvEntry2, '']]
+  Env3Exist: !Not [ !Equals [!Ref ContainerEnvEntry3, '']]
+  Env4Exist: !Not [ !Equals [!Ref ContainerEnvEntry4, '']]
 
 Resources:
 
@@ -106,10 +124,21 @@ Resources:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
           Environment:
-            - Name: AWS_REGIONCODE
-              Value: !Ref AWS::Region
-            - Name: PN_DELIVERY_TOPICS_NEWNOTIFICATIONS
-              Value: 'pippo4'
+            - 'Fn::If':
+                - Env1Exist
+                - - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry1 ] ]
+                    Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry1 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env2Exist
+                - - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry2 ] ]
+                    Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry2 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env3Exist
+                - - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry3 ] ]
+                    Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry3 ] ]
+                - !Ref "AWS::NoValue"
           PortMappings:
             - ContainerPort: 8080
           # Send logs to CloudWatch Logs
