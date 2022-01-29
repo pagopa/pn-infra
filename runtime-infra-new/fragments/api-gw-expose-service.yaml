@@ -23,12 +23,13 @@ Resources:
   PublicRestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      #Name: !Sub '${MicroServiceUniqueName}-public-api'
-      Description: !Sub '${MicroServiceUniqueName} public API proxy'
       FailOnWarnings: true
       EndpointConfiguration:
         Types:
           - REGIONAL
+      Tags:
+        - Key: ApiDesc
+          Value: !Sub '${MicroServiceUniqueName} public API: proxy for /${ServiceApiPath}/* path'
 
   PublicApiBasepathResource:
     Type: AWS::ApiGateway::Resource
@@ -122,4 +123,3 @@ Outputs:
   ApiGatewayUrlBeta:
     Value: !Sub 'https://${PublicRestApi}.execute-api.${AWS::Region}.amazonaws.com/unique/'
     Description: Base URL for API Requests
-    
