@@ -93,7 +93,6 @@ Resources:
       - PublicApiProxyAnyMethod
     Properties:
       RestApiId: !Ref PublicRestApi
-    Description: !Sub 'API-GW deployment for ${MicroServiceUniqueName} public API'
 
   PublicRestApiStage:
     Type: AWS::ApiGateway::Stage
@@ -102,7 +101,6 @@ Resources:
       StageName: unique
       TracingEnabled: true
       DeploymentId: !Ref PublicRestApiDeployment
-      Description: !Sub 'Unique stage for ${MicroServiceUniqueName} public API'
       AccessLogSetting:
         DestinationArn: !GetAtt "PublicApiLogGroup.Arn"
         Format: '{"requestTime":"$context.requestTime","requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","routeKey":"$context.routeKey","status":$context.status,"responseLatency":$context.responseLatency}'
