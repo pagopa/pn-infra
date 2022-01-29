@@ -5,6 +5,10 @@ Description: >
 
 
 Parameters:
+  TopicName:
+    Type: String
+    Description: Topic logical name
+
   SNSTopicArn:
     Type: String
     Description: SNS topic ARN
@@ -48,7 +52,7 @@ Resources:
   DevOpsChatbot:
     Type: AWS::Chatbot::SlackChannelConfiguration
     Properties:
-      ConfigurationName: !Sub '${EnvName}-DevOps-chatbot'
+      ConfigurationName: !Sub '${TopicName}-DevOps-chatbot'
       IamRoleArn:
         Fn::GetAtt: [ DevOpsChatbotIAMRole, Arn ]
       LoggingLevel: INFO
@@ -72,7 +76,7 @@ Resources:
   DevOpsChatbotIAMRole:
     Type: AWS::IAM::Role
     Properties:
-      Description: !Sub 'Role for DevOps chatbot of ${EnvName} environment'
+      Description: !Sub 'Role for DevOps chatbot of ${TopicName} environment'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -85,4 +89,3 @@ Resources:
       Path: "/service_role/"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess
-
