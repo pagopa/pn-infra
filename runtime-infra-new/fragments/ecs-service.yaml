@@ -105,11 +105,11 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
-          Environment: !Ref ContainerEnvironmentMap
-            #- Name: AWS_REGIONCODE
-            #  Value: !Ref AWS::Region
-            #- Name: PN_DELIVERY_TOPICS_NEWNOTIFICATIONS
-            #  Value: 'pippo2'
+          Environment:
+            - Name: AWS_REGIONCODE
+              Value: !Ref AWS::Region
+            - Name: PN_DELIVERY_TOPICS_NEWNOTIFICATIONS
+              Value: 'pippo3'
           PortMappings:
             - ContainerPort: 8080
           # Send logs to CloudWatch Logs
@@ -152,10 +152,10 @@ Resources:
               Service: ecs-tasks.amazonaws.com
             Action: 'sts:AssumeRole'
 
-  TaskPolicy:
+  EcrAccessTaskPolicy:
     Type: AWS::IAM::Policy
     Properties:
-      PolicyName: !Sub '${MicroServiceUniqueName}-TaskPolicy'
+      PolicyName: !Sub '${MicroServiceUniqueName}-EcrAccessTaskPolicy'
       Roles:
         - !Ref TaskRole
       PolicyDocument:
@@ -169,6 +169,16 @@ Resources:
               - ecr:BatchGetImage
             Resource:
               - '*'
+
+  CustomTaskPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub '${MicroServiceUniqueName}-CustomTaskPolicy'
+      Roles:
+        - !Ref TaskRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
           - Effect: Allow
             Action:
               - sqs:ChangeMessageVisibility
