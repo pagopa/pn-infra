@@ -105,11 +105,11 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
-          Environment:
-            - Name: AWS_REGIONCODE
-              Value: !Ref AWS::Region
-            - Name: PN_DELIVERY_TOPICS_NEWNOTIFICATIONS
-              Value: 'pippo2'
+          Environment: !Ref ContainerEnvironmentMap
+            #- Name: AWS_REGIONCODE
+            #  Value: !Ref AWS::Region
+            #- Name: PN_DELIVERY_TOPICS_NEWNOTIFICATIONS
+            #  Value: 'pippo2'
           PortMappings:
             - ContainerPort: 8080
           # Send logs to CloudWatch Logs
