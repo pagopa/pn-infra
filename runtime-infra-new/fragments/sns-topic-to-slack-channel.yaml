@@ -5,9 +5,9 @@ Description: >
 
 
 Parameters:
-  EnvName:
+  SNSTopicArn:
     Type: String
-    Description: The name of the installation devel, beta, uat, preprod, ...
+    Description: SNS topic ARN
 
   SlackInfo:
     Type: String
@@ -16,25 +16,6 @@ Parameters:
 
 
 Resources:
-
-  # - Everything written to this topic is an alarm
-  AlarmSNSTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      DisplayName: !Sub '${EnvName} alarms topic'
-
-  # - Event Bridge events that generate an alarm
-  # "ACM Certificate Approaching Expiration": alarm
-  CertificateExpiringIsAlarmEventRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Description: "EventRule"
-      EventPattern:
-        source: [ "aws.acm" ]
-        detail-type: [ "ACM Certificate Approaching Expiration" ]
-      Targets:
-        - Arn: !Ref AlarmSNSTopic
-          Id: "AlarmSnsTopic"
 
   # - List services allowed to publish alarm messages
   #   EventBridge: events.amazonaws.com
@@ -51,15 +32,15 @@ Resources:
             Action:
               - 'sns:Publish'
             Resource:
-              - !Ref AlarmSNSTopic
+              - !Ref SNSTopicArn
       Topics:
-        - !Ref AlarmSNSTopic
+        - !Ref SNSTopicArn
 
   # - Send alarm messages to CharBot
   AlarmToChatbot:
     Type: AWS::SNS::Subscription
     Properties:
-      TopicArn: !Ref AlarmSNSTopic
+      TopicArn: !Ref SNSTopicArn
       Endpoint: "https://global.sns-api.chatbot.amazonaws.com"
       Protocol: https
 
@@ -84,7 +65,7 @@ Resources:
               - ":"
               - Ref: SlackInfo
       SnsTopicArns:
-        - Ref: AlarmSNSTopic
+        - Ref: SNSTopicArn
 
 
   # - Authorize Chatbot service to read from the alarm topic
@@ -104,13 +85,4 @@ Resources:
       Path: "/service_role/"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess
-
-
-Outputs:
-  MySnsTopicName:
-    Description: DevOps alarms SNS topic name
-    Value: !GetAtt AlarmSNSTopic.TopicName
-  MySnsTopicArn:
-    Description: DevOps alarms SNS topic ARN
-    Value: !Ref AlarmSNSTopic
 
