@@ -70,6 +70,7 @@ Resources:
       Parameters:
         MicroServiceUniqueName: !Sub '${ProjectName}-delivery'
         ContainerImageURI: 'wordpress:5.9.0-php7.4'
+        MappedPathgs: '/delivery/,/delivery-private/'
         ECSClusterName: !GetAtt ECSCluster.Outputs.ClusterName
         Subnets: !GetAtt VPC.Outputs.PublicSubnetsIds
         VpcId: !GetAtt VPC.Outputs.VpcId

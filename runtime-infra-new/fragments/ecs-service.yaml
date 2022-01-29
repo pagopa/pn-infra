@@ -12,6 +12,8 @@ Parameters:
   ContainerImageURI:
     Type: String
     Description: Container image URI
+  MappedPaths:
+    Type: List<String>
 
 
   VpcId:
@@ -221,8 +223,7 @@ Resources:
       Conditions:
         - Field: path-pattern
           Values:
-            - /pn-delivery/
-            - /pn-delivery-private/
+            - !Ref MappedPaths
       Actions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
