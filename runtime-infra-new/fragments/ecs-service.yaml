@@ -156,6 +156,14 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
+              - ecr:GetAuthorizationToken
+              - ecr:BatchCheckLayerAvailability
+              - ecr:GetDownloadUrlForLayer
+              - ecr:BatchGetImage
+            Resource:
+              - '*'
+          - Effect: Allow
+            Action:
               - sqs:ChangeMessageVisibility
               - sqs:ChangeMessageVisibilityBatch
               - sqs:DeleteMessage
