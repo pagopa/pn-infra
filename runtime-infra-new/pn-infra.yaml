@@ -11,17 +11,13 @@ Parameters:
     Type: String
     Description: Second byte from the left for VPC CIDR
 
-  #ContainerImageUri:
-  #  Type: String
-  #  Description: Uri of the container image to deploy
-
-  #AlarmSNSTopicArn:
-  #  Type: String
-  #  Description: ARN of the Alarm SNS Topic
-
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
+  # pass-through parameters
+  AlarmSNSTopicArn:
+    Type: String
 
 Resources:
 
@@ -141,71 +137,33 @@ Resources:
 #              - '*'
 
 
-  # Expose PN-Core Delivery public API with API-GW
-  PnDeliveryPublicAPI:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-expose-service.yaml"
-      Parameters:
-        MicroServiceUniqueName: !Sub '${ProjectName}-delivery'
-        ServiceApiPath: 'delivery'
-        NetworkLoadBalancerLink: !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink
-        ApplicationLoadBalancerDomain: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain
+#  # Expose PN-Core Delivery public API with API-GW
+#  PnDeliveryPublicAPI:
+#    Type: AWS::CloudFormation::Stack
+#    Properties:
+#      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-expose-service.yaml"
+#      Parameters:
+#        MicroServiceUniqueName: !Sub '${ProjectName}-delivery'
+#        ServiceApiPath: 'delivery'
+#        NetworkLoadBalancerLink: !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink
+#        ApplicationLoadBalancerDomain: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain
 
 
-  ###                     MESSAGE ORIENTED MIDDLEWARE                     ###
-  ###########################################################################
+Outputs:
 
-  ### SQS ###
-  DeliveryPushInputsQueue:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
-      Parameters:
-        QueueName: !Sub '${ProjectName}-delivery_push_inputs'
-        DelaySeconds: 1
+  # Load balancers outputs
+  NetworkLoadBalancerLink:
+    Value: !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink
+    Description: Used by API-Gw to connect into VPC
 
-  DeliveryPushActionsQueue:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
-      Parameters:
-        QueueName: !Sub '${ProjectName}-delivery_push_actions'
-        DelaySeconds: 1
+  ApplicationLoadBalancerListenerArn:
+    Value: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerListenerArn
+    Description: Application Load Balancerlistener Arn
 
-  DeliveryPushActionsDoneQueue:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
-      Parameters:
-        QueueName: !Sub '${ProjectName}-delivery_push_actions-done'
-        DelaySeconds: 2
+  ApplicationLoadBalancerDomain:
+    Value: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain
+    Description: Application Load Balancer Domain to use for http URL
 
-
-
-  ExternalChannelsInputsQueue:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
-      Parameters:
-        QueueName: !Sub '${ProjectName}-external_channel_inputs'
-        DelaySeconds: 1
-
-  ExternalChannelsOutputsQueue:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
-      Parameters:
-        QueueName: !Sub '${ProjectName}-external_channel_outputs'
-        DelaySeconds: 1
-
-  ExternalChannelsElabResQueue:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
-      Parameters:
-        QueueName: !Sub '${ProjectName}-external_channel_elab_res'
-        DelaySeconds: 1
-
-
-
+  # pass-though parameters
+  AlarmSNSTopicArn:
+    Value: !Ref AlarmSNSTopicArn

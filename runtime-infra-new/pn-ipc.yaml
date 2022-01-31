@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys the base infra for PN'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
+  # pass-though parameters
+  NetworkLoadBalancerLink:
+    Type: String
+  ApplicationLoadBalancerListenerArn:
+    Type: String
+  ApplicationLoadBalancerDomain:
+    Type: String
+  AlarmSNSTopicArn:
+    Type: String
+
+
+Resources:
+
+  ###                     MESSAGE ORIENTED MIDDLEWARE                     ###
+  ###########################################################################
+
+  ### Communication between PN-DELIVERY and  PN-DELIVERY-PUSH ###
+  DeliveryPushInputsQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-delivery_push_inputs'
+        DelaySeconds: 1
+
+
+  ### Communication TO and FROM EXTERNAL-CHANNELS ###
+  ExternalChannelsInputsQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-external_channel_inputs'
+        DelaySeconds: 1
+
+  ExternalChannelsOutputsQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-external_channel_outputs'
+        DelaySeconds: 1
+
+
+Outputs:
+
+  # Delivery push inputs
+  DeliveryPushInputsQueueName:
+    Value: !GetAtt DeliveryPushInputsQueue.Outputs.QueueName
+    Description: pn-delivery-push input queue name
+  DeliveryPushInputsQueueURL:
+    Value: !GetAtt DeliveryPushInputsQueue.Outputs.QueueURL
+    Description: pn-delivery-push input queue URL
+  DeliveryPushInputsQueueARN:
+    Value: !GetAtt DeliveryPushInputsQueue.Outputs.QueueARN
+    Description: pn-delivery-push input queue ARN
+
+  # External channels inputs
+  ExternalChannelsInputsQueueName:
+    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueName
+    Description: pn-external-channels input queue name
+  ExternalChannelsInputsQueueURL:
+    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueURL
+    Description: pn-external-channels input queue URL
+  ExternalChannelsInputsQueueARN:
+    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueARN
+    Description: pn-external-channels input queue ARN
+
+  # External channels outputs
+  ExternalChannelsOutputsQueueName:
+    Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueName
+    Description: pn-external-channels output queue name
+  ExternalChannelsOutputsQueueURL:
+    Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueURL
+    Description: pn-external-channels output queue URL
+  ExternalChannelsOutputsQueueARN:
+    Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
+    Description: pn-external-channels output queue ARN
+
+
+  # pass-thought parameters
+  NetworkLoadBalancerLink:
+    Value: !Ref NetworkLoadBalancerLink
+  ApplicationLoadBalancerListenerArn:
+    Value: !Ref ApplicationLoadBalancerListenerArn
+  ApplicationLoadBalancerDomain:
+    Value: !Ref ApplicationLoadBalancerDomain
+  AlarmSNSTopicArn:
+    Value: !Ref AlarmSNSTopicArn
+

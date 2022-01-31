@@ -56,12 +56,21 @@ Resources:
       MessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
 
 Outputs:
+  # Queue info
+  QueueName:
+    Description: Name of source queue
+    Value: !GetAtt Queue.QueueName
   QueueURL:
     Description: URL of the source queue
     Value: !Ref Queue
   QueueARN:
     Description: ARN of source queue
     Value: !GetAtt Queue.Arn
+
+  # Dead letter queue info
+  DeadLetterQueueName:
+    Description: Name of source queue
+    Value: !GetAtt DeadLetterQueue.QueueName
   DeadLetterQueueURL:
     Description: URL of dead-letter queue
     Value: !Ref DeadLetterQueue
