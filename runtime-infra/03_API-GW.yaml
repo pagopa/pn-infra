@@ -5,9 +5,6 @@ Parameters:
   EnvName:
     Type: String
     Description: Nome dell'ambiente destinazione
-  EnvNumber:
-    Type: String
-    Description: Second byte from the left for VPC CIDR
 
 Resources:
   #############################################################################
@@ -17,15 +14,16 @@ Resources:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: !Sub '${EnvName}-public-api'
-      Description: Api che effettuano proxy ai microservizi di back-end
+      Description: Api Gataway for direct API call with Api Key
       FailOnWarnings: true
-      BinaryMediaTypes: 
+      BinaryMediaTypes:
         - 'image~1png'
         - 'image~1jpeg'
         - 'application~1pdf'
       EndpointConfiguration:
         Types:
           - REGIONAL
+          -
   ApiGwRestApiDeliveryRes:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -58,13 +56,13 @@ Resources:
       ResourceId: !Ref ApiGwRestApiDeliveryRes2
       HttpMethod: ANY
       ApiKeyRequired: true
-      AuthorizationType: NONE
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApikeyAuthorizer
       RequestParameters:
         method.request.path.proxy: true
         method.request.header.X-PagoPA-PN-PA: false
         method.request.header.X-PagoPA-User-Id: false
         method.request.header.X-PagoPA-User-Secret: false
-        method.request.header.user_secret: false
         method.request.querystring.recipientId: false
         method.request.querystring.senderId: false
         method.request.querystring.startDate: false
@@ -119,7 +117,7 @@ Resources:
             method.response.header.Access-Control-Allow-Origin: false
             method.response.header.Content-Type: false
             method.response.header.Content-Disposition: false
-            method.response.header.Location: false    
+            method.response.header.Location: false
       Integration:
         ConnectionType: VPC_LINK
         ConnectionId: !ImportValue
@@ -130,10 +128,9 @@ Resources:
         Uri: !Join ['', ["http://", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-alb-domain'}}, ":8080/delivery/{proxy}"]]
         RequestParameters:
           integration.request.path.proxy: method.request.path.proxy
-          integration.request.header.X-PagoPA-PN-PA: method.request.header.X-PagoPA-PN-PA
+          integration.request.header.X-PagoPA-PN-PA: context.authorizer.pa_id
           integration.request.header.X-PagoPA-User-Id: method.request.header.X-PagoPA-User-Id
           integration.request.header.X-PagoPA-User-Secret: method.request.header.X-PagoPA-User-Secret
-          integration.request.header.user_secret: method.request.header.user_secret
           integration.request.querystring.recipientId: method.request.querystring.recipientId
           integration.request.querystring.senderId: method.request.querystring.senderId
           integration.request.querystring.startDate: method.request.querystring.startDate
@@ -175,7 +172,7 @@ Resources:
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
             ResponseTemplates:
-              application/json: ""        
+              application/json: ""
           - StatusCode: 401
             SelectionPattern: 401
             ResponseParameters:
@@ -339,10 +336,31 @@ Resources:
           HttpMethod: '*'
           MetricsEnabled: 'true'
           DataTraceEnabled: 'false'
+
   PublicApiLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: 1
+
+
+  ApiKeyLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: ApikeyAuthorizer
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebapiGwRestApi}/authorizers/${ApikeyAuthorizer}"
+
+  ApikeyAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: apikeyAuthorizer
+      Type: REQUEST
+      AuthorizerResultTtlInSeconds: '300'
+      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-central-1:558518206506:function:apikeyAuthorizer/invocations'
+      IdentitySource: method.request.header.x-api-key
+      RestApiId: !Ref ApiGwRestApi
+
 
   #############################################################################
   ###                     PROXY TO EXTERNAL CHANNEL API                     ###
