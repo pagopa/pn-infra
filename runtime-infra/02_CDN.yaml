@@ -137,7 +137,7 @@ Outputs:
     Export:
       Name: !Sub '${EnvName}-website-bucket-name'
   WebAppCdnUrl:
-    Value:  !Sub 'https://${WebDomain}'
+    Value:  !Join ['', ['https://', !GetAtt WebsiteCDN.DomainName]] 
     Description: Site access URL
     Export:
       Name: !Sub '${EnvName}-cdn-url'
