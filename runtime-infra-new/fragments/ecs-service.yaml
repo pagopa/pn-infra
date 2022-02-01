@@ -49,6 +49,9 @@ Parameters:
   LoadBalancerListenerArn:
     Type: String
     Description: Application load balancer listener ARN
+  LoadbalancerRulePriority:
+    Type: Number
+    Description: Routing rules in the dame load balancer listener must have different priorities
 
   # Container environment map, maximum 30 entry
   ContainerEnvEntry1:
@@ -211,7 +214,7 @@ Resources:
   # ECS Service
   ECSService:
     Type: AWS::ECS::Service
-    DependsOn: LoadBalancerRoutingRule
+    DependsOn: LoadBalancerRoutingRulex
     Properties:
       Cluster: !Ref ECSClusterName
       TaskDefinition: !Ref TaskDefinition
@@ -506,7 +509,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
       ListenerArn: !Ref LoadBalancerListenerArn
-      Priority: 1
+      Priority: !Ref LoadbalancerRulePriority
       Conditions:
         - Field: path-pattern
           Values: !Ref MappedPaths
