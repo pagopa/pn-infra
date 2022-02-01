@@ -211,6 +211,7 @@ Resources:
   # ECS Service
   ECSService:
     Type: AWS::ECS::Service
+    DependsOn: LoadBalancerRoutingRule
     Properties:
       Cluster: !Ref ECSClusterName
       TaskDefinition: !Ref TaskDefinition
