@@ -7,6 +7,21 @@ Parameters:
   EnvNumber:
     Type: String
     Description: Second byte from the left for VPC CIDR
+  APIDomain:
+    Description: "Domain for API"
+    Type: String
+  WebDomain:
+    Description: "Domain for webapp"
+    Type: String
+  APICertificateArn:
+    Description: "ACM API Certificate ARN"
+    Type: String
+  WebCertificateArn:
+    Description: "ACM Web Certificate ARN"
+    Type: String
+  HostedZoneId:
+    Description: "Hosted Zone Id in which you want to add record"
+    Type: String
   
 Mappings:
   Region2S3WebsiteSuffix:
@@ -95,6 +110,22 @@ Resources:
               - ''
               - - origin-access-identity/cloudfront/
                 - Ref: CloudFrontOriginAccessIdentity
+        ViewerCertificate:
+          AcmCertificateArn: !Ref WebCertificateArn
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+
+  Route53RecordSetGroup:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Ref WebDomain
+      Type: A
+      HostedZoneId: !Ref HostedZoneId
+      AliasTarget:
+        DNSName: !GetAtt WebsiteCDN.DomainName
+        EvaluateTargetHealth: false
+        HostedZoneId: Z2FDTNDATAQYW2
+
 
 Outputs:
   # - WebApp Outputs
