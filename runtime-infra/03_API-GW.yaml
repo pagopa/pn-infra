@@ -5,6 +5,24 @@ Parameters:
   EnvName:
     Type: String
     Description: Nome dell'ambiente destinazione
+  EnvNumber:
+    Type: String
+    Description: Second byte from the left for VPC CIDR
+  APIDomain:
+    Description: "Domain for API"
+    Type: String
+  WebDomain:
+    Description: "Domain for webapp"
+    Type: String
+  APICertificateArn:
+    Description: "ACM API Certificate ARN"
+    Type: String
+  WebCertificateArn:
+    Description: "ACM Web Certificate ARN"
+    Type: String
+  HostedZoneId:
+    Description: "Hosted Zone Id in which you want to add record"
+    Type: String
 
 Resources:
   #############################################################################
@@ -23,7 +41,27 @@ Resources:
       EndpointConfiguration:
         Types:
           - REGIONAL
-          -
+
+  ApiGWAPICustomDomain:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName: !Ref APIDomain
+      RegionalCertificateArn: !Ref APICertificateArn
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      SecurityPolicy: TLS_1_2
+  Route53RecordSetGroup:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Ref APIDomain
+      Type: A
+      HostedZoneId: !Ref HostedZoneId
+      AliasTarget:
+        DNSName: !GetAtt ApiGWAPICustomDomain.RegionalDomainName
+        EvaluateTargetHealth: false
+        HostedZoneId: !GetAtt ApiGWAPICustomDomain.RegionalHostedZoneId
+
   ApiGwRestApiDeliveryRes:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -146,7 +184,7 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
-              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-cdn-url'}}, "'"]]
+              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'https://", !Ref WebDomain , "'"]]
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
             ResponseTemplates:
@@ -156,7 +194,7 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
-              method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'https://", !Ref WebDomain , "'"]]
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
@@ -167,7 +205,7 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
-              method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'https://", !Ref WebDomain , "'"]]
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
@@ -178,7 +216,7 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
-              method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'https://", !Ref WebDomain , "'"]]
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
@@ -189,7 +227,7 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
-              method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'https://", !Ref WebDomain , "'"]]
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
@@ -200,7 +238,7 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
-              method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'https://", !Ref WebDomain , "'"]]
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
@@ -240,7 +278,7 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
-              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-cdn-url'}}, "'"]]
+              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'https://", !Ref WebDomain , "'"]]
             ResponseTemplates:
               application/json: ""
   ApiGwRestApiDeliveryApiDocsGetMethod:
@@ -336,6 +374,15 @@ Resources:
           HttpMethod: '*'
           MetricsEnabled: 'true'
           DataTraceEnabled: 'false'
+
+  APIMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    DependsOn: Route53RecordSetGroup
+    Properties:
+      #BasePath: product
+      DomainName: !Ref APIDomain
+      RestApiId: !Ref ApiGwRestApi
+      Stage: !Ref ApiGwRestApiBetaStage
 
   PublicApiLogGroup:
     Type: AWS::Logs::LogGroup
@@ -510,7 +557,7 @@ Resources:
 Outputs:
   # - API Gateway access informations
   ApiGatewayUrlBeta:
-    Value: !Sub 'https://${ApiGwRestApi}.execute-api.${AWS::Region}.amazonaws.com/beta/'
+    Value: !Sub 'https://${APIDomain}'
     Description: Base URL for API Requests
     Export:
       Name: !Sub '${EnvName}-api-gw-url'

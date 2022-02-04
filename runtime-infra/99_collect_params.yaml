@@ -7,6 +7,21 @@ Parameters:
   EnvNumber:
     Type: String
     Description: Second byte from the left for VPC CIDR
+  APIDomain:
+    Description: "Domain for API"
+    Type: String
+  WebDomain:
+    Description: "Domain for webapp"
+    Type: String
+  APICertificateArn:
+    Description: "ACM API Certificate ARN"
+    Type: String
+  WebCertificateArn:
+    Description: "ACM Web Certificate ARN"
+    Type: String
+  HostedZoneId:
+    Description: "Hosted Zone Id in which you want to add record"
+    Type: String
   
 Conditions:
   Never:
@@ -36,5 +51,5 @@ Outputs:
     Description: Name of S3 bucket to hold website content
   WebAppCdnUrl:
     Value: !ImportValue 
-      "Fn::Sub": '${EnvName}-cdn-url'
+      "Fn::Sub": '${EnvName}-WebDomain'
     Description: Site access URL
