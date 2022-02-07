@@ -2,7 +2,7 @@
 
 E' preso da un tutorial ed è ancora da perfezionare, in particolare
 TODO: 
- - Aggiungere i test di integrazione ed ent-to-end, definire un meccanismo di promotion verso prod.
+ - Aggiungere i test di integrazione ed end-to-end, definire un meccanismo di promotion verso prod.
  - Implemntare i deploy verso regioni diverse da quelle di CI/CD
  
 ## Installazione
