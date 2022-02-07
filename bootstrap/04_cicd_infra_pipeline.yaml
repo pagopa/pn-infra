@@ -37,6 +37,10 @@ Parameters:
     Description: Cloudformation architectute template 03
     Type: String
     Default: runtime-infra/03_API-GW.yaml
+  InfraTemplatePath04:
+    Description: Cloudformation architectute template 04
+    Type: String
+    Default: runtime-infra/04_WEBAPI-GW.yaml
   InfraTemplatePath99:
     Description: Cloudformation architectute template 03
     Type: String
@@ -258,6 +262,33 @@ Resources:
               #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
               RoleArn:
                   Fn::If:
+                  - AddCodeBuildResource
+                  - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cicd-role
+                  - !Ref AWS::NoValue
+            - Name: DeployTestWebApiGw
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub ${ProductName}-${BranchName}-infra-webapigw
+                Capabilities: CAPABILITY_NAMED_IAM
+                TemplatePath: !Sub SCCheckoutArtifact::${InfraTemplatePath04}
+                TemplateConfiguration: !Sub SCCheckoutArtifact::runtime-infra/${ProductName}-${BranchName}-beta-cfg.json
+                #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
+                RoleArn:
+                  Fn::If:
+                    - AddCodeBuildResource
+                    - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cloudformationdeployer-role
+                    - !Ref AWS::NoValue
+              InputArtifacts:
+                - Name: SCCheckoutArtifact
+              RunOrder: 3
+              #RoleArn: !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
+              RoleArn:
+                Fn::If:
                   - AddCodeBuildResource
                   - !Sub arn:aws:iam::${BetaAccount}:role/${ProductName}-${BranchName}-cicd-role
                   - !Ref AWS::NoValue
