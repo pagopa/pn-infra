@@ -394,7 +394,7 @@ Resources:
     Type: AWS::Lambda::Permission
     DependsOn: ApikeyAuthorizer
     Properties:
-      FunctionName: ApikeyAuthorizer
+      FunctionName: !Ref ApikeyAuthorizer
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGwRestApi}/authorizers/${ApikeyAuthorizer}"
