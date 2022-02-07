@@ -1,6 +1,6 @@
 # Sample: https://github.com/aws-samples/aws-apigw-http-api-private--integrations/blob/main/templates/APIGW-HTTP-private-integration-ALB-ecs.yml
 AWSTemplateFormatVersion: '2010-09-09'
-Description: WEBAPI gateway Piattaforma Notifiche call with JWT token
+Description: WEBAPI gateway Piattaforma Notifiche with JWT token Authorizer for website calls
 
 Parameters:
   EnvName:
@@ -13,7 +13,7 @@ Resources:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: !Sub '${EnvName}-public-webapi'
-      Description: Api Gateway for website with JWT Authorize
+      Description: Api Gateway for website call with JWT token
       FailOnWarnings: true
       BinaryMediaTypes:
         - 'image~1png'
