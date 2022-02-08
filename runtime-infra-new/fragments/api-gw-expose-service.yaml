@@ -7,6 +7,10 @@ Parameters:
     Type: String
     Description: Microservice unique name
 
+  ApiDnsName:
+    Type: String
+    Description: 'The DNS name used for B2B rest API.'
+    
   ServiceApiPath:
     Type: String
     Description: path of the exposed API
@@ -118,7 +122,7 @@ Resources:
     Type: AWS::ApiGateway::BasePathMapping
     Properties:
       BasePath: !Ref ServiceApiPath
-      DomainName: !Ref APIDomain
+      DomainName: !Ref ApiDnsName
       RestApiId: PublicRestApi
       Stage: PublicRestApiStage
 
