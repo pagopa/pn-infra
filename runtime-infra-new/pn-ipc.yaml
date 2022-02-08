@@ -11,6 +11,26 @@ Parameters:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
 
+  ApiDnsName:
+    Type: String
+    Description: 'The DNS name used for B2B rest API.'
+
+  ApiCertificateArn:
+    Type: String
+    Description: 'The certificate used for B2B rest API.'
+
+  WebApiDnsName:
+    Type: String
+    Description: 'The DNS name used for browser rest API.'
+
+  WebApiCertificateArn:
+    Type: String
+    Description: 'The certificate used for browser rest API.'
+
+  HostedZoneId:
+    Description: "Hosted Zone Id in which you want to add record"
+    Type: String
+
   # pass-though parameters
   NetworkLoadBalancerLink:
     Type: String
@@ -29,6 +49,30 @@ Parameters:
 
 
 Resources:
+
+  ###            COMMON RESOURCES FOR WEB API AND DISTRIBUTIONS            ###
+  ############################################################################
+  RestApiCustomDomain:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName: !Ref ApiDnsName
+      RegionalCertificateArn: !Ref ApiCertificateArn
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      SecurityPolicy: TLS_1_2
+
+  Route53RecordSetGroup:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Ref ApiDnsName
+      Type: A
+      HostedZoneId: !Ref HostedZoneId
+      AliasTarget:
+        DNSName: !GetAtt RestApiCustomDomain.RegionalDomainName
+        EvaluateTargetHealth: false
+        HostedZoneId: !GetAtt RestApiCustomDomain.RegionalHostedZoneId
+
 
   ###                     MESSAGE ORIENTED MIDDLEWARE                     ###
   ###########################################################################
@@ -62,6 +106,13 @@ Resources:
 
 
 Outputs:
+  # Web API for browsers and B2B
+  ApiDnsName:
+    Value: !Ref ApiDnsName
+    Description: 'The DNS name used for B2B rest API.'
+  WebApiDnsName:
+    Value: !Ref WebApiDnsName
+    Description: 'The DNS name used for browser rest API.'
 
   # Delivery push inputs
   DeliveryPushInputsQueueName:

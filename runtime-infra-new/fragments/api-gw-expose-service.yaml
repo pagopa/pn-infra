@@ -113,6 +113,15 @@ Resources:
     Properties:
       RetentionInDays: 1
 
+  # Expose API to custom domain
+  APIMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Properties:
+      BasePath: !Ref ServiceApiPath
+      DomainName: !Ref APIDomain
+      RestApiId: PublicRestApi
+      Stage: PublicRestApiStage
+
 Outputs:
 
   # - Public API URL
