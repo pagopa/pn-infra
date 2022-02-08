@@ -47,6 +47,8 @@ Parameters:
   ECSClusterName:
     Type: String
 
+Conditions:
+  IsStandardPn: !Equals [ !Ref ProjectName, 'pn' ]
 
 Resources:
 
@@ -55,7 +57,11 @@ Resources:
   RestApiCustomDomain:
     Type: AWS::ApiGateway::DomainName
     Properties:
-      DomainName: !Ref ApiDnsName
+      DomainName:
+        Fn::If:
+          - IsStandardPn
+          - !Ref ApiDnsName
+          - !Sub '${ApiDnsName}-${ApiDnsName}'
       RegionalCertificateArn: !Ref ApiCertificateArn
       EndpointConfiguration:
         Types:
@@ -65,7 +71,11 @@ Resources:
   Route53RecordSetGroup:
     Type: AWS::Route53::RecordSet
     Properties:
-      Name: !Ref ApiDnsName
+      Name:
+        Fn::If:
+          - IsStandardPn
+          - !Ref ApiDnsName
+          - !Sub '${ApiDnsName}-${ApiDnsName}'
       Type: A
       HostedZoneId: !Ref HostedZoneId
       AliasTarget:
