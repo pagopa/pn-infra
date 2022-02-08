@@ -33,18 +33,19 @@ Resources:
         Types:
           - REGIONAL
 
-  PublicApiBasepathResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref PublicRestApi
-      ParentId: !GetAtt PublicRestApi.RootResourceId
-      PathPart: !Ref ServiceApiPath
+  #PublicApiBasepathResource:
+  #  Type: AWS::ApiGateway::Resource
+  #  Properties:
+  #    RestApiId: !Ref PublicRestApi
+  #    ParentId: !GetAtt PublicRestApi.RootResourceId
+  #    PathPart: !Ref ServiceApiPath
 
   PublicApiProxyResource:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref PublicRestApi
-      ParentId: !Ref PublicApiBasepathResource
+      #ParentId: !Ref PublicApiBasepathResource
+      ParentId: !GetAtt PublicRestApi.RootResourceId
       PathPart: '{proxy+}'
 
   PublicApiProxyAnyMethod:
