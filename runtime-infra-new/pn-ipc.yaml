@@ -52,26 +52,26 @@ Resources:
 
   ###            COMMON RESOURCES FOR WEB API AND DISTRIBUTIONS            ###
   ############################################################################
-  RestApiCustomDomain:
-    Type: AWS::ApiGateway::DomainName
-    Properties:
-      DomainName: !Ref ApiDnsName
-      RegionalCertificateArn: !Ref ApiCertificateArn
-      EndpointConfiguration:
-        Types:
-          - REGIONAL
-      SecurityPolicy: TLS_1_2
 
-  Route53RecordSetGroup:
-    Type: AWS::Route53::RecordSet
+  # Custom domain for B2B api
+  ApiCustomDomain:
+    Type: AWS::CloudFormation::Stack
     Properties:
-      Name: !Ref ApiDnsName
-      Type: A
-      HostedZoneId: !Ref HostedZoneId
-      AliasTarget:
-        DNSName: !GetAtt RestApiCustomDomain.RegionalDomainName
-        EvaluateTargetHealth: false
-        HostedZoneId: !GetAtt RestApiCustomDomain.RegionalHostedZoneId
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
+      Parameters:
+        DnsName: !Ref ApiDnsName
+        CertificateArn: !Ref ApiCertificateArn
+        HostedZoneId: !Ref HostedZoneId
+
+  # Custom domain for B2B api
+  WebApiCustomDomain:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
+      Parameters:
+        DnsName: !Ref WebApiDnsName
+        CertificateArn: !Ref WebApiCertificateArn
+        HostedZoneId: !Ref HostedZoneId
 
 
   ###                     MESSAGE ORIENTED MIDDLEWARE                     ###
