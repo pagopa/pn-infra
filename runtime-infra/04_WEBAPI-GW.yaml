@@ -191,7 +191,7 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
-              method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'https://", !Ref WebAPIDomain , "'"]]
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
             ResponseTemplates:
@@ -201,7 +201,7 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
-              method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'https://", !Ref WebAPIDomain , "'"]]
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
@@ -212,7 +212,7 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
-              method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'https://", !Ref WebAPIDomain , "'"]]
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
@@ -223,7 +223,7 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
-              method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'",  !Sub "https://${WebAPIDomain}" , "'" ] ]
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
@@ -234,7 +234,7 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
-              method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'https://", !Ref WebAPIDomain , "'"]]
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
@@ -245,7 +245,7 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
-              method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'https://", !Ref WebAPIDomain , "'"]]
               method.response.header.Content-Type: integration.response.header.Content-Type
               method.response.header.Content-Disposition: integration.response.header.Content-Disposition
               method.response.header.Location: integration.response.header.Location
@@ -285,7 +285,7 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'*'"
               method.response.header.Access-Control-Allow-Methods: "'*'"
-              method.response.header.Access-Control-Allow-Origin: !Join [ '', [ "'", { 'Fn::ImportValue': { 'Fn::Sub': '${EnvName}-cdn-url' } }, "'" ] ]
+              method.response.header.Access-Control-Allow-Origin: !Join ['', ["'https://", !Ref WebAPIDomain , "'"]]
             ResponseTemplates:
               application/json: ""
   WebapiGwRestApiDeliveryApiDocsGetMethod:
