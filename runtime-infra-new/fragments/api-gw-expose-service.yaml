@@ -74,6 +74,7 @@ Resources:
         Uri: !Sub 'http://${ApplicationLoadBalancerDomain}:8080/${ServiceApiPath}/{proxy}'
         RequestParameters:
           integration.request.path.proxy: method.request.path.proxy
+          integration.request.header.Aggiunto: 'ValoreHeaderAggiunto'
         PassthroughBehavior: "WHEN_NO_MATCH"
         TimeoutInMillis: 29000
         IntegrationResponses:
