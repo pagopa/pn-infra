@@ -59,13 +59,14 @@ Resources:
       AuthorizationType: NONE
       RequestParameters:
         method.request.path.proxy: true
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Content-Type: false
-        - StatusCode: 503
-          ResponseParameters:
-            method.response.header.Content-Type: false
+        method.request.header.Aggiunto: false
+      #MethodResponses:
+      #  - StatusCode: 200
+      #    ResponseParameters:
+      #      method.response.header.Content-Type: false
+      #  - StatusCode: 503
+      #    ResponseParameters:
+      #      method.response.header.Content-Type: false
       Integration:
         ConnectionType: VPC_LINK
         ConnectionId: !Ref NetworkLoadBalancerLink
@@ -77,19 +78,19 @@ Resources:
           integration.request.header.Aggiunto: "'ValoreHeaderAggiunto'"
         PassthroughBehavior: "WHEN_NO_MATCH"
         TimeoutInMillis: 29000
-        IntegrationResponses:
-          - StatusCode: 200
-            SelectionPattern: ""
-            ResponseParameters:
-              method.response.header.Content-Type: integration.response.header.Content-Type
-            ResponseTemplates:
-              application/json: ""
-          - StatusCode: 503
-            SelectionPattern: ""
-            ResponseParameters:
-              method.response.header.Content-Type: integration.response.header.Content-Type
-            ResponseTemplates:
-              application/json: ""
+#        IntegrationResponses:
+#          - StatusCode: 200
+#            SelectionPattern: ""
+#            ResponseParameters:
+#              method.response.header.Content-Type: integration.response.header.Content-Type
+#            ResponseTemplates:
+#              application/json: ""
+#          - StatusCode: 503
+#            SelectionPattern: ""
+#            ResponseParameters:
+#              method.response.header.Content-Type: integration.response.header.Content-Type
+#            ResponseTemplates:
+#              application/json: ""
 
   PublicRestApiDeployment:
     Type: AWS::ApiGateway::Deployment
