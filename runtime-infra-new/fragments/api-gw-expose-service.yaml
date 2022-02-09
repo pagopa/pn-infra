@@ -71,7 +71,7 @@ Resources:
         ConnectionType: VPC_LINK
         ConnectionId: !Ref NetworkLoadBalancerLink
         IntegrationHttpMethod: ANY
-        Type: HTTP
+        Type: HTTP_PROXY
         Uri: !Sub 'http://${ApplicationLoadBalancerDomain}:8080/${ServiceApiPath}/{proxy}'
         RequestParameters:
           integration.request.path.proxy: method.request.path.proxy
