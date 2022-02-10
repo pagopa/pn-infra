@@ -40,6 +40,7 @@ Conditions:
 
 Resources:
 
+  # API definition
   PublicRestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -48,14 +49,50 @@ Resources:
       EndpointConfiguration:
         Types:
           - REGIONAL
+  
+  # /v3/api-docs resource
+  PublicApiV3Resource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref PublicRestApi
+      ParentId: !GetAtt PublicRestApi.RootResourceId
+      PathPart: v3
+  PublicApiV3ApiDocsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref PublicRestApi
+      ParentId: !Ref PublicApiV3Resource
+      PathPart: api-docs
+  
+  # /v3/api-docs methods
+  PublicApiV3ApiDocsAnyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      OperationName: !Sub 'Proxy to ${MicroServiceUniqueName} public api-docs'
+      RestApiId: !Ref PublicRestApi
+      ResourceId: !Ref PublicApiV3ApiDocsResource
+      HttpMethod: ANY
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      Integration:
+        ConnectionType: VPC_LINK
+        ConnectionId: !Ref NetworkLoadBalancerLink
+        IntegrationHttpMethod: ANY
+        Type: HTTP_PROXY
+        Uri: !Sub 'http://${ApplicationLoadBalancerDomain}:8080/${ServiceApiPath}/v3/api-docs'
+        PassthroughBehavior: "WHEN_NO_MATCH"
+        TimeoutInMillis: 29000
+  
 
+  # /{proxy+} resource
   PublicApiProxyResource:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref PublicRestApi
       ParentId: !GetAtt PublicRestApi.RootResourceId
       PathPart: '{proxy+}'
-
+  
+  # /{proxy+} methdos
   PublicApiProxyAnyMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -95,6 +132,7 @@ Resources:
         PassthroughBehavior: "WHEN_NO_MATCH"
         TimeoutInMillis: 29000
 
+  # Deployment
   PublicRestApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -102,6 +140,7 @@ Resources:
     Properties:
       RestApiId: !Ref PublicRestApi
 
+  # Stage
   PublicRestApiStage:
     Type: AWS::ApiGateway::Stage
     Properties:
@@ -118,6 +157,7 @@ Resources:
           MetricsEnabled: 'true'
           DataTraceEnabled: 'false'
 
+  # Log Group
   PublicApiLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
