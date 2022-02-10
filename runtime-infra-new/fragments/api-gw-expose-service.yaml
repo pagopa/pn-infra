@@ -64,7 +64,7 @@ Resources:
       ResourceId: !Ref PublicApiProxyResource
       HttpMethod: ANY
       ApiKeyRequired: !If [ IsB2B, true, false]
-      AuthorizationType: CUSTOM
+      AuthorizationType: !If [ IsB2B, CUSTOM, NONE ]
       AuthorizerId: !If [ IsB2B, !Ref ApikeyAuthorizer, !Ref AWS::NoValue ]
       RequestParameters:
         Fn::If:
