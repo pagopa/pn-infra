@@ -125,7 +125,7 @@ Resources:
     Type: AWS::Lambda::Permission
     DependsOn: ApikeyAuthorizer
     Properties:
-      FunctionName: !Sub '${ProjectName}-jwtAuthorizerLambda'
+      FunctionName: !Sub '${ProjectName}-apikeyAuthorizerLambda'
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${ApikeyAuthorizer}"
