@@ -65,7 +65,7 @@ Resources:
       HttpMethod: ANY
       ApiKeyRequired: !If [ IsB2B, true, false]
       AuthorizationType: CUSTOM
-      AuthorizerId: !Ref ApikeyAuthorizer
+      AuthorizerId: !If [ IsB2B, !Ref ApikeyAuthorizer, !Ref AWS::NoValue ]
       RequestParameters:
         Fn::If:
           - IsWeb
