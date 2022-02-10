@@ -64,13 +64,15 @@ Resources:
       ResourceId: !Ref PublicApiProxyResource
       HttpMethod: ANY
       ApiKeyRequired: !If [ IsB2B, true, false]
-      AuthorizationType: !If [ IsB2B, CUSTOM, NONE ]
-      AuthorizerId: !If [ IsB2B, !Ref ApikeyAuthorizer, !Ref AWS::NoValue ]
+      AuthorizationType: CUSTOM
+      AuthorizerId: !If [ IsB2B, !Ref ApikeyAuthorizer, !Ref JwtAuthorizer ]
       RequestParameters:
         Fn::If:
           - IsWeb
           - method.request.path.proxy: true
             method.request.header.WebInjectedHeader: false
+            method.request.header.X-PagoPA-PN-PA: false
+            method.request.header.X-PagoPA-User-Id: false
           - method.request.path.proxy: true
             method.request.header.B2BInjectedHeader: false
             method.request.header.X-PagoPA-PN-PA: false
@@ -85,6 +87,8 @@ Resources:
             - IsWeb
             - integration.request.path.proxy: method.request.path.proxy
               integration.request.header.WebInjectedHeader: "'web_header_value'"
+              integration.request.header.X-PagoPA-PN-PA: context.authorizer.pa_id
+              integration.request.header.X-PagoPA-User-Id: context.authorizer.user_id
             - integration.request.path.proxy: method.request.path.proxy
               integration.request.header.B2BInjectedHeader: "'b2b_header_value'"
               integration.request.header.X-PagoPA-PN-PA: context.authorizer.pa_id
@@ -140,6 +144,29 @@ Resources:
       AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-apikeyAuthorizerLambda/invocations'
       IdentitySource: method.request.header.x-api-key
       RestApiId: !Ref PublicRestApi
+
+  # WEB Authorizer
+  JwtLambdaPermission:
+    Condition: IsWeb
+    Type: AWS::Lambda::Permission
+    DependsOn: JwtAuthorizer
+    Properties:
+      FunctionName: !Sub '${ProjectName}-jwtAuthorizerLambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${JwtAuthorizer}"
+
+  JwtAuthorizer:
+    Condition: IsWeb
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: pn-auth-fleet_jwtAuthorizer
+      Type: TOKEN
+      AuthorizerResultTtlInSeconds: '300'
+      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-jwtAuthorizerLambda/invocations'
+      IdentitySource: method.request.header.Authorization
+      RestApiId: !Ref PublicRestApi
+
 
   # Expose API to custom domain
   APIMapping:
