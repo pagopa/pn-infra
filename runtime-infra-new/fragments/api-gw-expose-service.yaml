@@ -92,7 +92,25 @@ Resources:
       ParentId: !GetAtt PublicRestApi.RootResourceId
       PathPart: '{proxy+}'
   
-  # /{proxy+} methdos
+  # /{proxy+} OPTIONS methdo
+  PublicApiProxyAnyCorsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      OperationName: !Sub 'Proxy to ${MicroServiceUniqueName} public API CORS'
+      RestApiId: !Ref PublicRestApi
+      ResourceId: !Ref PublicApiProxyResource
+      HttpMethod: OPTIONS
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      Integration:
+        ConnectionType: VPC_LINK
+        ConnectionId: !Ref NetworkLoadBalancerLink
+        IntegrationHttpMethod: ANY
+        Type: HTTP_PROXY
+        Uri: !Sub 'http://${ApplicationLoadBalancerDomain}:8080/${ServiceApiPath}/{proxy}'
+        PassthroughBehavior: "WHEN_NO_MATCH"
+        TimeoutInMillis: 29000
+  # /{proxy+} not OPTIONS methdos
   PublicApiProxyAnyMethod:
     Type: AWS::ApiGateway::Method
     Properties:
