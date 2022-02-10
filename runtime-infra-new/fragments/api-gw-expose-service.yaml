@@ -92,7 +92,7 @@ Resources:
       ParentId: !GetAtt PublicRestApi.RootResourceId
       PathPart: '{proxy+}'
   
-  # /{proxy+} OPTIONS methdo
+  # /{proxy+} OPTIONS method
   PublicApiProxyAnyCorsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -102,15 +102,19 @@ Resources:
       HttpMethod: OPTIONS
       ApiKeyRequired: false
       AuthorizationType: NONE
+      RequestParameters:
+        - method.request.path.proxy: true
       Integration:
         ConnectionType: VPC_LINK
         ConnectionId: !Ref NetworkLoadBalancerLink
         IntegrationHttpMethod: ANY
         Type: HTTP_PROXY
         Uri: !Sub 'http://${ApplicationLoadBalancerDomain}:8080/${ServiceApiPath}/{proxy}'
+        RequestParameters:
+          - integration.request.path.proxy: method.request.path.proxy
         PassthroughBehavior: "WHEN_NO_MATCH"
         TimeoutInMillis: 29000
-  # /{proxy+} not OPTIONS methdos
+  # /{proxy+} not OPTIONS methods
   PublicApiProxyAnyMethod:
     Type: AWS::ApiGateway::Method
     Properties:
