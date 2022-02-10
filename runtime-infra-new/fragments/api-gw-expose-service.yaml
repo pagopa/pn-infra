@@ -31,13 +31,14 @@ Parameters:
 
 Conditions:
   IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
+  IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
 
 Resources:
 
   PublicRestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Name: !Sub '${MicroServiceUniqueName}-public-api'
+      Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
       FailOnWarnings: true
       EndpointConfiguration:
         Types:
@@ -57,8 +58,9 @@ Resources:
       RestApiId: !Ref PublicRestApi
       ResourceId: !Ref PublicApiProxyResource
       HttpMethod: ANY
-      ApiKeyRequired: false
-      AuthorizationType: NONE
+      ApiKeyRequired: !If [ IsB2B, true, false]
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApikeyAuthorizer
       RequestParameters:
         Fn::If:
           - IsWeb
@@ -66,6 +68,7 @@ Resources:
             method.request.header.WebInjectedHeader: false
           - method.request.path.proxy: true
             method.request.header.B2BInjectedHeader: false
+            method.request.header.X-PagoPA-PN-PA: false
       Integration:
         ConnectionType: VPC_LINK
         ConnectionId: !Ref NetworkLoadBalancerLink
@@ -79,6 +82,7 @@ Resources:
               integration.request.header.WebInjectedHeader: "'web_header_value'"
             - integration.request.path.proxy: method.request.path.proxy
               integration.request.header.B2BInjectedHeader: "'b2b_header_value'"
+              integration.request.header.X-PagoPA-PN-PA: context.authorizer.pa_id
         PassthroughBehavior: "WHEN_NO_MATCH"
         TimeoutInMillis: 29000
 
@@ -109,6 +113,28 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: 1
+
+  # B2B Authorizer
+  ApiKeyLambdaPermission:
+    Condition: IsB2B
+    Type: AWS::Lambda::Permission
+    DependsOn: ApikeyAuthorizer
+    Properties:
+      FunctionName: !Sub '${ProjectName}-jwtAuthorizerLambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${ApikeyAuthorizer}"
+
+  ApikeyAuthorizer:
+    Condition: IsB2B
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: pn-auth-fleet_apikeyAuthorizer
+      Type: REQUEST
+      AuthorizerResultTtlInSeconds: '300'
+      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-apikeyAuthorizer/invocations'
+      IdentitySource: method.request.header.x-api-key
+      RestApiId: !Ref PublicRestApi
 
   # Expose API to custom domain
   APIMapping:
