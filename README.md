@@ -1,10 +1,10 @@
-# Preparazione DNS e certificati
-- [Script di creazione DNS e certificati](scripts/dns-zone-and-server-certificates/)
+# Generate DNS zones and certificates 
+- [DNS and certificates creation script](scripts/dns-zone-and-server-certificates/)
 
-# Definizione dell'infrastruttura cloud per Piattaforma Notifiche
+# "Piattaforma Notifiche" cloud infrastructure definition
 
 - OLD: [CI/CD dell'infrastruttura](bootstrap/)
 - OLD: [Definizione dell'infrastruttura in cui eseguirà PN](runtime-infra/)
 
-- [Definizione dell'infrastruttura in cui eseguirà PN](runtime-infra-new/)
+- [PN runtime infrastructure definition](runtime-infra-new/)
 
