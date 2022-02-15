@@ -1,5 +1,5 @@
 # Hight Level Description
-[!diagram](docs/base_infrastructure.drawio.png)
+![diagram](docs/base_infrastructure.drawio.png)
 
 This diagram is the hight level view of the infrastructure created by 3 different templates.
 
