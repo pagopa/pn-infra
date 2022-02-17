@@ -1,0 +1,80 @@
+# Key/Cert metadata
+METADATA_PRIVATE_CERT="${MakecertPrivate}"
+METADATA_PUBLIC_CERT="${MakecertPublic}"
+
+# Attributi dei metadati
+ORG_ISSUER=https://spid.agid.gov.it/cd
+ORG_URL=https://pagopa.gov.it
+# Assert Consumer Service: sevizio chiamato al termine della login spid che consuma la SAML response
+ACS_BASE_URL=http://${DnsFullDomain}:9090
+
+#
+ORG_DISPLAY_NAME=Organization display name
+ORG_NAME=Organization name
+
+AUTH_N_CONTEXT=https://www.spid.gov.it/SpidL2
+
+# Attributi presi da SAML
+SPID_ATTRIBUTES=address,email,name,familyName,fiscalNumber,mobilePhone
+
+ENDPOINT_ACS=/acs
+ENDPOINT_ERROR=/error
+ENDPOINT_SUCCESS=${LoginSuccessDestinationEnpoint}
+ENDPOINT_LOGIN=/login
+ENDPOINT_METADATA=/metadata
+ENDPOINT_LOGOUT=/logout
+
+# Utilizzato per la validita delle asserzione (spid-saml-check)
+SPID_VALIDATOR_URL=http://localhost
+# Url dal quale risponde lo spid idp di test (lanciando con docker compose)
+SPID_TESTENV_URL=https://${DnsFullDomain}:8088
+#SPID_TESTENV_URL=https://spid-testenv2:8088
+
+# Connessione a redis (vedi memory db di AWS)
+REDIS_URL=redis
+REDIS_TLS_ENABLED=false
+
+# abilitazione generazione JWT (se false viene generato un token opaco col quale interrogare Redis)
+ENABLE_JWT=true
+
+# User registry
+ENABLE_USER_REGISTRY=true
+USER_REGISTRY_URL=https://api.dev.userregistry.pagopa.it/user-registry-management/v1
+USER_REGISTRY_API_KEY=76db05fe91cd4c189d4ffc40d71fed06
+# abilità nella risposta di introspection il payload dei dati utente altrimenti valida solo.
+INCLUDE_SPID_USER_ON_INTROSPECTION=true
+
+TOKEN_EXPIRATION=3600
+JWT_TOKEN_ISSUER=${DnsFullDomain}
+JWT_TOKEN_PRIVATE_KEY="${JwtTokenPrivateKey}"
+JWT_TOKEN_KID=spid
+
+# Interfacciamento con ADE per restituzione per cui la persona fisica è legale rappresentante o referente (esiste ma non è esposto ***)
+# Il processo di login ha due livelli: utente / azienda
+ENABLE_ADE_AA=false
+ADE_AA_API_ENDPOINT=http://ade-aa-ms-mock:3000
+ENDPOINT_L1_SUCCESS="/success/l1"
+L1_TOKEN_EXPIRATION=60
+L1_TOKEN_HEADER_NAME=x-token
+L2_TOKEN_EXPIRATION=3600
+
+# AppInsights (dep Azure Telemetry)
+APPINSIGHTS_INSTRUMENTATIONKEY=foo
+
+# Service Name per CIE (nome del servizio che richiede i dati)
+REQUIRED_ATTRIBUTES_SERVICE_NAME=Service Name
+
+# Attributi che abilitano il service provider come operatore FULL
+ENABLE_FULL_OPERATOR_METADATA=true
+COMPANY_EMAIL=company@email.com
+COMPANY_FISCAL_CODE=12312312311
+COMPANY_IPA_CODE=IPA_CODE
+COMPANY_NAME=Company S.r.l
+COMPANY_VAT_NUMBER=12312312311
+
+ENABLE_SPID_ACCESS_LOGS=false
+SPID_LOGS_STORAGE_CONTAINER_NAME=spidassertions
+SPID_LOGS_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://storage:10000/devstoreaccount1;QueueEndpoint=http://storage:10001/devstoreaccount1;
+SPID_LOGS_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCh2U9uNjj06HglAlkXuCaAuGmB\ntWE9svolLzczQePuiVk41U8ALUto3FzpRDYKBdMawBo6ySsJSeNxBI8o/WPmEOsi\n0eXGlgiJvY/ily43l2xOOjPIJgCfHapBYEQPDv5thLehVi9nCHUynwDzxTpWshPM\nBOFhmaKZB2tgERXagwIDAQAB\n-----END PUBLIC KEY-----"
+
+SERVER_PORT=9090
