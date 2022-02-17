@@ -80,7 +80,7 @@ if ( [ "PENDING_VALIDATION" = "$certificateStatus" ] ) then
   echo " - Type: $validationDnsType"
   echo " - Value: $validationDnsValue"
 
-  echo "{ \"Changes\": [{ \n"\
+  echo -e "{ \"Changes\": [{ \n"\
        "    \"Action\": \"CREATE\", \n"\
        "    \"ResourceRecordSet\": { \n"\
        "        \"Name\": \"${validationDnsName}\",\n"\

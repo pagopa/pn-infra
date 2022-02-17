@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys the base infra for PN. VPC, AWS services endpoints, 
+              load balancer, ECS cluster'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  VpcNumber:
+    Type: String
+    Description: Second byte from the left for VPC CIDR
+
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
+  # pass-through parameters
+  AlarmSNSTopicArn:
+    Type: String
+
+Resources:
+
+  ###                       VPC BASE CONFIGURATIONS                       ###
+  ###########################################################################
+
+  # VPC and subnets
+  VPC:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/vpc.yaml"
+      Parameters:
+        VpcName: !Ref ProjectName
+        VpcNumber: !Ref VpcNumber
+
+  # Private connection from subnets to AWS services
+  VPCEndpoints:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/vpc-endpoints.yaml"
+      Parameters:
+        VpcName: !Ref ProjectName
+        VpcNumber: !Ref VpcNumber
+        Subnets: !GetAtt VPC.Outputs.SubnetsIds
+        RouteTableIds: !GetAtt VPC.Outputs.PublicRouteTables
+        VpcId: !GetAtt VPC.Outputs.VpcId
+
+  # LoadBalancer
+  LoadBalancer:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/load-balancer.yaml"
+      Parameters:
+        LoadBalancerName: !Ref ProjectName
+        Subnets: !GetAtt VPC.Outputs.SubnetsIds
+        VpcId: !GetAtt VPC.Outputs.VpcId
+
+  ###                             ECS CLUSTER                             ###
+  ###########################################################################
+
+  ECSCluster:
+    DependsOn: LoadBalancer
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-cluster.yaml"
+      Parameters:
+        MacroServiceName: !Sub '${ProjectName}-core'
+
+
+Outputs:
+
+  # VPC outputs
+  VpcId:
+    Value: !GetAtt VPC.Outputs.VpcId
+    Description: infrastructure VPC id
+
+  SubnetsIds:
+    Value: !GetAtt VPC.Outputs.SubnetsIds
+    Description: Subnets
+
+
+  # Load balancers outputs
+  NetworkLoadBalancerLink:
+    Value: !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink
+    Description: Used by API-Gw to connect into VPC
+
+  ApplicationLoadBalancerListenerArn:
+    Value: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerListenerArn
+    Description: Application Load Balancerlistener Arn
+
+  ApplicationLoadBalancerDomain:
+    Value: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain
+    Description: Application Load Balancer Domain to use for http URL
+
+  # ECS Cluster
+  ECSClusterName:
+    Value: !GetAtt ECSCluster.Outputs.ClusterName
+    Description: ECS cluster name
+
+  # pass-though parameters
+  AlarmSNSTopicArn:
+    Value: !Ref AlarmSNSTopicArn

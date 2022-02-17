@@ -1,0 +1,249 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Expose a microservice API using API-GW. This template can expose API for B2B or WEB usage'
+
+Parameters:
+
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+        experimental environments without crash official development environment'
+
+  MicroServiceUniqueName:
+    Type: String
+    Description: Microservice unique name
+
+  DnsName:
+    Type: String
+    Description: Custom DNS to register this api to
+
+  IntendedUsage:
+    Type: String
+    AllowedValues:
+      - B2B
+      - WEB
+    Description: B2B or WEB usage. Used from other back-end system or used from a browser
+
+  ServiceApiPath:
+    Type: String
+    Description: path of the exposed API
+
+  NetworkLoadBalancerLink:
+    Type: String
+    Description: Link inside the VPC
+  ApplicationLoadBalancerDomain:
+    Type: String
+    Description: Application load balancer that dispatch request to microserveces
+
+Conditions:
+  IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
+  IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
+
+Resources:
+
+  # API definition
+  PublicRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+      FailOnWarnings: true
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+  
+  # /v3/api-docs resource
+  PublicApiV3Resource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref PublicRestApi
+      ParentId: !GetAtt PublicRestApi.RootResourceId
+      PathPart: v3
+  PublicApiV3ApiDocsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref PublicRestApi
+      ParentId: !Ref PublicApiV3Resource
+      PathPart: api-docs
+  
+  # /v3/api-docs methods
+  PublicApiV3ApiDocsAnyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      OperationName: !Sub 'Proxy to ${MicroServiceUniqueName} public api-docs'
+      RestApiId: !Ref PublicRestApi
+      ResourceId: !Ref PublicApiV3ApiDocsResource
+      HttpMethod: ANY
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      Integration:
+        ConnectionType: VPC_LINK
+        ConnectionId: !Ref NetworkLoadBalancerLink
+        IntegrationHttpMethod: ANY
+        Type: HTTP_PROXY
+        Uri: !Sub 'http://${ApplicationLoadBalancerDomain}:8080/${ServiceApiPath}/v3/api-docs'
+        PassthroughBehavior: "WHEN_NO_MATCH"
+        TimeoutInMillis: 29000
+  
+
+  # /{proxy+} resource
+  PublicApiProxyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref PublicRestApi
+      ParentId: !GetAtt PublicRestApi.RootResourceId
+      PathPart: '{proxy+}'
+  
+  # /{proxy+} OPTIONS method
+  PublicApiProxyAnyCorsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      OperationName: !Sub 'Proxy to ${MicroServiceUniqueName} public API CORS'
+      RestApiId: !Ref PublicRestApi
+      ResourceId: !Ref PublicApiProxyResource
+      HttpMethod: OPTIONS
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        ConnectionType: VPC_LINK
+        ConnectionId: !Ref NetworkLoadBalancerLink
+        IntegrationHttpMethod: ANY
+        Type: HTTP_PROXY
+        Uri: !Sub 'http://${ApplicationLoadBalancerDomain}:8080/${ServiceApiPath}/{proxy}'
+        RequestParameters:
+          integration.request.path.proxy: method.request.path.proxy
+        PassthroughBehavior: "WHEN_NO_MATCH"
+        TimeoutInMillis: 29000
+  # /{proxy+} not OPTIONS methods
+  PublicApiProxyAnyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      OperationName: !Sub 'Proxy to ${MicroServiceUniqueName} public API'
+      RestApiId: !Ref PublicRestApi
+      ResourceId: !Ref PublicApiProxyResource
+      HttpMethod: ANY
+      ApiKeyRequired: !If [ IsB2B, true, false]
+      AuthorizationType: CUSTOM
+      AuthorizerId: !If [ IsB2B, !Ref ApikeyAuthorizer, !Ref JwtAuthorizer ]
+      RequestParameters:
+        Fn::If:
+          - IsWeb
+          - method.request.path.proxy: true
+            method.request.header.WebInjectedHeader: false
+            method.request.header.x-pagopa-pn-pa: false
+            method.request.header.X-PagoPA-User-Id: false
+          - method.request.path.proxy: true
+            method.request.header.B2BInjectedHeader: false
+            method.request.header.x-pagopa-pn-pa: false
+      Integration:
+        ConnectionType: VPC_LINK
+        ConnectionId: !Ref NetworkLoadBalancerLink
+        IntegrationHttpMethod: ANY
+        Type: HTTP_PROXY
+        Uri: !Sub 'http://${ApplicationLoadBalancerDomain}:8080/${ServiceApiPath}/{proxy}'
+        RequestParameters:
+          Fn::If:
+            - IsWeb
+            - integration.request.path.proxy: method.request.path.proxy
+              integration.request.header.WebInjectedHeader: "'web_header_value'"
+              integration.request.header.x-pagopa-pn-pa: context.authorizer.pa_id
+              integration.request.header.X-PagoPA-User-Id: context.authorizer.user_id
+            - integration.request.path.proxy: method.request.path.proxy
+              integration.request.header.B2BInjectedHeader: "'b2b_header_value'"
+              integration.request.header.x-pagopa-pn-pa: context.authorizer.pa_id
+        PassthroughBehavior: "WHEN_NO_MATCH"
+        TimeoutInMillis: 29000
+
+  # Deployment
+  PublicRestApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - PublicApiProxyAnyMethod
+      - PublicApiProxyAnyCorsMethod
+      - PublicApiV3ApiDocsAnyMethod
+    Properties:
+      RestApiId: !Ref PublicRestApi
+
+  # Stage
+  PublicRestApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref PublicRestApi
+      StageName: unique
+      TracingEnabled: true
+      DeploymentId: !Ref PublicRestApiDeployment
+      AccessLogSetting:
+        DestinationArn: !GetAtt "PublicApiLogGroup.Arn"
+        Format: '{"requestTime":"$context.requestTime","requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","routeKey":"$context.routeKey","status":$context.status,"responseLatency":$context.responseLatency}'
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          MetricsEnabled: 'true'
+          DataTraceEnabled: 'false'
+
+  # Log Group
+  PublicApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 1
+
+  # B2B Authorizer
+  ApiKeyLambdaPermission:
+    Condition: IsB2B
+    Type: AWS::Lambda::Permission
+    DependsOn: ApikeyAuthorizer
+    Properties:
+      FunctionName: !Sub '${ProjectName}-apikeyAuthorizerLambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${ApikeyAuthorizer}"
+
+  ApikeyAuthorizer:
+    Condition: IsB2B
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: pn-auth-fleet_apikeyAuthorizer
+      Type: REQUEST
+      AuthorizerResultTtlInSeconds: '300'
+      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-apikeyAuthorizerLambda/invocations'
+      IdentitySource: method.request.header.x-api-key
+      RestApiId: !Ref PublicRestApi
+
+  # WEB Authorizer
+  JwtLambdaPermission:
+    Condition: IsWeb
+    Type: AWS::Lambda::Permission
+    DependsOn: JwtAuthorizer
+    Properties:
+      FunctionName: !Sub '${ProjectName}-jwtAuthorizerLambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${JwtAuthorizer}"
+
+  JwtAuthorizer:
+    Condition: IsWeb
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: pn-auth-fleet_jwtAuthorizer
+      Type: TOKEN
+      AuthorizerResultTtlInSeconds: '300'
+      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-jwtAuthorizerLambda/invocations'
+      IdentitySource: method.request.header.Authorization
+      RestApiId: !Ref PublicRestApi
+
+
+  # Expose API to custom domain
+  APIMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Properties:
+      BasePath: !Ref ServiceApiPath
+      DomainName: !Ref DnsName
+      RestApiId: !Ref PublicRestApi
+      Stage: !Ref PublicRestApiStage
+
+Outputs:
+
+  # - Public API URL
+  ApiGatewayUrlBeta:
+    Value: !Sub 'https://${PublicRestApi}.execute-api.${AWS::Region}.amazonaws.com/unique/'
+    Description: Base URL for API Requests

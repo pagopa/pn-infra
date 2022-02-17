@@ -1,0 +1,184 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Define a VPC with internet gateway and 3 subnets in 3 different AZ. N.B: now subnets are public'
+# TODO: add a parameter to define if subnets are public or private
+
+Parameters:
+  VpcName:
+    Type: String
+    Description: 'VPC name: pn-dev, pn-uat, extreg-dev, ...'
+  VpcNumber:
+    Type: String
+    Description: Second byte from the left for VPC CIDR
+
+
+Resources:
+
+  ###                            VPC DEFINITION                            ###
+  ############################################################################
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Join ['', ["10.", !Ref "VpcNumber", ".0.0/16" ]]
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VpcName}-VPC
+
+  # Internet connections
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${VpcName}-InetGW
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  ###                SUBNETS AND ROUTING TABLES DEFINITIONS                ###
+  ############################################################################
+
+  # SUBNET 1 #
+  ############
+  Subnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Join ['', ["10.", !Ref "VpcNumber", ".1.0/24" ]]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VpcName} Subnet 1(AZ1)
+  Subnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable1
+      SubnetId: !Ref Subnet1
+  RouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${VpcName} Subnet 1 routes
+  DefaultPublicRoute1:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  # SUBNET 2 #
+  ############
+  Subnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Join [ '', [ "10.", !Ref "VpcNumber", ".2.0/24" ] ]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VpcName} Subnet 2 (AZ2)
+  Subnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable2
+      SubnetId: !Ref Subnet2
+  RouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${VpcName} Subnet 2 Routes
+  DefaultPublicRoute2:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+
+  # SUBNET 3 #
+  ############
+  Subnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 2, !GetAZs '' ]
+      CidrBlock: !Join [ '', [ "10.", !Ref "VpcNumber", ".3.0/24" ] ]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VpcName} Subnet 3 (AZ3)
+  Subnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable3
+      SubnetId: !Ref Subnet3
+  RouteTable3:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${VpcName} Subnet 3 routes
+  DefaultPublicRoute3:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable3
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+
+Outputs:
+  VpcId:
+    Value: !Ref VPC
+    Description: Id della VPC
+
+  SubnetsIds:
+    Value:
+      Fn::Join:
+        - ","
+        - - !Ref Subnet1
+          - !Ref Subnet2
+          - !Ref Subnet3
+    Description: Subnets ids joined with comma separator
+
+  PublicRouteTables:
+    Value:
+      Fn::Join:
+        - ","
+        - - !Ref RouteTable1
+          - !Ref RouteTable2
+          - !Ref RouteTable3
+    Description: Routing tables joined with comma separator
+
+
+  PublicSubnet1Id:
+    Value: !Ref Subnet1
+    Description: Id subnet 1
+  PublicSubnet2Id:
+    Value: !Ref Subnet2
+    Description: Id subnet 2
+  PublicSubnet3Id:
+    Value: !Ref Subnet3
+    Description: Id subnet 3
+  
+  PublicRouteTable1:
+    Value: !Ref RouteTable1
+    Description: Routing table for subnet 1
+  PublicRouteTable2:
+    Value: !Ref RouteTable2
+    Description: Routing table for subnet 2
+  PublicRouteTable3:
+    Value: !Ref RouteTable3
+    Description: Routing table for subnet 3
