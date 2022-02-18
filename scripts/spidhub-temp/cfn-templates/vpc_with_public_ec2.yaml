@@ -1,0 +1,134 @@
+#
+# yum install docker
+#
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Actions storage
+
+Parameters:
+  KeyName:
+    Type: String
+    Description: Nome della chiave da usare per accedere in SSH. La chiave default è creata nella zona di parigi e salvata nel secret manager dell'Utente CiCd
+  
+  EnvName:
+    Type: String
+    Description: DNS simple name
+  
+  DnsZoneDomain:
+    Type: String
+    Description: DNS domain
+
+  AmiId:
+    Type: AWS::EC2::Image::Id
+#    Default: ami-08cfb7b19d5cd546d # Ami per amazon linux Paris eu-west-3
+    Default: ami-0bf84c42e04519c85 # Ami per amazon linux Ireland eu-west-1
+
+  InstanceSize:
+    Type: String
+    Default: t2.small
+
+Resources:
+
+  # Microservices VPC:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: '10.100.0.0/16'
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+      - Key: Name
+        Value: 'Temporary spid-hub dev env'
+
+  InterfaceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Controls Inbound Access'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - FromPort: '22'
+          ToPort: '22'
+          IpProtocol: tcp
+          CidrIp: '0.0.0.0/0'
+        - FromPort: '8080'
+          ToPort: '8088'
+          IpProtocol: tcp
+          CidrIp: '0.0.0.0/0'          
+        - FromPort: '8088'
+          ToPort: '8088'
+          IpProtocol: tcp
+          CidrIp: '0.0.0.0/0'          
+        - FromPort: '9090'
+          ToPort: '9090'
+          IpProtocol: tcp
+          CidrIp: '0.0.0.0/0'
+      Tags:
+        - Key: Name
+          Value: 'SSH, 8088, 9090'
+
+  # Internet connections
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: 'Temporary spid-hub dev env'
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  # Public subnet 1
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: '10.100.1.0/24'
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: 'Temporary spid-hub dev env AZ1'
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable1
+      SubnetId: !Ref PublicSubnet1
+  PublicRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: 'Temporary spid-hub dev env Subnet1'
+  DefaultPublicRoute1:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+
+  # EC2 machine
+  Ec2Instance:
+    DependsOn: InternetGatewayAttachment
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      SecurityGroupIds:
+        - !Ref InterfaceSecurityGroup
+      SubnetId: !Ref PublicSubnet1
+      KeyName: !Ref KeyName
+      InstanceType: !Ref InstanceSize
+
+  Ec2DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Sub '${DnsZoneDomain}.'
+      Name: !Sub '${EnvName}.${DnsZoneDomain}'
+      ResourceRecords:
+        - !Sub ${Ec2Instance.PublicDnsName}
+      TTL: 600
+      Type: CNAME
