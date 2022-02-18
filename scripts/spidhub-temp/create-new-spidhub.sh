@@ -7,12 +7,11 @@ if ( [ $# -ne 3 ] ) then
   echo "Usage: $0 <profile> <region> <destination-url>"
   echo "<profile> the profile to access AWS account"
   echo "<zone>: where to deploy the spidhub istance"
-  echo "<destination-url>: redirection url after successful login"
+  echo "<login-success-url>: redirection url after successful login"
   echo ""
   echo "This script require following executable configured in the PATH variable:"
   echo " - aws cli 2.0 "
   echo " - jq"
-  echo " - sha256"
 
   if ( [ "$BASH_SOURCE" = "" ] ) then
     return 1
@@ -26,7 +25,7 @@ region=$2
 
 LoginSuccessDestinationEnpoint=$3
 
-EnvName="spidhub-try"
+EnvName="spid-hub-test"
 DnsDomain="dev.pn.pagopa.it"
 KeyName="${EnvName}-ssh-key"
 StackName="${EnvName}"

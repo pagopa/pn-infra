@@ -5,7 +5,7 @@ echo "= NEW CURRENT WORKING DIRECTORY: $(pwd)"
 echo -e "\n\n\n"
 echo "===                      RUN DOCKER COMPOSE                      ==="
 echo "===================================================================="
-docker compose up -d
+docker compose up -d backend spid-testenv2 redis
 
 
 echo -e "\n\n\n"
