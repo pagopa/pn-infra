@@ -129,11 +129,9 @@ Resources:
         Fn::If:
           - IsWeb
           - method.request.path.proxy: true
-            method.request.header.WebInjectedHeader: false
             method.request.header.x-pagopa-pn-pa: false
-            method.request.header.X-PagoPA-User-Id: false
+            method.request.header.x-pagopa-user-id: false
           - method.request.path.proxy: true
-            method.request.header.B2BInjectedHeader: false
             method.request.header.x-pagopa-pn-pa: false
       Integration:
         ConnectionType: VPC_LINK
@@ -145,11 +143,9 @@ Resources:
           Fn::If:
             - IsWeb
             - integration.request.path.proxy: method.request.path.proxy
-              integration.request.header.WebInjectedHeader: "'web_header_value'"
               integration.request.header.x-pagopa-pn-pa: context.authorizer.pa_id
-              integration.request.header.X-PagoPA-User-Id: context.authorizer.user_id
+              integration.request.header.x-pagopa-user-id: context.authorizer.user_id
             - integration.request.path.proxy: method.request.path.proxy
-              integration.request.header.B2BInjectedHeader: "'b2b_header_value'"
               integration.request.header.x-pagopa-pn-pa: context.authorizer.pa_id
         PassthroughBehavior: "WHEN_NO_MATCH"
         TimeoutInMillis: 29000
