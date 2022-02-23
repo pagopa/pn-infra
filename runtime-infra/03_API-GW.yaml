@@ -104,9 +104,9 @@ Resources:
       AuthorizerId: !Ref ApikeyAuthorizer
       RequestParameters:
         method.request.path.proxy: true
-        method.request.header.X-PagoPA-PN-PA: false
-        method.request.header.X-PagoPA-User-Id: false
-        method.request.header.X-PagoPA-User-Secret: false
+        method.request.header.x-pagopa-pn-pa: false
+        method.request.header.x-pagopa-user-id: false
+        method.request.header.x-pagopa-user-secret: false
         method.request.querystring.recipientId: false
         method.request.querystring.senderId: false
         method.request.querystring.startDate: false
@@ -172,9 +172,9 @@ Resources:
         Uri: !Join ['', ["http://", { 'Fn::ImportValue': { 'Fn::Sub':'${EnvName}-alb-domain'}}, ":8080/delivery/{proxy}"]]
         RequestParameters:
           integration.request.path.proxy: method.request.path.proxy
-          integration.request.header.X-PagoPA-PN-PA: context.authorizer.pa_id
-          integration.request.header.X-PagoPA-User-Id: method.request.header.X-PagoPA-User-Id
-          integration.request.header.X-PagoPA-User-Secret: method.request.header.X-PagoPA-User-Secret
+          integration.request.header.x-pagopa-pn-pa: context.authorizer.pa_id
+          integration.request.header.x-pagopa-user-id: method.request.header.x-pagopa-user-id
+          integration.request.header.x-pagopa-user-secret: method.request.header.x-pagopa-user-secret
           integration.request.querystring.recipientId: method.request.querystring.recipientId
           integration.request.querystring.senderId: method.request.querystring.senderId
           integration.request.querystring.startDate: method.request.querystring.startDate
@@ -261,8 +261,8 @@ Resources:
       AuthorizationType: NONE
       RequestParameters:
         method.request.path.proxy: true
-        method.request.header.X-PagoPA-PN-PA: true
-        method.request.header.X-PagoPA-User-Id: true
+        method.request.header.x-pagopa-pn-pa: true
+        method.request.header.x-pagopa-user-id: true
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
