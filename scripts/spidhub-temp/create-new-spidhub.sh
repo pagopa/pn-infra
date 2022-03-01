@@ -2,9 +2,9 @@
 
 scriptDir=$( dirname "$0" )
 
-if ( [ $# -ne 3 ] ) then
+if ( [ $# -ne 4 ] ) then
   echo "This script create a test spidhub instance"
-  echo "Usage: $0 <profile> <region> <destination-url>"
+  echo "Usage: $0 <profile> <region> <destination-url> <user-registry-api-key>"
   echo "<profile> the profile to access AWS account"
   echo "<zone>: where to deploy the spidhub istance"
   echo "<login-success-url>: redirection url after successful login"
@@ -24,12 +24,14 @@ profile=$1
 region=$2
 
 LoginSuccessDestinationEnpoint=$3
+UserRegistryApiKey=$4
 
 EnvName="spid-hub-test"
 DnsDomain="dev.pn.pagopa.it"
 KeyName="${EnvName}-ssh-key"
 StackName="${EnvName}"
 KeyFileName="${KeyName}-${region}-${profile}.pem"
+
 
 echo ""
 echo ""
@@ -140,6 +142,9 @@ echo ""
 echo "# Write successfull login destination"
 ssh -i ${KeyPath} "${SshConnectionUrl}" " echo ${LoginSuccessDestinationEnpoint} > ./login-success-destination-enpoint"
 
+echo ""
+echo "# Write successfull login destination"
+ssh -i ${KeyPath} "${SshConnectionUrl}" " echo ${UserRegistryApiKey} > ./user-registry-api-key"
 
 
 
