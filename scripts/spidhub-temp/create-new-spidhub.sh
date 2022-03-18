@@ -27,7 +27,7 @@ LoginSuccessDestinationEnpoint=$3
 UserRegistryApiKey=$4
 
 EnvName="spid-hub-test"
-DnsDomain="dev.pn.pagopa.it"
+DnsDomain="${profile}.pn.pagopa.it"
 KeyName="${EnvName}-ssh-key"
 StackName="${EnvName}"
 KeyFileName="${KeyName}-${region}-${profile}.pem"
