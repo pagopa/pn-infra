@@ -20,3 +20,9 @@ All file in _remote-scripts_ directory are copied in the EC2 instance and used t
 2. clone the [hub-spid-login-ms](https://github.com/pagopa/hub-spid-login-ms) repo
 3. apply the needed configuration (create certificate for SAM, key pairs for JWT, configure _.env_ file)
 4. launch container with docker compose
+
+Esempio:
+
+```bash
+./create-new-spidhub.sh dev eu-west-1 https://www.pn-develop.pn.pagopa.it/ <user registry apikey>
+```
