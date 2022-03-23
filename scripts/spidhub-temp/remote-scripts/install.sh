@@ -91,12 +91,15 @@ echo "= LoginSuccessDestinationEnpoint: ${LoginSuccessDestinationEnpoint}"
 UserRegistryApiKey=$( cat ../user-registry-api-key | tr -d '\n' )
 echo "= UserRegistryApiKey: ${UserRegistryApiKey}"
 
+UserRegistryApiUrl=$( cat ../user-registry-api-url | tr -d '\n' )
+echo "= UserRegistryApiUrl: ${UserRegistryApiUrl}"
+
 JwtTokenPrivateKey=$( cat jwt_rsa_key.pem | sed -e 's/$/\\n/' | tr -d '\n' | sed -e 's/\\n$//' )
 echo "= JwtTokenPrivateKey: ${JwtTokenPrivateKey}"
 
 echo ""
 echo "=== Generate .env and conf-testenv/config.yaml"
-export DnsFullDomain MakecertPrivate MakecertPublic LoginSuccessDestinationEnpoint JwtTokenPrivateKey UserRegistryApiKey
+export DnsFullDomain MakecertPrivate MakecertPublic LoginSuccessDestinationEnpoint JwtTokenPrivateKey UserRegistryApiUrl UserRegistryApiKey
 echo "\n= .env"
 cat ../customized-env | envsubst | tee .env
 echo "\n= conf-testenv/config.yaml"
