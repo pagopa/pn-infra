@@ -28,6 +28,7 @@ UserRegistryApiKey=$4
 
 EnvName="spid-hub-test"
 DnsDomain="${profile}.pn.pagopa.it"
+UserRegistryApiUrl="https://api.${profile}.userregistry.pagopa.it/user-registry-management/v1"
 KeyName="${EnvName}-ssh-key"
 StackName="${EnvName}"
 KeyFileName="${KeyName}-${region}-${profile}.pem"
@@ -143,9 +144,12 @@ echo "# Write successfull login destination"
 ssh -i ${KeyPath} "${SshConnectionUrl}" " echo ${LoginSuccessDestinationEnpoint} > ./login-success-destination-enpoint"
 
 echo ""
-echo "# Write successfull login destination"
+echo "# Write userregistry api key"
 ssh -i ${KeyPath} "${SshConnectionUrl}" " echo ${UserRegistryApiKey} > ./user-registry-api-key"
 
+echo ""
+echo "# Write userregistry api url"
+ssh -i ${KeyPath} "${SshConnectionUrl}" " echo ${UserRegistryApiUrl} > ./user-registry-api-url"
 
 
 echo ""
