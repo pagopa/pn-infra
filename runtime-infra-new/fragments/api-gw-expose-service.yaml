@@ -150,12 +150,20 @@ Resources:
         PassthroughBehavior: "WHEN_NO_MATCH"
         TimeoutInMillis: 29000
 
-  GatewayResponse:
+  GatewayResponse4XX:
     Type: AWS::ApiGateway::GatewayResponse
     Properties:
       ResponseParameters:
         gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
       ResponseType: DEFAULT_4XX
+      RestApiId: !Ref PublicRestApi
+
+  GatewayResponse5XX:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+      ResponseType: DEFAULT_5XX
       RestApiId: !Ref PublicRestApi
 
   # Deployment
