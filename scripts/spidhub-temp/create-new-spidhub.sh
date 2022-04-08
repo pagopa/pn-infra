@@ -28,6 +28,7 @@ UserRegistryApiKey=$4
 
 EnvName="spid-hub-test"
 DnsDomain="${profile}.pn.pagopa.it"
+WebApiDomain="webapi.${profile}.pn.pagopa.it"
 UserRegistryApiUrl="https://api.${profile}.userregistry.pagopa.it/user-registry-management/v1"
 KeyName="${EnvName}-ssh-key"
 StackName="${EnvName}"
@@ -151,6 +152,9 @@ echo ""
 echo "# Write userregistry api url"
 ssh -i ${KeyPath} "${SshConnectionUrl}" " echo ${UserRegistryApiUrl} > ./user-registry-api-url"
 
+echo ""
+echo "# Write WebApiDomain api url"
+ssh -i ${KeyPath} "${SshConnectionUrl}" " echo ${WebApiDomain} > ./web-api-domain"
 
 echo ""
 echo "### Execute install script"
