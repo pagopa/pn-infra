@@ -101,7 +101,7 @@ JwtTokenAudience=$( echo ${LoginSuccessDestinationEnpoint#*//} | sed 's|/.*||' )
 
 echo ""
 echo "=== Generate .env and conf-testenv/config.yaml"
-export DnsFullDomain MakecertPrivate MakecertPublic LoginSuccessDestinationEnpoint JwtTokenPrivateKey UserRegistryApiUrl UserRegistryApiKey
+export DnsFullDomain MakecertPrivate MakecertPublic LoginSuccessDestinationEnpoint JwtTokenPrivateKey JwtTokenAudience UserRegistryApiUrl UserRegistryApiKey
 echo "\n= .env"
 cat ../customized-env | envsubst | tee .env
 echo "\n= conf-testenv/config.yaml"
