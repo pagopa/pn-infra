@@ -10,6 +10,8 @@ This folder contains scripts to deploy and configure an EC2 instance with this c
   - Integration with SelfCare UserRegistry
   - JWT integration
 
+In order to launch correctly the following commands configure accurately your aws profiles _dev_ and _uat_
+
 The _create-new-spidhub.sh_ script automate the EC2 instance creation using the _cfn-templates/vpc_with_public_ec2.yaml_
 Cloud Formation template, creating the key pair to connect via ssh and exposing it on the DNS domain.
 
