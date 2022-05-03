@@ -155,9 +155,9 @@ echo ""
 echo "### Execute install script"
 ssh -i ${KeyPath} "${SshConnectionUrl}" source ./install.sh
 
-echo ""
-echo "### Execute build script"
-ssh -i ${KeyPath} "${SshConnectionUrl}" source ./build.sh
+#echo ""
+#echo "### Execute build script"
+#ssh -i ${KeyPath} "${SshConnectionUrl}" source ./build.sh
 
 echo ""
 echo "### RUN"
