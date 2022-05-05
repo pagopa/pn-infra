@@ -78,7 +78,52 @@ Resources:
   ###                     MESSAGE ORIENTED MIDDLEWARE                     ###
   ###########################################################################
 
-  ### Communication between PN-DELIVERY and  PN-DELIVERY-PUSH ###
+  ### PN-CORE EventBus
+  # Receive events from SafeStorage and CarrierPigeon (AKA ExternalChannel) 
+  # and redirect to the right SQS queue
+  PnCoreEventBus:
+    Type: AWS::Events::EventBus
+    Properties: 
+      Name: !Sub '${ProjectName}-CoreEventBus'
+  
+  # Send All Safe Storage Response to pn-delivery-push
+  PnCoreEventBusToSafeStorageResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route SafeStorage Events to pn-delivery-push
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail:
+          documentType: [ { "exists": true  } ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryPush'
+          Arn: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
+
+  # Send ExternalChannel Response to pn-delivery-push
+  PnCoreEventBusToExtChResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route SafeStorage Events to pn-delivery-push
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail:
+          digitalLegal: [ { "exists": true  } ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2DeliveryPush'
+          Arn: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
+
+
+  
+  ### Communication FROM SafeStorage TO pn-delivery-push ###
+  SafeStorageToDeliveryPushQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestore_to_deliverypush'
+        DelaySeconds: 1
+
+  ### Communication between PN-DELIVERY and PN-DELIVERY-PUSH ###
   DeliveryPushInputsQueue:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -114,6 +159,17 @@ Outputs:
   WebApiDnsName:
     Value: !Ref WebApiDnsName
     Description: 'The DNS name used for browser rest API.'
+
+  # SafeStorage to DeliveryPush
+  SafeStorageToDeliveryPushQueueName:
+    Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueName
+    Description: SafeStorage-to-delivery-push queue name
+  SafeStorageToDeliveryPushQueueURL:
+    Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueURL
+    Description: SafeStorage-to-delivery-push queue URL
+  SafeStorageToDeliveryPushQueueARN:
+    Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
+    Description: SafeStorage-to-delivery-push queue ARN
 
   # Delivery push inputs
   DeliveryPushInputsQueueName:
