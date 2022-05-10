@@ -10,6 +10,31 @@ Metadata:
       Parameters:
       - Project
       - Environment
+    - Label:
+        default: Network
+      Parameters:
+      - CIDRVPC
+      - CIDRBackEndA
+      - CIDRBackEndB
+      - CIDRBackEndC
+      - CIDRFrontEndA
+      - CIDRFrontEndB
+      - CIDRFrontEndC
+    ParameterLabels:
+      CIDRVPC:
+        default: VPC CIDR
+      CIDRBackEndA:
+        default: BackEnd Subnet A CIDR
+      CIDRBackEndB:
+        default: BackEnd Subnet B CIDR
+      CIDRBackEndC:
+        default: BackEnd Subnet C CIDR
+      CIDRFrontEndA:
+        default: FrontEnd Subnet A CIDR
+      CIDRFrontEndB:
+        default: FrontEnd Subnet B CIDR
+      CIDRFrontEndC:
+        default: FrontEnd Subnet C CIDR
 
 
 Parameters:
@@ -27,13 +52,71 @@ Parameters:
     - beta
     - prod
 
+  CIDRVPC:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: CIDR block for VPC
+    Type: String
+
+  CIDRBackEndA:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: CIDR block for subnet BackEnd A
+    Type: String
+
+  CIDRBackEndB:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: CIDR block for subnet BackEnd B
+    Type: String
+
+  CIDRBackEndC:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: CIDR block for subnet BackEnd C
+    Type: String
+
+  CIDRFrontEndA:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: CIDR block for subnet FrontEnd A
+    Type: String
+
+  CIDRFrontEndB:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: CIDR block for subnet FrontEnd B
+    Type: String
+
+  CIDRFrontEndC:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: CIDR block for subnet FrontEnd C
+    Type: String
+
 
 Resources:
 
-  # Placeholder resource to make template valid. Will be removed
-  Parameter:
-    Type: AWS::SSM::Parameter
+  Network:
+    Type: AWS::CloudFormation::Stack
     Properties:
-      Type: String
-      Value:
-        Fn::Sub: "${Project}-${Environment}"
+      Parameters:
+        Project:
+          Ref: Project
+        Environment:
+          Ref: Environment
+        CIDRVPC:
+          Ref: CIDRVPC
+        CIDRBackEndA:
+          Ref: CIDRBackEndA
+        CIDRBackEndB:
+          Ref: CIDRBackEndB
+        CIDRBackEndC:
+          Ref: CIDRBackEndC
+        CIDRFrontEndA:
+          Ref: CIDRFrontEndA
+        CIDRFrontEndB:
+          Ref: CIDRFrontEndB
+        CIDRFrontEndC:
+          Ref: CIDRFrontEndC
+      TemplateURL: ./stacks/network.yaml
