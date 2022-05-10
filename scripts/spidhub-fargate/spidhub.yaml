@@ -10,6 +10,8 @@ Metadata:
       Parameters:
       - Project
       - Environment
+      - DomainName
+      - HostedZoneId
     - Label:
         default: Network
       Parameters:
@@ -35,6 +37,10 @@ Metadata:
         default: FrontEnd Subnet B CIDR
       CIDRFrontEndC:
         default: FrontEnd Subnet C CIDR
+      DomainName:
+        default: Domain Name
+      HostedZoneId:
+        default: Hosted Zone Id
 
 
 Parameters:
@@ -94,6 +100,15 @@ Parameters:
     Description: CIDR block for subnet FrontEnd C
     Type: String
 
+  DomainName:
+    Description: The Domain Name
+    Type: String
+    AllowedPattern: ^(((?!-)[A-Za-z0-9-]{0,62}[A-Za-z0-9])\.)+((?!-)[A-Za-z0-9-]{1,62}[A-Za-z0-9])$
+
+  HostedZoneId:
+    Description: The ID of the Route 53 Hosted Zone
+    Type: AWS::Route53::HostedZone::Id
+
 
 Resources:
 
@@ -120,3 +135,25 @@ Resources:
         CIDRFrontEndC:
           Ref: CIDRFrontEndC
       TemplateURL: ./stacks/network.yaml
+
+  Orchestrator:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        Project:
+          Ref: Project
+        Environment:
+          Ref: Environment
+        DomainName:
+          Ref: DomainName
+        HostedZoneId:
+          Ref: HostedZoneId
+        VpcId:
+          Fn::GetAtt:
+          - Network
+          - Outputs.VPCId
+        Subnets:
+          Fn::GetAtt:
+          - Network
+          - Outputs.FrontEndSubnets
+      TemplateURL: ./stacks/orchestrator.yaml

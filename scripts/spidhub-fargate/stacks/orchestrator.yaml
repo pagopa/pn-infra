@@ -1,0 +1,221 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SPID Hub - Orchestrator
+
+
+Parameters:
+
+  Project:
+    Description: The project
+    MinLength: 3
+    Type: String
+
+  Environment:
+    Description: The enviroment
+    MinLength: 3
+    Type: String
+    AllowedValues:
+    - beta
+    - prod
+
+  DomainName:
+    Description: The Domain Name
+    Type: String
+    AllowedPattern: ^(((?!-)[A-Za-z0-9-]{0,62}[A-Za-z0-9])\.)+((?!-)[A-Za-z0-9-]{1,62}[A-Za-z0-9])$
+
+  HostedZoneId:
+    Description: The ID of the Route 53 Hosted Zone
+    Type: AWS::Route53::HostedZone::Id
+    AllowedPattern: ^Z[0-9]{6}([0-9])*[A-Z0-9]{6}([A-Z0-9])*$
+
+  VpcId:
+    Description: The ID of the VPC
+    Type: AWS::EC2::VPC::Id
+
+  Subnets:
+    Description: The subnets on which the balancer will listen at
+    Type: List<AWS::EC2::Subnet::Id>
+
+
+Resources:
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      CapacityProviders:
+      - FARGATE
+      ClusterSettings:
+      - Name: containerInsights
+        Value: enabled
+      Configuration:
+        ExecuteCommandConfiguration:
+          LogConfiguration:
+            CloudWatchLogGroupName:
+              Fn::Sub: "${Project}-${Environment}-cluster-execute-command"
+          Logging: OVERRIDE
+      DefaultCapacityProviderStrategy:
+      - Base: 0
+        CapacityProvider: FARGATE
+        Weight: 1000
+      Tags:
+      - Key: ecs:cluster:createdFrom
+        Value: cloudformation
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: ecs-tasks.amazonaws.com
+          Action: sts:AssumeRole
+      Description: Task Execution Role for Amazon ECS
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for ALB
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        CidrIp: 0.0.0.0/0
+      VpcId:
+        Ref: VpcId
+
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Subnets:
+        Ref: Subnets
+      LoadBalancerAttributes:
+      - Key: idle_timeout.timeout_seconds
+        Value: '3600'
+      - Key: deletion_protection.enabled
+        Value: 'false'
+      - Key: routing.http2.enabled
+        Value: 'true'
+      SecurityGroups:
+      - Ref: AlbSecurityGroup
+
+  ListenerHttp:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: redirect
+        RedirectConfig:
+          Host: '#{host}'
+          Path: '/#{path}'
+          Port: '443'
+          Protocol: HTTPS
+          Query: '#{query}'
+          StatusCode: HTTP_301
+      LoadBalancerArn:
+        Ref: ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  ListenerHttps:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: fixed-response
+        FixedResponseConfig:
+          StatusCode: '404'
+          ContentType: text/html
+          MessageBody: |
+            <html>
+            <head><title>404 Not Found</title></head>
+            <body>
+            <center><h1>404 Not Found</h1></center>
+            <hr><center>Piattaforma Notifiche</center>
+            </body>
+            </html>
+      LoadBalancerArn:
+        Ref: ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-FS-1-2-Res-2020-10
+      Certificates:
+      - CertificateArn:
+          Ref: Certificate
+
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName:
+        Ref: DomainName
+      DomainValidationOptions:
+      - DomainName:
+          Ref: DomainName
+        HostedZoneId:
+          Ref: HostedZoneId
+      SubjectAlternativeNames:
+      - Ref: DomainName
+      - Fn::Sub: "*.${DomainName}"
+      ValidationMethod: DNS
+
+  DNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      AliasTarget:
+        DNSName:
+          Fn::GetAtt:
+          - ApplicationLoadBalancer
+          - DNSName
+        EvaluateTargetHealth: true
+        HostedZoneId:
+          Fn::GetAtt:
+          - ApplicationLoadBalancer
+          - CanonicalHostedZoneID
+      HostedZoneId:
+        Ref: HostedZoneId
+      Name:
+        Ref: DomainName
+      Type: A
+
+  WildcardDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      AliasTarget:
+        DNSName:
+          Fn::GetAtt:
+          - ApplicationLoadBalancer
+          - DNSName
+        EvaluateTargetHealth: true
+        HostedZoneId:
+          Fn::GetAtt:
+          - ApplicationLoadBalancer
+          - CanonicalHostedZoneID
+      HostedZoneId:
+        Ref: HostedZoneId
+      Name:
+        Fn::Sub: "*.${DomainName}"
+      Type: A
+
+
+Outputs:
+
+  Cluster:
+    Description: ECS Cluster ARN
+    Value:
+      Ref: Cluster
+
+  AlbSecurityGroup:
+    Description: SecurityGroup of the ALB
+    Value:
+      Ref: AlbSecurityGroup
+
+  ListenerHttps:
+    Description: HTTPS Listerner for ALB
+    Value:
+      Ref: ListenerHttps
