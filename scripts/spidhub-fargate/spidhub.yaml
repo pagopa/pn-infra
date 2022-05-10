@@ -1,0 +1,39 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SPID Hub
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Global
+      Parameters:
+      - Project
+      - Environment
+
+
+Parameters:
+
+  Project:
+    Description: The project
+    MinLength: 3
+    Type: String
+
+  Environment:
+    Description: The enviroment
+    MinLength: 3
+    Type: String
+    AllowedValues:
+    - beta
+    - prod
+
+
+Resources:
+
+  # Placeholder resource to make template valid. Will be removed
+  Parameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Value:
+        Fn::Sub: "${Project}-${Environment}"
