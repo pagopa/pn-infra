@@ -1,0 +1,141 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SPID Hub - Cache
+
+
+Parameters:
+
+  Project:
+    Description: The project
+    MinLength: 3
+    Type: String
+
+  Environment:
+    Description: The enviroment
+    MinLength: 3
+    Type: String
+    AllowedValues:
+    - beta
+    - prod
+
+  NodeType:
+    Default: cache.t4g.small
+    Description: The compute and memory capacity of the nodes
+    Type: String
+    AllowedValues: ['cache.m6g.large', 'cache.m6g.xlarge', 'cache.m6g.2xlarge', 'cache.m6g.4xlarge', 'cache.m6g.8xlarge', 'cache.m6g.12xlarge', 'cache.m6g.16xlarge', 'cache.t4g.micro', 'cache.t4g.small', 'cache.t4g.medium', 'cache.c1.xlarge', 'cache.r6gd.xlarge', 'cache.r6gd.2xlarge', 'cache.r6gd.4xlarge', 'cache.r6gd.8xlarge', 'cache.r6gd.12xlarge', 'cache.r6gd.16xlarge', 'cache.r6g.large', 'cache.r6g.xlarge', 'cache.r6g.2xlarge', 'cache.r6g.4xlarge', 'cache.r6g.8xlarge', 'cache.r6g.12xlarge', 'cache.r6g.16xlarge']
+
+  VpcId:
+    Description: The VPC in which deploy the service
+    Type: AWS::EC2::VPC::Id
+
+  Subnets:
+    Description: The Data Subnets in which deploy the service
+    Type: List<AWS::EC2::Subnet::Id>
+
+
+Resources:
+
+  Redis:
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+      AtRestEncryptionEnabled: true
+      AuthToken:
+        Fn::Sub: "{{resolve:secretsmanager:${AuthToken}:SecretString:AuthToken}}"
+      AutomaticFailoverEnabled: false
+      AutoMinorVersionUpgrade: true
+      CacheNodeType:
+        Ref: NodeType
+      CacheParameterGroupName:
+        Ref: RedisNoClusterParameterGroup
+      CacheSubnetGroupName:
+        Ref: SubnetGroup
+      Engine: redis
+      EngineVersion: '6.2'
+      LogDeliveryConfigurations:
+      - DestinationDetails:
+          CloudWatchLogsDetails:
+            LogGroup:
+              Ref: LogGroup
+        DestinationType: cloudwatch-logs
+        LogFormat: text
+        LogType: engine-log
+      MultiAZEnabled: false
+      NumCacheClusters: 1
+      Port: 6379
+      PreferredMaintenanceWindow: sun:23:00-mon:01:30
+      ReplicationGroupDescription:
+        Fn::Sub: "${Project}-${Environment}"
+      SecurityGroupIds:
+      - Ref: SecurityGroup
+      SnapshotRetentionLimit: 5
+      SnapshotWindow: 05:00-09:00
+      TransitEncryptionEnabled: true
+
+  SubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description:
+        Fn::Sub: "${Project}-${Environment}-data"
+      SubnetIds:
+        Ref: Subnets
+
+  RedisNoClusterParameterGroup:
+    Type: AWS::ElastiCache::ParameterGroup
+    Properties:
+      CacheParameterGroupFamily: redis6.x
+      Description:
+        Fn::Sub: "${Project}-${Environment}"
+      Properties:
+        cluster-enabled: 'no'
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Sub: "${Project}-${Environment}-cache"
+      RetentionInDays: 14
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Redis
+      VpcId:
+        Ref: VpcId
+
+  AuthToken:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      GenerateSecretString:
+        ExcludePunctuation: true
+        SecretStringTemplate: '{}'
+        GenerateStringKey: "AuthToken"
+        PasswordLength: 26
+        IncludeSpace: false
+      Name:
+        Fn::Sub: "${Project}-${Environment}-cache"
+
+
+Outputs:
+  AuthSecret:
+    Description: The ARN of Secret for Auth
+    Value:
+      Ref: AuthToken
+
+  SecurityGroup:
+    Description: The Security Group for incoming Redis connection
+    Value:
+      Ref: SecurityGroup
+
+  Endpoint:
+    Description: The endpoint for Redis
+    Value:
+      Fn::GetAtt:
+      - Redis
+      - PrimaryEndPoint.Address
+
+  Port:
+    Description: The port for Redis
+    Value:
+      Fn::GetAtt:
+      - Redis
+      - PrimaryEndPoint.Port

@@ -24,6 +24,24 @@ Parameters:
     Description: CIDR block for VPC
     Type: String
 
+  CIDRDataA:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: CIDR block for subnet Data A
+    Type: String
+
+  CIDRDataB:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: CIDR block for subnet Data B
+    Type: String
+
+  CIDRDataC:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: CIDR block for subnet Data C
+    Type: String
+
   CIDRBackEndA:
     AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
     ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
@@ -89,6 +107,57 @@ Resources:
         Ref: VPC
       InternetGatewayId:
         Ref: InternetGateway
+
+  DataSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - '0'
+        - Fn::GetAZs:
+            Ref: AWS::Region
+      CidrBlock:
+        Ref: CIDRDataA
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: "${Project}-${Environment}-da-a"
+      VpcId:
+        Ref: VPC
+
+  DataSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - '1'
+        - Fn::GetAZs:
+            Ref: AWS::Region
+      CidrBlock:
+        Ref: CIDRDataB
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: "${Project}-${Environment}-da-b"
+      VpcId:
+        Ref: VPC
+
+  DataSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - '2'
+        - Fn::GetAZs:
+            Ref: AWS::Region
+      CidrBlock:
+        Ref: CIDRDataC
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: "${Project}-${Environment}-da-c"
+      VpcId:
+        Ref: VPC
 
   BackEndSubnetA:
     Type: AWS::EC2::Subnet
@@ -189,6 +258,36 @@ Resources:
       - Key: Name
         Value:
           Fn::Sub: "${Project}-${Environment}-fe-c"
+      VpcId:
+        Ref: VPC
+
+  DataRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: "${Project}-${Environment}-da-a"
+      VpcId:
+        Ref: VPC
+
+  DataRouteTableB:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: "${Project}-${Environment}-da-b"
+      VpcId:
+        Ref: VPC
+
+  DataRouteTableC:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: "${Project}-${Environment}-da-c"
       VpcId:
         Ref: VPC
 
@@ -317,6 +416,30 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId:
         Ref: InternetGateway
+
+  DataSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: DataSubnetA
+      RouteTableId:
+        Ref: DataRouteTableA
+
+  DataSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: DataSubnetB
+      RouteTableId:
+        Ref: DataRouteTableB
+
+  DataSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: DataSubnetC
+      RouteTableId:
+        Ref: DataRouteTableC
 
   BESubnetARouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -513,6 +636,15 @@ Outputs:
       Fn::GetAtt:
       - VPC
       - CidrBlock
+
+  DataSubnets:
+    Description: Data Subnets
+    Value:
+      Fn::Join:
+      - ','
+      - - Ref: DataSubnetA
+        - Ref: DataSubnetB
+        - Ref: DataSubnetC
 
   BackEndSubnets:
     Description: BackEnd Subnets

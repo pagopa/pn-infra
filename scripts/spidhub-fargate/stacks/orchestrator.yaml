@@ -61,20 +61,6 @@ Resources:
       - Key: ecs:cluster:createdFrom
         Value: cloudformation
 
-  TaskExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-        - Effect: Allow
-          Principal:
-            Service: ecs-tasks.amazonaws.com
-          Action: sts:AssumeRole
-      Description: Task Execution Role for Amazon ECS
-      ManagedPolicyArns:
-      - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-
   AlbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:

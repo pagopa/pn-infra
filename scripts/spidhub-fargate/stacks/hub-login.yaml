@@ -1,0 +1,390 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SPID Hub - Service - SPID Hub
+
+
+Parameters:
+
+  Project:
+    Description: The project
+    MinLength: 3
+    Type: String
+
+  Environment:
+    Description: The enviroment
+    MinLength: 3
+    Type: String
+    AllowedValues:
+    - beta
+    - prod
+
+  Name:
+    Default: hub-login
+    Description: The name of the service
+    Type: String
+
+  Port:
+    Default: 8080
+    Description: The port of the service
+    Type: Number
+
+  Version:
+    Description: The image version to use
+    Type: String
+
+  Storage:
+    AllowedPattern: ^((?!xn--)(?!.*-s3alias)[a-z0-9][a-z0-9-]{1,61}[a-z0-9])$
+    Description: The S3 bucked used as storage
+    Type: String
+
+  ConfigVersion:
+    AllowedPattern: ^v[0-9\.]+$
+    Description: The configuration version to get from the storage
+    Type: String
+
+  Secrets:
+    Description: The name of the Secret in SecretManager
+    Type: String
+
+  Cluster:
+    Description: The name of the ECS Cluster
+    Type: String
+
+  Subnets:
+    Description: The BackEnd Subnets in which deploy the service
+    Type: List<AWS::EC2::Subnet::Id>
+
+  ListenerArn:
+    Description: The ARN of the ALB Listener
+    Type: String
+
+  DomainName:
+    AllowedPattern: ^(((?!-)[A-Za-z0-9-]{0,62}[A-Za-z0-9])\.)+((?!-)[A-Za-z0-9-]{1,62}[A-Za-z0-9])$
+    Description: The domain name
+    Type: String
+
+  VpcId:
+    Description: The VPC in which deploy the service
+    Type: AWS::EC2::VPC::Id
+
+  IngressSecurityGroup:
+    Description: The Security Group from which incoming requests will arrive
+    Type: AWS::EC2::SecurityGroup::Id
+
+  RedisSecurityGroup:
+    Description: The Security Group for outgoing Redis connection
+    Type: AWS::EC2::SecurityGroup::Id
+
+  RedisEndpoint:
+    Description: The endpoint for Redis
+    Type: String
+
+  RedisPort:
+    Description: The port for Redis
+    Type: Number
+
+  RedisSecret:
+    Description: The ARN of the Secret in SecretManager for Redis Auth
+    Type: String
+
+
+Resources:
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+      - Name: main
+        Image:
+          Fn::Sub: "ghcr.io/pagopa/hub-spid-login-ms:${Version}"
+        Cpu: 1
+        Memory: 256
+        MemoryReservation: 128
+        Environment:
+        - Name: REDIS_URL
+          Value:
+            Ref: RedisEndpoint
+        - Name: REDIS_PORT
+          Value:
+            Ref: RedisPort
+        - Name: REDIS_CLUSTER_ENABLED
+          Value: 'false'
+        - Name: REDIS_TLS_ENABLED
+          Value: 'true'
+        EnvironmentFiles:
+        - Type: s3
+          Value:
+            Fn::Sub: "arn:aws:s3:::${Storage}/config/${Name}/${ConfigVersion}/.env"
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-region:
+              Ref: AWS::Region
+            awslogs-group:
+              Ref: LogGroup
+            awslogs-stream-prefix: logs
+        PortMappings:
+        - ContainerPort:
+            Ref: Port
+          Protocol: tcp
+        Privileged: false
+        Secrets:
+        - Name: METADATA_PRIVATE_CERT
+          ValueFrom:
+            Fn::Sub: "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Secrets}:MakecertPrivate:AWSCURRENT:"
+        - Name: METADATA_PUBLIC_CERT
+          ValueFrom:
+            Fn::Sub: "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Secrets}:MakecertPublic:AWSCURRENT:"
+        - Name: JWT_TOKEN_PRIVATE_KEY
+          ValueFrom:
+            Fn::Sub: "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Secrets}:JwtTokenPrivateKey:AWSCURRENT:"
+        - Name: USER_REGISTRY_API_KEY
+          ValueFrom:
+            Fn::Sub: "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Secrets}:UserRegistryApiKey:AWSCURRENT:"
+        - Name: REDIS_PASSWORD
+          ValueFrom:
+            Fn::Sub: "${RedisSecret}:AuthToken:AWSCURRENT:"
+      Cpu: 256
+      Memory: 512
+      ExecutionRoleArn:
+        Fn::GetAtt:
+        - TaskExecutionRole
+        - Arn
+      Family:
+        Fn::Sub: "${Project}-${Environment}-${Name}"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+      - FARGATE
+      TaskRoleArn:
+        Ref: Role
+
+  Service:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster:
+        Ref: Cluster
+      EnableECSManagedTags: true
+      EnableExecuteCommand: true
+      DesiredCount: 1
+      LaunchType: FARGATE
+      LoadBalancers:
+      - ContainerName: main
+        ContainerPort:
+          Ref: Port
+        TargetGroupArn:
+          Ref: TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+          - Ref: SecurityGroup
+          Subnets:
+            Ref: Subnets
+      PropagateTags: SERVICE
+      SchedulingStrategy: REPLICA
+      ServiceName:
+        Fn::Sub: "${Project}-${Environment}-${Name}"
+      TaskDefinition:
+        Ref: TaskDefinition
+
+  ListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn:
+          Ref: TargetGroup
+      Conditions:
+      - Field: host-header
+        HostHeaderConfig:
+          Values:
+          - Fn::Sub: "${Name}.${DomainName}"
+      ListenerArn:
+        Ref: ListenerArn
+      Priority: 30
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: /healthcheck
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      Matcher:
+        HttpCode: 200
+      Port:
+        Ref: Port
+      Protocol: HTTP
+      TargetGroupAttributes:
+      - Key: stickiness.enabled
+        Value: 'false'
+      - Key: stickiness.type
+        Value: 'lb_cookie'
+      - Key: deregistration_delay.timeout_seconds
+        Value: '30'
+      - Key: slow_start.duration_seconds
+        Value: '30'
+      TargetType: ip
+      UnhealthyThresholdCount: 3
+      VpcId:
+        Ref: VpcId
+
+  ScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName:
+        Fn::Sub: "${Project}-${Environment}-${Name}"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId:
+        Ref: ScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 75.0
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+
+  ScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 5
+      MinCapacity: 1
+      RoleARN:
+        Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
+      ServiceNamespace: ecs
+      ScalableDimension: ecs:service:DesiredCount
+      ResourceId:
+        Fn::Sub:
+        - "service/${Cluster}/${ServiceName}"
+        - ServiceName:
+            Fn::GetAtt:
+            - Service
+            - Name
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Service
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort:
+          Ref: Port
+        ToPort:
+          Ref: Port
+        SourceSecurityGroupId:
+          Ref: IngressSecurityGroup
+      VpcId:
+        Ref: VpcId
+
+  RedisOutgoing:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description:
+        Fn::Sub:
+        - "Connection from ${ServiceName} service"
+        - ServiceName:
+            Fn::GetAtt:
+            - Service
+            - Name
+      FromPort:
+        Ref: RedisPort
+      ToPort:
+        Ref: RedisPort
+      GroupId:
+        Ref: RedisSecurityGroup
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        Ref: SecurityGroup
+
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ecs-tasks.amazonaws.com
+          Action: sts:AssumeRole
+          Condition:
+            StringEquals:
+              aws:SourceAccount:
+                Ref: AWS::AccountId
+
+  ExecuteCommand:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: EnableExecuteCommand
+      Roles:
+      - Ref: Role
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - ssmmessages:CreateControlChannel
+          - ssmmessages:CreateDataChannel
+          - ssmmessages:OpenControlChannel
+          - ssmmessages:OpenDataChannel
+          Resource: "*"
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: ecs-tasks.amazonaws.com
+          Action: sts:AssumeRole
+      Description: Task Execution Role for Amazon ECS
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  TaskExecutionS3Config:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Get service configuration files from S3
+      Roles:
+      - Ref: TaskExecutionRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - s3:GetObject
+          Resource:
+          - Fn::Sub: "arn:aws:s3:::${Storage}/config/${Name}/*"
+        - Effect: Allow
+          Action:
+          - s3:GetBucketLocation
+          Resource:
+          - Fn::Sub: "arn:aws:s3:::${Storage}"
+
+  TaskExecutionSecrets:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Get service secrets from SecretManager
+      Roles:
+      - Ref: TaskExecutionRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - secretsmanager:GetSecretValue
+          - kms:Decrypt
+          Resource:
+          - Ref: RedisSecret
+          - Fn::Sub: "arn:${AWS::Partition}:secretsmanager:*:${AWS::AccountId}:secret:${Secrets}-*"
+          - Fn::Sub: "arn:${AWS::Partition}:kms:*:${AWS::AccountId}:alias/aws/secretsmanager"
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Sub: "${Project}-${Environment}-${Name}"
+      RetentionInDays: 14

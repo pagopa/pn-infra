@@ -1,0 +1,48 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SPID Hub - Storage
+
+
+Parameters:
+
+  Project:
+    Description: The project
+    MinLength: 3
+    Type: String
+
+  Environment:
+    Description: The enviroment
+    MinLength: 3
+    Type: String
+    AllowedValues:
+    - beta
+    - prod
+
+  StorageKMSKey:
+    Default: alias/aws/s3
+    Description: KMS key to encrypt storage
+    Type: String
+
+
+Resources:
+
+  Storage:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName:
+        Fn::Sub: "${Project}-${Environment}-${AWS::Region}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - ServerSideEncryptionByDefault:
+            KMSMasterKeyID:
+              Fn::Sub: "arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:${StorageKMSKey}"
+            SSEAlgorithm: aws:kms
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
+        RestrictPublicBuckets: True
+      VersioningConfiguration:
+        Status: Enabled

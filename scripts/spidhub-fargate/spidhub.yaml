@@ -12,6 +12,7 @@ Metadata:
       - Environment
       - DomainName
       - HostedZoneId
+      - Storage
     - Label:
         default: Network
       Parameters:
@@ -22,6 +23,12 @@ Metadata:
       - CIDRFrontEndA
       - CIDRFrontEndB
       - CIDRFrontEndC
+    - Label:
+        default: Hub Login
+      Parameters:
+      - HubLoginVersion
+      - HubLoginConfigVersion
+      - HubLoginSecrets
     ParameterLabels:
       CIDRVPC:
         default: VPC CIDR
@@ -41,6 +48,12 @@ Metadata:
         default: Domain Name
       HostedZoneId:
         default: Hosted Zone Id
+      HubLoginVersion:
+        default: Version
+      HubLoginConfigVersion:
+        default: Config Version
+      HubLoginSecrets:
+        default: Secrets
 
 
 Parameters:
@@ -58,10 +71,33 @@ Parameters:
     - beta
     - prod
 
+  Storage:
+    AllowedPattern: ^((?!xn--)(?!.*-s3alias)[a-z0-9][a-z0-9-]{1,61}[a-z0-9])$
+    Description: The S3 bucked used as storage
+    Type: String
+
   CIDRVPC:
     AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
     ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
     Description: CIDR block for VPC
+    Type: String
+
+  CIDRDataA:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: CIDR block for subnet Data A
+    Type: String
+
+  CIDRDataB:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: CIDR block for subnet Data B
+    Type: String
+
+  CIDRDataC:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: CIDR block for subnet Data C
     Type: String
 
   CIDRBackEndA:
@@ -109,6 +145,19 @@ Parameters:
     Description: The ID of the Route 53 Hosted Zone
     Type: AWS::Route53::HostedZone::Id
 
+  HubLoginVersion:
+    Description: The image version to use
+    Type: String
+
+  HubLoginConfigVersion:
+    AllowedPattern: ^v[0-9\.]+$
+    Description: The configuration version to get from the storage
+    Type: String
+
+  HubLoginSecrets:
+    Description: The secret name to get from the SecretManager
+    Type: String
+
 
 Resources:
 
@@ -122,6 +171,12 @@ Resources:
           Ref: Environment
         CIDRVPC:
           Ref: CIDRVPC
+        CIDRDataA:
+          Ref: CIDRDataA
+        CIDRDataB:
+          Ref: CIDRDataB
+        CIDRDataC:
+          Ref: CIDRDataC
         CIDRBackEndA:
           Ref: CIDRBackEndA
         CIDRBackEndB:
@@ -157,3 +212,77 @@ Resources:
           - Network
           - Outputs.FrontEndSubnets
       TemplateURL: ./stacks/orchestrator.yaml
+
+  Cache:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        Project:
+          Ref: Project
+        Environment:
+          Ref: Environment
+        VpcId:
+          Fn::GetAtt:
+          - Network
+          - Outputs.VPCId
+        Subnets:
+          Fn::GetAtt:
+          - Network
+          - Outputs.DataSubnets
+      TemplateURL: ./stacks/cache.yaml
+
+  HubLogin:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        Project:
+          Ref: Project
+        Environment:
+          Ref: Environment
+        Storage:
+          Ref: Storage
+        Version:
+          Ref: HubLoginVersion
+        ConfigVersion:
+          Ref: HubLoginConfigVersion
+        Secrets:
+          Ref: HubLoginSecrets
+        DomainName:
+          Ref: DomainName
+        VpcId:
+          Fn::GetAtt:
+          - Network
+          - Outputs.VPCId
+        Subnets:
+          Fn::GetAtt:
+          - Network
+          - Outputs.BackEndSubnets
+        Cluster:
+          Fn::GetAtt:
+          - Orchestrator
+          - Outputs.Cluster
+        ListenerArn:
+          Fn::GetAtt:
+          - Orchestrator
+          - Outputs.ListenerHttps
+        IngressSecurityGroup:
+          Fn::GetAtt:
+          - Orchestrator
+          - Outputs.AlbSecurityGroup
+        RedisSecurityGroup:
+          Fn::GetAtt:
+          - Cache
+          - Outputs.SecurityGroup
+        RedisEndpoint:
+          Fn::GetAtt:
+          - Cache
+          - Outputs.Endpoint
+        RedisPort:
+          Fn::GetAtt:
+          - Cache
+          - Outputs.Port
+        RedisSecret:
+          Fn::GetAtt:
+          - Cache
+          - Outputs.AuthSecret
+      TemplateURL: ./stacks/hub-login.yaml
