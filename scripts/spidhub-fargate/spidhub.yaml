@@ -29,6 +29,11 @@ Metadata:
       - HubLoginVersion
       - HubLoginConfigVersion
       - HubLoginSecrets
+    - Label:
+        default: SPID SAML Check
+      Parameters:
+      - SpidSamlCheckVersion
+      - SpidSamlCheckConfigVersion
     ParameterLabels:
       CIDRVPC:
         default: VPC CIDR
@@ -54,6 +59,10 @@ Metadata:
         default: Config Version
       HubLoginSecrets:
         default: Secrets
+      SpidSamlCheckVersion:
+        default: Version
+      SpidSamlCheckConfigVersion:
+        default: Config Version
 
 
 Parameters:
@@ -156,6 +165,15 @@ Parameters:
 
   HubLoginSecrets:
     Description: The secret name to get from the SecretManager
+    Type: String
+
+  SpidSamlCheckVersion:
+    Description: The image version to use
+    Type: String
+
+  SpidSamlCheckConfigVersion:
+    AllowedPattern: ^v[0-9\.]+$
+    Description: The configuration version to get from the storage
     Type: String
 
 
@@ -286,3 +304,41 @@ Resources:
           - Cache
           - Outputs.AuthSecret
       TemplateURL: ./stacks/hub-login.yaml
+
+  SpidSamlCheck:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        Project:
+          Ref: Project
+        Environment:
+          Ref: Environment
+        Version:
+          Ref: SpidSamlCheckVersion
+        Storage:
+          Ref: Storage
+        ConfigVersion:
+          Ref: SpidSamlCheckConfigVersion
+        DomainName:
+          Ref: DomainName
+        VpcId:
+          Fn::GetAtt:
+          - Network
+          - Outputs.VPCId
+        Subnets:
+          Fn::GetAtt:
+          - Network
+          - Outputs.BackEndSubnets
+        Cluster:
+          Fn::GetAtt:
+          - Orchestrator
+          - Outputs.Cluster
+        ListenerArn:
+          Fn::GetAtt:
+          - Orchestrator
+          - Outputs.ListenerHttps
+        IngressSecurityGroup:
+          Fn::GetAtt:
+          - Orchestrator
+          - Outputs.AlbSecurityGroup
+      TemplateURL: ./stacks/spid-saml-check.yaml

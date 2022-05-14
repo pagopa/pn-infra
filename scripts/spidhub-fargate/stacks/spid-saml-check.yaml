@@ -1,0 +1,373 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SPID Hub - Service - SPID SAML Check
+
+
+Parameters:
+
+  Project:
+    Description: The project
+    MinLength: 3
+    Type: String
+
+  Environment:
+    Description: The enviroment
+    MinLength: 3
+    Type: String
+    AllowedValues:
+    - beta
+    - prod
+
+  Name:
+    Default: spid-saml-check
+    Description: The name of the service
+    Type: String
+
+  Port:
+    Default: 8443
+    Description: The port of the service
+    Type: Number
+
+  Version:
+    Description: The image version to use
+    Type: String
+
+  Storage:
+    AllowedPattern: ^((?!xn--)(?!.*-s3alias)[a-z0-9][a-z0-9-]{1,61}[a-z0-9])$
+    Description: The S3 bucked used as storage
+    Type: String
+
+  ConfigVersion:
+    AllowedPattern: ^v[0-9\.]+$
+    Description: The configuration version to get from the storage
+    Type: String
+
+  Cluster:
+    Description: The Name of the ECS Cluster
+    Type: String
+
+  Subnets:
+    Description: The BackEnd Subnets in which deploy the service
+    Type: List<AWS::EC2::Subnet::Id>
+
+  ListenerArn:
+    Description: The ARN of the ALB Listener
+    Type: String
+
+  DomainName:
+    AllowedPattern: ^(((?!-)[A-Za-z0-9-]{0,62}[A-Za-z0-9])\.)+((?!-)[A-Za-z0-9-]{1,62}[A-Za-z0-9])$
+    Description: The domain name
+    Type: String
+
+  VpcId:
+    Description: The VPC in which deploy the service
+    Type: AWS::EC2::VPC::Id
+
+  IngressSecurityGroup:
+    Description: The Security Group from which incoming requests will arrive
+    Type: AWS::EC2::SecurityGroup::Id
+
+
+Resources:
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+      - Name: init-config
+        Essential: false
+        Image: amazon/aws-cli
+        Command:
+        - s3
+        - cp
+        - --recursive
+        - Fn::Sub: "s3://${Storage}/config/${Name}/${ConfigVersion}/configvolume"
+        - /tmp/config/
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-region:
+              Ref: AWS::Region
+            awslogs-group:
+              Ref: LogGroup
+            awslogs-stream-prefix: logs
+        MountPoints:
+        - ContainerPath: /tmp/config
+          SourceVolume: config
+      - Name: init-bootstrap
+        Essential: false
+        Image: bash
+        Command:
+        - -c
+        - Fn::Sub: "wget -O /tmp/bootstrap/sp-metadata.xml https://hub-login.${DomainName}/metadata"
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-region:
+              Ref: AWS::Region
+            awslogs-group:
+              Ref: LogGroup
+            awslogs-stream-prefix: logs
+        MountPoints:
+        - ContainerPath: /tmp/bootstrap
+          SourceVolume: bootstrap
+      - Name: main
+        Essential: true
+        DependsOn:
+        - Condition: COMPLETE
+          ContainerName: init-config
+        - Condition: COMPLETE
+          ContainerName: init-bootstrap
+        MountPoints:
+        - ContainerPath: /spid-saml-check/spid-validator/config
+          SourceVolume: config
+        - ContainerPath: /data/bootstrap
+          SourceVolume: bootstrap
+        Image:
+          Fn::Sub: "ghcr.io/pagopa/spid-saml-check:${Version}"
+        Cpu: 1
+        Memory: 256
+        MemoryReservation: 128
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-region:
+              Ref: AWS::Region
+            awslogs-group:
+              Ref: LogGroup
+            awslogs-stream-prefix: logs
+        PortMappings:
+        - ContainerPort:
+            Ref: Port
+          Protocol: tcp
+        Privileged: false
+      Volumes:
+      - Name: config
+      - Name: bootstrap
+      Cpu: 256
+      Memory: 512
+      ExecutionRoleArn:
+        Fn::GetAtt:
+        - TaskExecutionRole
+        - Arn
+      Family:
+        Fn::Sub: "${Project}-${Environment}-${Name}"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+      - FARGATE
+      TaskRoleArn:
+        Ref: Role
+
+  Service:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster:
+        Ref: Cluster
+      DesiredCount: 1
+      EnableECSManagedTags: true
+      EnableExecuteCommand: true
+      LaunchType: FARGATE
+      LoadBalancers:
+      - ContainerName: main
+        ContainerPort:
+          Ref: Port
+        TargetGroupArn:
+          Ref: TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+          - Ref: SecurityGroup
+          Subnets:
+            Ref: Subnets
+      PropagateTags: SERVICE
+      SchedulingStrategy: REPLICA
+      ServiceName:
+        Fn::Sub: "${Project}-${Environment}-${Name}"
+      TaskDefinition:
+        Ref: TaskDefinition
+
+  ListenerRuleRewrite:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: redirect
+        RedirectConfig:
+          Host: '#{host}'
+          Path: '/demo/metadata.xml'
+          Port: '#{port}'
+          Protocol: '#{protocol}'
+          Query: '#{query}'
+          StatusCode: HTTP_302
+      Conditions:
+      - Field: path-pattern
+        PathPatternConfig:
+          Values:
+          - '/demo/metadata'
+      ListenerArn:
+        Ref: ListenerArn
+      Priority: 15
+
+  ListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn:
+          Ref: TargetGroup
+      Conditions:
+      - Field: host-header
+        HostHeaderConfig:
+          Values:
+          - Fn::Sub: "${Name}.${DomainName}"
+      ListenerArn:
+        Ref: ListenerArn
+      Priority: 20
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name:
+        Fn::Sub: "${Project}-${Environment}-${Name}"
+      HealthCheckIntervalSeconds: 30
+      HealthCheckProtocol: HTTPS
+      HealthCheckPath: /
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      Port:
+        Ref: Port
+      Protocol: HTTPS
+      TargetGroupAttributes:
+      - Key: stickiness.enabled
+        Value: 'false'
+      - Key: stickiness.type
+        Value: 'lb_cookie'
+      - Key: deregistration_delay.timeout_seconds
+        Value: '30'
+      - Key: slow_start.duration_seconds
+        Value: '30'
+      TargetType: ip
+      UnhealthyThresholdCount: 3
+      VpcId:
+        Ref: VpcId
+
+  ScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName:
+        Fn::Sub: "${Project}-${Environment}-${Name}"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId:
+        Ref: ScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 75.0
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+
+  ScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 5
+      MinCapacity: 1
+      RoleARN:
+        Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
+      ServiceNamespace: ecs
+      ScalableDimension: ecs:service:DesiredCount
+      ResourceId:
+        Fn::Sub:
+        - "service/${Cluster}/${ServiceName}"
+        - ServiceName:
+            Fn::GetAtt:
+            - Service
+            - Name
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Service
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort:
+          Ref: Port
+        ToPort:
+          Ref: Port
+        SourceSecurityGroupId:
+          Ref: IngressSecurityGroup
+      VpcId:
+        Ref: VpcId
+
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ecs-tasks.amazonaws.com
+          Action: sts:AssumeRole
+          Condition:
+            StringEquals:
+              aws:SourceAccount:
+                Ref: AWS::AccountId
+
+  S3Config:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Get service configuration files from S3
+      Roles:
+      - Ref: Role
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - s3:GetObject
+          Resource:
+          - Fn::Sub: "arn:aws:s3:::${Storage}/config/${Name}/*"
+        - Effect: Allow
+          Action:
+          - s3:ListBucket
+          Resource:
+          - Fn::Sub: "arn:aws:s3:::${Storage}"
+
+  ExecuteCommand:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: EnableExecuteCommand
+      Roles:
+      - Ref: Role
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - ssmmessages:CreateControlChannel
+          - ssmmessages:CreateDataChannel
+          - ssmmessages:OpenControlChannel
+          - ssmmessages:OpenDataChannel
+          Resource: "*"
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: ecs-tasks.amazonaws.com
+          Action: sts:AssumeRole
+      Description: Task Execution Role for Amazon ECS
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Sub: "${Project}-${Environment}-${Name}"
+      RetentionInDays: 14
