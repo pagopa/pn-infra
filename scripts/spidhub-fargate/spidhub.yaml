@@ -342,3 +342,15 @@ Resources:
           - Orchestrator
           - Outputs.AlbSecurityGroup
       TemplateURL: ./stacks/spid-saml-check.yaml
+
+  WellKnown:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        Secrets:
+          Ref: HubLoginSecrets
+        ListenerArn:
+          Fn::GetAtt:
+          - Orchestrator
+          - Outputs.ListenerHttps
+      TemplateURL: ./stacks/well-known.yaml

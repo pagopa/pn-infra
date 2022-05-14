@@ -1,0 +1,37 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SPID Hub - Service - SPID SAML Check
+
+
+Parameters:
+
+  Secrets:
+    Description: The name of the Secret in SecretManager
+    Type: String
+
+  ListenerArn:
+    Description: The ARN of the ALB Listener
+    Type: String
+
+
+Resources:
+
+  ListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: fixed-response
+        FixedResponseConfig:
+          StatusCode: 200
+          ContentType: application/json
+          MessageBody:
+            # maximum character length 1024
+            Fn::Sub: "{{resolve:secretsmanager:${Secrets}:SecretString:Jwks}}"
+      Conditions:
+      - Field: path-pattern
+        PathPatternConfig:
+          Values:
+          - '/.well-known/jwks.json'
+      ListenerArn:
+        Ref: ListenerArn
+      Priority: 10
