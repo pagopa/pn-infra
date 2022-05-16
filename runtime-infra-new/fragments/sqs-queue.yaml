@@ -29,9 +29,15 @@ Parameters:
       specify an integer value from 60 seconds (1 minute) to 1209600 seconds (14 days). '
     Type: Number
     Default: '1209600'
+  AlarmSNSTopicArn:
+    Type: String
+    Default: '-'
+    Description: 'An ARN of an SNS topic where to send alarm when DLQ contain messages'
+    
 
 Conditions:
   DlqHasDefaultName: !Equals [ !Ref DeadLetterQueueName, '-' ]
+  DlqHasAlarm: !Not [ !Equals [ !Ref DeadLetterQueueName, '-' ] ]
 
 Resources:
 
@@ -54,6 +60,30 @@ Resources:
           - !Sub "${QueueName}-DLQ"
           - !Ref DeadLetterQueueName
       MessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
+
+  DLQHasMessagesAlarm:
+    Condition: DlqHasAlarm
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${QueueName}-DLQ-HasMessage"
+      AlarmDescription: "Alarm dlq messages when we have 1 or more messages in DLQ"
+      Namespace: "AWS/SQS"
+      MetricName: "ApproximateNumberOfMessagesVisible"
+      Dimensions:
+        - Name: "QueueName"
+          Value: !Sub '${DeadLetterQueue.QueueName}'
+      Statistic: "Sum"
+      Period: 60  
+      Threshold: 1
+      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 1       
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      InsufficientDataActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+
 
 Outputs:
   # Queue info

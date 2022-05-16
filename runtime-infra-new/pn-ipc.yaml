@@ -86,6 +86,7 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-delivery_push_inputs'
         DelaySeconds: 1
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 
   ### Communication TO and FROM EXTERNAL-CHANNELS ###
@@ -96,6 +97,7 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-external_channel_inputs'
         DelaySeconds: 1
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   ExternalChannelsOutputsQueue:
     Type: AWS::CloudFormation::Stack
@@ -104,6 +106,7 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-external_channel_outputs'
         DelaySeconds: 1
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 
 Outputs:
