@@ -29,7 +29,7 @@ Parameters:
       specify an integer value from 60 seconds (1 minute) to 1209600 seconds (14 days). '
     Type: Number
     Default: '1209600'
-  AlarmSNSTopicArn:
+  AlarmSNSTopicName:
     Type: String
     Default: '-'
     Description: 'An ARN of an SNS topic where to send alarm when DLQ contain messages'
@@ -78,11 +78,11 @@ Resources:
       ComparisonOperator: "GreaterThanOrEqualToThreshold" 
       EvaluationPeriods: 1       
       AlarmActions:
-        - !Ref AlarmSNSTopicArn
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
       InsufficientDataActions:
-        - !Ref AlarmSNSTopicArn
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
       OKActions:
-        - !Ref AlarmSNSTopicArn
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
 
 Outputs:
