@@ -19,7 +19,19 @@ Resources:
   AlarmSNSTopic:
     Type: AWS::SNS::Topic
     Properties:
-      DisplayName: !Sub 'dev account alarms topic'
+      DisplayName: 'dev account alarms topic'
+  
+  # - Alarm message queue
+  AlarmHistoryBufferQueue:
+    Type: AWS::SQS::Queue  
+
+  AlarmSNSTopicToSqsHistoryBuffer:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sqs
+      Endpoint: !GetAtt AlarmHistoryBufferQueue.Arn
+      Region: !Ref AWS::Region
+      TopicArn: !Ref AlarmSNSTopic
 
   # - Connect dev alarm to slack developers channel
   AlarmSNSTopicSlackConnection:
@@ -73,3 +85,8 @@ Outputs:
   AlarmSNSTopicArn:
     Value: !Ref AlarmSNSTopic
     Description: ARN of the Alarm SNS Topic
+  
+  AlarmSNSTopicName:
+    Value: !GetAtt  AlarmSNSTopic.TopicName
+    Description: Name of the Alarm SNS Topic
+

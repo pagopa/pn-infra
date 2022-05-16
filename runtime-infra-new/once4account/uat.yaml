@@ -19,7 +19,7 @@ Resources:
   AlarmSNSTopic:
     Type: AWS::SNS::Topic
     Properties:
-      DisplayName: !Sub 'uat account alarms topic'
+      DisplayName: 'uat account alarms topic'
 
 #  # - Connect dev alarm to slack developers channel
 #  AlarmSNSTopicSlackConnection:
@@ -73,3 +73,7 @@ Outputs:
   AlarmSNSTopicArn:
     Value: !Ref AlarmSNSTopic
     Description: ARN of the Alarm SNS Topic
+
+  AlarmSNSTopicName:
+    Value: !GetAtt  AlarmSNSTopic.TopicName
+    Description: Name of the Alarm SNS Topic

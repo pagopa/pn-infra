@@ -41,6 +41,8 @@ Parameters:
     Type: String
   AlarmSNSTopicArn:
     Type: String
+  AlarmSNSTopicName:
+    Type: String
   VpcId:
     Type: String
   SubnetsIds:
@@ -131,6 +133,7 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-delivery_push_inputs'
         DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
 
   ### Communication TO and FROM EXTERNAL-CHANNELS ###
@@ -141,6 +144,7 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-external_channel_inputs'
         DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
   ExternalChannelsOutputsQueue:
     Type: AWS::CloudFormation::Stack
@@ -149,6 +153,7 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-external_channel_outputs'
         DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
 
 Outputs:
@@ -214,6 +219,8 @@ Outputs:
     Value: !Ref ApplicationLoadBalancerDomain
   AlarmSNSTopicArn:
     Value: !Ref AlarmSNSTopicArn
+  AlarmSNSTopicName:
+    Value: !Ref AlarmSNSTopicName
   VpcId:
     Value: !Ref VpcId
   SubnetsIds:

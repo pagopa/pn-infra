@@ -38,17 +38,22 @@ Resources:
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
       VpcId: !Ref VpcId
 
-  ### to CASSANDRA service ###
-  CassandraInterfaceEndpoint:
-    Type: 'AWS::EC2::VPCEndpoint'
+  ### to DynamoDB service ###
+  DynamoDBVPCGatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
     Properties:
-      VpcEndpointType: Interface
-      PrivateDnsEnabled: true
-      SecurityGroupIds:
-        - !Ref InterfaceSecurityGroup
-      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.cassandra'
-      SubnetIds: !Ref Subnets
+      VpcEndpointType: Gateway
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action: '*'
+            Effect: Allow
+            Resource: '*'
+            Principal: '*'
+      RouteTableIds: !Ref RouteTableIds
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
       VpcId: !Ref VpcId
+
 
   ### to SQS service ###
   SQSInterfaceEndpoint:
