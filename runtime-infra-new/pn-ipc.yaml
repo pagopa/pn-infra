@@ -93,16 +93,16 @@ Resources:
       Name: !Sub '${ProjectName}CoreEventBus'
   
   # Allow access from partner system
-  PnCoreEventBusSafeStoreAccessPolicy: 
-    Type: AWS::Events::EventBusPolicy
-    Properties: 
-        StatementId: "AllowEventPutBySafeStorage"
-        Statement: 
-            Effect: "Allow"
-            Principal: 
-                AWS: !Sub "arn:aws:iam::${SafeStorageAccountId}:root"
-            Action: "events:PutEvents"
-            Resource: !GetAtt PnCoreEventBus.Arn
+  #PnCoreEventBusSafeStoreAccessPolicy: 
+  #  Type: AWS::Events::EventBusPolicy
+  #  Properties: 
+  #      StatementId: "AllowEventPutBySafeStorage"
+  #      Statement: 
+  #          Effect: "Allow"
+  #          Principal: 
+  #              AWS: !Sub "arn:aws:iam::${SafeStorageAccountId}:root"
+  #          Action: "events:PutEvents"
+  #          Resource: !GetAtt PnCoreEventBus.Arn
   
   # Send All Safe Storage Response to pn-delivery-push
   PnCoreEventBusToSafeStorageResponseQueue:
