@@ -29,10 +29,10 @@ EnvName="spid-hub-test"
 
 if [ "$profile" = "prod" ]; then
   DnsDomain="pn.pagopa.it"
-  UserRegistryApiUrl="https://api.pdv.pagopa.it/user-registry-management/v1"
+  UserRegistryApiUrl="https://api.pdv.pagopa.it/user-registry/v1"
 else
   DnsDomain="${profile}.pn.pagopa.it"
-  UserRegistryApiUrl="https://api.uat.pdv.pagopa.it/user-registry-management/v1"
+  UserRegistryApiUrl="https://api.uat.pdv.pagopa.it/user-registry/v1"
 fi
 
 KeyName="${EnvName}-ssh-key"
