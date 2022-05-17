@@ -31,6 +31,10 @@ Parameters:
   HostedZoneId:
     Description: "Hosted Zone Id in which you want to add record"
     Type: String
+  
+  SafeStorageAccountId:
+    Description: "SafeStorage AWS Account id. Useful to grant rights to send feedback to EventBus"
+    Type: String
 
   # pass-though parameters
   NetworkLoadBalancerLink:
@@ -88,6 +92,18 @@ Resources:
     Properties: 
       Name: !Sub '${ProjectName}-CoreEventBus'
   
+  # Allow access from partner system
+  SampleEventBusPolicy: 
+    Type: AWS::Events::EventBusPolicy
+    Properties: 
+        StatementId: "AllowEventPutBySafeStorage"
+        Statement: 
+            Effect: "Allow"
+            Principal: 
+                AWS: !Sub "arn:aws:iam::${SafeStorageAccountId}:root"
+            Action: "events:PutEvents"
+            Resource: !GetAtt PnCoreEventBus.Arn
+  
   # Send All Safe Storage Response to pn-delivery-push
   PnCoreEventBusToSafeStorageResponseQueue:
     Type: AWS::Events::Rule
@@ -95,8 +111,7 @@ Resources:
       Description: Route SafeStorage Events to pn-delivery-push
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
-        detail:
-          documentType: [ { "exists": true  } ]
+        detail-type: [ "SafeStorageOutcomeEvent" ]
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryPush'
           Arn: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
@@ -105,14 +120,29 @@ Resources:
   PnCoreEventBusToExtChResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
-      Description: Route SafeStorage Events to pn-delivery-push
+      Description: Route ExternalChannel Events to pn-delivery-push
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
-        detail:
-          digitalLegal: [ { "exists": true  } ]
+        detail-type: [ "ExternalChannelOutcomeEvent" ]
+        details:
+          clientId: [ "pn-delivery-push" ]
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2DeliveryPush'
           Arn: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
+  
+  # Send ExternalChannel Response to pn-user-attributes
+  PnCoreEventBusToUserAttributesQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route ExternalChannel Events to pn-user-attributes
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "ExternalChannelOutcomeEvent" ]
+        details:
+          clientId: [ "pn-user-attributes" ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2UserAttributes'
+          Arn: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
 
 
   
@@ -152,6 +182,15 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub '${ProjectName}-external_channel_outputs'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+  
+  ExternalChannels2UserAttributesQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-external_channel_to_user_attributes'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
