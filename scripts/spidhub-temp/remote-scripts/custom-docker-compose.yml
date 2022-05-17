@@ -60,6 +60,13 @@ services:
     networks:
       - spid-net
 
+  jwks-http:
+    image: danjellz/http-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - "./well-known:/public/.well-known"
+
 networks:
   spid-net:
     driver: bridge
