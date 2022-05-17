@@ -96,13 +96,14 @@ Resources:
   PnCoreEventBusSafeStoreAccessPolicy: 
     Type: AWS::Events::EventBusPolicy
     Properties: 
-        StatementId: "AllowEventPutBySafeStorage"
-        Statement: 
-            Effect: "Allow"
-            Principal: 
-                AWS: !Sub "arn:aws:iam::${SafeStorageAccountId}:root"
-            Action: "events:PutEvents"
-            Resource: "arn:aws:events:eu-central-1:558518206506:event-bus/pnCoreEventBus"
+      EventBusName: !Ref PnCoreEventBus
+      StatementId: "AllowEventPutBySafeStorage"
+      Statement: 
+        Effect: "Allow"
+        Principal: 
+            AWS: !Sub "arn:aws:iam::${SafeStorageAccountId}:root"
+        Action: "events:PutEvents"
+        Resource: !GetAtt "PnCoreEventBus.Arn"
   
   # Send All Safe Storage Response to pn-delivery-push
   PnCoreEventBusToSafeStorageResponseQueue:
