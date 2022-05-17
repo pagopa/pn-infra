@@ -116,6 +116,7 @@ Resources:
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryPush'
           Arn: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
+          InputPath: '$.detail'
 
   # Send ExternalChannel Response to pn-delivery-push
   PnCoreEventBusToExtChResponseQueue:
