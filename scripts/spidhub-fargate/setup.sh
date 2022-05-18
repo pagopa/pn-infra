@@ -2,7 +2,7 @@
 
 AWS_REGION=eu-west-1
 AWS_PROFILE=ppa-piattaforma-notifiche-beta.FullAdmin
-ENVIRONMENT=beta
+ENVIRONMENT=dev
 PROJECT=spidhub
 STACK_NAME=spidhub
 PACKAGE_BUCKET=cf-templates-tu6w3i55ikf3-eu-west-1
