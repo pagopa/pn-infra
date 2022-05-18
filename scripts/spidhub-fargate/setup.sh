@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-set -e
-set -o pipefail
-
 AWS_REGION=eu-west-1
 AWS_PROFILE=ppa-piattaforma-notifiche-beta.FullAdmin
 ENVIRONMENT=beta
@@ -10,11 +7,16 @@ PROJECT=spidhub
 STACK_NAME=spidhub
 PACKAGE_BUCKET=cf-templates-tu6w3i55ikf3-eu-west-1
 PACKAGE_PREFIX=package/$PROJECT
-INITIAL=false
 
 
-if $INITIAL; then
+aws \
+  --profile "$AWS_PROFILE" \
+  --region "$AWS_REGION" \
+  secretsmanager describe-secret \
+  --secret-id $PROJECT-$ENVIRONMENT-hub-login \
+  > /dev/null 2> /dev/null
 
+if test $? -ne 0; then
   mkdir -p "./environments/$ENVIRONMENT/certs"
 
   openssl req -nodes -new -x509 -sha256 -days 365 -newkey rsa:2048 \
@@ -46,17 +48,17 @@ if $INITIAL; then
     --name $PROJECT-$ENVIRONMENT-hub-login \
     --secret-string "$SecretString"
 
-  aws \
-    --profile "$AWS_PROFILE" \
-    --region "$AWS_REGION" \
-    cloudformation deploy \
-    --template-file "./stacks/storage.yaml" \
-    --stack-name "$PROJECT-$ENVIRONMENT-storage" \
-    --parameter-overrides Project=$PROJECT Environment=$ENVIRONMENT \
-    --tags Project=$PROJECT Environment=$ENVIRONMENT
-
 fi
 
+aws \
+  --profile "$AWS_PROFILE" \
+  --region "$AWS_REGION" \
+  cloudformation deploy \
+  --template-file "./stacks/storage.yaml" \
+  --stack-name "$PROJECT-$ENVIRONMENT-storage" \
+  --parameter-overrides Project=$PROJECT Environment=$ENVIRONMENT \
+  --tags Project=$PROJECT Environment=$ENVIRONMENT \
+  --no-fail-on-empty-changeset
 
 aws \
   --profile "$AWS_PROFILE" \
@@ -83,6 +85,7 @@ aws \
   --parameter-overrides "file://environments/$ENVIRONMENT/params.json" \
   --tags Project=$PROJECT Environment=$ENVIRONMENT \
   --template-file "./$STACK_NAME.tmp" \
-  --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND
+  --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
+  --no-fail-on-empty-changeset
 
 rm "./$STACK_NAME.tmp"
