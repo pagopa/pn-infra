@@ -25,10 +25,16 @@ region=$2
 
 LoginSuccessDestinationEnpoint=$3
 UserRegistryApiKey=$4
-
 EnvName="spid-hub-test"
-DnsDomain="${profile}.pn.pagopa.it"
-UserRegistryApiUrl="https://api.${profile}.userregistry.pagopa.it/user-registry-management/v1"
+
+if [ "$profile" = "prod" ]; then
+  DnsDomain="pn.pagopa.it"
+  UserRegistryApiUrl="https://api.pdv.pagopa.it/user-registry/v1"
+else
+  DnsDomain="${profile}.pn.pagopa.it"
+  UserRegistryApiUrl="https://api.uat.pdv.pagopa.it/user-registry/v1"
+fi
+
 KeyName="${EnvName}-ssh-key"
 StackName="${EnvName}"
 KeyFileName="${KeyName}-${region}-${profile}.pem"
@@ -155,9 +161,9 @@ echo ""
 echo "### Execute install script"
 ssh -i ${KeyPath} "${SshConnectionUrl}" source ./install.sh
 
-echo ""
-echo "### Execute build script"
-ssh -i ${KeyPath} "${SshConnectionUrl}" source ./build.sh
+#echo ""
+#echo "### Execute build script"
+#ssh -i ${KeyPath} "${SshConnectionUrl}" source ./build.sh
 
 echo ""
 echo "### RUN"

@@ -39,14 +39,6 @@ mkdir -p ~/.docker/cli-plugins/
 curl -SL https://github.com/docker/compose/releases/download/v2.2.3/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
 chmod +x ~/.docker/cli-plugins/docker-compose
 
-echo ""
-echo "=== Install node and yarn"
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash
-. ~/.nvm/nvm.sh
-nvm install node
-npm install yarn -g
-
-
 
 echo -e "\n\n\n"
 echo "===           DOWNLOAD AND CONFIGURE SPIDHUB REPOSITORY           ==="
@@ -106,6 +98,10 @@ echo "\n= .env"
 cat ../customized-env | envsubst | tee .env
 echo "\n= conf-testenv/config.yaml"
 cat ../customized-config.yaml | envsubst | tee conf-testenv/config.yaml
+
+echo ""
+echo "=== Overwrite docker-compose"
+cp ../custom-docker-compose.yml custom-docker-compose.yml
 
 echo "====================================================================="
 echo "===                          INSTALL END                          ==="
