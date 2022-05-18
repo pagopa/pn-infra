@@ -1,0 +1,74 @@
+version: "2.2"
+
+services:
+  backend:
+    container_name: hub-spid-login-ms
+    image: ghcr.io/pagopa/hub-spid-login-ms:3.0.0-alpha.3
+    environment:
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - spid-saml-check
+    expose:
+      - ${SERVER_PORT}
+    ports:
+      - ${SERVER_PORT}:${SERVER_PORT}
+      - "5859:5859"
+    command: ["yarn", "start"]
+    volumes:
+      - "./certs:/usr/src/app/certs:ro"
+    networks:
+      - spid-net
+
+  spid-saml-check:
+    container_name: spid-saml-check
+    image: italia/spid-saml-check:v.1.8.1
+    restart: unless-stopped
+    environment:
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
+    ports:
+      - "9191:8080"
+    networks:
+      - spid-net
+
+  spid-testenv2:
+#    profiles: [ "prod" ]
+    container_name: spid-testenv2
+    image: italia/spid-testenv2:latest
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    volumes:
+      - "./conf-testenv:/app/conf"
+      - "./certs:/app/certs:ro"
+    depends_on:
+      - backend
+    networks:
+      - spid-net
+
+  redis:
+    container_name: redis
+    image: wodby/redis:3.2-2.1.5
+    ports:
+      - "6379:6379"
+    environment:
+      REDIS_TIMEOUT: 300
+      REDIS_TCP_KEEPALIVE: 60
+      REDIS_MAXMEMORY: 182m
+    networks:
+      - spid-net
+
+  jwks-http:
+    image: danjellz/http-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - "./well-known:/public/.well-known"
+
+networks:
+  spid-net:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1450
