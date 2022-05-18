@@ -24,7 +24,7 @@ Parameters:
     Type: String
 
   Port:
-    Default: 8443
+    Default: 8080
     Description: The port of the service
     Type: Number
 
@@ -227,16 +227,14 @@ Resources:
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name:
-        Fn::Sub: "${Project}-${Environment}-${Name}"
       HealthCheckIntervalSeconds: 30
-      HealthCheckProtocol: HTTPS
+      HealthCheckProtocol: HTTP
       HealthCheckPath: /
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 3
       Port:
         Ref: Port
-      Protocol: HTTPS
+      Protocol: HTTP
       TargetGroupAttributes:
       - Key: stickiness.enabled
         Value: 'false'
