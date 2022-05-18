@@ -53,7 +53,7 @@ if $INITIAL; then
     --template-file "./stacks/storage.yaml" \
     --stack-name "$PROJECT-$ENVIRONMENT-storage" \
     --parameter-overrides Project=$PROJECT Environment=$ENVIRONMENT \
-    --tags "file://environments/$ENVIRONMENT/tags.json"
+    --tags Project=$PROJECT Environment=$ENVIRONMENT
 
 fi
 
@@ -81,7 +81,7 @@ aws \
   cloudformation deploy \
   --stack-name "$PROJECT-$ENVIRONMENT" \
   --parameter-overrides "file://environments/$ENVIRONMENT/params.json" \
-  --tags "file://environments/$ENVIRONMENT/tags.json" \
+  --tags Project=$PROJECT Environment=$ENVIRONMENT \
   --template-file "./$STACK_NAME.tmp" \
   --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND
 
