@@ -65,6 +65,18 @@ Metadata:
         default: Config Version
 
 
+Conditions:
+
+  IsProd:
+    Fn::Equals:
+    - Ref: Environment
+    - prod
+
+  IsNotProd:
+    Fn::Not:
+    - Condition: IsProd
+
+
 Parameters:
 
   Project:
@@ -307,6 +319,7 @@ Resources:
 
   SpidSamlCheck:
     Type: AWS::CloudFormation::Stack
+    Condition: IsNotProd
     Properties:
       Parameters:
         Project:
