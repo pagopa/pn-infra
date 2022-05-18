@@ -5,11 +5,4 @@ echo "= NEW CURRENT WORKING DIRECTORY: $(pwd)"
 echo -e "\n\n\n"
 echo "===                      RUN DOCKER COMPOSE                      ==="
 echo "===================================================================="
-docker compose up -d backend spid-testenv2 redis
-
-
-echo -e "\n\n\n"
-echo "===                      EXPOSE WELL_KNOWN                       ==="
-echo "===================================================================="
-cd well-known
-docker run -d --rm -p 8080:8080 -v $(pwd):/public/.well-known/ danjellz/http-server
+docker compose -f custom-docker-compose.yml up -d
