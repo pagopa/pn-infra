@@ -126,16 +126,11 @@ Resources:
       AuthorizationType: CUSTOM
       AuthorizerId: !If [ IsB2B, !Ref ApikeyAuthorizer, !Ref JwtAuthorizer ]
       RequestParameters:
-        Fn::If:
-          - IsWeb
-          - method.request.path.proxy: true
-            method.request.header.x-pagopa-pn-uid: false
-            method.request.header.x-pagopa-pn-cx-id: false
-            method.request.header.x-pagopa-pn-cx-type: false
-            method.request.header.x-pagopa-pn-cx-groups: false
-          - method.request.path.proxy: true
-            method.request.header.x-pagopa-pn-cx-id: false
-            method.request.header.x-pagopa-pn-cx-type: false
+        method.request.path.proxy: true
+        method.request.header.x-pagopa-pn-uid: false
+        method.request.header.x-pagopa-pn-cx-id: false
+        method.request.header.x-pagopa-pn-cx-type: false
+        method.request.header.x-pagopa-pn-cx-groups: false
       Integration:
         ConnectionType: VPC_LINK
         ConnectionId: !Ref NetworkLoadBalancerLink
@@ -143,16 +138,11 @@ Resources:
         Type: HTTP_PROXY
         Uri: !Sub 'http://${ApplicationLoadBalancerDomain}:8080/${ServiceApiPath}/{proxy}'
         RequestParameters:
-          Fn::If:
-            - IsWeb
-            - integration.request.path.proxy: method.request.path.proxy
-              integration.request.header.x-pagopa-pn-uid: context.authorizer.uid
-              integration.request.header.x-pagopa-pn-cx-id: context.authorizer.cx_id
-              integration.request.header.x-pagopa-pn-cx-type: context.authorizer.cx_type
-              integration.request.header.x-pagopa-pn-cx-groups: context.authorizer.cx_groups
-            - integration.request.path.proxy: method.request.path.proxy
-              integration.request.header.x-pagopa-pn-cx-id: context.authorizer.cx_id
-              integration.request.header.x-pagopa-pn-cx-type: context.authorizer.cx_type
+          integration.request.path.proxy: method.request.path.proxy
+          integration.request.header.x-pagopa-pn-uid: context.authorizer.uid
+          integration.request.header.x-pagopa-pn-cx-id: context.authorizer.cx_id
+          integration.request.header.x-pagopa-pn-cx-type: context.authorizer.cx_type
+          integration.request.header.x-pagopa-pn-cx-groups: context.authorizer.cx_groups
         PassthroughBehavior: "WHEN_NO_MATCH"
         TimeoutInMillis: 29000
 
