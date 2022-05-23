@@ -1,18 +1,39 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash -ex
 
-AWS_REGION=eu-west-1
-AWS_PROFILE=ppa-piattaforma-notifiche-beta.FullAdmin
-ENVIRONMENT=dev
+if ( [ $# -ne 4 ] ) then
+  echo "This script create a test spidhub instance"
+  echo "Usage: $0 <profile> <region> <environment> <user-registry-api-key>"
+  echo "<profile> the profile to access AWS account"
+  echo "<region>: where to deploy the spidhub instance"
+  echo "<environment>: redirection url after successful login"
+  echo "<user-registry-api-key>: user registry for this environment"
+  echo " other parameters are retrieved from the specific environments directory"
+  echo "This script require following executable configured in the PATH variable:"
+  echo " - aws cli 2.0 "
+  echo " - jq"
+
+  if ( [ "$BASH_SOURCE" = "" ] ) then
+    return 1
+  else
+    exit 1
+  fi
+fi
+
+AWS_PROFILE=$1
+AWS_REGION=$2
+ENVIRONMENT=$3
+UserRegistryApiKey=$4
+
 PROJECT=spidhub
 STACK_NAME=spidhub
 PACKAGE_BUCKET=$PROJECT-$ENVIRONMENT-$AWS_REGION
 PACKAGE_PREFIX=package
 
-
 aws \
   --profile "$AWS_PROFILE" \
   --region "$AWS_REGION" \
   secretsmanager describe-secret \
+  --no-paginate \
   --secret-id $PROJECT-$ENVIRONMENT-hub-login \
   > /dev/null 2> /dev/null
 
@@ -30,7 +51,7 @@ if test $? -ne 0; then
   openssl rsa -in "./environments/$ENVIRONMENT/jwt/jwt_rsa_key.pem" \
     -outform PEM -pubout -out "./environments/$ENVIRONMENT/jwt/jwt_rsa_public.pem"
 
-  UserRegistryApiKey=$(tr -d '\n' < "./environments/$ENVIRONMENT/UserRegistryApiKey.tmp")
+#  UserRegistryApiKey=$(tr -d '\n' < "./environments/$ENVIRONMENT/UserRegistryApiKey.tmp")
   MakecertPrivate=$( sed -e 's/$/\\n/' "./environments/$ENVIRONMENT/certs/key.pem" | tr -d '\n' | sed -e 's/\\n$//')
   MakecertPublic=$( sed -e 's/$/\\n/' "./environments/$ENVIRONMENT/certs/cert.pem" | tr -d '\n' | sed -e 's/\\n$//' )
   JwtTokenPrivateKey=$( sed -e 's/$/\\n/' "./environments/$ENVIRONMENT/jwt/jwt_rsa_key.pem" | tr -d '\n' | sed -e 's/\\n$//' )
