@@ -268,10 +268,10 @@ Resources:
     Type: AWS::ApiGateway::Authorizer
     Properties:
       Name: pn-auth-fleet_IoAuthorizer
-      Type: TOKEN
+      Type: REQUEST
       AuthorizerResultTtlInSeconds: '300'
       AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-IoAuthorizerLambda/invocations'
-      IdentitySource: method.request.header.Authorization
+      IdentitySource: method.request.header.x-api-key, method.request.header.x-pagopa-pn-cx-taxid
       RestApiId: !Ref PublicRestApi
 
   # Expose API to custom domain
