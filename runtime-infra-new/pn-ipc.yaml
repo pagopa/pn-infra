@@ -28,6 +28,14 @@ Parameters:
     Type: String
     Description: 'The certificate used for browser rest API.'
 
+  IoApiDnsName:
+    Type: String
+    Description: 'The DNS name used for IO API rest'
+
+  IoApiCertificateArn:
+    Type: String
+    Description: 'The certificate used for browser rest IO API.'
+
   HostedZoneId:
     Description: "Hosted Zone Id in which you want to add record"
     Type: String
@@ -80,6 +88,15 @@ Resources:
         CertificateArn: !Ref WebApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
 
+  # Custom domain for IO api
+  IoApiCustomDomain:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
+      Parameters:
+        DnsName: !Ref IoApiDnsName
+        CertificateArn: !Ref IoApiCertificateArn
+        HostedZoneId: !Ref HostedZoneId
 
   ###                     MESSAGE ORIENTED MIDDLEWARE                     ###
   ###########################################################################
@@ -204,6 +221,9 @@ Outputs:
     Description: 'The DNS name used for B2B rest API.'
   WebApiDnsName:
     Value: !Ref WebApiDnsName
+    Description: 'The DNS name used for browser rest API.'
+  IoApiDnsName:
+    Value: !Ref IoApiDnsName
     Description: 'The DNS name used for browser rest API.'
 
   # SafeStorage to DeliveryPush
