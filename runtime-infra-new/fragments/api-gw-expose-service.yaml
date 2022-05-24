@@ -21,8 +21,8 @@ Parameters:
     AllowedValues:
       - B2B
       - WEB
-      - APPIO
-    Description: B2B, WEB or APPIO usage. Used from other back-end system or used from a browser
+      - IO
+    Description: B2B, WEB or IO usage. Used from other back-end system or used from a browser
 
   ServiceApiPath:
     Type: String
@@ -38,7 +38,7 @@ Parameters:
 Conditions:
   IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
   IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
-  IsAPPIO: !Equals [ !Ref IntendedUsage, 'APPIO' ]
+  IsIO: !Equals [ !Ref IntendedUsage, 'IO' ]
 
 Resources:
 
@@ -124,20 +124,20 @@ Resources:
       RestApiId: !Ref PublicRestApi
       ResourceId: !Ref PublicApiProxyResource
       HttpMethod: ANY
-      ApiKeyRequired: !Or [ IsB2B, IsAPPIO]
+      ApiKeyRequired: !Or [ IsB2B, IsIO]
       AuthorizationType: CUSTOM
       AuthorizerId:
         Fn::If:
           - IsB2B
           - !Ref ApikeyAuthorizer
           - Fn::If:
-            - IsAPPIO
-            - !Ref AppIoAuthorizer
+            - IsIO
+            - !Ref IoAuthorizer
             - !Ref JwtAuthorizer
       RequestParameters:
         method.request.path.proxy: true
         Fn::If:
-          - IsAPPIO
+          - IsIO
           - method.request.header.x-pagopa-pn-cx-taxid: true
           - Fn::If:
             - IsWeb
@@ -251,25 +251,25 @@ Resources:
       IdentitySource: method.request.header.Authorization
       RestApiId: !Ref PublicRestApi
 
-  # APPIO Authorizer
-  appIoLambdaPermission:
-    Condition: IsAPPIO
+  # IO Authorizer
+  IoLambdaPermission:
+    Condition: IsIO
     Type: AWS::Lambda::Permission
-    DependsOn: AppIoAuthorizer
+    DependsOn: IoAuthorizer
     Properties:
-      FunctionName: !Sub '${ProjectName}-appIoAuthorizerLambda'
+      FunctionName: !Sub '${ProjectName}-IoAuthorizerLambda'
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${JwtAuthorizer}"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${IoAuthorizer}"
 
-  AppIoAuthorizer:
-    Condition: IsAPPIO
+  IoAuthorizer:
+    Condition: IsIO
     Type: AWS::ApiGateway::Authorizer
     Properties:
-      Name: pn-auth-fleet_appIoAuthorizer
+      Name: pn-auth-fleet_IoAuthorizer
       Type: TOKEN
       AuthorizerResultTtlInSeconds: '300'
-      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-appIoAuthorizerLambda/invocations'
+      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-IoAuthorizerLambda/invocations'
       IdentitySource: method.request.header.Authorization
       RestApiId: !Ref PublicRestApi
 
