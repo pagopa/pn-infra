@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 if ( [ $# -ne 5 ] ) then
   echo "This script create or renew a certificate for a server domain name"
@@ -27,7 +27,7 @@ zoneRegion=$5
 fullDomain="${domainName}.${zoneName}"
 
 
-certificateArn=$( aws acm --profile $profile --region $certificateRegion list-certificates \
+certificateArn=$( aws acm --profile $profile --region $certificateRegion list-certificates --no-paginate \
     | jq ".CertificateSummaryList[] | select(.DomainName==\"${fullDomain}\") | .CertificateArn" )
 
 if ( [ "" = "$certificateArn" ] ) then
@@ -39,7 +39,7 @@ if ( [ "" = "$certificateArn" ] ) then
   echo "Give 5 second to request creation"
   sleep 5
 
-  certificateArn=$( aws acm --profile $profile --region $certificateRegion list-certificates \
+  certificateArn=$( aws acm --profile $profile --region $certificateRegion list-certificates --no-paginate \
     | jq ".CertificateSummaryList[] | select(.DomainName==\"${fullDomain}\") | .CertificateArn" )
   if ( [ "" = "$certificateArn" ] ) then
     echo "!!!! CANNOT CREATE A CERTIFICATE REQUEST"
@@ -59,7 +59,7 @@ echo ""
 echo "Certificate for ${fullDomain} has ARN ${certificateArn}"
 
 certificateDescription=$( aws acm --profile $profile --region $certificateRegion describe-certificate \
-                                  --certificate-arn $certificateArn )
+                                  --certificate-arn $certificateArn --no-paginate)
 
 echo "Certificate Description"
 echo "$certificateDescription"
@@ -85,7 +85,7 @@ if ( [ "PENDING_VALIDATION" = "$certificateStatus" ] ) then
        "    \"ResourceRecordSet\": { \n"\
        "        \"Name\": \"${validationDnsName}\",\n"\
        "        \"Type\": \"${validationDnsType}\",\n"\
-       "        \"TTL\": 300,"\
+       "        \"TTL\": 300,\n"\
        "        \"ResourceRecords\": [{ \"Value\": \"${validationDnsValue}\"}] \n"\
        "    }\n"\
        "}]}" \
@@ -96,7 +96,7 @@ if ( [ "PENDING_VALIDATION" = "$certificateStatus" ] ) then
 
   echo "Look for hosted zone id"
   hostedZoneId=$( aws --profile $profile --region $zoneRegion route53 list-hosted-zones-by-name \
-             --dns-name ${zoneName} | jq ".HostedZones[] | select(.Name==\"${zoneName}.\") | .Id"\
+             --dns-name ${zoneName} --no-paginate | jq ".HostedZones[] | select(.Name==\"${zoneName}.\") | .Id"\
               | sed -e 's|/hostedzone/||' | tr -d '"')
   if ( [ "" = "$hostedZoneId" ] ) then
     echo "Hosted zone not found"
@@ -121,7 +121,7 @@ if ( [ "PENDING_VALIDATION" = "$certificateStatus" ] ) then
     echo -n "."
     counter=$[ $counter + 1 ]
     certificateDescription=$( aws acm --profile $profile --region $certificateRegion describe-certificate \
-                                  --certificate-arn $certificateArn )
+                                  --certificate-arn $certificateArn --no-paginate)
     certificateStatus=$( echo "$certificateDescription" | jq -r '.Certificate.Status' )
   done
   echo ""
