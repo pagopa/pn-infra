@@ -10,12 +10,13 @@ uatZoneName="uat"
 
 # COMPLETE CERTIFICATES LIST (we have a certificate for every public exposed https endpoint)
 # - Certificate used by CloudFront must be in "us-east-1" region
-certificateSubdomainsAndRegion="api#${zoneRegion} webapi#${zoneRegion} portale-pa#${cloudFrontRegion} portale#${cloudFrontRegion} www#${cloudFrontRegion}"
+certificateSubdomainsAndRegion="api#${zoneRegion} webapi#${zoneRegion} portale-pa#${cloudFrontRegion} portale#${cloudFrontRegion} www#${cloudFrontRegion} api-io#${zoneRegion}"
 
 
 if ( [ $# -ne 3 ] ) then
   echo "This script create DNS zones for ($environments) PN environments in region ${zoneRegion}"
   echo "Usage: $0 <parent-zone-profile> <dev-zone-profile> <uat-zone-profile>"
+  echo "Sample: $0 uat dev uat"
   echo ""
   echo "This script require following executable configured in the PATH variable:"
   echo " - aws cli 2.0 "
