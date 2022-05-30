@@ -68,7 +68,15 @@ if test $? -ne 0; then
     secretsmanager create-secret \
     --name $PROJECT-$ENVIRONMENT-hub-login \
     --secret-string "$SecretString"
-
+else
+  Kid=$(aws \
+    --profile "$AWS_PROFILE" \
+    --region "$AWS_REGION" \
+    secretsmanager get-secret-value \
+    --no-paginate \
+    --secret-id $PROJECT-$ENVIRONMENT-hub-login \
+    --query SecretString --output text |  jq -r .Jwks | jq -r '.keys[0].kid')
+  sed -i '' "/^JWT_TOKEN_KID=/s/=.*/=$Kid/" "./environments/$ENVIRONMENT/storage/config/hub-login/v1/.env"
 fi
 
 aws \
