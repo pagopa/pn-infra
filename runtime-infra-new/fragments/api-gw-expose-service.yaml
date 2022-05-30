@@ -253,7 +253,7 @@ Resources:
     Type: AWS::Lambda::Permission
     DependsOn: IoAuthorizer
     Properties:
-      FunctionName: !Sub '${ProjectName}-IoAuthorizerLambda'
+      FunctionName: !Sub '${ProjectName}-ioAuthorizerLambda'
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${IoAuthorizer}"
