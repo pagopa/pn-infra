@@ -25,6 +25,7 @@ Resources:
   AlarmHistoryBufferQueue:
     Type: AWS::SQS::Queue  
 
+  # - Alarm message queue subscription
   AlarmSNSTopicToSqsHistoryBuffer:
     Type: AWS::SNS::Subscription
     Properties:
@@ -32,7 +33,24 @@ Resources:
       Endpoint: !GetAtt AlarmHistoryBufferQueue.Arn
       Region: !Ref AWS::Region
       TopicArn: !Ref AlarmSNSTopic
-
+  
+  # - Alarm message queue policy that grant write right to SNS
+  AlarmSNSTopicToSqsHistoryPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties: 
+      Queues: 
+        - !Ref AlarmHistoryBufferQueue
+      PolicyDocument:
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "sns.amazonaws.com"
+            Action: "sqs:SendMessage"
+            Resource: !Sub ${AlarmHistoryBufferQueue.Arn}
+            Condition: 
+              ArnEquals: 
+                aws:SourceArn: !Ref AlarmSNSTopic
+      
   # - Connect dev alarm to slack developers channel
   AlarmSNSTopicSlackConnection:
     Type: AWS::CloudFormation::Stack
