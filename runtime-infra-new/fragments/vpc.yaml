@@ -1,5 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: 'Define a VPC with internet gateway and 3 subnets in 3 different AZ. It also includes a option to define more 3 private subnets using NAT gateway'
+Description: 'Define a VPC with internet gateway and 3 subnets in 3 different AZ. N.B: now subnets are public'
+# TODO: add a parameter to define if subnets are public or private
 
 Parameters:
   VpcName:
@@ -8,19 +9,6 @@ Parameters:
   VpcNumber:
     Type: String
     Description: Second byte from the left for VPC CIDR
-
-  SubnetType:
-    Description: Environment type.
-    Type: String
-    AllowedValues:
-      - OnlyPublic
-      - Public-and-Private
-    ConstraintDescription: must specify the type of subnets
-
-Conditions:
-  isPublicPrivate: !Equals 
-    - !Ref SubnetType
-    - Public-and-Private
 
 
 Resources:
@@ -50,66 +38,12 @@ Resources:
       InternetGatewayId: !Ref InternetGateway
       VpcId: !Ref VPC
 
-  # Elastic IPs
-  Subnet1EIP:
-    Type: AWS::EC2::EIP
-    Condition: isPublicPrivate
-    Properties:
-      Domain: vpc
-
-  Subnet2EIP:
-    Type: AWS::EC2::EIP
-    Condition: isPublicPrivate
-    Properties:
-      Domain: vpc
-
-  Subnet3EIP:
-    Type: AWS::EC2::EIP
-    Condition: isPublicPrivate
-    Properties:
-      Domain: vpc
-
-  # NAT Gateways 
-  Subnet1NATGateway:
-    Type: AWS::EC2::NatGateway
-    Condition: isPublicPrivate
-    Properties:
-      SubnetId:
-        Ref: PublicSubnet1
-      AllocationId:
-        Fn::GetAtt:
-          - Subnet1EIP
-          - AllocationId
-
-  Subnet2NATGateway:
-    Type: AWS::EC2::NatGateway
-    Condition: isPublicPrivate
-    Properties:
-      SubnetId:
-        Ref: PublicSubnet2
-      AllocationId:
-        Fn::GetAtt:
-          - Subnet2EIP
-          - AllocationId
-
-  Subnet3NATGateway:
-    Type: AWS::EC2::NatGateway
-    Condition: isPublicPrivate
-    Properties:
-      SubnetId:
-        Ref: PublicSubnet3
-      AllocationId:
-        Fn::GetAtt:
-          - Subnet3EIP
-          - AllocationId
-        
-
   ###                SUBNETS AND ROUTING TABLES DEFINITIONS                ###
   ############################################################################
 
-  # PUBLIC SUBNET 1 #
-  ###################
-  PublicSubnet1:
+  # SUBNET 1 #
+  ############
+  Subnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
@@ -118,30 +52,30 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${VpcName} Public Subnet 1(AZ1)
-  PublicSubnet1RouteTableAssociation:
+          Value: !Sub ${VpcName} Subnet 1(AZ1)
+  Subnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PublicRouteTable1
-      SubnetId: !Ref PublicSubnet1
-  PublicRouteTable1:
+      RouteTableId: !Ref RouteTable1
+      SubnetId: !Ref Subnet1
+  RouteTable1:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${VpcName} Public Subnet 1 routes
+          Value: !Sub ${VpcName} Subnet 1 routes
   DefaultPublicRoute1:
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
     Properties:
-      RouteTableId: !Ref PublicRouteTable1
+      RouteTableId: !Ref RouteTable1
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
-  # PUBLIC SUBNET 2 #
-  ###################
-  PublicSubnet2:
+  # SUBNET 2 #
+  ############
+  Subnet2:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
@@ -150,31 +84,31 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${VpcName} Public Subnet 2 (AZ2)
-  PublicSubnet2RouteTableAssociation:
+          Value: !Sub ${VpcName} Subnet 2 (AZ2)
+  Subnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PublicRouteTable2
-      SubnetId: !Ref PublicSubnet2
-  PublicRouteTable2:
+      RouteTableId: !Ref RouteTable2
+      SubnetId: !Ref Subnet2
+  RouteTable2:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${VpcName} Public Subnet 2 Routes
+          Value: !Sub ${VpcName} Subnet 2 Routes
   DefaultPublicRoute2:
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
     Properties:
-      RouteTableId: !Ref PublicRouteTable2
+      RouteTableId: !Ref RouteTable2
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
 
-  # PUBLIC SUBNET 3 #
-  ###################
-  PublicSubnet3:
+  # SUBNET 3 #
+  ############
+  Subnet3:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
@@ -183,245 +117,68 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${VpcName} Public Subnet 3 (AZ3)
-  PublicSubnet3RouteTableAssociation:
+          Value: !Sub ${VpcName} Subnet 3 (AZ3)
+  Subnet3RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PublicRouteTable3
-      SubnetId: !Ref PublicSubnet3
-  PublicRouteTable3:
+      RouteTableId: !Ref RouteTable3
+      SubnetId: !Ref Subnet3
+  RouteTable3:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${VpcName} Public Subnet 3 routes
+          Value: !Sub ${VpcName} Subnet 3 routes
   DefaultPublicRoute3:
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
     Properties:
-      RouteTableId: !Ref PublicRouteTable3
+      RouteTableId: !Ref RouteTable3
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
-  # PRIVATE SUBNET 1 #
-  ####################
-  PrivateSubnet1:
-    Type: AWS::EC2::Subnet
-    Condition: isPublicPrivate
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
-      CidrBlock: !Join ['', ["10.", !Ref "VpcNumber", ".4.0/24" ]]
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${VpcName} Private Subnet 1(AZ1)
-  PrivateSubnet1RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Condition: isPublicPrivate
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable1
-      SubnetId: !Ref PrivateSubnet1
-  PrivateRouteTable1:
-    Type: AWS::EC2::RouteTable
-    Condition: isPublicPrivate
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${VpcName} Private Subnet 1 routes
-  DefaultPrivateRoute1:
-    Type: AWS::EC2::Route
-    Condition: isPublicPrivate
-    DependsOn: InternetGatewayAttachment
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable1
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref Subnet1NATGateway
-
-  # PRIVATE SUBNET 2 #
-  ####################
-  PrivateSubnet2:
-    Type: AWS::EC2::Subnet
-    Condition: isPublicPrivate
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 1, !GetAZs '' ]
-      CidrBlock: !Join ['', ["10.", !Ref "VpcNumber", ".5.0/24" ]]
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${VpcName} Private Subnet 2(AZ2)
-  PrivateSubnet2RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Condition: isPublicPrivate
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable2
-      SubnetId: !Ref PrivateSubnet2
-  PrivateRouteTable2:
-    Type: AWS::EC2::RouteTable
-    Condition: isPublicPrivate
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${VpcName} Private Subnet 2 routes
-  DefaultPrivateRoute2:
-    Type: AWS::EC2::Route
-    Condition: isPublicPrivate
-    DependsOn: InternetGatewayAttachment
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable2
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref Subnet2NATGateway
-
-
-  # PRIVATE SUBNET 3 #
-  ####################
-  PrivateSubnet3:
-    Type: AWS::EC2::Subnet
-    Condition: isPublicPrivate
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 2, !GetAZs '' ]
-      CidrBlock: !Join ['', ["10.", !Ref "VpcNumber", ".6.0/24" ]]
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${VpcName} Private Subnet 3(AZ3)
-  PrivateSubnet3RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Condition: isPublicPrivate
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable3
-      SubnetId: !Ref PrivateSubnet3
-  PrivateRouteTable3:
-    Type: AWS::EC2::RouteTable
-    Condition: isPublicPrivate
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${VpcName} Private Subnet 3 routes
-  DefaultPrivateRoute3:
-    Type: AWS::EC2::Route
-    Condition: isPublicPrivate
-    DependsOn: InternetGatewayAttachment
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable3
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref Subnet3NATGateway
 
 Outputs:
   VpcId:
     Value: !Ref VPC
     Description: Id della VPC
 
-  PublicSubnetsIds:
+  SubnetsIds:
     Value:
       Fn::Join:
         - ","
-        - - !Ref PublicSubnet1
-          - !Ref PublicSubnet2
-          - !Ref PublicSubnet3
-    Description: Public Subnets ids joined with comma separator
-
-  PrivateSubnetsIds:
-    Condition: isPublicPrivate
-    Value:
-      Fn::Join:
-        - ","
-        - - !Ref PrivateSubnet1
-          - !Ref PrivateSubnet2
-          - !Ref PrivateSubnet3
-    Description: Private Subnets ids joined with comma separator
+        - - !Ref Subnet1
+          - !Ref Subnet2
+          - !Ref Subnet3
+    Description: Subnets ids joined with comma separator
 
   PublicRouteTables:
     Value:
       Fn::Join:
         - ","
-        - - !Ref PublicRouteTable1
-          - !Ref PublicRouteTable2
-          - !Ref PublicRouteTable3
-    Description: Public Routing tables joined with comma separator
+        - - !Ref RouteTable1
+          - !Ref RouteTable2
+          - !Ref RouteTable3
+    Description: Routing tables joined with comma separator
 
-  PrivateRouteTables:
-    Condition: isPublicPrivate
-    Value:
-      Fn::Join:
-        - ","
-        - - !Ref PrivateRouteTable1
-          - !Ref PrivateRouteTable2
-          - !Ref PrivateRouteTable3
-    Description: Private Routing tables joined with comma separator
 
-  # PublicSubnet1Id:
-  #   Value: !Ref PublicSubnet1
-  #   Description: Id public subnet 1
-  # PublicSubnet2Id:
-  #   Value: !Ref PublicSubnet2
-  #   Description: Id public subnet 2
-  # PublicSubnet3Id:
-  #   Value: !Ref PublicSubnet3
-  #   Description: Id public subnet 3
-
-  # PrivateSubnet1Id:
-  #   Condition: isPublicPrivate
-  #   Value: !Ref PrivateSubnet1
-  #   Description: Id private subnet 1
-  # PrivateSubnet2Id:
-  #   Condition: isPublicPrivate
-  #   Value: !Ref PrivateSubnet2
-  #   Description: Id private subnet 2
-  # PrivateSubnet3Id:
-  #   Condition: isPublicPrivate
-  #   Value: !Ref PrivateSubnet3
-  #   Description: Id private subnet 3
+  PublicSubnet1Id:
+    Value: !Ref Subnet1
+    Description: Id subnet 1
+  PublicSubnet2Id:
+    Value: !Ref Subnet2
+    Description: Id subnet 2
+  PublicSubnet3Id:
+    Value: !Ref Subnet3
+    Description: Id subnet 3
   
-  # PublicRouteTable1:
-  #   Value: !Ref PublicRouteTable1
-  #   Description: Routing table for public subnet 1
-  # PublicRouteTable2:
-  #   Value: !Ref PublicRouteTable2
-  #   Description: Routing table for public subnet 2
-  # PublicRouteTable3:
-  #   Value: !Ref PublicRouteTable3
-  #   Description: Routing table for public subnet 3
-
-  # PrivateRouteTable1:
-  #   Condition: isPublicPrivate
-  #   Value: !Ref PrivateRouteTable1
-  #   Description: Routing table for private subnet 1
-  # PrivateRouteTable2:
-  #   Condition: isPublicPrivate
-  #   Value: !Ref PrivateRouteTable2
-  #   Description: Routing table for private subnet 2
-  # PrivateRouteTable3:
-  #   Condition: isPublicPrivate
-  #   Value: !Ref PublicRouteTable3
-  #   Description: Routing table for private subnet 3
-
-  NATGateways:
-    Condition: isPublicPrivate
-    Value:
-      Fn::Join:
-        - ","
-        - - !Ref Subnet1NATGateway
-          - !Ref Subnet2NATGateway
-          - !Ref Subnet3NATGateway
-    Description: NAT Gateways joined with comma separator
-
-  # NATGateway1:
-  #   Value: !Ref Subnet1NATGateway
-  #   Condition: isPublicPrivate
-  #   Description: Nat Gateway attached to Routing table for public subnet 1
-  # NATGateway2:
-  #   Value: !Ref Subnet2NATGateway
-  #   Condition: isPublicPrivate
-  #   Description: Nat Gateway attached to Routing table for public subnet 2
-  # NATGateway3:
-  #   Value: !Ref Subnet3NATGateway
-  #   Condition: isPublicPrivate
-  #   Description: Nat Gateway attached to Routing table for public subnet 3
-
+  PublicRouteTable1:
+    Value: !Ref RouteTable1
+    Description: Routing table for subnet 1
+  PublicRouteTable2:
+    Value: !Ref RouteTable2
+    Description: Routing table for subnet 2
+  PublicRouteTable3:
+    Value: !Ref RouteTable3
+    Description: Routing table for subnet 3

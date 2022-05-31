@@ -35,7 +35,6 @@ Resources:
       Parameters:
         VpcName: !Ref ProjectName
         VpcNumber: !Ref VpcNumber
-        SubnetType: Public-and-Private
 
   # Private connection from subnets to AWS services
   VPCEndpoints:
@@ -45,7 +44,7 @@ Resources:
       Parameters:
         VpcName: !Ref ProjectName
         VpcNumber: !Ref VpcNumber
-        Subnets: !GetAtt VPC.Outputs.PublicSubnetsIds
+        Subnets: !GetAtt VPC.Outputs.SubnetsIds
         RouteTableIds: !GetAtt VPC.Outputs.PublicRouteTables
         VpcId: !GetAtt VPC.Outputs.VpcId
 
@@ -56,7 +55,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/load-balancer.yaml"
       Parameters:
         LoadBalancerName: !Ref ProjectName
-        Subnets: !GetAtt VPC.Outputs.PrivateSubnetsIds
+        Subnets: !GetAtt VPC.Outputs.SubnetsIds
         VpcId: !GetAtt VPC.Outputs.VpcId
 
   ###                             ECS CLUSTER                             ###
@@ -79,8 +78,8 @@ Outputs:
     Description: infrastructure VPC id
 
   SubnetsIds:
-    Value: !GetAtt VPC.Outputs.PrivateSubnetsIds
-    Description: ECS Services Subnets
+    Value: !GetAtt VPC.Outputs.SubnetsIds
+    Description: Subnets
 
 
   # Load balancers outputs

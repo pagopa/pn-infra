@@ -228,9 +228,8 @@ Resources:
       PlatformVersion: 1.4.0
       NetworkConfiguration:
         AwsvpcConfiguration:
-          # set to DISABLED if you're using private subnets that have access to a NAT gateway
-          # set to ENABLED if you're using public subnets
-          AssignPublicIp: DISABLED
+          # change to DISABLED if you're using private subnets that have access to a NAT gateway
+          AssignPublicIp: ENABLED
           Subnets: !Ref Subnets
           SecurityGroups:
             - !Ref EcsServiceSecurityGroup
@@ -255,6 +254,7 @@ Resources:
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
     # Makes sure the log group is created before it is used.
+    DependsOn: LogGroup
     Properties:
       # Name of the task definition. Subsequent versions of the task definition are grouped together under this name.
       Family: !Ref MicroServiceUniqueName
