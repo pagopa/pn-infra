@@ -2,8 +2,6 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   Contains SNS topics configured to send message to DevOps Engineer. At the current state has only
   one "alarm" channel sending messages to slack channel
-
-
 Parameters:
   TopicName:
     Type: String
@@ -17,7 +15,6 @@ Parameters:
     Type: String
     Description: <slack workspace id>:<slack channel id>. 'team_notifiche_dev_alarm' by default
     Default: TQSBH3ZS4:C02V0SRC4TV
-
 
 Resources:
 
@@ -33,6 +30,7 @@ Resources:
             Principal:
               Service:
                 - "events.amazonaws.com"
+                - "cloudwatch.amazonaws.com"
             Action:
               - 'sns:Publish'
             Resource:
