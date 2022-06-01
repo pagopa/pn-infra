@@ -44,10 +44,6 @@ Parameters:
     Description: "SafeStorage AWS Account id. Useful to grant rights to send feedback to EventBus"
     Type: String
 
-  EventBusDeadLetterQueueName:
-    Type: String
-    Description: "Dead Letter Queue name."
-
   EventBusDeadLetterQueueMaximumRetentionPeriod:
     Type: Number
     Default: '1209600'
@@ -234,7 +230,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       MessageRetentionPeriod: !Ref EventBusDeadLetterQueueMaximumRetentionPeriod
-      QueueName: !Ref EventBusDeadLetterQueueName
+      QueueName: !Sub '${ProjectName}-CoreEventBus-DLQ'
 
   # Dead Letter Queue policy 
   EventBusDeadLetterQueuePolicy:
@@ -258,7 +254,7 @@ Resources:
   DLQHasMessagesAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "${EventBusDeadLetterQueueName}-EventBus-DLQ-HasMessage"
+      AlarmName: !Sub '${ProjectName}-CoreEventBus-DLQ-HasMessage'
       AlarmDescription: "CloudWatch alarm for when DLQ has 1 or more messages."
       Namespace: "AWS/SQS"
       MetricName: "ApproximateNumberOfMessagesVisible"
