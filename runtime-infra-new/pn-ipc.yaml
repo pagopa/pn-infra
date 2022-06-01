@@ -44,6 +44,16 @@ Parameters:
     Description: "SafeStorage AWS Account id. Useful to grant rights to send feedback to EventBus"
     Type: String
 
+  EventBusDeadLetterQueueName:
+    Type: String
+    Description: "Dead Letter Queue name."
+
+  EventBusDeadLetterQueueMaximumRetentionPeriod:
+    Type: Number
+    Default: '1209600'
+    Description: "The number of seconds that Amazon SQS retains a message. You can specify an integer 
+      value from 60 seconds (1 minute) to 1,209,600 seconds (14 days)."
+
   # pass-though parameters
   NetworkLoadBalancerLink:
     Type: String
@@ -98,73 +108,9 @@ Resources:
         CertificateArn: !Ref IoApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
 
-  ###                     MESSAGE ORIENTED MIDDLEWARE                     ###
+  ###                    QUEUES BETWEEN MICRO SERVICES                    ###
   ###########################################################################
 
-  ### PN-CORE EventBus
-  # Receive events from SafeStorage and CarrierPigeon (AKA ExternalChannel) 
-  # and redirect to the right SQS queue
-  PnCoreEventBus:
-    Type: AWS::Events::EventBus
-    Properties: 
-      Name: !Sub '${ProjectName}-CoreEventBus'
-  
-  # Allow access from partner system
-  PnCoreEventBusSafeStoreAccessPolicy: 
-    Type: AWS::Events::EventBusPolicy
-    Properties: 
-      EventBusName: !Ref PnCoreEventBus
-      StatementId: "AllowEventPutBySafeStorage"
-      Statement: 
-        Effect: "Allow"
-        Principal: 
-            AWS: !Sub "arn:aws:iam::${SafeStorageAccountId}:root"
-        Action: "events:PutEvents"
-        Resource: !GetAtt "PnCoreEventBus.Arn"
-  
-  # Send All Safe Storage Response to pn-delivery-push
-  PnCoreEventBusToSafeStorageResponseQueue:
-    Type: AWS::Events::Rule
-    Properties: 
-      Description: Route SafeStorage Events to pn-delivery-push
-      EventBusName: !Ref PnCoreEventBus
-      EventPattern:
-        detail-type: [ "SafeStorageOutcomeEvent" ]
-      Targets: 
-        - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryPush'
-          Arn: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
-          InputPath: $.detail
-
-  # Send ExternalChannel Response to pn-delivery-push
-  PnCoreEventBusToExtChResponseQueue:
-    Type: AWS::Events::Rule
-    Properties: 
-      Description: Route ExternalChannel Events to pn-delivery-push
-      EventBusName: !Ref PnCoreEventBus
-      EventPattern:
-        detail-type: [ "ExternalChannelOutcomeEvent" ]
-        details:
-          clientId: [ "pn-delivery-push" ]
-      Targets: 
-        - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2DeliveryPush'
-          Arn: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
-  
-  # Send ExternalChannel Response to pn-user-attributes
-  PnCoreEventBusToUserAttributesQueue:
-    Type: AWS::Events::Rule
-    Properties: 
-      Description: Route ExternalChannel Events to pn-user-attributes
-      EventBusName: !Ref PnCoreEventBus
-      EventPattern:
-        detail-type: [ "ExternalChannelOutcomeEvent" ]
-        details:
-          clientId: [ "pn-user-attributes" ]
-      Targets: 
-        - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2UserAttributes'
-          Arn: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
-
-
-  
   ### Communication FROM SafeStorage TO pn-delivery-push ###
   SafeStorageToDeliveryPushQueue:
     Type: AWS::CloudFormation::Stack
@@ -213,6 +159,123 @@ Resources:
         QueueName: !Sub '${ProjectName}-external_channel_to_user_attributes'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  ###                          PN-CORE EVENT BUS                          ###
+  ###########################################################################
+  # Receive events from SafeStorage and CarrierPigeon (AKA ExternalChannel) 
+  # and redirect to the right SQS queue
+  PnCoreEventBus:
+    Type: AWS::Events::EventBus
+    Properties: 
+      Name: !Sub '${ProjectName}-CoreEventBus'
+  
+  # Allow access from partner system
+  PnCoreEventBusSafeStoreAccessPolicy: 
+    Type: AWS::Events::EventBusPolicy
+    Properties: 
+      EventBusName: !Ref PnCoreEventBus
+      StatementId: "AllowEventPutBySafeStorage"
+      Statement: 
+        Effect: "Allow"
+        Principal: 
+            AWS: !Sub "arn:aws:iam::${SafeStorageAccountId}:root"
+        Action: "events:PutEvents"
+        Resource: !GetAtt "PnCoreEventBus.Arn"
+  
+  # Send All Safe Storage Response to pn-delivery-push
+  PnCoreEventBusToSafeStorageResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route SafeStorage Events to pn-delivery-push
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "SafeStorageOutcomeEvent" ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryPush'
+          Arn: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
+  # Send ExternalChannel Response to pn-delivery-push
+  PnCoreEventBusToExtChResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route ExternalChannel Events to pn-delivery-push
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "ExternalChannelOutcomeEvent" ]
+        details:
+          clientId: [ "pn-delivery-push" ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2DeliveryPush'
+          Arn: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+  
+  # Send ExternalChannel Response to pn-user-attributes
+  PnCoreEventBusToUserAttributesQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route ExternalChannel Events to pn-user-attributes
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "ExternalChannelOutcomeEvent" ]
+        details:
+          clientId: [ "pn-user-attributes" ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2UserAttributes'
+          Arn: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
+  # Standard Queue for events Dead Letter Queue
+  EventBusDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: !Ref EventBusDeadLetterQueueMaximumRetentionPeriod
+      QueueName: !Ref EventBusDeadLetterQueueName
+
+  # Dead Letter Queue policy 
+  EventBusDeadLetterQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref "EventBusDeadLetterQueue"
+      PolicyDocument:
+        Statement:
+          - Sid: "SendEventsToDLQ"
+            Effect: "Allow"
+            Principal: 
+              Service: 
+                - "events.amazonaws.com"
+            Action: 
+              - "SQS:SendMessage"
+            Resource:
+              - !GetAtt "EventBusDeadLetterQueue.Arn"
+
+  # Alarm for Dead letter queue has messages
+  DLQHasMessagesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${EventBusDeadLetterQueueName}-EventBus-DLQ-HasMessage"
+      AlarmDescription: "CloudWatch alarm for when DLQ has 1 or more messages."
+      Namespace: "AWS/SQS"
+      MetricName: "ApproximateNumberOfMessagesVisible"
+      Dimensions:
+        - Name: "QueueName"
+          Value: !Sub '${EventBusDeadLetterQueue.QueueName}'
+      Statistic: "Sum"
+      Period: 60  
+      Threshold: 1
+      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 1       
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      InsufficientDataActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
 
 Outputs:
