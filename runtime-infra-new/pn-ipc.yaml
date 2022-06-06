@@ -103,6 +103,27 @@ Resources:
         CertificateArn: !Ref IoApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
 
+  ###                  KINESIS SOURCE STREAM FOR DYNAMO                   ###
+  ###########################################################################
+  TimelineCdcKinesis:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-stream.yaml"
+      Parameters:
+        StreamName: !Sub '${ProjectName}-timeline-cdc-stream'
+        StreamRetentionPeriodHours: 24
+        StreamShardCount: 10
+  
+  NotificationCdcKinesis:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-stream.yaml"
+      Parameters:
+        StreamName: !Sub '${ProjectName}-notification-cdc-stream'
+        StreamRetentionPeriodHours: 24
+        StreamShardCount: 10
+  
+
   ###                    QUEUES BETWEEN MICRO SERVICES                    ###
   ###########################################################################
 
