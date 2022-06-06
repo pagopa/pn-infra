@@ -61,6 +61,7 @@ Resources:
   ###                             ECS CLUSTER                             ###
   ###########################################################################
 
+  # The cluster
   ECSCluster:
     DependsOn: LoadBalancer
     Type: AWS::CloudFormation::Stack
@@ -68,6 +69,29 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-cluster.yaml"
       Parameters:
         MacroServiceName: !Sub '${ProjectName}-core'
+
+  # Role to read ecs micro services logs
+  ReadonlyEcsMicroServicesLogsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: logs.amazonaws.com
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: read_from_ecs_logs
+          PolicyDocument:
+            Statement:
+              - Sid: read_logs
+                Action:
+                  - "*"
+                Effect: Allow
+                Resource: 
+                  - "*"
+
 
 
 Outputs:
@@ -99,7 +123,9 @@ Outputs:
   ECSClusterName:
     Value: !GetAtt ECSCluster.Outputs.ClusterName
     Description: ECS cluster name
-
+  ReadonlyEcsMicroServicesLogsRoleArn:
+    Value: !GetAtt ReadonlyEcsMicroServicesLogsRole.Arn
+  
   # pass-though parameters
   AlarmSNSTopicArn:
     Value: !Ref AlarmSNSTopicArn
