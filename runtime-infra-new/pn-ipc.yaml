@@ -103,27 +103,6 @@ Resources:
         CertificateArn: !Ref IoApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
 
-  ###                  KINESIS SOURCE STREAM FOR DYNAMO                   ###
-  ###########################################################################
-  TimelineCdcKinesis:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-stream.yaml"
-      Parameters:
-        StreamName: !Sub '${ProjectName}-timeline-cdc-stream'
-        StreamRetentionPeriodHours: 24
-        StreamShardCount: 10
-  
-  NotificationCdcKinesis:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-stream.yaml"
-      Parameters:
-        StreamName: !Sub '${ProjectName}-notification-cdc-stream'
-        StreamRetentionPeriodHours: 24
-        StreamShardCount: 10
-  
-
   ###                    QUEUES BETWEEN MICRO SERVICES                    ###
   ###########################################################################
 
@@ -349,28 +328,6 @@ Outputs:
   ExternalChannelsOutputsQueueARN:
     Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
     Description: pn-external-channels output queue ARN
-
-  # Timeline Change Data Capture
-  TimelineCdcKinesisStreamName:
-    Value: !GetAtt TimelineCdcKinesis.Outputs.KinesisStreamName
-    Description: kinesis stream name for timeline dynamo table
-  TimelineCdcKinesisStreamArn:
-    Value: !GetAtt TimelineCdcKinesis.Outputs.KinesisStreamArn
-    Description: kinesis stream Arn for timeline dynamo table
-  TimelineCdcKinesisKeyArn:
-    Value: !GetAtt TimelineCdcKinesis.Outputs.KinesisStreamKeyArn
-    Description: KMS key arn for timeline stream decryption
-
-  # Notification Change Data Capture
-  NotificationCdcKinesisStreamName:
-    Value: !GetAtt NotificationCdcKinesis.Outputs.KinesisStreamName
-    Description: kinesis stream name for notification dynamo table
-  NotificationCdcKinesisStreamArn:
-    Value: !GetAtt NotificationCdcKinesis.Outputs.KinesisStreamArn
-    Description: kinesis stream Arn for notification dynamo table
-  NotificationCdcKinesisKeyArn:
-    Value: !GetAtt NotificationCdcKinesis.Outputs.KinesisStreamKeyArn
-    Description: KMS key arn for notification stream decryption
 
   # pass-thought parameters
   NetworkLoadBalancerLink:
