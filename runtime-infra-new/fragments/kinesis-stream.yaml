@@ -77,10 +77,17 @@ Resources:
                 Effect: Allow
                 Action:
                   - kinesis:DescribeStream
+                  - kinesis:DescribeStreamSummary
                   - kinesis:GetShardIterator
                   - kinesis:GetRecords
-                  - kinesis:ListShards
+                  - kinesis:ListShards    
+                  - kinesis:ListStreams
+                  - kinesis:SubscribeToShard
                 Resource: !GetAtt 'KinesisStream.Arn'
+              - Sid: decryptMessages
+                Action: kms:Decrypt
+                Effect: Allow
+                Resource: !GetAtt 'KinesisServerSideEncryptionKey.Arn'
 
 Outputs:
   
