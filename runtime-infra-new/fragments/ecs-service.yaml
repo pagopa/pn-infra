@@ -53,7 +53,7 @@ Parameters:
     Type: Number
     Description: Routing rules in the dame load balancer listener must have different priorities
 
-  # Container environment map, maximum 30 entry
+  # Container environment map, maximum 40 entry
   ContainerEnvEntry1:
     Description: 1st container environment entry in the form key=value
     Type: String
@@ -174,6 +174,46 @@ Parameters:
     Description: 30th container environment entry in the form key=value
     Type: String
     Default: ''
+  ContainerEnvEntry31:
+    Description: 31st container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry32:
+    Description: 32nd container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry33:
+    Description: 33rd container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry34:
+    Description: 34th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry35:
+    Description: 35th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry36:
+    Description: 36th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry37:
+    Description: 37th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry38:
+    Description: 38th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry39:
+    Description: 39th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry40:
+    Description: 40th container environment entry in the form key=value
+    Type: String
+    Default: ''
 
 
 Conditions:
@@ -207,6 +247,16 @@ Conditions:
   Env28Exist: !Not [ !Equals [ !Ref ContainerEnvEntry28, '' ] ]
   Env29Exist: !Not [ !Equals [ !Ref ContainerEnvEntry29, '' ] ]
   Env30Exist: !Not [ !Equals [ !Ref ContainerEnvEntry30, '' ] ]
+  Env31Exist: !Not [ !Equals [ !Ref ContainerEnvEntry31, '' ] ]
+  Env32Exist: !Not [ !Equals [ !Ref ContainerEnvEntry32, '' ] ]
+  Env33Exist: !Not [ !Equals [ !Ref ContainerEnvEntry33, '' ] ]
+  Env34Exist: !Not [ !Equals [ !Ref ContainerEnvEntry34, '' ] ]
+  Env35Exist: !Not [ !Equals [ !Ref ContainerEnvEntry35, '' ] ]
+  Env36Exist: !Not [ !Equals [ !Ref ContainerEnvEntry36, '' ] ]
+  Env37Exist: !Not [ !Equals [ !Ref ContainerEnvEntry37, '' ] ]
+  Env38Exist: !Not [ !Equals [ !Ref ContainerEnvEntry38, '' ] ]
+  Env39Exist: !Not [ !Equals [ !Ref ContainerEnvEntry39, '' ] ]
+  Env40Exist: !Not [ !Equals [ !Ref ContainerEnvEntry40, '' ] ]
 
 
 Resources:
@@ -424,6 +474,56 @@ Resources:
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry30 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry30 ] ]
                 - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env31Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry31 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry31 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env32Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry32 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry32 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env33Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry33 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry33 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env34Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry34 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry34 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env35Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry35 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry35 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env36Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry36 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry36 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env37Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry37 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry37 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env38Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry38 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry38 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env39Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry39 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry39 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env40Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry40 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry40 ] ]
+                - !Ref "AWS::NoValue"
           PortMappings:
             - ContainerPort: 8080
           # Send logs to CloudWatch Logs
@@ -439,7 +539,7 @@ Resources:
     Properties:
       LogGroupName: !Sub '/ecs/${MicroServiceUniqueName}'
       RetentionInDays: 3
-
+  
   # A role needed by ECS
   ExecutionRole:
     Type: AWS::IAM::Role
