@@ -11,6 +11,11 @@ Parameters:
   ECSClusterName:
     Type: String
     Description: ECS Cluster Name where the service is going to be deployed
+  
+  AlarmSNSTopicName:
+    Type: String
+    Default: '-'
+    Description: 'An ARN of an SNS topic where to send alarm when DLQ contain messages'
 
   MappedPaths:
     Type: List<String>
@@ -217,6 +222,8 @@ Parameters:
 
 
 Conditions:
+  HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicName, '-' ] ]
+
   Env1Exist: !Not [ !Equals [!Ref ContainerEnvEntry1, '']]
   Env2Exist: !Not [ !Equals [!Ref ContainerEnvEntry2, '']]
   Env3Exist: !Not [ !Equals [!Ref ContainerEnvEntry3, '']]
@@ -618,6 +625,42 @@ Resources:
           TargetGroupArn: !Ref TargetGroup
           Order: 1
 
+
+  # CloudWatch metric to filer ERROR - FATAL lines, in Log group
+  ErrorFatalLogsMetricFilter: 
+    Condition: HasAlarmTopic
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: !Ref LogGroup
+      FilterPattern: '?ERROR ?FATAL ?CRITICAL'
+      MetricTransformations: 
+        - MetricValue: 1
+          MetricNamespace: "ErrorFatalLogs"
+          MetricName: !Sub "${MicroServiceUniqueName}-ErrorFatalMetric"
+  
+  # Create alarm
+  ErrorFatalLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmTopic
+    DependsOn: ErrorFatalLogsMetricFilter
+    Properties:
+      AlarmName: ErrorFatalLogsMetricAlarm
+      AlarmDescription: "CloudWatch alarm for when ECS LogGroup has ERROR or FATAL line."
+      AlarmActions: 
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      InsufficientDataActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      DatapointsToAlarm: 1
+      MetricName: !Sub "${MicroServiceUniqueName}-ErrorFatalMetric"
+      Namespace: "ErrorFatalLogs"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Statistic: Sum
+      Threshold: 1
+      TreatMissingData: missing
 
 Outputs:
   ServiceName:
