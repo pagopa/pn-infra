@@ -10,6 +10,11 @@ Parameters:
     Type: String
     Description: <slack workspace id>:<slack channel id>. 'team_notifiche_dev_alarm' by default
     Default: TQSBH3ZS4:C030L43BXGE
+  
+  AlarmEmailAddress:
+    Type: String
+    Description: 'Email group address for dev alarm'
+    Default: marco.vit@pagopa.it
 
 Resources:
 
@@ -60,6 +65,16 @@ Resources:
         TopicName: 'dev_alarm'
         SNSTopicArn: !Ref AlarmSNSTopic
         SlackInfo: !Ref SlackInfo
+  
+  # - Connect dev alarm to email
+  # - Send alarm message to email address
+  AlarmToEmail:
+     Type: AWS::SNS::Subscription
+     Properties: 
+       TopicArn: !Ref AlarmSNSTopic
+       Endpoint: !Ref AlarmEmailAddress
+       Protocol: email
+
 
   # - Event Bridge events that generate an alarm
   # "ACM Certificate Approaching Expiration": alarm
