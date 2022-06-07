@@ -12,7 +12,7 @@ Parameters:
     Type: String
     Description: ECS Cluster Name where the service is going to be deployed
   
-  AlarmSNSTopicName:
+  AlarmSNSTopicArn:
     Type: String
     Default: '-'
     Description: 'An ARN of an SNS topic where to send alarm when DLQ contain messages'
@@ -222,7 +222,7 @@ Parameters:
 
 
 Conditions:
-  HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicName, '-' ] ]
+  HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
 
   Env1Exist: !Not [ !Equals [!Ref ContainerEnvEntry1, '']]
   Env2Exist: !Not [ !Equals [!Ref ContainerEnvEntry2, '']]
@@ -647,11 +647,11 @@ Resources:
       AlarmName: ErrorFatalLogsMetricAlarm
       AlarmDescription: "CloudWatch alarm for when ECS LogGroup has ERROR or FATAL line."
       AlarmActions: 
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+        - !Ref AlarmSNSTopicArn
       InsufficientDataActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+        - !Ref AlarmSNSTopicArn
       OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+        - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: 1
       MetricName: !Sub "${MicroServiceUniqueName}-ErrorFatalMetric"
       Namespace: "ErrorFatalLogs"
