@@ -644,7 +644,7 @@ Resources:
     Condition: HasAlarmTopic
     DependsOn: ErrorFatalLogsMetricFilter
     Properties:
-      AlarmName: ErrorFatalLogsMetricAlarm
+      AlarmName: !Sub "${MicroServiceUniqueName}-ErrorFatalLogs-Alarm"
       AlarmDescription: "CloudWatch alarm for when ECS LogGroup has ERROR or FATAL line."
       AlarmActions: 
         - !Ref AlarmSNSTopicArn
