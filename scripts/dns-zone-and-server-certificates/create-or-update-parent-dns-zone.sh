@@ -5,7 +5,7 @@ cloudFrontRegion="us-east-1"
 
 # COMPLETE CERTIFICATES LIST (we have a certificate for every public exposed https endpoint)
 # - Certificate used by CloudFront must be in "us-east-1" region
-certificateSubdomainsAndRegion="api#${zoneRegion} webapi#${zoneRegion} portale-pa#${cloudFrontRegion} portale#${cloudFrontRegion}"
+certificateSubdomainsAndRegion="api#${zoneRegion} webapi#${zoneRegion} portale-pa#${cloudFrontRegion} portale#${cloudFrontRegion} api-io#${zoneRegion}"
 
 
 if ( [ $# -ne 1 ] ) then
