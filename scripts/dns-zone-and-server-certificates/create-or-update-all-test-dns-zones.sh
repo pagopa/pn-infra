@@ -1,6 +1,6 @@
 #! /bin/bash
 
-zoneRegion="eu-central-1"
+zoneRegion="eu-south-1"
 cloudFrontRegion="us-east-1"
 
 # COMPLETE LIST OF dev & test SUBDOMAINS
