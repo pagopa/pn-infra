@@ -5,9 +5,9 @@ Parameters:
   VpcName:
     Type: String
     Description: 'VPC name: pn-dev, pn-uat, extreg-dev, ...'
-  VpcNumber:
+  VpcCidr:
     Type: String
-    Description: Second byte from the left for VPC CIDR
+    Description: Address range for security group
 
   VpcId:
     Type: AWS::EC2::VPC::Id
@@ -79,7 +79,7 @@ Resources:
         - FromPort: '0'
           ToPort: '65535'
           IpProtocol: tcp
-          CidrIp: !Join ['', ["10.", !Ref "VpcNumber", ".0.0/16" ]]
+          CidrIp: !Ref VpcCidr
       Tags:
         - Key: Name
           Value: !Sub '${VpcName}-Interface-Endpoint-SecGrp'

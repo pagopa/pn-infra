@@ -8,9 +8,18 @@ Parameters:
     Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
       experimental environments without crash official development environment'
 
-  VpcNumber:
+  VpcId:
     Type: String
-    Description: Second byte from the left for VPC CIDR
+    Description: VpcId of the VPC where to install PN-CORE
+  VpcCidr:
+    Type: String
+    Description: Cidr of the VPC where to install PN-CORE
+  VpcSubnets:
+    Type: String
+    Description: subnets where to install PN-CORE
+  VpcSubnetsRoutingTables:
+    Type: String
+    Description: routing table for subnets where to install PN-CORE
 
   TemplateBucketBaseUrl:
     Type: String
@@ -28,13 +37,13 @@ Resources:
   ###########################################################################
 
   # VPC and subnets
-  VPC:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/vpc.yaml"
-      Parameters:
-        VpcName: !Ref ProjectName
-        VpcNumber: !Ref VpcNumber
+  #VPC:
+  #  Type: AWS::CloudFormation::Stack
+  #  Properties:
+  #    TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/vpc.yaml"
+  #    Parameters:
+  #      VpcName: !Ref ProjectName
+  #      VpcNumber: !Ref VpcNumber
 
   # Private connection from subnets to AWS services
   VPCEndpoints:
@@ -43,10 +52,10 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/vpc-endpoints.yaml"
       Parameters:
         VpcName: !Ref ProjectName
-        VpcNumber: !Ref VpcNumber
-        Subnets: !GetAtt VPC.Outputs.SubnetsIds
-        RouteTableIds: !GetAtt VPC.Outputs.PublicRouteTables
-        VpcId: !GetAtt VPC.Outputs.VpcId
+        VpcCidr: !Ref VpcCidr
+        Subnets: !Ref VpcSubnets
+        RouteTableIds: !Ref VpcSubnetsRoutingTables
+        VpcId: !Ref VpcId
 
   # LoadBalancer
   LoadBalancer:
@@ -55,8 +64,8 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/load-balancer.yaml"
       Parameters:
         LoadBalancerName: !Ref ProjectName
-        Subnets: !GetAtt VPC.Outputs.SubnetsIds
-        VpcId: !GetAtt VPC.Outputs.VpcId
+        Subnets: !Ref VpcSubnets
+        VpcId: !Ref VpcId
 
   ###                             ECS CLUSTER                             ###
   ###########################################################################
@@ -98,11 +107,11 @@ Outputs:
 
   # VPC outputs
   VpcId:
-    Value: !GetAtt VPC.Outputs.VpcId
+    Value: !Ref VpcId
     Description: infrastructure VPC id
 
   SubnetsIds:
-    Value: !GetAtt VPC.Outputs.SubnetsIds
+    Value: !Ref VpcSubnets
     Description: Subnets
 
 
