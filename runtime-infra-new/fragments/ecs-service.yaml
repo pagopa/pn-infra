@@ -286,10 +286,11 @@ Resources:
       NetworkConfiguration:
         AwsvpcConfiguration:
           # change to DISABLED if you're using private subnets that have access to a NAT gateway
-          AssignPublicIp: ENABLED
+          AssignPublicIp: DISABLED
           Subnets: !Ref Subnets
           SecurityGroups:
             - !Ref EcsServiceSecurityGroup
+            - sg-05496aea288f2417e
       LoadBalancers:
         - ContainerName: !Sub '${MicroServiceUniqueName}'
           ContainerPort: 8080
