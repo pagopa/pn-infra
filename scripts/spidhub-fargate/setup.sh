@@ -29,15 +29,14 @@ STACK_NAME=spidhub
 PACKAGE_BUCKET=$PROJECT-$ENVIRONMENT-$AWS_REGION
 PACKAGE_PREFIX=package
 
-aws \
+secretPresent=$( aws \
   --profile "$AWS_PROFILE" \
   --region "$AWS_REGION" \
-  secretsmanager describe-secret \
+  secretsmanager list-secrets \
   --no-paginate \
-  --secret-id $PROJECT-$ENVIRONMENT-hub-login \
-  > /dev/null 2> /dev/null
+  | jq -r ".SecretList | .[] | select(.Name==\"$PROJECT-$ENVIRONMENT-hub-login\")" | wc -l )
 
-if test $? -ne 0; then
+if ( [ $secretPresent -eq 0 ] ) then
   mkdir -p "./environments/$ENVIRONMENT/certs"
 
   openssl req -nodes -new -x509 -sha256 -days 365 -newkey rsa:2048 \
@@ -66,6 +65,7 @@ if test $? -ne 0; then
     --profile "$AWS_PROFILE" \
     --region "$AWS_REGION" \
     secretsmanager create-secret \
+    --no-paginate \
     --name $PROJECT-$ENVIRONMENT-hub-login \
     --secret-string "$SecretString"
 else
