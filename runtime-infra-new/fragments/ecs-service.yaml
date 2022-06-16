@@ -43,6 +43,24 @@ Parameters:
     Type: String
     Description: memory amount reserved to the task pod
 
+## Enable/Disable Autoscaling 
+  AutoscalingStrategy:
+    Description: Autoscaling strategy.
+    Default: Disabled
+    Type: String
+    AllowedValues:
+      - Disabled
+      - REST-API
+      - SQS
+      - Mixed
+    ConstraintDescription: must specify the type of Autoscaling strategy
+
+ ## Queue name for Autoscaling when using SQS
+  QueueName:
+    Type: String
+    Default: ''
+    Description: The SQS queue auto scaling is based on
+
 
   # Technical parameters
   VpcId:
@@ -265,6 +283,16 @@ Conditions:
   Env39Exist: !Not [ !Equals [ !Ref ContainerEnvEntry39, '' ] ]
   Env40Exist: !Not [ !Equals [ !Ref ContainerEnvEntry40, '' ] ]
 
+  ## Conditions for enable/disable autoscaling feature.
+  restApi: !Equals [ !Ref AutoscalingStrategy, REST-API]
+  sqs: !Equals [ !Ref AutoscalingStrategy, SQS]
+  mixed: !Equals [ !Ref AutoscalingStrategy, Mixed]
+  isAutoscalingSQSEnabled:
+    !Or [ Condition: sqs, Condition: mixed]
+  isAutoscalingRestAPIEnabled:
+    !Or [ Condition: restApi, Condition: mixed]
+  isAutoscalingEnabled:
+    !Or [ Condition: isAutoscalingSQSEnabled, Condition: isAutoscalingRestAPIEnabled]
 
 Resources:
 
@@ -626,6 +654,122 @@ Resources:
           Order: 1
 
 
+###                            Application AutoScaling                    ###
+  ############################################################################
+
+#### IAM Role for Application AutoScaling 
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Condition: isAutoscalingEnabled
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [application-autoscaling.amazonaws.com]
+            Action: ["sts:AssumeRole"]
+      Path: /
+      Policies:
+        - PolicyName: service-autoscaling
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: ["application-autoscaling:*", "cloudwatch:DescribeAlarms", "cloudwatch:PutMetricAlarm",
+                         "ecs:DescribeServices", "ecs:UpdateService"]
+                Resource: "*"
+
+#### Target Application AutoScaling 
+  AutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Condition: isAutoscalingEnabled
+    Properties:
+      MinCapacity: 1
+      MaxCapacity: 10
+      ResourceId: !Join ["/", [service, !Ref "ECSClusterName", !GetAtt [ECSService, Name]]]
+      RoleARN: !GetAtt [ AutoScalingRole, Arn ]
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+
+      
+#### Scaling Up Policy
+  ScaleUpPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Condition: isAutoscalingEnabled
+    Properties:
+      PolicyName: !Sub '${MicroServiceUniqueName}ScaleUpPolicy'
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      StepScalingPolicyConfiguration:
+        AdjustmentType: ChangeInCapacity
+        Cooldown: 60
+        MetricAggregationType: Average
+        StepAdjustments:
+          - MetricIntervalLowerBound: 0
+            ScalingAdjustment: 1
+
+#### Scaling Down Policy
+  ScaleDownPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Condition: isAutoscalingEnabled
+    Properties:
+      PolicyName: !Sub '${MicroServiceUniqueName}ScaleDownPolicy'
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      StepScalingPolicyConfiguration:
+        AdjustmentType: ChangeInCapacity
+        Cooldown: 60
+        MetricAggregationType: Average
+        StepAdjustments:
+          - MetricIntervalUpperBound: 0
+            ScalingAdjustment: -1
+
+#### Alarm for Rest-API metric Autoscaling
+  AlarmHighRequests:
+    Type: AWS::CloudWatch::Alarm
+    Condition: isAutoscalingRestAPIEnabled
+    Properties:
+      ActionsEnabled: TRUE
+      AlarmDescription: "Trigger scaling based on APIs"
+      ComparisonOperator: GreaterThanThreshold
+      DatapointsToAlarm: 2
+      Dimensions:
+        - Name: TargetGroup
+          Value: !GetAtt TargetGroup.TargetGroupFullName
+      EvaluationPeriods: 3
+      MetricName: RequestCountPerTarget
+      Namespace: AWS/ApplicationELB
+      AlarmActions:
+        - !Ref ScaleUpPolicy
+      OKActions:
+        - !Ref ScaleDownPolicy
+      Period: 60
+      Statistic: Sum
+      Threshold: 3000
+      TreatMissingData: ignore
+      Unit: None
+
+#### Alarm for QSQ metric Autoscaling
+  AlarmSQS:
+    Type: "AWS::CloudWatch::Alarm"
+    Condition: isAutoscalingSQSEnabled
+    Properties:
+      AlarmName: "SQSAlarm"
+      AlarmDescription: "Trigger scaling based on SQS queue"
+      Namespace: "AWS/SQS"
+      MetricName: "ApproximateNumberOfMessagesVisible"
+      ComparisonOperator: "GreaterThanThreshold"
+      Dimensions:
+        - Name: QueueName
+          Value: !Ref "QueueName"
+      EvaluationPeriods: 2
+      Period: 300
+      Statistic: 'Average'
+      Threshold: 1000
+      AlarmActions:
+        - !Ref ScaleUpPolicy
+      OKActions:
+        - !Ref ScaleDownPolicy
+
   # CloudWatch metric to filer ERROR - FATAL lines, in Log group
   ErrorFatalLogsMetricFilter: 
     Condition: HasAlarmTopic
@@ -672,4 +816,12 @@ Outputs:
   TaskRoleName:
     Description: Container execution role name, useful to attach custom policies
     Value: !Ref TaskRole
+  AutoscalingAlarmNameRestAPI:
+    Description: Alarm for autoscaling based on the number of REST-API request
+    Value: !Sub '${AlarmHighRequests.Arn}'
+    Condition: isAutoscalingRestAPIEnabled
+  AutoscalingAlarmNameSQS:
+    Description: Alarm for autoscaling based on the number of messages in the input SQS queue.
+    Value: !Sub '${AlarmSQS.Arn}'
+    Condition: isAutoscalingSQSEnabled
 
