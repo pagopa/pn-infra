@@ -1,3 +1,0 @@
-# Infrastruttura runtime PN
-
-WIP
