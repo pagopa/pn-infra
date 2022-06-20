@@ -31,9 +31,14 @@ Parameters:
   NetworkLoadBalancerLink:
     Type: String
     Description: Link inside the VPC
+
   ApplicationLoadBalancerDomain:
     Type: String
     Description: Application load balancer that dispatch request to microserveces
+
+  AlarmSNSTopicName:
+    Type: String
+    Description: A name of an SNS topic where to send alarm when log line includes 5XX and 4XX errors
 
 Conditions:
   IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
@@ -253,7 +258,7 @@ Resources:
     Type: AWS::Lambda::Permission
     DependsOn: IoAuthorizer
     Properties:
-      FunctionName: !Sub '${ProjectName}-ioAuthorizerLambda'
+      FunctionName: !Sub '${ProjectName}-IoAuthorizerLambda'
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${IoAuthorizer}"
@@ -265,7 +270,7 @@ Resources:
       Name: pn-auth-fleet_IoAuthorizer
       Type: REQUEST
       AuthorizerResultTtlInSeconds: '300'
-      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-ioAuthorizerLambda/invocations'
+      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-IoAuthorizerLambda/invocations'
       IdentitySource: method.request.header.x-api-key, method.request.header.x-pagopa-cx-taxid
       RestApiId: !Ref PublicRestApi
 
@@ -277,6 +282,42 @@ Resources:
       DomainName: !Ref DnsName
       RestApiId: !Ref PublicRestApi
       Stage: !Ref PublicRestApiStage
+
+  # Rest API CloudWatch Logs Metric Filter
+  APIGatewayApiErrorMetric: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: 
+        !Ref PublicApiLogGroup
+      FilterPattern: '{($.status="4*") || ($.status="5*") && ($.path="*/{proxy}")}'
+      MetricTransformations: 
+        - MetricValue: 1
+          MetricNamespace: "APIGateway"
+          MetricName: !Sub "${ProjectName}-APIGatewayMetric"
+  
+  # Rest API CloudWatch alarm 
+  APIGatewayApiErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn: APIGatewayApiErrorMetric
+    Properties:
+      AlarmName: !Sub "${ProjectName}-APIGatewayAlarm"
+      AlarmDescription: "CloudWatch alarm for when API Gateway has 4xx or 5xx error."
+      AlarmActions: 
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      InsufficientDataActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      DatapointsToAlarm: 1
+      MetricName: !Sub "${ProjectName}-APIGatewayMetric"
+      Namespace: APIGateway
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 5
+      Period: 60
+      Statistic: Sum
+      Threshold: 1
+      TreatMissingData: notBreaching
+
 
 Outputs:
 
