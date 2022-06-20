@@ -36,7 +36,7 @@ Parameters:
     Type: String
     Description: Application load balancer that dispatch request to microserveces
 
-  AlarmSNSTopicARN:
+  AlarmSNSTopicArn:
     Type: String
     Description: ARN of SNS topic where to send alarm when log line includes 5XX and 4XX errors
 
@@ -303,11 +303,11 @@ Resources:
       AlarmName: !Sub "${ProjectName}-APIGatewayAlarm"
       AlarmDescription: "CloudWatch alarm for when API Gateway has 4xx or 5xx error."
       AlarmActions: 
-        - !Ref AlarmSNSTopicARN
+        - !Ref AlarmSNSTopicArn
       InsufficientDataActions:
-        - !Ref AlarmSNSTopicARN
+        - !Ref AlarmSNSTopicArn
       OKActions:
-        - !Ref AlarmSNSTopicARN
+        - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: 1
       MetricName: !Sub "${ProjectName}-APIGatewayMetric"
       Namespace: APIGateway
