@@ -300,7 +300,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     DependsOn: APIGatewayApiErrorMetric
     Properties:
-      AlarmName: !Sub "${ProjectName}-APIGatewayAlarm"
+      AlarmName: !Sub "${ProjectName}-${MicroServiceUniqueName}-${IntendedUsage}-ApiGwAlarm"
       AlarmDescription: "CloudWatch alarm for when API Gateway has 4xx or 5xx error."
       AlarmActions: 
         - !Ref AlarmSNSTopicArn
