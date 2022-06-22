@@ -43,6 +43,14 @@ Parameters:
   SafeStorageAccountId:
     Description: "SafeStorage AWS Account id. Useful to grant rights to send feedback to EventBus"
     Type: String
+  
+  DeliveryPushExtChUser:
+    Description: "external channel user dedicated to pn-delivery-push"
+    Type: String
+
+  UserAttributesExtChUser:
+    Description: "SafeStorage AWS Account id. Useful to grant rights to send feedback to EventBus"
+    Type: String
 
   EventBusDeadLetterQueueMaximumRetentionPeriod:
     Type: Number
@@ -201,7 +209,7 @@ Resources:
       EventPattern:
         detail-type: [ "ExternalChannelOutcomeEvent" ]
         details:
-          clientId: [ "pn-delivery-push" ]
+          clientId: [ !Ref DeliveryPushExtChUser ]
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2DeliveryPush'
           Arn: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
@@ -217,7 +225,7 @@ Resources:
       EventPattern:
         detail-type: [ "ExternalChannelOutcomeEvent" ]
         details:
-          clientId: [ "pn-user-attributes" ]
+          clientId: [ !Ref UserAttributesExtChUser ]
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2UserAttributes'
           Arn: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
