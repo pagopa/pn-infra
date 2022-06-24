@@ -213,6 +213,7 @@ Resources:
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2DeliveryPush'
           Arn: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
+          InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
   
@@ -229,6 +230,7 @@ Resources:
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2UserAttributes'
           Arn: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
+          InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
