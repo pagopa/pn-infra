@@ -51,6 +51,9 @@ Parameters:
   Subnets:
     Type: List<AWS::EC2::Subnet::Id>
     Description: the subnets where the service is going to be deployed
+  EcsDefaultSecurityGroup:
+    Type: String
+    Description: default security group
   LoadBalancerListenerArn:
     Type: String
     Description: Application load balancer listener ARN
@@ -223,6 +226,7 @@ Parameters:
 
 Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
+  HasDefaultSecurityGroup: !Not [ !Equals [ !Ref EcsDefaultSecurityGroup, '' ] ]
 
   Env1Exist: !Not [ !Equals [!Ref ContainerEnvEntry1, '']]
   Env2Exist: !Not [ !Equals [!Ref ContainerEnvEntry2, '']]
@@ -290,7 +294,10 @@ Resources:
           Subnets: !Ref Subnets
           SecurityGroups:
             - !Ref EcsServiceSecurityGroup
-            - sg-0e65e8f31547c2969
+            - Fn::If: 
+                - HasDefaultSecurityGroup
+                - !Ref EcsDefaultSecurityGroup
+                - !Ref AWS::NoValue
       LoadBalancers:
         - ContainerName: !Sub '${MicroServiceUniqueName}'
           ContainerPort: 8080
