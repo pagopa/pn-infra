@@ -61,6 +61,37 @@ Parameters:
     Default: ''
     Description: The SQS queue auto scaling is based on
 
+ ## Cooldown period for Scaling Down Policy
+  ScaleDownCoolDownPeriod:
+    Type: String
+    Default: 60
+    Description: The cooldown period for Scaling Down Policy
+
+ ## Cooldown period for Scaling Up Policy
+  ScaleUpCoolDownPeriod:
+    Type: String
+    Default: 60
+    Description: The cooldown period for Scaling Up Policy
+
+  AlarmHighRequestsThreshold:
+    Type: String
+    Default: 3000
+    Description: The value to compare with the specified statistic based on requests.
+
+  AlarmSQSThreshold:
+    Type: String
+    Default: 1000
+    Description: The value to compare with the specified statistic sqs on SQS queue length.
+
+  AlarmHighRequestsPeriod:
+    Type: String
+    Default: 60
+    Description: The period, in seconds, over which the statistic is applied. 
+
+  AlarmSQSPeriod:
+    Type: String
+    Default: 300
+    Description: The period, in seconds, over which the statistic is applied. 
 
   # Technical parameters
   VpcId:
@@ -653,6 +684,41 @@ Resources:
           TargetGroupArn: !Ref TargetGroup
           Order: 1
 
+  # CloudWatch metric to filer ERROR - FATAL lines, in Log group
+  ErrorFatalLogsMetricFilter: 
+    Condition: HasAlarmTopic
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: !Ref LogGroup
+      FilterPattern: '?ERROR ?FATAL ?CRITICAL'
+      MetricTransformations: 
+        - MetricValue: 1
+          MetricNamespace: "ErrorFatalLogs"
+          MetricName: !Sub "${MicroServiceUniqueName}-ErrorFatalMetric"
+  
+  # Create alarm
+  ErrorFatalLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmTopic
+    DependsOn: ErrorFatalLogsMetricFilter
+    Properties:
+      AlarmName: !Sub "${MicroServiceUniqueName}-ErrorFatalLogs-Alarm"
+      AlarmDescription: "CloudWatch alarm for when ECS LogGroup has ERROR or FATAL line."
+      AlarmActions: 
+        - !Ref AlarmSNSTopicArn
+      InsufficientDataActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      MetricName: !Sub "${MicroServiceUniqueName}-ErrorFatalMetric"
+      Namespace: "ErrorFatalLogs"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Statistic: Sum
+      Threshold: 1
+      TreatMissingData: missing
 
 ###                            Application AutoScaling                    ###
   ############################################################################
@@ -701,7 +767,7 @@ Resources:
       ScalingTargetId: !Ref AutoScalingTarget
       StepScalingPolicyConfiguration:
         AdjustmentType: ChangeInCapacity
-        Cooldown: 60
+        Cooldown: !Ref ScaleUpCoolDownPeriod
         MetricAggregationType: Average
         StepAdjustments:
           - MetricIntervalLowerBound: 0
@@ -717,7 +783,7 @@ Resources:
       ScalingTargetId: !Ref AutoScalingTarget
       StepScalingPolicyConfiguration:
         AdjustmentType: ChangeInCapacity
-        Cooldown: 60
+        Cooldown: !Ref ScaleUpCoolDownPeriod
         MetricAggregationType: Average
         StepAdjustments:
           - MetricIntervalUpperBound: 0
@@ -742,9 +808,9 @@ Resources:
         - !Ref ScaleUpPolicy
       OKActions:
         - !Ref ScaleDownPolicy
-      Period: 60
+      Period: !Ref ScaleUpCoolDownPeriod
       Statistic: Sum
-      Threshold: 3000
+      Threshold: !Ref ScaleUpCoolDownPeriod
       TreatMissingData: ignore
       Unit: None
 
@@ -762,49 +828,14 @@ Resources:
         - Name: QueueName
           Value: !Ref "QueueName"
       EvaluationPeriods: 2
-      Period: 300
+      Period: !Ref ScaleUpCoolDownPeriod
       Statistic: 'Average'
-      Threshold: 1000
+      Threshold: !Ref ScaleUpCoolDownPeriod
       AlarmActions:
         - !Ref ScaleUpPolicy
       OKActions:
         - !Ref ScaleDownPolicy
 
-  # CloudWatch metric to filer ERROR - FATAL lines, in Log group
-  ErrorFatalLogsMetricFilter: 
-    Condition: HasAlarmTopic
-    Type: AWS::Logs::MetricFilter
-    Properties: 
-      LogGroupName: !Ref LogGroup
-      FilterPattern: '?ERROR ?FATAL ?CRITICAL'
-      MetricTransformations: 
-        - MetricValue: 1
-          MetricNamespace: "ErrorFatalLogs"
-          MetricName: !Sub "${MicroServiceUniqueName}-ErrorFatalMetric"
-  
-  # Create alarm
-  ErrorFatalLogsMetricAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Condition: HasAlarmTopic
-    DependsOn: ErrorFatalLogsMetricFilter
-    Properties:
-      AlarmName: !Sub "${MicroServiceUniqueName}-ErrorFatalLogs-Alarm"
-      AlarmDescription: "CloudWatch alarm for when ECS LogGroup has ERROR or FATAL line."
-      AlarmActions: 
-        - !Ref AlarmSNSTopicArn
-      InsufficientDataActions:
-        - !Ref AlarmSNSTopicArn
-      OKActions:
-        - !Ref AlarmSNSTopicArn
-      DatapointsToAlarm: 1
-      MetricName: !Sub "${MicroServiceUniqueName}-ErrorFatalMetric"
-      Namespace: "ErrorFatalLogs"
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
-      Period: 60
-      Statistic: Sum
-      Threshold: 1
-      TreatMissingData: missing
 
 Outputs:
   ServiceName:
