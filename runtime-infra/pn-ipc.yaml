@@ -229,6 +229,7 @@ Resources:
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryPush'
           Arn: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
+          RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
           InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
@@ -247,6 +248,7 @@ Resources:
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2DeliveryPush'
           Arn: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
+          RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
   
@@ -264,6 +266,7 @@ Resources:
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2UserAttributes'
           Arn: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
+          RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
