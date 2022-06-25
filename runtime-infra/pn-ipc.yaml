@@ -216,6 +216,28 @@ Resources:
                   - !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
                   - !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
                   - !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
+  
+  ExternalChannelsOutputsQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !GetAtt "ExternalChannelsOutputsQueue.Outputs.QueueURL"
+        - !GetAtt "ExternalChannels2UserAttributesQueue.Outputs.QueueURL"
+        - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueURL"
+      PolicyDocument:
+        Statement:
+          - Sid: "SendEventsToDLQ"
+            Effect: "Allow"
+            Principal: 
+              Service: 
+                - "events.amazonaws.com"
+            Action: 
+              - "SQS:SendMessage"
+            Resource:
+              - !GetAtt "ExternalChannelsOutputsQueue.Outputs.QueueARN"
+              - !GetAtt "ExternalChannels2UserAttributesQueue.Outputs.QueueARN"
+              - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueARN"
+
 
   # Send All Safe Storage Response to pn-delivery-push
   PnCoreEventBusToSafeStorageResponseQueue:
@@ -229,7 +251,6 @@ Resources:
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryPush'
           Arn: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
-          RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
           InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
@@ -248,7 +269,6 @@ Resources:
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2DeliveryPush'
           Arn: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
-          RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
   
@@ -266,7 +286,6 @@ Resources:
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2UserAttributes'
           Arn: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
-          RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
@@ -294,7 +313,7 @@ Resources:
               - "SQS:SendMessage"
             Resource:
               - !GetAtt "EventBusDeadLetterQueue.Arn"
-
+  
   # Alarm for Dead letter queue has messages
   DLQHasMessagesAlarm:
     Type: AWS::CloudWatch::Alarm
