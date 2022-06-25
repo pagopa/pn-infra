@@ -187,12 +187,42 @@ Resources:
             AWS: !Sub "arn:aws:iam::${SafeStorageAccountId}:root"
         Action: "events:PutEvents"
         Resource: !GetAtt "PnCoreEventBus.Arn"
-  
+
+  # Allow event bus rules to write to queues
+  EventBusEnqueueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: putEventIntoQueues
+          PolicyDocument:
+            Statement:
+              - Sid: putEvents
+                Action:
+                  - sqs:ChangeMessageVisibility
+                  - sqs:ChangeMessageVisibilityBatch
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:SendMessage
+                  - sqs:SendMessageBatch
+                Effect: Allow
+                Resource: 
+                  - !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
+                  - !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
+                  - !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
+
   # Send All Safe Storage Response to pn-delivery-push
   PnCoreEventBusToSafeStorageResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
       Description: Route SafeStorage Events to pn-delivery-push
+      RoleArn: !Ref EventBusEnqueueRole
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "SafeStorageOutcomeEvent" ]
@@ -208,6 +238,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties: 
       Description: Route ExternalChannel Events to pn-delivery-push
+      RoleArn: !Ref EventBusEnqueueRole
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "ExternalChannelOutcomeEvent" ]
@@ -224,6 +255,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties: 
       Description: Route ExternalChannel Events to pn-user-attributes
+      RoleArn: !Ref EventBusEnqueueRole
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "ExternalChannelOutcomeEvent" ]
