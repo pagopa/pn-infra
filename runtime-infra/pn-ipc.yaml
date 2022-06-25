@@ -222,7 +222,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties: 
       Description: Route SafeStorage Events to pn-delivery-push
-      RoleArn: !Ref EventBusEnqueueRole
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "SafeStorageOutcomeEvent" ]
@@ -238,7 +238,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties: 
       Description: Route ExternalChannel Events to pn-delivery-push
-      RoleArn: !Ref EventBusEnqueueRole
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "ExternalChannelOutcomeEvent" ]
@@ -255,7 +255,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties: 
       Description: Route ExternalChannel Events to pn-user-attributes
-      RoleArn: !Ref EventBusEnqueueRole
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "ExternalChannelOutcomeEvent" ]
