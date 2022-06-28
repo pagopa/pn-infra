@@ -549,12 +549,53 @@ Resources:
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: ecs
 
+  # Microservice Log group
   LogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/ecs/${MicroServiceUniqueName}'
       RetentionInDays: 3
-  
+      KmsKeyId:
+        Fn::GetAtt:
+          - LogGroupKmsKey
+          - Arn
+
+  # KMS Key for Encrypt log data in CloudWatch Logs
+  LogGroupKmsKey:
+    Type: AWS::KMS::Key
+    Properties:
+      KeyPolicy:
+        Statement:
+          - Action: kms:*
+            Effect: Allow
+            Principal:
+              AWS:
+                Fn::Join:
+                  - ""
+                  - - "arn:"
+                    - Ref: AWS::Partition
+                    - ":iam::"
+                    - Ref: AWS::AccountId
+                    - :root
+            Resource: "*"
+          - Action:
+              - kinesis:DescribeStream
+              - kms:Encrypt*
+              - kms:Decrypt*
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:Describe*
+            Effect: Allow      
+            Principal:
+                Service: !Sub logs.${AWS::Region}.amazonaws.com
+            Resource: '*'
+            Condition:
+                ArnLike:
+                    'kms:EncryptionContext:aws:logs:arn': !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*' 
+        Version: "2012-10-17"
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
+
   # A role needed by ECS
   ExecutionRole:
     Type: AWS::IAM::Role
