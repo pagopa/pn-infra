@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create Kinesis Firehose Delivery Stream from DynamoDB and Cloudwatch Data Stream
+
+Parameters:
+  
+  ProjectName:
+    Type: String
+    Default: pn
+    Description: Base name for pn project
+  
+  LogsBucketName:
+    Type: String 
+    Description: Name of the destination bucket
+  
+  LogsBucketKmsKeyArn:
+    Type: String 
+    Description: copied by logs destination output
+
+Conditions:
+  ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
+
+Resources:
+
+  LogsIngestionRole:
+    Condition: ExportLogs
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Sub '${ProjectName}-logs-ingestion-role'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "firehose.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: /
+      Policies:
+        -
+          PolicyName: !Sub '${ProjectName}-ingest-logs-to-s3-policy'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Action:
+                  - "s3:PutObject"
+                  - "s3:PutObjectAcl"
+                  - "s3:AbortMultipartUpload"
+                  - "s3:GetBucketLocation"
+                  - "s3:GetObject"
+                  - "s3:ListBucket"
+                  - "s3:ListBucketMultipartUploads"
+                Effect: "Allow"
+                Resource:
+                  - !Sub "arn:aws:s3:::${LogsBucketName}"
+                  - !Sub "arn:aws:s3:::${LogsBucketName}/*"             
+              - 
+                Action:
+                  - "kms:Encrypt"
+                  - "kms:GenerateDataKey"
+                  - "kms:Decrypt"
+                Effect: "Allow"
+                Resource:
+                  - !Ref LogsBucketKmsKeyArn
+                Condition:
+                  StringEquals:
+                    "kms:ViaService": !Sub s3.${AWS::Region}.amazonaws.com
+
+Outputs:
+  LogsIngestionRoleArn:
+    Value: 
+      Fn::If: 
+       - ExportLogs
+       - !GetAtt LogsIngestionRole.Arn
+       - ''

@@ -20,6 +20,14 @@ Parameters:
   VpcSubnetsRoutingTables:
     Type: String
     Description: routing table for subnets where to install PN-CORE
+  
+  LogsBucketName:
+    Type: String
+    Default: ''
+    Description: Name of the bucket where the logs must be exported
+  LogsBucketKmsKeyArn:
+    Type: String
+    Description: Name of the bucket where the logs must be exported
 
   TemplateBucketBaseUrl:
     Type: String
@@ -35,6 +43,7 @@ Parameters:
     Type: String
   EcsDefaultSecurityGroup:
     Type: String
+
 
 Resources:
 
@@ -106,6 +115,18 @@ Resources:
                 Resource: 
                   - "*"
 
+  ###                       LOGS STREAMS PREPARATION                      ###
+  ###########################################################################
+
+  LogsExporterRole:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-bucket-access-role.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        LogsBucketName: !Ref LogsBucketName
+        LogsBucketKmsKeyArn: !Ref LogsBucketKmsKeyArn
+
 
 
 Outputs:
@@ -140,6 +161,18 @@ Outputs:
   ReadonlyEcsMicroServicesLogsRoleArn:
     Value: !GetAtt ReadonlyEcsMicroServicesLogsRole.Arn
   
+  # Log exports outputs
+  LogsBucketName:
+    Description: The name of the bucket where logs must be exported
+    Value: !Ref LogsBucketName
+  LogsBucketKmsKeyArn:
+    Description: The ARN of the kms key used to export logs
+    Value: !Ref LogsBucketKmsKeyArn
+  LogsExporterRoleArn:
+    Description: Role used to export logs to external bucket
+    Value: !GetAtt LogsExporterRole.Outputs.LogsExporterRoleArn
+    
+
   # pass-though parameters
   AlarmSNSTopicArn:
     Value: !Ref AlarmSNSTopicArn
