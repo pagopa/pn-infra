@@ -127,50 +127,50 @@ Resources:
         Prefix: !Sub 'cdc/${StreamNamePrefix}/'
         ErrorOutputPrefix: !Sub 'errors/cdc/${StreamNamePrefix}/'
         RoleARN: !Ref LogsExporterRoleArn
-      DeliveryStreamEncryptionConfigurationInput: 
-        KeyARN: !GetAtt LogsKinesisDeliveryStreamKmsKey.Arn
-        KeyType: CUSTOMER_MANAGED_CMK
+      # DeliveryStreamEncryptionConfigurationInput: 
+      #   KeyARN: !GetAtt LogsKinesisDeliveryStreamKmsKey.Arn
+      #   KeyType: CUSTOMER_MANAGED_CMK
 
-  LogsKinesisDeliveryStreamKmsKey:
-    Condition: ExportLogs
-    Type: AWS::KMS::Key
-    Properties:
-      Description: Firehose encryption key
-      EnableKeyRotation: true
-      KeyPolicy:
-        Version: "2012-10-17"
-        Id: !Sub '${ProjectName}-${StreamNamePrefix}-delivery-strm-keyid'
-        Statement:
-          - Sid: Allow application account to do everything
-            Effect: Allow
-            Principal:
-              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
-            Action:
-              - "kms:Create*"
-              - "kms:Describe*"
-              - "kms:Enable*"
-              - "kms:List*"
-              - "kms:Put*"
-              - "kms:Update*"
-              - "kms:Revoke*"
-              - "kms:Disable*"
-              - "kms:Get*"
-              - "kms:Delete*"
-              - "kms:ScheduleKeyDeletion"
-              - "kms:CancelKeyDeletion"
-              - kms:*Tag*
-              - kms:*tag*
-            Resource: "*"
-          - Sid: Allow target accounts to use key for encrypt/decrypt
-            Effect: Allow
-            Principal:
-              AWS:
-                - !Sub arn:aws:iam::${AWS::AccountId}:root
-                - !Ref LogsExporterRoleArn
-            Action:
-              - kms:Encrypt
-              - kms:Decrypt
-              - kms:ReEncrypt*
-              - kms:GenerateDataKey*
-              - kms:DescribeKey
-            Resource: "*"
+  # LogsKinesisDeliveryStreamKmsKey:
+  #   Condition: ExportLogs
+  #   Type: AWS::KMS::Key
+  #   Properties:
+  #     Description: Firehose encryption key
+  #     EnableKeyRotation: true
+  #     KeyPolicy:
+  #       Version: "2012-10-17"
+  #       Id: !Sub '${ProjectName}-${StreamNamePrefix}-delivery-strm-keyid'
+  #       Statement:
+  #         - Sid: Allow application account to do everything
+  #           Effect: Allow
+  #           Principal:
+  #             AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+  #           Action:
+  #             - "kms:Create*"
+  #             - "kms:Describe*"
+  #             - "kms:Enable*"
+  #             - "kms:List*"
+  #             - "kms:Put*"
+  #             - "kms:Update*"
+  #             - "kms:Revoke*"
+  #             - "kms:Disable*"
+  #             - "kms:Get*"
+  #             - "kms:Delete*"
+  #             - "kms:ScheduleKeyDeletion"
+  #             - "kms:CancelKeyDeletion"
+  #             - kms:*Tag*
+  #             - kms:*tag*
+  #           Resource: "*"
+  #         - Sid: Allow target accounts to use key for encrypt/decrypt
+  #           Effect: Allow
+  #           Principal:
+  #             AWS:
+  #               - !Sub arn:aws:iam::${AWS::AccountId}:root
+  #               - !Ref LogsExporterRoleArn
+  #           Action:
+  #             - kms:Encrypt
+  #             - kms:Decrypt
+  #             - kms:ReEncrypt*
+  #             - kms:GenerateDataKey*
+  #             - kms:DescribeKey
+  #           Resource: "*"
