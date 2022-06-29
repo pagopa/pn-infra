@@ -64,6 +64,7 @@ Resources:
                 Effect: "Allow"
                 Resource:
                   - !Sub 'arn:aws:kms:${AWS::Region}:${LogsAccountId}:alias/${LogsBucketName}-key-alias'
+                  - !Sub 'arn:aws:kms:${AWS::Region}:${LogsAccountId}:key/*'
                 Condition:
                   StringEquals:
                     "kms:ViaService": !Sub s3.${AWS::Region}.amazonaws.com
