@@ -12,6 +12,10 @@ Parameters:
     Type: String 
     Description: Name of the destination bucket
   
+  LogsAccountId:
+    Type: String 
+    Description: Account id of the log receiver bucket
+  
 Conditions:
   ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
 
@@ -59,7 +63,7 @@ Resources:
                   - "kms:Decrypt"
                 Effect: "Allow"
                 Resource:
-                  - !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/${LogsBucketName}-key-alias'
+                  - !Sub 'arn:aws:kms:${AWS::Region}:${LogsAccountId}:alias/${LogsBucketName}-key-alias'
                 Condition:
                   StringEquals:
                     "kms:ViaService": !Sub s3.${AWS::Region}.amazonaws.com
