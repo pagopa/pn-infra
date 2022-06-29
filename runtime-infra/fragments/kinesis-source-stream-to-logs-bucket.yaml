@@ -1,13 +1,22 @@
-AWSTemplateFormatVersion: "2010-09-09"
-Description: Kinesis Firehose - Ingest Account
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create Kinesis Firehose Delivery Stream from DynamoDB and Cloudwatch Data Stream
 
 Parameters:
-
+  
   ProjectName:
     Type: String 
     Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
       experimental environments without crash official development environment'
-
+  
+  SourceKinesisDataStreamArn:
+    Type: String
+    Default: "arn:aws:kinesis:eu-south-1:748275689270:stream/pn-timeline-cdc-stream"
+    Description: Kinesis Data Stream ARN - DynamoDB
+  SourceKinesisDataStreamKeyArn:
+    Type: String
+    Default: "arn:aws:kms:eu-south-1:748275689270:key/2e97a2bf-f07d-44c9-b2f2-25a8748096d6"
+    Description: Kinesis Data Stream ARN - DynamoDB
+  
   LogsBucketName:
     Type: String 
     Description: Name of the destination bucket
@@ -20,22 +29,53 @@ Parameters:
     Type: String 
     Description: to distinguish different log groups streams
 
-  LogGroupName:
-    Type: String
-    Description: LogGroup name
-  
-  RetentionTag:
-    Type: String
-    Description: S3 path segment used to distinguish retention periods
-  
-  CloudwatchFilterPattern:
-    Type: String
-    Description: Filter expression used to choose the logs to write to the stream
-
 Conditions:
   ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
 
+
 Resources:
+
+  ###########################################################################
+  ###     Stream from DynamoDB to S3 using  Kinesys Stream and Firehose   ###
+  ###########################################################################
+
+  ## IAM Role
+  DeliveryStreamSourceServiceRole:
+    Condition: ExportLogs
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+        Version: "2012-10-17"
+
+  ## IAM Policy  
+  DeliveryStreamSourceServiceRoleDefaultPolicy:
+    Condition: ExportLogs
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - kinesis:DescribeStream
+              - kinesis:DescribeStreamSummary
+              - kinesis:GetRecords
+              - kinesis:GetShardIterator
+              - kinesis:ListShards
+              - kinesis:ListStreams
+              - kinesis:SubscribeToShard
+            Effect: Allow
+            Resource: !Ref SourceKinesisDataStreamArn
+          - Action: kms:Decrypt
+            Effect: Allow
+            Resource: !Ref SourceKinesisDataStreamKeyArn
+        Version: "2012-10-17"
+      PolicyName: !Sub '${ProjectName}-${StreamNamePrefix}-source-source-read-policy'
+      Roles:
+        - Ref: DeliveryStreamSourceServiceRole
 
   ### - CloudWatchLoggingOptions - LogGroup output kinesis stream 
   #########################################
@@ -63,7 +103,13 @@ Resources:
     Condition: ExportLogs
     Type: AWS::KinesisFirehose::DeliveryStream
     Properties:
-      DeliveryStreamName: !Sub '${ProjectName}-${StreamNamePrefix}-${RetentionTag}-delivery-stream'
+      DeliveryStreamName: !Sub '${ProjectName}-${StreamNamePrefix}-delivery-stream'
+      KinesisStreamSourceConfiguration:
+        KinesisStreamARN: !Ref SourceKinesisDataStreamArn
+        RoleARN: 
+          Fn::GetAtt:
+            - DeliveryStreamSourceServiceRole
+            - Arn
       ExtendedS3DestinationConfiguration: 
         BucketARN: !Sub arn:aws:s3:::${LogsBucketName}
         BufferingHints:
@@ -75,8 +121,8 @@ Resources:
             Ref: DeliveryStreamLogGroup
           LogStreamName:
             Ref: DeliveryStreamLogGroupS3Destination
-        Prefix: !Sub 'logs/${RetentionTag}/${StreamNamePrefix}/'
-        ErrorOutputPrefix: !Sub 'errors/logs/${RetentionTag}/${StreamNamePrefix}/'
+        Prefix: !Sub 'cdc/${StreamNamePrefix}/'
+        ErrorOutputPrefix: !Sub 'errors/cdc/${StreamNamePrefix}/'
         RoleARN: !Ref LogsExporterRoleArn
       DeliveryStreamEncryptionConfigurationInput: 
         KeyARN: !GetAtt LogsKinesisDeliveryStreamKmsKey.Arn
@@ -90,7 +136,7 @@ Resources:
       EnableKeyRotation: true
       KeyPolicy:
         Version: "2012-10-17"
-        Id: !Sub '${ProjectName}-${StreamNamePrefix}-${RetentionTag}-delivery-strm-keyid'
+        Id: !Sub '${ProjectName}-${StreamNamePrefix}-delivery-strm-keyid'
         Statement:
           - Sid: Allow application account to do everything
             Effect: Allow
@@ -125,45 +171,3 @@ Resources:
               - kms:GenerateDataKey*
               - kms:DescribeKey
             Resource: "*"
-
-  ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
-  SubscriptionFilter: 
-    Condition: ExportLogs
-    Type: AWS::Logs::SubscriptionFilter
-    Properties: 
-      RoleArn: 
-        Fn::GetAtt: 
-          - "SubscriptionFilterServiceRole"
-          - "Arn"
-      LogGroupName: !Ref LogGroupName
-      FilterPattern: !Ref CloudwatchFilterPattern
-      DestinationArn:
-        Fn::GetAtt:
-          - LogsKinesisDeliveryStream
-          - Arn
-
-  ### IAM Role used by Subscription filters to allow read logs from Cloudwatch and send logs to Kinesis Firehose           
-  SubscriptionFilterServiceRole:
-    Condition: ExportLogs
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service: logs.amazonaws.com
-        Version: "2012-10-17"
-      Path: /
-      Policies:
-        -
-          PolicyName: !Sub '${ProjectName}-${StreamNamePrefix}-${RetentionTag}-log-subscription-role'
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              -
-                Action:
-                  - "firehose:*"
-                Effect: "Allow"
-                Resource:
-                  - "*"
