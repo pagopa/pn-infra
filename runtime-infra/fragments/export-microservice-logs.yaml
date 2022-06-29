@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Kinesis Firehose - Ingest Account
+
+Parameters:
+
+  ProjectName:
+    Type: String 
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  LogsBucketName:
+    Type: String 
+    Description: Name of the destination bucket
+  
+  LogsExporterRoleArn:
+    Type: String 
+    Description: Role used to access the S3 bucket where logs are exported
+  
+  StreamNamePrefix:
+    Type: String 
+    Description: to distinguish different log groups streams
+
+  LogGroupName:
+    Type: String
+    Description: LogGroup name
+  
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
+Resources:
+
+  StreamAudit5LogsToExternalBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        LogsBucketName: !Ref LogsBucketName
+        LogsExporterRoleArn: !Ref LogsExporterRoleArn
+        StreamNamePrefix: !Ref StreamNamePrefix
+        LogGroupName: !Ref LogGroupName
+        RetentionTag: 'auditLong'
+        CloudwatchFilterPattern: '{ $.tags[0] = "AUDIT10Y" }'
+  
+  StreamAudit2LogsToExternalBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        LogsBucketName: !Ref LogsBucketName
+        LogsExporterRoleArn: !Ref LogsExporterRoleArn
+        StreamNamePrefix: !Ref StreamNamePrefix
+        LogGroupName: !Ref LogGroupName
+        RetentionTag: 'auditShort'
+        CloudwatchFilterPattern: '{ $.tags[0] = "AUDIT5Y" }'
+  
+  StreamNoAuditLogsToExternalBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        LogsBucketName: !Ref LogsBucketName
+        LogsExporterRoleArn: !Ref LogsExporterRoleArn
+        StreamNamePrefix: !Ref StreamNamePrefix
+        LogGroupName: !Ref LogGroupName
+        RetentionTag: 'noAudit'
+        CloudwatchFilterPattern: '{ $.tags NOT EXISTS }'
+
+

@@ -23,6 +23,14 @@ Parameters:
   LogGroupName:
     Type: String
     Description: LogGroup name
+  
+  RetentionTag:
+    Type: String
+    Description: S3 path segment used to distinguish retention periods
+  
+  CloudwatchFilterPattern:
+    Type: String
+    Description: Filter expression used to choose the logs to write to the stream
 
 Resources:
 
@@ -49,7 +57,7 @@ Resources:
   LogsKinesisDeliveryStream:
     Type: AWS::KinesisFirehose::DeliveryStream
     Properties:
-      DeliveryStreamName: !Sub '${ProjectName}-${StreamNamePrefix}-delivery-stream'
+      DeliveryStreamName: !Sub '${ProjectName}-${StreamNamePrefix}-${RetentionTag}-delivery-stream'
       ExtendedS3DestinationConfiguration: 
         BucketARN: !Sub arn:aws:s3:::${LogsBucketName}
         BufferingHints:
@@ -61,8 +69,8 @@ Resources:
             Ref: DeliveryStreamLogGroup
           LogStreamName:
             Ref: DeliveryStreamLogGroupS3Destination
-        Prefix: !Sub 'logs/${ProjectName}-${StreamNamePrefix}/'
-        ErrorOutputPrefix: !Sub 'errors/logs/${ProjectName}-${StreamNamePrefix}/'
+        Prefix: !Sub 'logs/${RetentionTag}/${StreamNamePrefix}/'
+        ErrorOutputPrefix: !Sub 'errors/logs/${RetentionTag}/${StreamNamePrefix}/'
         RoleARN: !Ref LogsExporterRoleArn
       DeliveryStreamEncryptionConfigurationInput: 
         KeyARN: !GetAtt LogsKinesisDeliveryStreamKmsKey.Arn
@@ -75,7 +83,7 @@ Resources:
       EnableKeyRotation: true
       KeyPolicy:
         Version: "2012-10-17"
-        Id: !Sub '${ProjectName}-${StreamNamePrefix}-delivery-strm-keyid'
+        Id: !Sub '${ProjectName}-${StreamNamePrefix}-${RetentionTag}-delivery-strm-keyid'
         Statement:
           - Sid: Allow application account to do everything
             Effect: Allow
@@ -120,7 +128,7 @@ Resources:
           - "SubscriptionFilterServiceRole"
           - "Arn"
       LogGroupName: !Ref LogGroupName
-      FilterPattern: ""
+      FilterPattern: !Ref CloudwatchFilterPattern
       DestinationArn:
         Fn::GetAtt:
           - LogsKinesisDeliveryStream
@@ -140,7 +148,7 @@ Resources:
       Path: /
       Policies:
         -
-          PolicyName: plc.kfh.ingest.account.cloudwatch
+          PolicyName: !Sub '${ProjectName}-${StreamNamePrefix}-${RetentionTag}-log-subscription-role'
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
