@@ -101,9 +101,12 @@ Resources:
 
   LogsKinesisDeliveryStream:
     Condition: ExportLogs
+    DependsOn:
+      - DeliveryStreamSourceServiceRoleDefaultPolicy
     Type: AWS::KinesisFirehose::DeliveryStream
     Properties:
       DeliveryStreamName: !Sub '${ProjectName}-${StreamNamePrefix}-delivery-stream'
+      DeliveryStreamType: KinesisStreamAsSource
       KinesisStreamSourceConfiguration:
         KinesisStreamARN: !Ref SourceKinesisDataStreamArn
         RoleARN: 
