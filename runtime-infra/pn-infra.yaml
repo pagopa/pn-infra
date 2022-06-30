@@ -126,7 +126,7 @@ Resources:
   LogsBucket:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-bucket.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
         BucketSuffix: !Ref BucketSuffix
@@ -137,7 +137,7 @@ Resources:
   LogsExporterRole:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-bucket.yaml"
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-bucket-access-role.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
         LogsBucketName: !GetAtt LogsBucket.Outputs.LogsBucketName
