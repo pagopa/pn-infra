@@ -21,13 +21,19 @@ Parameters:
     Type: String
     Description: routing table for subnets where to install PN-CORE
   
-  LogsBucketName:
+  BucketSuffix:
     Type: String
-    Description: Name of the bucket where the logs must be exported
-  LogsAccountId:
+    Default: "001"
+    Description: Suffix to the log bucket name
+  DataLakeAccountId1:
     Type: String
-    Description: AWS account id of the bucket where the logs must be exported
-
+    Default: '-'
+    Description: Data lake can read logs
+  DataLakeAccountId2:
+    Type: String
+    Default: '-'
+    Description: Data lake can read logs
+  
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
@@ -116,15 +122,26 @@ Resources:
 
   ###                       LOGS STREAMS PREPARATION                      ###
   ###########################################################################
+  # Logs bucket
+  LogsBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        BucketSuffix: !Ref BucketSuffix
+        DataLakeAccountId1: !Ref DataLakeAccountId1
+        DataLakeAccountId2: !Ref DataLakeAccountId2
 
+  # Exporter role
   LogsExporterRole:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-bucket-access-role.yaml"
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-bucket.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
-        LogsBucketName: !Ref LogsBucketName
-        LogsAccountId: !Ref LogsAccountId
+        LogsBucketName: !GetAtt LogsBucket.Outputs.LogsBucketName
+        LogsAccountId: !Ref AWS::AccountId
 
 
 Outputs:
