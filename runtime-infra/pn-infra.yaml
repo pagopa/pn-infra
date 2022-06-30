@@ -179,7 +179,7 @@ Outputs:
   # Log exports outputs
   LogsBucketName:
     Description: The name of the bucket where logs must be exported
-    Value: !Ref LogsBucketName
+    Value: !GetAtt LogsBucket.Outputs.LogsBucketName
   LogsExporterRoleArn:
     Description: Role used to export logs to external bucket
     Value: !GetAtt LogsExporterRole.Outputs.LogsIngestionRoleArn
