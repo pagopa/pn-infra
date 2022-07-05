@@ -1,0 +1,194 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys the base infra for PN. VPC, AWS services endpoints, 
+              load balancer, ECS cluster'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  VpcId:
+    Type: String
+    Description: VpcId of the VPC where to install PN-CORE
+  VpcCidr:
+    Type: String
+    Description: Cidr of the VPC where to install PN-CORE
+  VpcSubnets:
+    Type: String
+    Description: subnets where to install PN-CORE
+  VpcSubnetsRoutingTables:
+    Type: String
+    Description: routing table for subnets where to install PN-CORE
+  
+  BucketSuffix:
+    Type: String
+    Default: "001"
+    Description: Suffix to the log bucket name
+  DataLakeAccountId1:
+    Type: String
+    Default: '-'
+    Description: Data lake can read logs
+  DataLakeAccountId2:
+    Type: String
+    Default: '-'
+    Description: Data lake can read logs
+  
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+  Version:
+    Type: String
+    Description: 'keep track of used projects commitIds'
+
+  # pass-through parameters
+  AlarmSNSTopicArn:
+    Type: String
+  AlarmSNSTopicName:
+    Type: String
+  EcsDefaultSecurityGroup:
+    Type: String
+
+
+Resources:
+
+  ###                       VPC BASE CONFIGURATIONS                       ###
+  ###########################################################################
+
+  # VPC and subnets
+  #VPC:
+  #  Type: AWS::CloudFormation::Stack
+  #  Properties:
+  #    TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/vpc.yaml"
+  #    Parameters:
+  #      VpcName: !Ref ProjectName
+  #      VpcNumber: !Ref VpcNumber
+
+  # Private connection from subnets to AWS services
+  VPCEndpoints:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/vpc-endpoints.yaml"
+      Parameters:
+        VpcName: !Ref ProjectName
+        VpcCidr: !Ref VpcCidr
+        Subnets: !Ref VpcSubnets
+        RouteTableIds: !Ref VpcSubnetsRoutingTables
+        VpcId: !Ref VpcId
+
+  # LoadBalancer
+  LoadBalancer:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/load-balancer.yaml"
+      Parameters:
+        LoadBalancerName: !Ref ProjectName
+        Subnets: !Ref VpcSubnets
+        VpcId: !Ref VpcId
+
+  ###                             ECS CLUSTER                             ###
+  ###########################################################################
+
+  # The cluster
+  ECSCluster:
+    DependsOn: LoadBalancer
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-cluster.yaml"
+      Parameters:
+        MacroServiceName: !Sub '${ProjectName}-core'
+
+  # Role to read ecs micro services logs
+  ReadonlyEcsMicroServicesLogsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: logs.amazonaws.com
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: read_from_ecs_logs
+          PolicyDocument:
+            Statement:
+              - Sid: readLogs
+                Action:
+                  - "*"
+                Effect: Allow
+                Resource: 
+                  - "*"
+
+  ###                       LOGS STREAMS PREPARATION                      ###
+  ###########################################################################
+  # Logs bucket
+  LogsBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-bucket.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        BucketSuffix: !Ref BucketSuffix
+        DataLakeAccountId1: !Ref DataLakeAccountId1
+        DataLakeAccountId2: !Ref DataLakeAccountId2
+
+  # Exporter role
+  LogsExporterRole:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-bucket-access-role.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        LogsBucketName: !GetAtt LogsBucket.Outputs.LogsBucketName
+        LogsAccountId: !Ref AWS::AccountId
+
+
+Outputs:
+
+  # VPC outputs
+  VpcId:
+    Value: !Ref VpcId
+    Description: infrastructure VPC id
+
+  SubnetsIds:
+    Value: !Ref VpcSubnets
+    Description: Subnets
+
+
+  # Load balancers outputs
+  NetworkLoadBalancerLink:
+    Value: !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink
+    Description: Used by API-Gw to connect into VPC
+
+  ApplicationLoadBalancerListenerArn:
+    Value: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerListenerArn
+    Description: Application Load Balancerlistener Arn
+
+  ApplicationLoadBalancerDomain:
+    Value: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain
+    Description: Application Load Balancer Domain to use for http URL
+
+  # ECS Cluster
+  ECSClusterName:
+    Value: !GetAtt ECSCluster.Outputs.ClusterName
+    Description: ECS cluster name
+  ReadonlyEcsMicroServicesLogsRoleArn:
+    Value: !GetAtt ReadonlyEcsMicroServicesLogsRole.Arn
+  
+  # Log exports outputs
+  LogsBucketName:
+    Description: The name of the bucket where logs must be exported
+    Value: !GetAtt LogsBucket.Outputs.LogsBucketName
+  LogsExporterRoleArn:
+    Description: Role used to export logs to external bucket
+    Value: !GetAtt LogsExporterRole.Outputs.LogsIngestionRoleArn
+    
+
+  # pass-though parameters
+  AlarmSNSTopicArn:
+    Value: !Ref AlarmSNSTopicArn
+  AlarmSNSTopicName:
+    Value: !Ref AlarmSNSTopicName
+  EcsDefaultSecurityGroup:
+    Value: !Ref EcsDefaultSecurityGroup

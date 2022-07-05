@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Kinesis Firehose - Ingest Account
+
+Parameters:
+
+  ProjectName:
+    Type: String 
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  LogsBucketName:
+    Type: String 
+    Description: Name of the destination bucket
+  
+  LogsExporterRoleArn:
+    Type: String 
+    Description: Role used to access the S3 bucket where logs are exported
+  
+  StreamNamePrefix:
+    Type: String 
+    Description: to distinguish different log groups streams
+
+  LogGroupName:
+    Type: String
+    Description: LogGroup name
+  
+  RetentionTag:
+    Type: String
+    Description: S3 path segment used to distinguish retention periods
+  
+  CloudwatchFilterPattern:
+    Type: String
+    Description: Filter expression used to choose the logs to write to the stream
+
+Conditions:
+  ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
+
+Resources:
+
+  ### - CloudWatchLoggingOptions - LogGroup output kinesis stream 
+  #########################################
+  DeliveryStreamLogGroup:
+    Condition: ExportLogs
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 120
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+
+  ### - CloudWatchLoggingOptions - LogStream output kinesis stream 
+  #########################################
+  DeliveryStreamLogGroupS3Destination:
+    Condition: ExportLogs
+    Type: AWS::Logs::LogStream
+    Properties:
+      LogGroupName:
+        Ref: DeliveryStreamLogGroup
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+  
+
+  LogsKinesisDeliveryStream:
+    Condition: ExportLogs
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamName: !Sub '${ProjectName}-${StreamNamePrefix}-${RetentionTag}-delivery-stream'
+      ExtendedS3DestinationConfiguration: 
+        BucketARN: !Sub arn:aws:s3:::${LogsBucketName}
+        BufferingHints:
+          IntervalInSeconds: 60
+          SizeInMBs: 64
+        CloudWatchLoggingOptions:
+          Enabled: true
+          LogGroupName:
+            Ref: DeliveryStreamLogGroup
+          LogStreamName:
+            Ref: DeliveryStreamLogGroupS3Destination
+        Prefix: !Sub 'logs/${RetentionTag}/${StreamNamePrefix}/'
+        ErrorOutputPrefix: !Sub 'errors/logs/${RetentionTag}/${StreamNamePrefix}/'
+        RoleARN: !Ref LogsExporterRoleArn
+      DeliveryStreamEncryptionConfigurationInput: 
+        KeyARN: !GetAtt LogsKinesisDeliveryStreamKmsKey.Arn
+        KeyType: CUSTOMER_MANAGED_CMK
+
+  LogsKinesisDeliveryStreamKmsKey:
+    Condition: ExportLogs
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Firehose encryption key
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: !Sub '${ProjectName}-${StreamNamePrefix}-${RetentionTag}-delivery-strm-keyid'
+        Statement:
+          - Sid: Allow application account to do everything
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action:
+              - "kms:Create*"
+              - "kms:Describe*"
+              - "kms:Enable*"
+              - "kms:List*"
+              - "kms:Put*"
+              - "kms:Update*"
+              - "kms:Revoke*"
+              - "kms:Disable*"
+              - "kms:Get*"
+              - "kms:Delete*"
+              - "kms:ScheduleKeyDeletion"
+              - "kms:CancelKeyDeletion"
+              - kms:*Tag*
+              - kms:*tag*
+            Resource: "*"
+          - Sid: Allow target accounts to use key for encrypt/decrypt
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub arn:aws:iam::${AWS::AccountId}:root
+                - !Ref LogsExporterRoleArn
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+            Resource: "*"
+
+  ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
+  SubscriptionFilter: 
+    Condition: ExportLogs
+    Type: AWS::Logs::SubscriptionFilter
+    Properties: 
+      RoleArn: 
+        Fn::GetAtt: 
+          - "SubscriptionFilterServiceRole"
+          - "Arn"
+      LogGroupName: !Ref LogGroupName
+      FilterPattern: !Ref CloudwatchFilterPattern
+      DestinationArn:
+        Fn::GetAtt:
+          - LogsKinesisDeliveryStream
+          - Arn
+
+  ### IAM Role used by Subscription filters to allow read logs from Cloudwatch and send logs to Kinesis Firehose           
+  SubscriptionFilterServiceRole:
+    Condition: ExportLogs
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: logs.amazonaws.com
+        Version: "2012-10-17"
+      Path: /
+      Policies:
+        -
+          PolicyName: !Sub '${ProjectName}-${StreamNamePrefix}-${RetentionTag}-log-subscription-role'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Action:
+                  - "firehose:*"
+                Effect: "Allow"
+                Resource:
+                  - "*"

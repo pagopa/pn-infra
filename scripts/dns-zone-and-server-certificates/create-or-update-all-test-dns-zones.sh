@@ -1,16 +1,16 @@
 #! /bin/bash
 
-zoneRegion="eu-central-1"
+zoneRegion="eu-south-1"
 cloudFrontRegion="us-east-1"
 
 # COMPLETE LIST OF dev & test SUBDOMAINS
 envTypes="dev uat"
-devZoneName="dev"
-uatZoneName="uat"
+devZoneName="svil"
+uatZoneName="coll"
 
 # COMPLETE CERTIFICATES LIST (we have a certificate for every public exposed https endpoint)
 # - Certificate used by CloudFront must be in "us-east-1" region
-certificateSubdomainsAndRegion="api#${zoneRegion} webapi#${zoneRegion} portale-pa#${cloudFrontRegion} portale#${cloudFrontRegion} www#${cloudFrontRegion} api-io#${zoneRegion}"
+certificateSubdomainsAndRegion="api#${zoneRegion} webapi#${zoneRegion} portale-pa#${cloudFrontRegion} portale#${cloudFrontRegion} portale-login#${cloudFrontRegion} www#${cloudFrontRegion} api-io#${zoneRegion}"
 
 
 if ( [ $# -ne 3 ] ) then
