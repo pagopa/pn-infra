@@ -43,6 +43,21 @@ Resources:
       Weight: 1
       SetIdentifier: unique
 
+  CAARecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZone
+      Name: 
+        !If
+          - CreateParentZone
+          - 'pn.pagopa.it'
+          - !Sub '${EnvName}.pn.pagopa.it'
+      Comment: !Sub "CAA DNS record for PN ${EnvName}"
+      ResourceRecords: 
+        - '0 issue "amazonaws.com"'
+      TTL: 120
+      Type: CAA
+
 Outputs:
   NameServers:
     Value:
