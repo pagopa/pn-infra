@@ -30,7 +30,7 @@ Parameters:
 
 Resources:
 
-  StreamAuditLogsToExternalBucket:
+  StreamEcsLogsToExternalBucket:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
@@ -42,18 +42,5 @@ Resources:
         LogGroupName: !Ref LogGroupName
         RetentionTag: 'all'
         CloudwatchFilterPattern: ''
-  
-  # StreamNoAuditLogsToExternalBucket:
-  #   Type: AWS::CloudFormation::Stack
-  #   Properties:
-  #     TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
-  #     Parameters:
-  #       ProjectName: !Ref ProjectName
-  #       LogsBucketName: !Ref LogsBucketName
-  #       LogsExporterRoleArn: !Ref LogsExporterRoleArn
-  #       StreamNamePrefix: !Ref StreamNamePrefix
-  #       LogGroupName: !Ref LogGroupName
-  #       RetentionTag: 'noAudit'
-  #       CloudwatchFilterPattern: '{ $.tags NOT EXISTS }'
 
 
