@@ -52,6 +52,9 @@ Resources:
   PublicRestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
+      Tags:
+        - Key: "PN_APIGW_TYPE"
+          Value: !Ref IntendedUsage
       Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
       FailOnWarnings: true
       EndpointConfiguration:
