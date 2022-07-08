@@ -28,21 +28,25 @@ Parameters:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
 
+Conditions:
+  Never: !Equals [ "A", "B" ]
+
 Resources:
 
-  # StreamEcsLogsToExternalBucket:
-  #   Type: AWS::CloudFormation::Stack
-  #   Properties:
-  #     TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
-  #     Parameters:
-  #       ProjectName: !Ref ProjectName
-  #       LogsBucketName: !Ref LogsBucketName
-  #       LogsExporterRoleArn: !Ref LogsExporterRoleArn
-  #       StreamNamePrefix: !Ref StreamNamePrefix
-  #       LogGroupName: !Ref LogGroupName
-  #       RetentionTag: 'all'
-  #       CloudwatchFilterPattern: ''
-  #       StreamRetentionPeriodHours: 240
-  #       StreamShardCount: 10
+  StreamEcsLogsToExternalBucket:
+    Type: AWS::CloudFormation::Stack
+    Condition: Never
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        LogsBucketName: !Ref LogsBucketName
+        LogsExporterRoleArn: !Ref LogsExporterRoleArn
+        StreamNamePrefix: !Ref StreamNamePrefix
+        LogGroupName: !Ref LogGroupName
+        RetentionTag: 'all'
+        CloudwatchFilterPattern: ''
+        StreamRetentionPeriodHours: 240
+        StreamShardCount: 10
 
 
