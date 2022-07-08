@@ -46,20 +46,20 @@ Conditions:
 Resources:
 
   ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
-  SubscriptionFilter: 
-    Condition: ExportLogs
-    Type: AWS::Logs::SubscriptionFilter
-    Properties: 
-      RoleArn: 
-        Fn::GetAtt: 
-          - "SubscriptionFilterServiceRole"
-          - "Arn"
-      LogGroupName: !Ref LogGroupName
-      FilterPattern: !Ref CloudwatchFilterPattern
-      DestinationArn:
-        Fn::GetAtt:
-          - CloudwatchLogKinesisStream
-          - Arn
+  # SubscriptionFilter: 
+  #   Condition: ExportLogs
+  #   Type: AWS::Logs::SubscriptionFilter
+  #   Properties: 
+  #     RoleArn: 
+  #       Fn::GetAtt: 
+  #         - "SubscriptionFilterServiceRole"
+  #         - "Arn"
+  #     LogGroupName: !Ref LogGroupName
+  #     FilterPattern: !Ref CloudwatchFilterPattern
+  #     DestinationArn:
+  #       Fn::GetAtt:
+  #         - CloudwatchLogKinesisStream
+  #         - Arn
 
   ### IAM Role used by Subscription filters to allow read logs from Cloudwatch and send logs to Kinesis Firehose           
   SubscriptionFilterServiceRole:
