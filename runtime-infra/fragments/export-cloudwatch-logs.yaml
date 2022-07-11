@@ -76,13 +76,18 @@ Resources:
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-              -
-                Action:
-                  - "*"
-                Effect: "Allow"
-                Resource:
-                  - "*"
+              - Action:
+                  - kinesis:PutRecord
+                Effect: Allow
+                Resource: "*"
+              - Action:
+                - "kms:Encrypt"
+                - "kms:GenerateDataKey"
+                - "kms:Decrypt"
+                Effect: Allow
+                Resource: "*"
 
+  
   ### AWS KMS / Server-side encryption for Kinesis Stream 
   # https://docs.aws.amazon.com/streams/latest/dev/server-side-encryption.html
   CloudwatchLogKinesisStreamEncryptionKey:
