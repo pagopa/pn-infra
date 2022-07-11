@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys the queues needed for communication between microservices and 
+              API gateway custom domains'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+  
+  LogsBucketName:
+    Type: String
+    Description: Bucket name where the logs must be exported
+  LogsExporterRoleArn:
+    Type: String
+    Description: ARN of the role used to write to external logs bucket
+
+  ActivateCloudwatchSubscription:
+    Type: String
+    Description: set to false when create Kinesis Stream
+  
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
+Resources:
+  
+  ###             Export cloudwatch logs to Log saving bucket             ###
+  ###########################################################################
+  
+  # - Delivery
+  StreamEcsLogsToExternalBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        LogsBucketName: !Ref LogsBucketName
+        LogsExporterRoleArn: !Ref LogsExporterRoleArn
+        StreamNamePrefix: pnDelivery
+        LogGroupName: '/ecs/pn-delivery'
+        RetentionTag: 'ecs'
+        CloudwatchFilterPattern: ''
+        StreamRetentionPeriodHours: 240
+        StreamShardCount: 10
+        ActivateCloudwatchSubscription: !Ref ActivateCloudwatchSubscription
+
+  # - Delivery Push
+  # PnDeliveryPushLogsToExternalBucket:
+  #   Type: AWS::CloudFormation::Stack
+  #   Properties:
+  #     TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-microservice-logs.yaml"
+  #     Parameters:
+  #       TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
+  #       ProjectName: !Ref ProjectName
+  #       LogsBucketName: !Ref LogsBucketName
+  #       LogsExporterRoleArn: !Ref LogsExporterRoleArn
+  #       StreamNamePrefix: pnDeliveryPush
+  #       LogGroupName: '/ecs/pn-delivery-push'
+  #       ActivateCloudwatchSubscription: !Ref ActivateCloudwatchSubscription
+
+  # Export cdc to Log analysis account
+  # StreamTimelineCdcToExternalBucket:
+  #   Type: AWS::CloudFormation::Stack
+  #   Properties:
+  #     TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket.yaml"
+  #     Parameters:
+  #       ProjectName: !Ref ProjectName
+  #       SourceKinesisDataStreamArn: !Ref TimelineCdcKinesisStreamArn
+  #       SourceKinesisDataStreamKeyArn: !Ref TimelineCdcKinesisKeyArn
+  #       LogsBucketName: !Ref LogsBucketName
+  #       LogsExporterRoleArn: !Ref LogsExporterRoleArn
+  #       StreamNamePrefix: pnTimelineCdc

@@ -207,4 +207,9 @@ Resources:
         Prefix: !Sub 'logs/${RetentionTag}/${StreamNamePrefix}/'
         ErrorOutputPrefix: !Sub 'errors/logs/${RetentionTag}/${StreamNamePrefix}/'
         RoleARN: !Ref LogsExporterRoleArn
-
+      KinesisStreamSourceConfiguration:
+        KinesisStreamARN: !GetAtt  CloudwatchLogKinesisStream.Arn
+        RoleARN: 
+          Fn::GetAtt:
+            - KinesisStreamReadOnlyRole
+            - Arn
