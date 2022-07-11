@@ -40,20 +40,11 @@ Parameters:
     Type: String
     Description: number of shard in the source logs stream
   
-  ActivateCloudwatchSubscription:
-    Type: String
-    Default: "true"
-    Description: set to false when create Kinesis Stream
-  
-
-Conditions:
-  ActivateCloudwatchSubscriptionCondition: !Equals [ !Ref ActivateCloudwatchSubscription, 'true' ]
 
 Resources:
 
   ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
   SubscriptionFilter: 
-    Condition: ActivateCloudwatchSubscriptionCondition
     Type: AWS::Logs::SubscriptionFilter
     Properties: 
       RoleArn: 

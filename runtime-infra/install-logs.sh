@@ -1,5 +1,5 @@
 
-templateBucketHttpsBaseUrl="https://s3.eu-south-1.amazonaws.com/cd-pipeline-cdartifactbucket-up55jiob2cs/pn-infra/f403177ede7926a2e172a80a643f508bfe967e18/runtime-infra"
+templateBucketHttpsBaseUrl="https://s3.eu-south-1.amazonaws.com/cd-pipeline-cdartifactbucket-up55jiob2cs/pn-infra/47043714abcdafd58bba558b10059905daec4d80/runtime-infra"
 aws_param="--region eu-south-1 --profile staging"
 
 echo ""
@@ -37,22 +37,21 @@ aws ${aws_param} cloudformation deploy \
         TemplateBucketBaseUrl="$templateBucketHttpsBaseUrl" \
         ProjectName=pn \
         LogsBucketName="${logsBucketName}" \
-        ActivateCloudwatchSubscription="false" \
         LogsExporterRoleArn="${logsExporterRoleArn}" \
         Version="cd_scripts_commitId=${cd_scripts_commitId},pn_infra_commitId=${pn_infra_commitid}"
 
 
-aws ${aws_param} cloudformation deploy \
-      --stack-name pn-logs-export-dev \
-      --capabilities CAPABILITY_NAMED_IAM \
-      --template-file runtime-infra/pn-logs-export.yaml \
-      --parameter-overrides \
-        TemplateBucketBaseUrl="$templateBucketHttpsBaseUrl" \
-        ProjectName=pn \
-        LogsBucketName="${logsBucketName}" \
-        ActivateCloudwatchSubscription="true" \
-        LogsExporterRoleArn="${logsExporterRoleArn}" \
-        Version="cd_scripts_commitId=${cd_scripts_commitId},pn_infra_commitId=${pn_infra_commitid}"
+# aws ${aws_param} cloudformation deploy \
+#       --stack-name pn-logs-export-dev \
+#       --capabilities CAPABILITY_NAMED_IAM \
+#       --template-file runtime-infra/pn-logs-export.yaml \
+#       --parameter-overrides \
+#         TemplateBucketBaseUrl="$templateBucketHttpsBaseUrl" \
+#         ProjectName=pn \
+#         LogsBucketName="${logsBucketName}" \
+#         ActivateCloudwatchSubscription="true" \
+#         LogsExporterRoleArn="${logsExporterRoleArn}" \
+#         Version="cd_scripts_commitId=${cd_scripts_commitId},pn_infra_commitId=${pn_infra_commitid}"
 
 
 
