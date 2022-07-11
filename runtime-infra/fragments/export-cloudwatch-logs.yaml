@@ -39,31 +39,36 @@ Parameters:
   StreamShardCount:
     Type: String
     Description: number of shard in the source logs stream
+  
+  ActivateCloudwatchSubscription:
+    Type: String
+    Default: "true"
+    Description: set to false when create Kinesis Stream
+  
 
 Conditions:
-  ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
+  ActivateCloudwatchSubscriptionCondition: !Equals [ !Ref ActivateCloudwatchSubscription, 'true' ]
 
 Resources:
 
   ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
-  # SubscriptionFilter: 
-  #   Condition: ExportLogs
-  #   Type: AWS::Logs::SubscriptionFilter
-  #   Properties: 
-  #     RoleArn: 
-  #       Fn::GetAtt: 
-  #         - "SubscriptionFilterServiceRole"
-  #         - "Arn"
-  #     LogGroupName: !Ref LogGroupName
-  #     FilterPattern: !Ref CloudwatchFilterPattern
-  #     DestinationArn:
-  #       Fn::GetAtt:
-  #         - CloudwatchLogKinesisStream
-  #         - Arn
+  SubscriptionFilter: 
+    Condition: ActivateCloudwatchSubscriptionCondition
+    Type: AWS::Logs::SubscriptionFilter
+    Properties: 
+      RoleArn: 
+        Fn::GetAtt: 
+          - "SubscriptionFilterServiceRole"
+          - "Arn"
+      LogGroupName: !Ref LogGroupName
+      FilterPattern: !Ref CloudwatchFilterPattern
+      DestinationArn:
+        Fn::GetAtt:
+          - CloudwatchLogKinesisStream
+          - Arn
 
   ### IAM Role used by Subscription filters to allow read logs from Cloudwatch and send logs to Kinesis Firehose           
   SubscriptionFilterServiceRole:
-    Condition: ExportLogs
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -91,7 +96,6 @@ Resources:
   ### AWS KMS / Server-side encryption for Kinesis Stream 
   # https://docs.aws.amazon.com/streams/latest/dev/server-side-encryption.html
   CloudwatchLogKinesisStreamEncryptionKey:
-    Condition: ExportLogs
     Type: AWS::KMS::Key
     Properties:
       KeyPolicy:
@@ -114,7 +118,6 @@ Resources:
 
   ### Kinesis Data Stream 
   CloudwatchLogKinesisStream:
-    Condition: ExportLogs
     Type: AWS::Kinesis::Stream
     Properties:
       Name: !Sub '${ProjectName}-${StreamNamePrefix}-${RetentionTag}-stream'
@@ -131,7 +134,6 @@ Resources:
   
   ### Read Only role for external user
   KinesisStreamReadOnlyRole:
-    Condition: ExportLogs
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub '${ProjectName}-${StreamNamePrefix}-${RetentionTag}-stream-readonly-role'
@@ -167,7 +169,6 @@ Resources:
   ### - CloudWatchLoggingOptions - LogGroup output kinesis stream 
   #########################################
   DeliveryStreamLogGroup:
-    Condition: ExportLogs
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: 120
@@ -177,7 +178,6 @@ Resources:
   ### - CloudWatchLoggingOptions - LogStream output kinesis stream 
   #########################################
   DeliveryStreamLogGroupS3Destination:
-    Condition: ExportLogs
     Type: AWS::Logs::LogStream
     Properties:
       LogGroupName:
@@ -189,7 +189,6 @@ Resources:
   ### - Delivery Stream to send cloudwatch Logs to S3 bucket
   ############################################################
   LogsKinesisDeliveryStream:
-    Condition: ExportLogs
     Type: AWS::KinesisFirehose::DeliveryStream
     Properties:
       DeliveryStreamName: !Sub '${ProjectName}-${StreamNamePrefix}-${RetentionTag}-delivery-stream'

@@ -24,18 +24,19 @@ Parameters:
     Type: String
     Description: LogGroup name
   
+  ActivateCloudwatchSubscription:
+    Type: String
+    Description: set to false when create Kinesis Stream
+  
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
 
-Conditions:
-  Never: !Equals [ "A", "B" ]
 
 Resources:
 
   StreamEcsLogsToExternalBucket:
     Type: AWS::CloudFormation::Stack
-    Condition: Never
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
       Parameters:
@@ -44,9 +45,10 @@ Resources:
         LogsExporterRoleArn: !Ref LogsExporterRoleArn
         StreamNamePrefix: !Ref StreamNamePrefix
         LogGroupName: !Ref LogGroupName
-        RetentionTag: 'all'
+        RetentionTag: 'ecs'
         CloudwatchFilterPattern: ''
         StreamRetentionPeriodHours: 240
         StreamShardCount: 10
+        ActivateCloudwatchSubscription: !Ref ActivateCloudwatchSubscription
 
 
