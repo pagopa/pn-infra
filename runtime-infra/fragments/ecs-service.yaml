@@ -541,6 +541,8 @@ Resources:
                 - !Ref "AWS::NoValue"
           PortMappings:
             - ContainerPort: 8080
+          LinuxParameters:
+                InitProcessEnabled: true
           # Send logs to CloudWatch Logs
           LogConfiguration:
             LogDriver: awslogs
@@ -638,6 +640,14 @@ Resources:
               - ecr:BatchCheckLayerAvailability
               - ecr:GetDownloadUrlForLayer
               - ecr:BatchGetImage
+            Resource:
+              - '*'
+          - Effect: Allow
+            Action:
+              - ssmmessages:CreateControlChannel
+              - ssmmessages:CreateDataChannel
+              - ssmmessages:OpenControlChannel
+              - ssmmessages:OpenDataChannel
             Resource:
               - '*'
 
