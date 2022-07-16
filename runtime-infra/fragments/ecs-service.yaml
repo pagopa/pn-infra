@@ -73,9 +73,20 @@ Parameters:
     ConstraintDescription: must specify the type of Autoscaling strategy
   
   AutoscalingCheckPeriod:
-    Default: 180
+    Default: 60
     Type: Number
     Description: minimum autoscaling number of tasks\
+
+  AutoscalingDataPointN:
+    Default: 1
+    Type: Number
+    Description: activate when N datapoint on M
+
+  AutoscalingDataPointM:
+    Default: 1
+    Type: Number
+    Description: activate when N datapoint on M
+
 
   AutoscalingThreshold:
     Default: 0
@@ -857,11 +868,11 @@ Resources:
       AlarmDescription: "Trigger scaling based on APIs"
       ActionsEnabled: TRUE
       ComparisonOperator: GreaterThanThreshold
-      DatapointsToAlarm: 2
+      DatapointsToAlarm: !Ref AutoscalingDataPointN
       Dimensions:
         - Name: TargetGroup
           Value: !GetAtt TargetGroup.TargetGroupFullName
-      EvaluationPeriods: 3
+      EvaluationPeriods: !Ref AutoscalingDataPointM
       MetricName: RequestCountPerTarget
       Namespace: AWS/ApplicationELB
       AlarmActions:
@@ -881,13 +892,14 @@ Resources:
     Properties:
       AlarmName: !Sub "${MicroServiceUniqueName}-autoscaling-sqs"
       AlarmDescription: "Trigger scaling based on SQS queue"
+      DatapointsToAlarm: !Ref AutoscalingDataPointN
       Namespace: "AWS/SQS"
       MetricName: "ApproximateNumberOfMessagesVisible"
       ComparisonOperator: "GreaterThanThreshold"
       Dimensions:
         - Name: QueueName
           Value: !Ref "AutoscalingQueueName"
-      EvaluationPeriods: 2
+      EvaluationPeriods: !Ref AutoscalingDataPointM
       Period: !Ref AutoscalingCheckPeriod
       Statistic: 'Average'
       Threshold: !Ref AutoscalingThreshold
