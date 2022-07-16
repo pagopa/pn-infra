@@ -281,7 +281,7 @@ Conditions:
   HasDefaultSecurityGroup: !Not [ !Equals [ !Ref EcsDefaultSecurityGroup, '' ] ]
 
   AutoscalingByRestApi: !Equals [ !Ref AutoscalingStrategy, REST-API]
-  AutoscalingBySQS: !Equals [ !Ref AutoscalingStrategy, REST-API]
+  AutoscalingBySQS: !Equals [ !Ref AutoscalingStrategy, SQS]
   AutoscalingEnabled:
     Fn::Or:
      - Condition: AutoscalingByRestApi
