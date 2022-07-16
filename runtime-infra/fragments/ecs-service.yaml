@@ -44,6 +44,58 @@ Parameters:
     Description: memory amount reserved to the task pod
 
 
+  # Heath Check parameters
+  HealthCheckInterval:
+    Description: Seconds between two health check
+    Type: Number
+    Default: 60
+
+  HealthCheckTimeout:
+    Description: health check timeout seconds
+    Type: Number
+    Default: 15
+
+  HealthCheckPath:
+    Description: path called for health check
+    Type: String
+    Default: '/'
+  
+  
+  # Autoscaling parameters
+  AutoscalingStrategy:
+    Description: Autoscaling strategy.
+    Default: Disabled
+    Type: String
+    AllowedValues:
+      - Disabled
+      - REST-API
+      - SQS
+    ConstraintDescription: must specify the type of Autoscaling strategy
+  
+  AutoscalingCheckPeriod:
+    Default: 180
+    Type: Number
+    Description: minimum autoscaling number of tasks\
+
+  AutoscalingThreshold:
+    Default: 0
+    Type: String
+  
+  AutoscalingQueueName:
+    Default: ''
+    Type: String
+  
+  MinTasksNumber:
+    Default: 1
+    Type: Number
+    Description: minimum autoscaling number of tasks\
+
+  MaxTasksNumber:
+    Default: 6
+    Type: Number
+    Description: maximum autoscaling number of tasks\
+    
+
   # Technical parameters
   VpcId:
     Type: AWS::EC2::VPC::Id
@@ -228,6 +280,13 @@ Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
   HasDefaultSecurityGroup: !Not [ !Equals [ !Ref EcsDefaultSecurityGroup, '' ] ]
 
+  AutoscalingByRestApi: !Equals [ !Ref AutoscalingStrategy, REST-API]
+  AutoscalingBySQS: !Equals [ !Ref AutoscalingStrategy, REST-API]
+  AutoscalingEnabled:
+    Fn::Or:
+     - Condition: AutoscalingByRestApi
+     - Condition: AutoscalingBySQS
+
   Env1Exist: !Not [ !Equals [!Ref ContainerEnvEntry1, '']]
   Env2Exist: !Not [ !Equals [!Ref ContainerEnvEntry2, '']]
   Env3Exist: !Not [ !Equals [!Ref ContainerEnvEntry3, '']]
@@ -283,9 +342,9 @@ Resources:
       DeploymentConfiguration:
         MinimumHealthyPercent: 100
         MaximumPercent: 200
-      DesiredCount: 1
+      DesiredCount: !Ref MinTasksNumber
       # This may need to be adjusted if the container takes a while to start up
-      #HealthCheckGracePeriodSeconds: 30
+      HealthCheckGracePeriodSeconds: !Ref AutoscalingCheckPeriod
       LaunchType: FARGATE
       PlatformVersion: 1.4.0
       NetworkConfiguration:
@@ -320,7 +379,6 @@ Resources:
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
     # Makes sure the log group is created before it is used.
-    DependsOn: LogGroup
     Properties:
       # Name of the task definition. Subsequent versions of the task definition are grouped together under this name.
       Family: !Ref MicroServiceUniqueName
@@ -333,7 +391,7 @@ Resources:
       # A role needed by ECS.
       # "The ARN of the task execution role that containers in this task can assume. All containers in this task are granted the permissions that are specified in this role."
       # "There is an optional task execution IAM role that you can specify with Fargate to allow your Fargate tasks to make API calls to Amazon ECR."
-      ExecutionRoleArn: !Ref ExecutionRole
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
       # "The Amazon Resource Name (ARN) of an AWS Identity and Access Management (IAM) role that grants containers in the task permission to call AWS APIs on your behalf."
       TaskRoleArn: !Ref TaskRole
       ContainerDefinitions:
@@ -660,10 +718,11 @@ Resources:
       Protocol: HTTP
       Port: 8080
       HealthCheckEnabled: true
-      HealthCheckIntervalSeconds: 300
-      HealthCheckPath: /
+      HealthCheckIntervalSeconds: !Ref HealthCheckInterval
+      HealthCheckPath: !Ref HealthCheckPath
       HealthCheckPort: 8080
       HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: !Ref HealthCheckTimeout
       Matcher:
         HttpCode: 200
       TargetGroupAttributes:
@@ -721,6 +780,121 @@ Resources:
       Statistic: Sum
       Threshold: 1
       TreatMissingData: missing
+
+  ###                            Application AutoScaling                    ###
+  ############################################################################
+
+  #### IAM Role for Application AutoScaling 
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Condition: AutoscalingEnabled
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [application-autoscaling.amazonaws.com]
+            Action: ["sts:AssumeRole"]
+      Path: /
+      Policies:
+        - PolicyName: service-autoscaling
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: ["application-autoscaling:*", "cloudwatch:DescribeAlarms", "cloudwatch:PutMetricAlarm",
+                         "ecs:DescribeServices", "ecs:UpdateService"]
+                Resource: "*"
+
+  AutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Condition: AutoscalingEnabled
+    Properties:
+      MinCapacity: !Ref MinTasksNumber
+      MaxCapacity: !Ref MaxTasksNumber
+      ResourceId: !Join ["/", [service, !Ref "ECSClusterName", !GetAtt [ECSService, Name]]]
+      RoleARN: !GetAtt [ AutoScalingRole, Arn ]
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+  
+  #### Scaling Up Policy
+  ScaleUpPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Condition: AutoscalingEnabled
+    Properties:
+      PolicyName: !Sub '${MicroServiceUniqueName}-ScaleUpPolicy'
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      StepScalingPolicyConfiguration:
+        AdjustmentType: ChangeInCapacity
+        Cooldown: !Ref AutoscalingCheckPeriod
+        MetricAggregationType: Average
+        StepAdjustments:
+          - MetricIntervalLowerBound: 0
+            ScalingAdjustment: 1
+
+  #### Scaling Down Policy
+  ScaleDownPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Condition: AutoscalingEnabled
+    Properties:
+      PolicyName: !Sub '${MicroServiceUniqueName}-ScaleDownPolicy'
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      StepScalingPolicyConfiguration:
+        AdjustmentType: ChangeInCapacity
+        Cooldown: !Ref AutoscalingCheckPeriod
+        MetricAggregationType: Average
+        StepAdjustments:
+          - MetricIntervalUpperBound: 0
+            ScalingAdjustment: -1
+  
+  #### Alarm for Rest-API metric Autoscaling
+  AlarmHighRequests:
+    Type: AWS::CloudWatch::Alarm
+    Condition: AutoscalingByRestApi
+    Properties:
+      AlarmName: !Sub "${MicroServiceUniqueName}-autoscaling-rest"
+      AlarmDescription: "Trigger scaling based on APIs"
+      ActionsEnabled: TRUE
+      ComparisonOperator: GreaterThanThreshold
+      DatapointsToAlarm: 2
+      Dimensions:
+        - Name: TargetGroup
+          Value: !GetAtt TargetGroup.TargetGroupFullName
+      EvaluationPeriods: 3
+      MetricName: RequestCountPerTarget
+      Namespace: AWS/ApplicationELB
+      AlarmActions:
+        - !Ref ScaleUpPolicy
+      OKActions:
+        - !Ref ScaleDownPolicy
+      Period: !Ref AutoscalingCheckPeriod
+      Statistic: Sum
+      Threshold: !Ref AutoscalingThreshold
+      TreatMissingData: ignore
+      Unit: None
+
+  #### Alarm for QSQ metric Autoscaling
+  AlarmSQS:
+    Type: "AWS::CloudWatch::Alarm"
+    Condition: AutoscalingBySQS
+    Properties:
+      AlarmName: !Sub "${MicroServiceUniqueName}-autoscaling-sqs"
+      AlarmDescription: "Trigger scaling based on SQS queue"
+      Namespace: "AWS/SQS"
+      MetricName: "ApproximateNumberOfMessagesVisible"
+      ComparisonOperator: "GreaterThanThreshold"
+      Dimensions:
+        - Name: QueueName
+          Value: !Ref "AutoscalingQueueName"
+      EvaluationPeriods: 2
+      Period: !Ref AutoscalingCheckPeriod
+      Statistic: 'Average'
+      Threshold: !Ref AutoscalingThreshold
+      AlarmActions:
+        - !Ref ScaleUpPolicy
+      OKActions:
+        - !Ref ScaleDownPolicy
 
 Outputs:
   ServiceName:
