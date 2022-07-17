@@ -15,10 +15,35 @@ Parameters:
     Type: String
     Description: ARN of the role used to write to external logs bucket
 
-  # ActivateCloudwatchSubscription:
-  #   Type: String
-  #   Description: set to false when create Kinesis Stream
-  
+  TimelineCdcKinesisStreamArn:
+    Type: String
+    Description: timeline CDC kinesis stream ARN
+  TimelineCdcKinesisKeyArn:
+    Type: String
+    Description: timeline CDC kinesis stream encryption key ARN
+
+  NotificationCdcKinesisStreamArn:
+    Type: String
+    Description: notification CDC kinesis stream ARN
+  NotificationCdcKinesisKeyArn:
+    Type: String
+    Description: notification CDC kinesis stream encryption key ARN
+
+  MandateCdcKinesisStreamArn:
+    Type: String
+    Description: mandate CDC kinesis stream ARN
+  MandateCdcKinesisKeyArn:
+    Type: String
+    Description: mandate CDC kinesis stream encryption key ARN
+
+  UserAttributesCdcKinesisStreamArn:
+    Type: String
+    Description: user-attributes CDC kinesis stream ARN
+  UserAttributesCdcKinesisKeyArn:
+    Type: String
+    Description: user-attributes CDC kinesis stream encryption key ARN
+
+
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
@@ -29,7 +54,7 @@ Resources:
   ###########################################################################
   
   # - Delivery
-  StreamEcsLogsToExternalBucket:
+  PnDeliveryEcsLogsToExternalBucket:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
@@ -43,31 +68,110 @@ Resources:
         CloudwatchFilterPattern: ''
         StreamRetentionPeriodHours: 240
         StreamShardCount: 10
-        # ActivateCloudwatchSubscription: !Ref ActivateCloudwatchSubscription
-
+  
   # - Delivery Push
-  # PnDeliveryPushLogsToExternalBucket:
-  #   Type: AWS::CloudFormation::Stack
-  #   Properties:
-  #     TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-microservice-logs.yaml"
-  #     Parameters:
-  #       TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
-  #       ProjectName: !Ref ProjectName
-  #       LogsBucketName: !Ref LogsBucketName
-  #       LogsExporterRoleArn: !Ref LogsExporterRoleArn
-  #       StreamNamePrefix: pnDeliveryPush
-  #       LogGroupName: '/ecs/pn-delivery-push'
-  #       ActivateCloudwatchSubscription: !Ref ActivateCloudwatchSubscription
+  PnDeliveryPushEcsLogsToExternalBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        LogsBucketName: !Ref LogsBucketName
+        LogsExporterRoleArn: !Ref LogsExporterRoleArn
+        StreamNamePrefix: pnDeliveryPush
+        LogGroupName: '/ecs/pn-delivery-push'
+        RetentionTag: 'ecs'
+        CloudwatchFilterPattern: ''
+        StreamRetentionPeriodHours: 240
+        StreamShardCount: 10
+  
+  # - Mandate
+  PnMandateEcsLogsToExternalBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        LogsBucketName: !Ref LogsBucketName
+        LogsExporterRoleArn: !Ref LogsExporterRoleArn
+        StreamNamePrefix: pnMandate
+        LogGroupName: '/ecs/pn-mandate'
+        RetentionTag: 'ecs'
+        CloudwatchFilterPattern: ''
+        StreamRetentionPeriodHours: 240
+        StreamShardCount: 10
+  
+  # - User Attributes
+  PnUserAttributesEcsLogsToExternalBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        LogsBucketName: !Ref LogsBucketName
+        LogsExporterRoleArn: !Ref LogsExporterRoleArn
+        StreamNamePrefix: pnUserAttributes
+        LogGroupName: '/ecs/pn-UserAttributes'
+        RetentionTag: 'ecs'
+        CloudwatchFilterPattern: ''
+        StreamRetentionPeriodHours: 240
+        StreamShardCount: 10
+  
+  # - External Registries
+  PnExternalRegistryEcsLogsToExternalBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        LogsBucketName: !Ref LogsBucketName
+        LogsExporterRoleArn: !Ref LogsExporterRoleArn
+        StreamNamePrefix: pnExternalRegistry
+        LogGroupName: '/ecs/pn-ExternalRegistry'
+        RetentionTag: 'ecs'
+        CloudwatchFilterPattern: ''
+        StreamRetentionPeriodHours: 240
+        StreamShardCount: 10
+  
+  
+  ###             Export dynamo CDC to Log saving bucket             ###
+  ###########################################################################
+  
+  # Export timeline cdc to Log analysis account
+  PnTimelineCdcToExternalBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        SourceKinesisDataStreamArn: !Ref TimelineCdcKinesisStreamArn
+        SourceKinesisDataStreamKeyArn: !Ref TimelineCdcKinesisKeyArn
+        LogsBucketName: !Ref LogsBucketName
+        LogsExporterRoleArn: !Ref LogsExporterRoleArn
+        StreamNamePrefix: pnTimelineCdc
 
-  # Export cdc to Log analysis account
-  # StreamTimelineCdcToExternalBucket:
-  #   Type: AWS::CloudFormation::Stack
-  #   Properties:
-  #     TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket.yaml"
-  #     Parameters:
-  #       ProjectName: !Ref ProjectName
-  #       SourceKinesisDataStreamArn: !Ref TimelineCdcKinesisStreamArn
-  #       SourceKinesisDataStreamKeyArn: !Ref TimelineCdcKinesisKeyArn
-  #       LogsBucketName: !Ref LogsBucketName
-  #       LogsExporterRoleArn: !Ref LogsExporterRoleArn
-  #       StreamNamePrefix: pnTimelineCdc
+  # Export notification cdc to Log analysis account
+  PnNotificationCdcToExternalBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        SourceKinesisDataStreamArn: !Ref NotificationCdcKinesisStreamArn
+        SourceKinesisDataStreamKeyArn: !Ref NotificationCdcKinesisKeyArn
+        LogsBucketName: !Ref LogsBucketName
+        LogsExporterRoleArn: !Ref LogsExporterRoleArn
+        StreamNamePrefix: pnNotificationCdc
+
+  # Export mandate cdc to Log analysis account
+  PnMandateCdcToExternalBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        SourceKinesisDataStreamArn: !Ref MandateCdcKinesisStreamArn
+        SourceKinesisDataStreamKeyArn: !Ref MandateCdcKinesisKeyArn
+        LogsBucketName: !Ref LogsBucketName
+        LogsExporterRoleArn: !Ref LogsExporterRoleArn
+        StreamNamePrefix: pnMandateCdc
