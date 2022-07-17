@@ -776,10 +776,11 @@ Resources:
     Properties:
       AlarmName: !Sub "${MicroServiceUniqueName}-ErrorFatalLogs-Alarm"
       AlarmDescription: "CloudWatch alarm for when ECS LogGroup has ERROR or FATAL line."
+      TreatMissingData: notBreaching
       AlarmActions: 
         - !Ref AlarmSNSTopicArn
-      InsufficientDataActions:
-        - !Ref AlarmSNSTopicArn
+      #InsufficientDataActions:
+      #  - !Ref AlarmSNSTopicArn
       OKActions:
         - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: 1
@@ -790,7 +791,6 @@ Resources:
       Period: 60
       Statistic: Sum
       Threshold: 1
-      TreatMissingData: missing
 
   ###                            Application AutoScaling                    ###
   ############################################################################
