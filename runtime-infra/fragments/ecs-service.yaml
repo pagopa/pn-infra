@@ -106,7 +106,11 @@ Parameters:
     Type: Number
     Description: maximum autoscaling number of tasks\
     
-
+  JavaToolOptions:
+    Default: ''
+    Type: String
+    Description: add system properties and other parameters to the JVM
+  
   # Technical parameters
   VpcId:
     Type: AWS::EC2::VPC::Id
@@ -297,6 +301,8 @@ Conditions:
     Fn::Or:
      - Condition: AutoscalingByRestApi
      - Condition: AutoscalingBySQS
+  
+  HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
   Env1Exist: !Not [ !Equals [!Ref ContainerEnvEntry1, '']]
   Env2Exist: !Not [ !Equals [!Ref ContainerEnvEntry2, '']]
@@ -409,6 +415,11 @@ Resources:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
           Environment:
+            - 'Fn::If':
+                - HasJavaToolOptions
+                - Name: 'JAVA_TOOL_OPTIONS'
+                  Value: !Ref JavaToolOptions
+                - !Ref "AWS::NoValue"
             - 'Fn::If':
                 - Env1Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry1 ] ]
