@@ -1,0 +1,1093 @@
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Define a Multi-VPC (Ingress, Egress and Private) with 3 subnets in 3 different AZ attached to a transit gateway.
+
+Parameters:
+
+  ## Egress VPC
+  VpcEgressName:
+    Type: String
+    Description: 'Egress VPC name'
+    Default: Egress
+  VpcEgressNumber:
+    Type: String
+    Description: Second byte from the left for VPC CIDR
+    Default: 16
+
+  ## Ingress VPC
+  VpcIngressName:
+    Type: String
+    Description: 'Ingress VPC name'
+    Default: Ingress
+  VpcIngressNumber:
+    Type: String
+    Description: Second byte from the left for VPC CIDR
+    Default: 4
+
+  ## Private VPC
+  VpcPrivateName:
+    Type: String
+    Description: 'Private VPC name'
+    Default: Private
+  VpcPrivateNumber:
+    Type: String
+    Description: Second byte from the left for VPC CIDR
+    Default: 32
+  
+
+Resources:
+
+  ###                        EGRESS VPC DEFINITION                         ###
+  ############################################################################
+
+  ## VPC for Egress 
+  EgressVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Join ['', ["10.", !Ref "VpcEgressNumber", ".0.0/16" ]]
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub ${VpcEgressName}-VPC
+
+  ## Subnet 1 - Public
+  EgressVPCPublicEgressVPCSubNet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Join [ '', [ "10.", !Ref "VpcEgressNumber", ".0.0/24" ] ]
+      VpcId:
+        Ref: EgressVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Public - EgressVPC SubNet
+
+  EgressVPCPublicEgressVPCSubNetSubnet1RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: EgressVPC
+
+  EgressVPCPublicEgressVPCSubNetSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: EgressVPCPublicEgressVPCSubNetSubnet1RouteTable
+      SubnetId:
+        Ref: EgressVPCPublicEgressVPCSubNet1
+
+  EgressVPCPublicEgressVPCSubNetSubnet1DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: EgressVPCPublicEgressVPCSubNetSubnet1RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: EgressVPCIGW
+    DependsOn:
+      - EgressVPCVPCGW
+
+  EgressVPCPublicEgressVPCSubNetSubnet1EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  EgressVPCPublicEgressVPCSubNetSubnet1NATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - EgressVPCPublicEgressVPCSubNetSubnet1EIP
+          - AllocationId
+      SubnetId:
+        Ref: EgressVPCPublicEgressVPCSubNet1
+
+
+  ## Subnet 2 - Public
+  EgressVPCPublicEgressVPCSubNetSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Join [ '', [ "10.", !Ref "VpcEgressNumber", ".1.0/24" ] ]
+      VpcId:
+        Ref: EgressVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: true
+
+  EgressVPCPublicEgressVPCSubNetSubnet2RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: EgressVPC
+
+  EgressVPCPublicEgressVPCSubNetSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: EgressVPCPublicEgressVPCSubNetSubnet2RouteTable
+      SubnetId:
+        Ref: EgressVPCPublicEgressVPCSubNetSubnet2
+
+  EgressVPCPublicEgressVPCSubNetSubnet2DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: EgressVPCPublicEgressVPCSubNetSubnet2RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: EgressVPCIGW
+    DependsOn:
+      - EgressVPCVPCGW
+
+  EgressVPCPublicEgressVPCSubNetSubnet2EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  EgressVPCPublicEgressVPCSubNetSubnet2NATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - EgressVPCPublicEgressVPCSubNetSubnet2EIP
+          - AllocationId
+      SubnetId:
+        Ref: EgressVPCPublicEgressVPCSubNetSubnet2
+
+  ## Subnet 3 - Public
+  EgressVPCPublicEgressVPCSubNet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Join [ '', [ "10.", !Ref "VpcEgressNumber", ".2.0/24" ] ]
+      VpcId:
+        Ref: EgressVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 2
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Public - EgressVPC SubNet
+
+  EgressVPCPublicEgressVPCSubNetSubnet3RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: EgressVPC
+
+  EgressVPCPublicEgressVPCSubNetSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: EgressVPCPublicEgressVPCSubNetSubnet3RouteTable
+      SubnetId:
+        Ref: EgressVPCPublicEgressVPCSubNet3
+
+  EgressVPCPublicEgressVPCSubNetSubnet3DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: EgressVPCPublicEgressVPCSubNetSubnet3RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: EgressVPCIGW
+    DependsOn:
+      - EgressVPCVPCGW
+
+  EgressVPCPublicEgressVPCSubNetSubnet3EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  EgressVPCPublicEgressVPCSubNetSubnet3NATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - EgressVPCPublicEgressVPCSubNetSubnet3EIP
+          - AllocationId
+      SubnetId:
+        Ref: EgressVPCPublicEgressVPCSubNet3
+
+
+  ## Subnet 1 - Private
+  EgressVPCPrivateEgressVPCSubNetSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Join [ '', [ "10.", !Ref "VpcEgressNumber", ".3.0/24" ] ]
+      VpcId:
+        Ref: EgressVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Private - EgressVPC SubNet
+        - Key: aws-cdk:subnet-type
+          Value: Private
+
+  EgressVPCPrivateEgressVPCSubNetSubnet1RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: EgressVPC
+      Tags:
+        - Key: Name
+          Value: Egress VPC/Private - EgressVPC SubNetSubnet1
+
+  EgressVPCPrivateEgressVPCSubNetSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: EgressVPCPrivateEgressVPCSubNetSubnet1RouteTable
+      SubnetId:
+        Ref: EgressVPCPrivateEgressVPCSubNetSubnet1
+
+  EgressVPCPrivateEgressVPCSubNetSubnet1DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: EgressVPCPrivateEgressVPCSubNetSubnet1RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: EgressVPCPublicEgressVPCSubNetSubnet1NATGateway
+
+  ## Subnet 2 - Private
+  EgressVPCPrivateEgressVPCSubNetSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Join [ '', [ "10.", !Ref "VpcEgressNumber", ".4.0/24" ] ]
+      VpcId:
+        Ref: EgressVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Private - EgressVPC SubNet
+
+
+  EgressVPCPrivateEgressVPCSubNetSubnet2RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: EgressVPC
+
+  EgressVPCPrivateEgressVPCSubNetSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: EgressVPCPrivateEgressVPCSubNetSubnet2RouteTable
+      SubnetId:
+        Ref: EgressVPCPrivateEgressVPCSubNetSubnet2
+
+  EgressVPCPrivateEgressVPCSubNetSubnet2DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: EgressVPCPrivateEgressVPCSubNetSubnet2RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: EgressVPCPublicEgressVPCSubNetSubnet2NATGateway
+
+  ## Subnet 3 - Private
+  EgressVPCPrivateEgressVPCSubNetSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Join [ '', [ "10.", !Ref "VpcEgressNumber", ".5.0/24" ] ]
+      VpcId:
+        Ref: EgressVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 2
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Private - EgressVPC SubNet
+        - Key: aws-cdk:subnet-type
+          Value: Private
+
+  EgressVPCPrivateEgressVPCSubNetSubnet3RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: EgressVPC
+
+  EgressVPCPrivateEgressVPCSubNetSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: EgressVPCPrivateEgressVPCSubNetSubnet3RouteTable
+      SubnetId:
+        Ref: EgressVPCPrivateEgressVPCSubNetSubnet3
+
+  EgressVPCPrivateEgressVPCSubNetSubnet3DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: EgressVPCPrivateEgressVPCSubNetSubnet3RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: EgressVPCPublicEgressVPCSubNetSubnet3NATGateway
+
+  ## Internet Gateway      
+  EgressVPCIGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: Egress VPC
+
+  ## VGW Attachment
+  EgressVPCVPCGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId:
+        Ref: EgressVPC
+      InternetGatewayId:
+        Ref: EgressVPCIGW
+
+
+  ###                        INGRESS VPC DEFINITION                        ###
+  ############################################################################
+
+  ## VPC for Ingress 
+  IngressVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Join ['', ["10.", !Ref "VpcIngressNumber", ".0.0/16" ]]
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub ${VpcIngressName}-VPC
+
+  ## Subnet 1 - Public
+  IngressVPCPublicIngressVPCSubNetSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Join ['', ["10.", !Ref "VpcIngressNumber", ".0.0/24" ]]
+      VpcId:
+        Ref: IngressVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Public - IngressVPC SubNetSubnet1
+
+  IngressVPCPublicIngressVPCSubNetSubnet1RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: IngressVPC
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Public - IngressVPC SubNetSubnet1
+
+  IngressVPCPublicIngressVPCSubNetSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet1RouteTable
+      SubnetId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet1
+
+  IngressVPCPublicIngressVPCSubNetSubnet1DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet1RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: IngressVPCIGW
+    DependsOn:
+      - IngressVPCVPCGW
+
+  IngressVPCPublicIngressVPCSubNetSubnet1EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Public - IngressVPC SubNetSubnet1
+
+  IngressVPCPublicIngressVPCSubNetSubnet1NATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - IngressVPCPublicIngressVPCSubNetSubnet1EIP
+          - AllocationId
+      SubnetId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet1
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Public - IngressVPC SubNetSubnet1
+
+  ## Subnet 2 - Public
+  IngressVPCPublicIngressVPCSubNetSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Join ['', ["10.", !Ref "VpcIngressNumber", ".1.0/24" ]]
+      VpcId:
+        Ref: IngressVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Public - IngressVPC SubNetSubnet2
+        - Key: aws-cdk:subnet-name
+          Value: Public - IngressVPC SubNet
+        - Key: aws-cdk:subnet-type
+          Value: Public
+
+  IngressVPCPublicIngressVPCSubNetSubnet2RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: IngressVPC
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Public - IngressVPC SubNetSubnet2
+
+  IngressVPCPublicIngressVPCSubNetSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet2RouteTable
+      SubnetId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet2
+
+  IngressVPCPublicIngressVPCSubNetSubnet2DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet2RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: IngressVPCIGW
+    DependsOn:
+      - IngressVPCVPCGW
+
+  IngressVPCPublicIngressVPCSubNetSubnet2EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Public - IngressVPC SubNetSubnet2
+
+  IngressVPCPublicIngressVPCSubNetSubnet2NATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - IngressVPCPublicIngressVPCSubNetSubnet2EIP
+          - AllocationId
+      SubnetId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet2
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Public - IngressVPC SubNetSubnet2
+
+  ## Subnet 3 - Public
+  IngressVPCPublicIngressVPCSubNetSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Join ['', ["10.", !Ref "VpcIngressNumber", ".2.0/24" ]]
+      VpcId:
+        Ref: IngressVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 2
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Public - IngressVPC SubNetSubnet3
+
+  IngressVPCPublicIngressVPCSubNetSubnet3RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: IngressVPC
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Public - IngressVPC SubNetSubnet3
+
+  IngressVPCPublicIngressVPCSubNetSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet3RouteTable
+      SubnetId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet3
+
+  IngressVPCPublicIngressVPCSubNetSubnet3DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet3RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: IngressVPCIGW
+    DependsOn:
+      - IngressVPCVPCGW
+
+  IngressVPCPublicIngressVPCSubNetSubnet3EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Public - IngressVPC SubNetSubnet3
+
+  IngressVPCPublicIngressVPCSubNetSubnet3NATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - IngressVPCPublicIngressVPCSubNetSubnet3EIP
+          - AllocationId
+      SubnetId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet3
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Public - IngressVPC SubNetSubnet3
+
+  ## Subnet 1 - Private
+  IngressVPCPrivateEgressVPCSubNetSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Join ['', ["10.", !Ref "VpcIngressNumber", ".3.0/24" ]]
+      VpcId:
+        Ref: IngressVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Private - EgressVPC SubNetSubnet1
+        - Key: aws-cdk:subnet-name
+          Value: Private - EgressVPC SubNet
+        - Key: aws-cdk:subnet-type
+          Value: Private
+
+  IngressVPCPrivateEgressVPCSubNetSubnet1RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: IngressVPC
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Private - EgressVPC SubNetSubnet1
+
+  IngressVPCPrivateEgressVPCSubNetSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: IngressVPCPrivateEgressVPCSubNetSubnet1RouteTable
+      SubnetId:
+        Ref: IngressVPCPrivateEgressVPCSubNetSubnet1
+
+  IngressVPCPrivateEgressVPCSubNetSubnet1DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: IngressVPCPrivateEgressVPCSubNetSubnet1RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet1NATGateway
+
+  ## Subnet 2 - Private
+  IngressVPCPrivateEgressVPCSubNetSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Join ['', ["10.", !Ref "VpcIngressNumber", ".4.0/24" ]]
+      VpcId:
+        Ref: IngressVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Private - EgressVPC SubNetSubnet2
+        - Key: aws-cdk:subnet-name
+          Value: Private - EgressVPC SubNet
+        - Key: aws-cdk:subnet-type
+          Value: Private
+
+  IngressVPCPrivateEgressVPCSubNetSubnet2RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: IngressVPC
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Private - EgressVPC SubNetSubnet2
+
+  IngressVPCPrivateEgressVPCSubNetSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: IngressVPCPrivateEgressVPCSubNetSubnet2RouteTable
+      SubnetId:
+        Ref: IngressVPCPrivateEgressVPCSubNetSubnet2
+
+  IngressVPCPrivateEgressVPCSubNetSubnet2DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: IngressVPCPrivateEgressVPCSubNetSubnet2RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet2NATGateway
+
+  ## Subnet 3 - Private
+  IngressVPCPrivateEgressVPCSubNetSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Join ['', ["10.", !Ref "VpcIngressNumber", ".5.0/24" ]]
+      VpcId:
+        Ref: IngressVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 2
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Private - EgressVPC SubNetSubnet3
+        - Key: aws-cdk:subnet-name
+          Value: Private - EgressVPC SubNet
+        - Key: aws-cdk:subnet-type
+          Value: Private
+
+  IngressVPCPrivateEgressVPCSubNetSubnet3RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: IngressVPC
+      Tags:
+        - Key: Name
+          Value: Ingress VPC/Private - EgressVPC SubNetSubnet3
+
+  IngressVPCPrivateEgressVPCSubNetSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: IngressVPCPrivateEgressVPCSubNetSubnet3RouteTable
+      SubnetId:
+        Ref: IngressVPCPrivateEgressVPCSubNetSubnet3
+
+  IngressVPCPrivateEgressVPCSubNetSubnet3DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: IngressVPCPrivateEgressVPCSubNetSubnet3RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet3NATGateway
+
+  ## Internet Gateway
+  IngressVPCIGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: Ingress VPC
+
+  ## VPC gateway attachment
+  IngressVPCVPCGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId:
+        Ref: IngressVPC
+      InternetGatewayId:
+        Ref: IngressVPCIGW
+
+  ###                        PRIVATE VPC DEFINITION                        ###
+  ############################################################################       
+
+  ## Private VPC
+  PrivateVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Join ['', ["10.", !Ref "VpcPrivateNumber", ".0.0/16" ]]
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub ${VpcPrivateName}-VPC
+
+  ## Subnet 1 - Private
+  PrivateVPCIsolatedSubnetprivateVPCSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Join ['', ["10.", !Ref "VpcPrivateNumber", ".0.0/24" ]]
+      VpcId:
+        Ref: PrivateVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Private VPC/Isolated Subnet - privateVPCSubnet1
+
+  PrivateVPCIsolatedSubnetprivateVPCSubnet1RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: PrivateVPC
+      Tags:
+        - Key: Name
+          Value: Private VPC/Isolated Subnet - privateVPCSubnet1
+
+  PrivateVPCIsolatedSubnetprivateVPCSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateVPCIsolatedSubnetprivateVPCSubnet1RouteTable
+      SubnetId:
+        Ref: PrivateVPCIsolatedSubnetprivateVPCSubnet1
+
+  ## Subnet 2 - Private
+  PrivateVPCIsolatedSubnetprivateVPCSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Join ['', ["10.", !Ref "VpcPrivateNumber", ".1.0/24" ]]
+      VpcId:
+        Ref: PrivateVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Private VPC/Isolated Subnet - privateVPCSubnet2
+        - Key: aws-cdk:subnet-name
+          Value: Isolated Subnet - privateVPC
+        - Key: aws-cdk:subnet-type
+          Value: Isolated
+
+  PrivateVPCIsolatedSubnetprivateVPCSubnet2RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: PrivateVPC
+      Tags:
+        - Key: Name
+          Value: Private VPC/Isolated Subnet - privateVPCSubnet2
+
+  PrivateVPCIsolatedSubnetprivateVPCSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateVPCIsolatedSubnetprivateVPCSubnet2RouteTable
+      SubnetId:
+        Ref: PrivateVPCIsolatedSubnetprivateVPCSubnet2
+
+  ## Subnet 3 - Private
+  PrivateVPCIsolatedSubnetprivateVPCSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Join ['', ["10.", !Ref "VpcPrivateNumber", ".2.0/24" ]]
+      VpcId:
+        Ref: PrivateVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 2
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Private VPC/Isolated Subnet - privateVPCSubnet3
+
+  PrivateVPCIsolatedSubnetprivateVPCSubnet3RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: PrivateVPC
+      Tags:
+        - Key: Name
+          Value: Private VPC/Isolated Subnet - privateVPCSubnet3
+
+  PrivateVPCIsolatedSubnetprivateVPCSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateVPCIsolatedSubnetprivateVPCSubnet3RouteTable
+      SubnetId:
+        Ref: PrivateVPCIsolatedSubnetprivateVPCSubnet3
+
+  ###                     TRANSIT GATEWAY DEFINITION                       ###
+  ############################################################################
+
+  TransitGateway:
+    Type: AWS::EC2::TransitGateway
+    Properties:
+      DefaultRouteTableAssociation: disable
+      DefaultRouteTablePropagation: disable
+      AutoAcceptSharedAttachments: enable
+      Description: Transit Gateway used by internal VPC of each account
+      Tags:
+        - Key: Name
+          Value: Transit Gateway
+      VpnEcmpSupport: enable
+
+  TransitGatewayAttachmentEgress:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      SubnetIds:
+        - Ref: EgressVPCPrivateEgressVPCSubNetSubnet1
+        - Ref: EgressVPCPrivateEgressVPCSubNetSubnet2
+        - Ref: EgressVPCPrivateEgressVPCSubNetSubnet3
+      TransitGatewayId: !Ref TransitGateway
+      VpcId:
+        Ref: EgressVPC
+      Tags:
+        - Key: Name
+          Value: TG-Egress-VPC-Private_SubNet-Attachment
+    
+  TransitGatewayAttachmentIngress:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      SubnetIds:
+        - Ref: IngressVPCPrivateEgressVPCSubNetSubnet1
+        - Ref: IngressVPCPrivateEgressVPCSubNetSubnet2
+        - Ref: IngressVPCPrivateEgressVPCSubNetSubnet3
+      TransitGatewayId: !Ref TransitGateway
+      VpcId:
+        Ref: IngressVPC
+      Tags:
+        - Key: Name
+          Value: TG-Ingress-VPC-Private_SubNet-Attachment
+
+  TransitGatewayAttachmentPrivate:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      SubnetIds:
+        - Ref: PrivateVPCIsolatedSubnetprivateVPCSubnet1
+        - Ref: PrivateVPCIsolatedSubnetprivateVPCSubnet2
+        - Ref: PrivateVPCIsolatedSubnetprivateVPCSubnet3
+      TransitGatewayId: !Ref TransitGateway
+      VpcId:
+        Ref: PrivateVPC
+      Tags:
+        - Key: Name
+          Value: TG-Private-VPC-Private_SubNet-Attachment
+
+  ## Routing
+
+  RouteEgressVPCSubNetSubnet1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: EgressVPCPublicEgressVPCSubNetSubnet1RouteTable
+      DestinationCidrBlock:
+        Fn::GetAtt:
+          - PrivateVPC
+          - CidrBlock
+      TransitGatewayId: !Ref TransitGateway
+    DependsOn:
+      - TransitGatewayAttachmentEgress
+
+  RouteEgressVPCSubNetSubnet2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: EgressVPCPublicEgressVPCSubNetSubnet2RouteTable
+      DestinationCidrBlock:
+        Fn::GetAtt:
+          - PrivateVPC
+          - CidrBlock
+      TransitGatewayId: !Ref TransitGateway
+    DependsOn:
+      - TransitGatewayAttachmentEgress
+
+  RouteEgressVPCSubNetSubnet3:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: EgressVPCPublicEgressVPCSubNetSubnet3RouteTable
+      DestinationCidrBlock:
+        Fn::GetAtt:
+          - PrivateVPC
+          - CidrBlock
+      TransitGatewayId: !Ref TransitGateway
+    DependsOn:
+      - TransitGatewayAttachmentEgress
+
+  RouteIngressVPCSubNetSubnet1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet1RouteTable
+      DestinationCidrBlock:
+        Fn::GetAtt:
+          - PrivateVPC
+          - CidrBlock
+      TransitGatewayId: !Ref TransitGateway
+    DependsOn:
+      - TransitGatewayAttachmentEgress
+
+  RouteIngressVPCSubNetSubnet2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet2RouteTable
+      DestinationCidrBlock:
+        Fn::GetAtt:
+          - PrivateVPC
+          - CidrBlock
+      TransitGatewayId: !Ref TransitGateway
+    DependsOn:
+      - TransitGatewayAttachmentEgress
+
+  RouteIngressVPCSubNetSubnet3:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: IngressVPCPublicIngressVPCSubNetSubnet3RouteTable
+      DestinationCidrBlock:
+        Fn::GetAtt:
+          - PrivateVPC
+          - CidrBlock
+      TransitGatewayId: !Ref TransitGateway
+    DependsOn:
+      - TransitGatewayAttachmentEgress
+
+  RoutePrivateVPCSubnet1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: PrivateVPCIsolatedSubnetprivateVPCSubnet1RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      TransitGatewayId: !Ref TransitGateway
+    DependsOn:
+      - TransitGatewayAttachmentPrivate
+
+  RoutePrivateVPCSubnet2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: PrivateVPCIsolatedSubnetprivateVPCSubnet2RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      TransitGatewayId: !Ref TransitGateway
+    DependsOn:
+      - TransitGatewayAttachmentPrivate
+
+  RoutePrivateVPCSubnet3:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: PrivateVPCIsolatedSubnetprivateVPCSubnet3RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      TransitGatewayId: !Ref TransitGateway
+    DependsOn:
+      - TransitGatewayAttachmentPrivate
+
+  ## Transit gateway route table
+  TGEgressRouteTable:
+    Type: AWS::EC2::TransitGatewayRouteTable
+    Properties:
+      TransitGatewayId: !Ref TransitGateway
+      Tags:
+        - Key: Name
+          Value: TG Route Domain
+
+  TransitGatewayToEgressVPCRoute:
+    Type: AWS::EC2::TransitGatewayRoute
+    Properties:
+      TransitGatewayRouteTableId:
+        Ref: TGEgressRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      TransitGatewayAttachmentId:
+        Ref: TransitGatewayAttachmentEgress
+
+  EgressVPCTGAssociation:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    Properties:
+      TransitGatewayAttachmentId:
+        Ref: TransitGatewayAttachmentEgress
+      TransitGatewayRouteTableId:
+        Ref: TGEgressRouteTable
+
+  EgressVPCTGPropagation:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayAttachmentId:
+        Ref: TransitGatewayAttachmentEgress
+      TransitGatewayRouteTableId:
+        Ref: TGEgressRouteTable
+
+  IngressVPCTGAssociation:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    Properties:
+      TransitGatewayAttachmentId:
+        Ref: TransitGatewayAttachmentIngress
+      TransitGatewayRouteTableId:
+        Ref: TGEgressRouteTable
+
+  IngressVPCTGPropagation:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayAttachmentId:
+        Ref: TransitGatewayAttachmentIngress
+      TransitGatewayRouteTableId:
+        Ref: TGEgressRouteTable
+
+  PrivateVPCTGAssociation:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    Properties:
+      TransitGatewayAttachmentId:
+        Ref: TransitGatewayAttachmentPrivate
+      TransitGatewayRouteTableId:
+        Ref: TGEgressRouteTable
+
+  PrivateVPCTGPropagation:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayAttachmentId:
+        Ref: TransitGatewayAttachmentPrivate
+      TransitGatewayRouteTableId:
+        Ref: TGEgressRouteTable
+
+
+Outputs:
+  TransitGatewayId:
+    Description: The ID of the transit gateway.
+    Value: !GetAtt TransitGateway.Id
+
+  PrivateVPCId:
+    Description: The ID of the private VPC.
+    Value: !Ref PrivateVPC
