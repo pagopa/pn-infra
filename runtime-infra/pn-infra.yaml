@@ -20,6 +20,9 @@ Parameters:
   VpcSubnetsRoutingTables:
     Type: String
     Description: routing table for subnets where to install PN-CORE
+  PrivateHostedZone:
+    Type: String
+    Description: private hosted zone where register the application load balancer
   
   BucketSuffix:
     Type: String
@@ -85,6 +88,18 @@ Resources:
         LoadBalancerName: !Ref ProjectName
         Subnets: !Ref VpcSubnets
         VpcId: !Ref VpcId
+  
+  # Load balancer private fixed DNS
+  Route53RecordSetGroup:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Sub 'alb.core.${ProjectName}.internal'
+      Type: A
+      HostedZoneId: !Ref PrivateHostedZone  
+      AliasTarget:
+        DNSName: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain 
+        EvaluateTargetHealth: false
+        HostedZoneId: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomainZone
 
   ###                             ECS CLUSTER                             ###
   ###########################################################################

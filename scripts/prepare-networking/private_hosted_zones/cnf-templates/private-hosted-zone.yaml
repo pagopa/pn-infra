@@ -1,0 +1,43 @@
+# Reference for ALB Hosted Zone: https://docs.aws.amazon.com/general/latest/gr/elb.html
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: This templates creates a private hosted zone.
+
+Parameters:  
+  VPCID:
+    Type: String
+    Description: The Amazon VPC ID in the owner account that use the hosted zone created.
+
+  HostedZoneDomainName: 
+    Type: String
+    Description: The name of the domain.
+
+Resources:
+  PrivateHostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties: 
+      HostedZoneConfig: 
+        Comment: !Sub "Private Hosted Zone for ${HostedZoneDomainName}"
+      Name: !Ref HostedZoneDomainName
+      VPCs: 
+        - VPCId: !Ref VPCID
+          VPCRegion: !Ref AWS::Region
+
+  TestRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref PrivateHostedZone
+      Name: !Sub 'testdns.${HostedZoneDomainName}'
+      Comment: !Sub "Test DNS entry for Zone ${HostedZoneDomainName}"
+      ResourceRecords:
+        - !Sub '"Test DNS entry for Zone ${HostedZoneDomainName}"'
+      TTL: 120
+      Type: TXT
+      Weight: 1
+      SetIdentifier: unique
+
+Outputs:
+  PrivateHostedZoneId:
+    Description: The HostedZone ID Route53.
+    Value: !Ref PrivateHostedZone
+
