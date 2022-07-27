@@ -40,6 +40,15 @@ Parameters:
     Type: String
     Description: number of shard in the source logs stream
   
+  StreamMode:
+    Description: Stream Mode.
+    Default: ON_DEMAND
+    Type: String
+    AllowedValues: [ON_DEMAND, PROVISIONED]
+
+Conditions: 
+  OnDemandDisabled: !Not [!Equals [!Ref StreamMode, ON_DEMAND]]
+  
 
 Resources:
 
@@ -117,7 +126,7 @@ Resources:
     Properties:
       Name: !Sub '${ProjectName}-${StreamNamePrefix}-${RetentionTag}-stream'
       RetentionPeriodHours: !Ref StreamRetentionPeriodHours
-      ShardCount: !Ref StreamShardCount
+      ShardCount: !If [OnDemandDisabled, !Ref StreamShardCount, !Ref "AWS::NoValue"]
       StreamEncryption:
         EncryptionType: KMS
         KeyId:
@@ -125,7 +134,7 @@ Resources:
             - CloudwatchLogKinesisStreamEncryptionKey
             - Arn
       StreamModeDetails:
-        StreamMode: PROVISIONED
+        StreamMode: !Ref StreamMode
   
   ### Read Only role for external user
   KinesisStreamReadOnlyRole:

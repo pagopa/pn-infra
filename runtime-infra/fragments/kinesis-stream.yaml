@@ -14,6 +14,15 @@ Parameters:
     Type: Number
     Description: 'Number of shards in the stream'
 
+  StreamMode:
+    Description: Stream Mode.
+    Default: ON_DEMAND
+    Type: String
+    AllowedValues: [ON_DEMAND, PROVISIONED]
+
+Conditions: 
+  OnDemandDisabled: !Not [!Equals [!Ref StreamMode, ON_DEMAND]]
+
 Resources:
 
   ### AWS KMS / Server-side encryption for Kinesis Stream 
@@ -45,7 +54,7 @@ Resources:
     Properties:
       Name: !Ref StreamName
       RetentionPeriodHours: !Ref StreamRetentionPeriodHours
-      ShardCount: !Ref StreamShardCount
+      ShardCount: !If [OnDemandDisabled, !Ref StreamShardCount, !Ref "AWS::NoValue"]
       StreamEncryption:
         EncryptionType: KMS
         KeyId:
@@ -53,8 +62,8 @@ Resources:
             - KinesisServerSideEncryptionKey
             - Arn
       StreamModeDetails:
-        StreamMode: PROVISIONED
-  
+        StreamMode: !Ref StreamMode    
+
   ### Read Only role for external user
   KinesisStreamReadOnlyRole:
     Type: AWS::IAM::Role
@@ -106,5 +115,3 @@ Outputs:
   KinesisStreamReadOnlyRoleArn:
     Value: !GetAtt KinesisStreamReadOnlyRole.Arn
     Description: 'Arn of the role configured for reading Kinesis source stream'
-
-
