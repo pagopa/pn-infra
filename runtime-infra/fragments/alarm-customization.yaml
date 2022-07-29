@@ -1,0 +1,237 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template creates a SNS queue to trigger lambda function
+
+Parameters:
+  AlarmSNSTopicName:
+    Description: The SNS topic name 
+    Type: String
+    Default: Test-Alarm-AlarmSNSTopic-13MAZGETFM60X
+
+  DelaySeconds:
+    Description: The time in seconds for which the delivery of all messages in the queue is delayed. 
+      You can specify an integer value of 0 to 900 (15 minutes).
+    Type: Number
+    Default: '5'
+
+  MessageRetentionPeriod:
+    Description: The number of seconds that Amazon SQS retains a message. 
+      You can specify an integer value from 60 seconds (1 minute) to 1,209,600 seconds (14 days). 
+    Type: Number
+    Default: 1209600
+
+  QueueName:
+    Description: A name for the queue.
+    Type: String
+    Default: AlarmQueue
+
+  ReceiveMessageWaitTimeSeconds:
+    Description: Specifies the duration, in seconds, that the ReceiveMessage action 
+      call waits until a message is in the queue in order to include it in the response.
+      You can specify an integer from 1 to 20.
+    Type: Number
+    Default: 20
+
+  EventBridgeName:
+    Description: "The name of the rule"
+    Type: String
+    Default: custom-alarm-rule
+
+  EventBusName:
+    Description: The EventBridge events bus name.
+    Type: String
+    Default: default 
+
+  DLQMessageRetentionPeriod:
+    Description: The number of seconds that Amazon SQS retains a message. 
+      You can specify an integer value from 60 seconds (1 minute) to 1,209,600 seconds (14 days).
+    Type: Number
+    Default: 1209600
+
+  maxReceiveCount:
+    Description: The number of times a message is delivered to the source queue 
+      before being moved to the dead-letter queue. 
+    Type: Number
+    Default: 5
+
+  LambdasBucketName:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the Lambda Zip.'
+    Default: cfn-templates-alarm
+
+Resources:
+  AlarmQueue:
+    Type: AWS::SQS::Queue
+    Properties: 
+      DelaySeconds: !Ref DelaySeconds
+      MessageRetentionPeriod: !Ref MessageRetentionPeriod
+      QueueName: !Ref QueueName
+      ReceiveMessageWaitTimeSeconds: !Ref ReceiveMessageWaitTimeSeconds
+      RedrivePolicy: 
+        deadLetterTargetArn: !GetAtt AlarmDeadLetterQueue.Arn
+        maxReceiveCount: !Ref maxReceiveCount
+
+  SQSPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+      - Ref: AlarmQueue
+      PolicyDocument:
+        Statement:
+        - Sid: Allow-events-messages
+          Effect: Allow
+          Principal: 
+            Service: events.amazonaws.com
+          Action: SQS:SendMessage
+          Resource:
+            !GetAtt AlarmQueue.Arn
+        - Sid: Allow-Lambda-access
+          Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action:
+            - SQS:SendMessage
+            - SQS:ReceiveMessage
+            - SQS:DeleteMessage
+            - SQS:GetQueueAttributes
+          Resource: 
+            !GetAtt AlarmQueue.Arn
+            
+
+  AlarmDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${QueueName}-dlq"
+      MessageRetentionPeriod: !Ref DLQMessageRetentionPeriod
+
+  # Event Watch Rule 
+  EventBridgeAlarmStateRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: The EventBridge rule to match CloudWatch Alarm state change
+      EventBusName: !Ref EventBusName
+      EventPattern: 
+        source:
+          - aws.cloudwatch
+        detail-type:
+          - CloudWatch Alarm State Change
+        detail:
+          state:
+            value:
+            - ALARM
+            - OK
+      Name: !Ref EventBridgeName
+      State: ENABLED
+      Targets: 
+        - Arn: !GetAtt AlarmQueue.Arn
+          Id: !Ref EventBridgeName
+
+  CodePipelineBridgeStateRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: The EventBridge rule to match CodePipeline pipeline state change
+      EventBusName: !Ref EventBusName
+      EventPattern: 
+        source:
+          - aws.codepipeline
+        detail-type:
+          - CodePipeline Pipeline Execution State Change
+        detail:
+          state:
+            - STARTED
+            - SUCCEEDED
+            - FAILED
+      Name: !Sub ${EventBridgeName}-codepipeline
+      State: ENABLED
+      Targets: 
+        - Arn: !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}"
+          Id: !Ref EventBridgeName
+
+  EventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      Enabled: true
+      BatchSize: 10
+      EventSourceArn: !GetAtt AlarmQueue.Arn
+      FunctionName: !GetAtt MessageCustomizationLambda.Arn
+
+  # Lambda function to customize alarm message
+  MessageCustomizationLambda:
+    Type: AWS::Lambda::Function
+    Properties: 
+      Code: 
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub fragments/enrich-lambda-message.zip
+        #S3ObjectVersion:
+      Description: AWS Lambda function to customize CloudWatch Alarm notification
+      Environment: 
+        Variables:  
+          AlarmSNSTopicNama: !Ref AlarmSNSTopicName
+      FunctionName: !Sub ${EventBridgeName}-message-enrich-lambda
+      Handler: enrich-lambda-message.lambda_handler
+      Role: !GetAtt MessageCustomizationLambdaRole.Arn
+      Runtime: python3.9
+      Timeout: 15 #Queue wait time should be equal or greater then timeout
+
+  # Lambda Execution role 
+  MessageCustomizationLambdaRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole
+      Description: AWS IAM Role for Lambda execution role
+      Path: /
+      RoleName: !Sub ${EventBridgeName}-Role
+
+  # Lambda Policy  
+  MessageCustomizationLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties: 
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement: 
+          - Sid: InvokeLambda
+            Effect: Allow
+            Action: lambda:InvokeFunction
+            Resource: !GetAtt MessageCustomizationLambda.Arn
+          - Sid: PublishToSNS
+            Effect: Allow
+            Action: sns:Publish
+            Resource: 
+              - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}"
+          - Sid: AllowSQSAccess
+            Effect: Allow
+            Action:
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ChangeMessageVisibility
+            Resource: !GetAtt AlarmQueue.Arn
+          - Sid: DescribeLogStreamsAndMetricFilter
+            Effect: Allow
+            Action: 
+              - logs:DescribeMetricFilters
+              - logs:DescribeLogStreams
+            Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*"
+          - Sid: DescribeAlarmsMetric
+            Effect: Allow
+            Action: cloudwatch:DescribeAlarmsForMetric
+            Resource: "*"
+      PolicyName: !Sub ${EventBridgeName}-Policy
+      Roles: 
+        - !Ref MessageCustomizationLambdaRole
+
+  # CloudWatch Log Group for Lambda
+  MessageCustomizationLambdaLogs:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Sub "/aws/lambda/${MessageCustomizationLambda}"

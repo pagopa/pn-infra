@@ -117,6 +117,13 @@ Resources:
       ManagedPolicyArns:
         - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
 
+  AlarmCustomization:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/alarm-customization.yaml"
+      Parameters:
+        AlarmSNSTopicName: !Ref AlarmSNSTopic
+
 Outputs:
 
   AlarmSNSTopicArn:
