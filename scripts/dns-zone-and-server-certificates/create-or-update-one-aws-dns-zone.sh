@@ -39,38 +39,11 @@ function createOrUpdateStack() {
   shift
   shift
 
-  echo "Check if ${stackName} is already present"
-  aws --profile $profile --region $region cloudformation describe-stacks \
-      --stack-name ${stackName} > /dev/null 2> /dev/null
-  stackAbsent=$?
-
-  if ( [ "$stackAbsent" -ne 0 ] ) then
-    echo "Start stack ${stackName} creation"
-    aws --profile $profile --region $region cloudformation create-stack \
-        --stack-name ${stackName} \
-        --template-body file://${scriptDir}/cnf-templates/${templateFile} \
-        --parameters $@
-    echo "Wait for creation"
-    aws --profile $profile --region $region cloudformation wait stack-create-complete \
-        --stack-name ${stackName}
-    echo "Stack ${stackName} created"
-  else
-    echo "Start stack ${stackName} update"
-    aws --profile $profile --region $region cloudformation update-stack \
-        --stack-name ${stackName} \
-        --template-body file://${scriptDir}/cnf-templates/${templateFile} \
-        --parameters $@
-    updateNotNeeded=$?
-    if ( [ "$updateNotNeeded" -eq 0 ] ) then
-      echo "Wait for update"
-      aws --profile $profile --region $region cloudformation wait stack-update-complete \
-          --stack-name ${stackName}
-      echo "Stack ${stackName} updated"
-    else
-      echo "Stack ${stackName} do not need update"
-    fi
-  fi
-
+  echo "Start stack ${stackName} creation or update"
+  aws --profile $profile --region $region cloudformation deploy \
+      --stack-name ${stackName} \
+      --template-file ${scriptDir}/cnf-templates/${templateFile} \
+      --parameter-override $@
 }
 
 echo "CONFIGURE ZONE"
