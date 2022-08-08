@@ -8,15 +8,19 @@ Parameters:
   NameServers:
     Type: String
     Description: A pipe separated list of DNS server names
+  BaseDnsDomain:
+    Type: String
+    Default: 'pn.pagopa.it'
+    Description: 'DNS zone that make delegation to NameServer'
 
 Resources:
 
   ZoneDelegationRecord:
     Type: AWS::Route53::RecordSet
     Properties:
-      HostedZoneName: "pn.pagopa.it."
-      Name: !Sub '${EnvName}.pn.pagopa.it'
-      Comment: !Sub "Delegation to ${EnvName}.pn.pagopa.it zone"
+      HostedZoneName: !Sub "${BaseDnsDomain}."
+      Name: !Sub '${EnvName}.${BaseDnsDomain}'
+      Comment: !Sub "Delegation to ${EnvName}.${BaseDnsDomain} zone"
       ResourceRecords:
         Fn::Split:
         - '|'

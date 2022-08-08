@@ -4,9 +4,9 @@ zoneRegion="eu-south-1"
 cloudFrontRegion="us-east-1"
 
 # COMPLETE LIST OF dev & test SUBDOMAINS
-envTypes="dev uat"
-devZoneName="svil"
-uatZoneName="coll"
+envTypes="dev"
+devZoneName="dev"
+uatZoneName="doNotExsists"
 
 # COMPLETE CERTIFICATES LIST (we have a certificate for every public exposed https endpoint)
 # - Certificate used by CloudFront must be in "us-east-1" region
