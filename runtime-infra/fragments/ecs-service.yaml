@@ -44,6 +44,12 @@ Parameters:
     Description: memory amount reserved to the task pod
 
   # Open Telemetry X-Ray configuration
+  OtelXRayEnabled:
+    Type: String
+    Description: Enable Open Telemetry agent and sidecar containers
+    AllowedValues: [True, False]
+    Default: 'True'
+
   ContainerImageOtelURI:
     Type: String
     Description: Container image URI for Open telemetry
@@ -330,6 +336,9 @@ Conditions:
     Fn::Or:
      - Condition: AutoscalingByRestApi
      - Condition: AutoscalingBySQS
+
+  ShouldEnableOtelXRay:
+    !Equals [ True, !Ref OtelXRayEnabled ]
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
@@ -459,11 +468,18 @@ Resources:
             - Name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
               Value: 'http://localhost:4317'
             - 'Fn::If':
+              - ShouldEnableOtelXRay
+              - 'Fn::If':
                 - HasJavaToolOptions
                 - Name: 'JAVA_TOOL_OPTIONS'
                   Value: !Sub '-javaagent:/xray/aws-opentelemetry-agent.jar ${JavaToolOptions}'
                 - Name: 'JAVA_TOOL_OPTIONS'
                   Value: '-javaagent:/xray/aws-opentelemetry-agent.jar'
+              - 'Fn::If':
+                  - HasJavaToolOptions
+                  - Name: 'JAVA_TOOL_OPTIONS'
+                    Value: !Sub '${JavaToolOptions}'
+                  - !Ref "AWS::NoValue"
             - 'Fn::If':
                 - Env1Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry1 ] ]
@@ -675,35 +691,41 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: ecs
-        - Name: aws-collector
-          Image: !Ref ContainerImageOtelURI
-          Command: [!Ref AwsCollectorCommand]
-          Cpu: '256'
-          Memory: '512'
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-create-group: 'True'
-              awslogs-group: !Ref LogGroup
-              awslogs-region: !Ref 'AWS::Region'
-              awslogs-stream-prefix: ecs
-        - Name: sidecar-injector
-          Image: !Ref ContainerImageInjectorURI
-          Command: !Ref CommandSidecarInjector
-          EntryPoint: [!Ref EntrypointSidecarInjector]
-          Essential: false
-          MountPoints:
-            - SourceVolume: "my-vol"
-              ContainerPath: "/xray/"
-          Cpu: '256'
-          Memory: '512'
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-create-group: 'True'
-              awslogs-group: !Ref LogGroup
-              awslogs-region: !Ref 'AWS::Region'
-              awslogs-stream-prefix: ecs
+        - 'Fn::If':
+          - ShouldEnableOtelXRay
+          - Name: aws-collector
+            Image: !Ref ContainerImageOtelURI
+            Command: [!Ref AwsCollectorCommand]
+            Cpu: '256'
+            Memory: '512'
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-create-group: 'True'
+                awslogs-group: !Ref LogGroup
+                awslogs-region: !Ref 'AWS::Region'
+                awslogs-stream-prefix: ecs
+          - !Ref "AWS::NoValue"
+        - 'Fn::If':
+          - ShouldEnableOtelXRay
+          - Name: sidecar-injector
+            Image: !Ref ContainerImageInjectorURI
+            Command: !Ref CommandSidecarInjector
+            EntryPoint: [!Ref EntrypointSidecarInjector]
+            Essential: false
+            MountPoints:
+              - SourceVolume: "my-vol"
+                ContainerPath: "/xray/"
+            Cpu: '256'
+            Memory: '512'
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-create-group: 'True'
+                awslogs-group: !Ref LogGroup
+                awslogs-region: !Ref 'AWS::Region'
+                awslogs-stream-prefix: ecs
+          - !Ref "AWS::NoValue"
       Volumes:
         - Name: "my-vol"
 
