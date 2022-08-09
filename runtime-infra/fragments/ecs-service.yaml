@@ -452,6 +452,12 @@ Resources:
             - ContainerName: aws-collector
               Condition: START
           Environment:
+            - Name: 'OTEL_RESOURCE_ATTRIBUTES'
+              Value: !Sub 'service.name=${MicroServiceUniqueName}'
+            - Name: 'OTEL_IMR_EXPORT_INTERVAL'
+              Value: 10000
+            - Name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
+              Value: 'http://localhost:4317'
             - 'Fn::If':
                 - HasJavaToolOptions
                 - Name: 'JAVA_TOOL_OPTIONS'
