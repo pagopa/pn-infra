@@ -43,6 +43,35 @@ Parameters:
     Type: String
     Description: memory amount reserved to the task pod
 
+  ContainerImageOtelURI:
+    Type: String
+    Description: Container image URI for Open telemetry
+    Default: 911845998067.dkr.ecr.eu-central-1.amazonaws.com/aws-otel-collector:latest
+
+  ContainerImageInjectorURI:
+    Type: String
+    Description: Container image URI for Open telemetry
+    Default: alpine
+
+# The AWS collector comes with two configs baked in for ECS:
+#
+#  To consume OTPL metrics/traces and X-Ray SDK traces (custom application metrics/traces): --config=/etc/ecs/ecs-default-config.yaml
+#  To Use OTPL, Xray and Container Resource utilization metrics: --config=/etc/ecs/container-insights/otel-task-metrics-config.yaml
+#  more datails here: https://github.com/aws-observability/aws-otel-collector/
+  Command :
+    Type: String
+    Description: Using the right command to choose the config file you want to config your AOC
+    Default: --config=/etc/ecs/ecs-xray.yaml
+
+  EntrypointSidecarInjector:
+    Type: String
+    Description: Excute wget for xray auto-intrumentation
+    Default: "wget"
+
+  CommandSidecarInjector:
+    Type: List<String>
+    Description: Command for download and copy xray agent for auto-instrumentation in /xray
+    Default: -O, /xray/aws-opentelemetry-agent.jar, https://github.com/aws-observability/aws-otel-java-instrumentation/releases/latest/download/aws-opentelemetry-agent.jar
 
   # Heath Check parameters
   HealthCheckInterval:
@@ -414,6 +443,14 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
+          MountPoints:
+            - SourceVolume: "my-vol"
+              ContainerPath: "/xray/"
+          DependsOn:
+            - ContainerName: sidecar-injector
+              Condition: COMPLETE
+            - ContainerName: aws-collector
+              Condition: START
           Environment:
             - 'Fn::If':
                 - HasJavaToolOptions
@@ -631,6 +668,38 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: ecs
+        - Name: aws-collector
+          Image: !Ref ContainerImageOtelURI
+          Command: [!Ref Command]
+          Cpu: '256'
+          Memory: '512'
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-create-group: 'True'
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: ecs
+        - Name: sidecar-injector
+          Image: !Ref ContainerImageInjectorURI
+          Command: !Ref CommandSidecarInjector
+          EntryPoint: [!Ref EntrypointSidecarInjector]
+          Essential: false
+          MountPoints:
+            - SourceVolume: "my-vol"
+              ContainerPath: "/xray/"
+          Cpu: '256'
+          Memory: '512'
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-create-group: 'True'
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: ecs
+      Volumes:
+        - Name: "my-vol"
+
 
   # Microservice Log group
   LogGroup:
@@ -692,6 +761,7 @@ Resources:
             Action: 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+        - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
 
   # A role for the containers
   TaskRole:
@@ -704,6 +774,8 @@ Resources:
             Principal:
               Service: ecs-tasks.amazonaws.com
             Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
 
   # Role policy needed to access the ECR registry of the CiCd account
   EcrAccessTaskPolicy:
@@ -731,6 +803,20 @@ Resources:
               - ssmmessages:OpenDataChannel
             Resource:
               - '*'
+          - Effect: Allow
+            Action:
+              - 'logs:PutLogEvents'
+              - 'logs:CreateLogGroup'
+              - 'logs:CreateLogStream'
+              - 'logs:DescribeLogStreams'
+              - 'logs:DescribeLogGroups'
+              - 'xray:PutTraceSegments'
+              - 'xray:PutTelemetryRecords'
+              - 'xray:GetSamplingRules'
+              - 'xray:GetSamplingTargets'
+              - 'xray:GetSamplingStatisticSummaries'
+              - 'ssm:GetParameters'
+            Resource: '*'
 
   # Load balancer target group
   TargetGroup:
