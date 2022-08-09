@@ -44,11 +44,11 @@ Parameters:
     Description: memory amount reserved to the task pod
 
   # Open Telemetry X-Ray configuration
-  OtelXRayEnabled:
+  DisableOtelXRay:
     Type: String
     Description: Enable Open Telemetry agent and sidecar containers
-    AllowedValues: [True, False]
-    Default: 'True'
+    AllowedValues: [True, '']
+    Default: ''
 
   ContainerImageOtelURI:
     Type: String
@@ -121,7 +121,6 @@ Parameters:
     Default: 1
     Type: Number
     Description: activate when N datapoint on M
-
 
   AutoscalingThreshold:
     Default: 0
@@ -337,8 +336,7 @@ Conditions:
      - Condition: AutoscalingByRestApi
      - Condition: AutoscalingBySQS
 
-  ShouldEnableOtelXRay:
-    !Equals [ True, !Ref OtelXRayEnabled ]
+  ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, 'True' ] ]
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
