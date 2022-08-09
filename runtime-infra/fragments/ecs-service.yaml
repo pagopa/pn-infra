@@ -43,6 +43,7 @@ Parameters:
     Type: String
     Description: memory amount reserved to the task pod
 
+  # Open Telemetry X-Ray configuration
   ContainerImageOtelURI:
     Type: String
     Description: Container image URI for Open telemetry
@@ -58,7 +59,7 @@ Parameters:
 #  To consume OTPL metrics/traces and X-Ray SDK traces (custom application metrics/traces): --config=/etc/ecs/ecs-default-config.yaml
 #  To Use OTPL, Xray and Container Resource utilization metrics: --config=/etc/ecs/container-insights/otel-task-metrics-config.yaml
 #  more datails here: https://github.com/aws-observability/aws-otel-collector/
-  Command :
+  AwsCollectorCommand:
     Type: String
     Description: Using the right command to choose the config file you want to config your AOC
     Default: --config=/etc/ecs/ecs-xray.yaml
@@ -88,8 +89,7 @@ Parameters:
     Description: path called for health check
     Type: String
     Default: '/'
-  
-  
+
   # Autoscaling parameters
   AutoscalingStrategy:
     Description: Autoscaling strategy.
@@ -136,10 +136,10 @@ Parameters:
     Description: maximum autoscaling number of tasks\
     
   JavaToolOptions:
-    Default: ''
+    Default: '-javaagent:/xray/aws-opentelemetry-agent.jar'
     Type: String
     Description: add system properties and other parameters to the JVM
-  
+
   # Technical parameters
   VpcId:
     Type: AWS::EC2::VPC::Id
@@ -670,7 +670,7 @@ Resources:
               awslogs-stream-prefix: ecs
         - Name: aws-collector
           Image: !Ref ContainerImageOtelURI
-          Command: [!Ref Command]
+          Command: [!Ref AwsCollectorCommand]
           Cpu: '256'
           Memory: '512'
           LogConfiguration:
