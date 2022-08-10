@@ -483,8 +483,8 @@ Resources:
               Value: !Sub 'service.name=${MicroServiceUniqueName}'
             - Name: 'OTEL_IMR_EXPORT_INTERVAL'
               Value: 10000
-            - Name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
-              Value: 'http://localhost:4317'
+            - Name: 'OTEL_METRICS_EXPORTER'
+              Value: 'none'
             - 'Fn::If':
               - ShouldEnableOtelXRay
               - 'Fn::If':
