@@ -5,6 +5,10 @@ Parameters:
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+  TemplateBucketName:
+    Type: String
+    Description: 'The S3 bucket Name from which to fetch the templates used by this stack.'
+
 
   SlackInfo:
     Type: String
@@ -123,7 +127,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/alarm-customization.yaml"
       Parameters:
         AlarmSNSTopicName: !GetAtt AlarmSNSTopic.TopicName
-        LambdasBucketName: !Ref TemplateBucketBaseUrl
+        LambdasBucketName: !Ref TemplateBucketName
 
 Outputs:
 
