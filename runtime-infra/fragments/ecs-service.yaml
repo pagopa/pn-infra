@@ -41,7 +41,8 @@ Parameters:
   # Between 8GB and 30GB in 1GB increments - Available cpu values: 4096 (4 vCPU)
   MemoryAmount:
     Type: String
-    Description: memory amount reserved to the task pod
+    Description: memory amount reserved to the task pod.
+    AllowedValues: [ 2GB, 4GB, 6GB, 8GB ]
 
   # Open Telemetry X-Ray configuration
   DisableOtelXRay:
@@ -324,6 +325,24 @@ Parameters:
     Type: String
     Default: ''
 
+Mappings:
+  ContainerMemory:
+    2GB:
+      awsCollector: 512
+      sidecarInjector: 512
+      microservice: 1GB
+    4GB:
+      awsCollector: 512
+      sidecarInjector: 512
+      microservice: 2GB
+    6GB:
+      awsCollector: 512
+      sidecarInjector: 512
+      microservice: 5GB
+    8GB:
+      awsCollector: 512
+      sidecarInjector: 512
+      microservice: 7GB
 
 Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
@@ -450,6 +469,7 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
+          Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
           MountPoints:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
@@ -695,7 +715,7 @@ Resources:
             Image: !Ref ContainerImageOtelURI
             Command: [!Ref AwsCollectorCommand]
             Cpu: '256'
-            Memory: '512'
+            Memory: !FindInMap [ ContainerMemory, !Ref MemoryAmount, awsCollector ]
             LogConfiguration:
               LogDriver: awslogs
               Options:
@@ -715,7 +735,7 @@ Resources:
               - SourceVolume: "my-vol"
                 ContainerPath: "/xray/"
             Cpu: '256'
-            Memory: '512'
+            Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
             LogConfiguration:
               LogDriver: awslogs
               Options:
