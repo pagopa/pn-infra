@@ -122,7 +122,8 @@ Resources:
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/alarm-customization.yaml"
       Parameters:
-        AlarmSNSTopicName: !Ref AlarmSNSTopic
+        AlarmSNSTopicName: !GetAtt AlarmSNSTopic.TopicName
+        LambdasBucketName: !Ref TemplateBucketBaseUrl
 
 Outputs:
 
@@ -131,6 +132,6 @@ Outputs:
     Description: ARN of the Alarm SNS Topic
   
   AlarmSNSTopicName:
-    Value: !GetAtt  AlarmSNSTopic.TopicName
+    Value: !GetAtt AlarmSNSTopic.TopicName
     Description: Name of the Alarm SNS Topic
 
