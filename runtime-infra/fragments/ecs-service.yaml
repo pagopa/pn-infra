@@ -43,6 +43,42 @@ Parameters:
     Type: String
     Description: memory amount reserved to the task pod
 
+  # Open Telemetry X-Ray configuration
+  DisableOtelXRay:
+    Type: String
+    Description: Enable Open Telemetry agent and sidecar containers
+    AllowedValues: [True, '']
+    Default: ''
+
+  ContainerImageOtelURI:
+    Type: String
+    Description: Container image URI for Open telemetry
+    Default: amazon/aws-otel-collector:latest
+
+  ContainerImageInjectorURI:
+    Type: String
+    Description: Container image URI for Open telemetry
+    Default: alpine
+
+# The AWS collector comes with two configs baked in for ECS:
+#
+#  To consume OTPL metrics/traces and X-Ray SDK traces (custom application metrics/traces): --config=/etc/ecs/ecs-default-config.yaml
+#  To Use OTPL, Xray and Container Resource utilization metrics: --config=/etc/ecs/container-insights/otel-task-metrics-config.yaml
+#  more datails here: https://github.com/aws-observability/aws-otel-collector/
+  AwsCollectorCommand:
+    Type: String
+    Description: Using the right command to choose the config file you want to config your AOC
+    Default: --config=/etc/ecs/ecs-xray.yaml
+
+  EntrypointSidecarInjector:
+    Type: String
+    Description: Excute wget for xray auto-intrumentation
+    Default: "wget"
+
+  CommandSidecarInjector:
+    Type: List<String>
+    Description: Command for download and copy xray agent for auto-instrumentation in /xray
+    Default: -O, /xray/aws-opentelemetry-agent.jar, https://github.com/aws-observability/aws-otel-java-instrumentation/releases/latest/download/aws-opentelemetry-agent.jar
 
   # Heath Check parameters
   HealthCheckInterval:
@@ -59,8 +95,7 @@ Parameters:
     Description: path called for health check
     Type: String
     Default: '/'
-  
-  
+
   # Autoscaling parameters
   AutoscalingStrategy:
     Description: Autoscaling strategy.
@@ -87,7 +122,6 @@ Parameters:
     Type: Number
     Description: activate when N datapoint on M
 
-
   AutoscalingThreshold:
     Default: 0
     Type: String
@@ -110,7 +144,7 @@ Parameters:
     Default: ''
     Type: String
     Description: add system properties and other parameters to the JVM
-  
+
   # Technical parameters
   VpcId:
     Type: AWS::EC2::VPC::Id
@@ -301,6 +335,8 @@ Conditions:
     Fn::Or:
      - Condition: AutoscalingByRestApi
      - Condition: AutoscalingBySQS
+
+  ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, 'True' ] ]
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
@@ -414,12 +450,34 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
+          MountPoints:
+            - SourceVolume: "my-vol"
+              ContainerPath: "/xray/"
+          DependsOn:
+            - ContainerName: sidecar-injector
+              Condition: COMPLETE
+            - ContainerName: aws-collector
+              Condition: START
           Environment:
+            - Name: 'OTEL_RESOURCE_ATTRIBUTES'
+              Value: !Sub 'service.name=${MicroServiceUniqueName}'
+            - Name: 'OTEL_IMR_EXPORT_INTERVAL'
+              Value: 10000
+            - Name: 'OTEL_METRICS_EXPORTER'
+              Value: 'none'
             - 'Fn::If':
+              - ShouldEnableOtelXRay
+              - 'Fn::If':
                 - HasJavaToolOptions
                 - Name: 'JAVA_TOOL_OPTIONS'
-                  Value: !Ref JavaToolOptions
-                - !Ref "AWS::NoValue"
+                  Value: !Sub '-javaagent:/xray/aws-opentelemetry-agent.jar ${JavaToolOptions}'
+                - Name: 'JAVA_TOOL_OPTIONS'
+                  Value: '-javaagent:/xray/aws-opentelemetry-agent.jar'
+              - 'Fn::If':
+                  - HasJavaToolOptions
+                  - Name: 'JAVA_TOOL_OPTIONS'
+                    Value: !Sub '${JavaToolOptions}'
+                  - !Ref "AWS::NoValue"
             - 'Fn::If':
                 - Env1Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry1 ] ]
@@ -631,6 +689,44 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: ecs
+        - 'Fn::If':
+          - ShouldEnableOtelXRay
+          - Name: aws-collector
+            Image: !Ref ContainerImageOtelURI
+            Command: [!Ref AwsCollectorCommand]
+            Cpu: '256'
+            Memory: '512'
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-create-group: 'True'
+                awslogs-group: !Ref LogGroup
+                awslogs-region: !Ref 'AWS::Region'
+                awslogs-stream-prefix: ecs
+          - !Ref "AWS::NoValue"
+        - 'Fn::If':
+          - ShouldEnableOtelXRay
+          - Name: sidecar-injector
+            Image: !Ref ContainerImageInjectorURI
+            Command: !Ref CommandSidecarInjector
+            EntryPoint: [!Ref EntrypointSidecarInjector]
+            Essential: false
+            MountPoints:
+              - SourceVolume: "my-vol"
+                ContainerPath: "/xray/"
+            Cpu: '256'
+            Memory: '512'
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-create-group: 'True'
+                awslogs-group: !Ref LogGroup
+                awslogs-region: !Ref 'AWS::Region'
+                awslogs-stream-prefix: ecs
+          - !Ref "AWS::NoValue"
+      Volumes:
+        - Name: "my-vol"
+
 
   # Microservice Log group
   LogGroup:
@@ -692,6 +788,7 @@ Resources:
             Action: 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+        - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
 
   # A role for the containers
   TaskRole:
@@ -704,6 +801,8 @@ Resources:
             Principal:
               Service: ecs-tasks.amazonaws.com
             Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
 
   # Role policy needed to access the ECR registry of the CiCd account
   EcrAccessTaskPolicy:
@@ -731,6 +830,20 @@ Resources:
               - ssmmessages:OpenDataChannel
             Resource:
               - '*'
+          - Effect: Allow
+            Action:
+              - 'logs:PutLogEvents'
+              - 'logs:CreateLogGroup'
+              - 'logs:CreateLogStream'
+              - 'logs:DescribeLogStreams'
+              - 'logs:DescribeLogGroups'
+              - 'xray:PutTraceSegments'
+              - 'xray:PutTelemetryRecords'
+              - 'xray:GetSamplingRules'
+              - 'xray:GetSamplingTargets'
+              - 'xray:GetSamplingStatisticSummaries'
+              - 'ssm:GetParameters'
+            Resource: '*'
 
   # Load balancer target group
   TargetGroup:
