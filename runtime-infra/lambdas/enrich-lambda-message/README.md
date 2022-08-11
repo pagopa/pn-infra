@@ -1,4 +1,4 @@
-# Istruzione per costruire il package zip
+# Istruzione per costruire il package zip caricare su bucket
 
 ```shell
 pip install --target ./package requests
