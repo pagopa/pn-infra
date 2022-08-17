@@ -1,0 +1,15 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Expose a microservice API using API-GW. This template can expose API for B2B or WEB usage'
+
+Resources:
+  StandardB2BUsagePlan:
+    Type: 'AWS::ApiGateway::UsagePlan'
+    Properties:
+      UsagePlanName: STANDARD_B2B
+      Description: Standard usage plan for small PA
+      Quota:
+        Limit: 5000
+        Period: DAY
+      Throttle:
+        BurstLimit: 100
+        RateLimit: 50

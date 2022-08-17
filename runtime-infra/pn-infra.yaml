@@ -158,6 +158,14 @@ Resources:
         LogsBucketName: !GetAtt LogsBucket.Outputs.LogsBucketName
         LogsAccountId: !Ref AWS::AccountId
 
+  B2BUsagePlanes:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-usageplans_B2B.yaml"
+  IOBackendUsagePlanes:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-usageplans_IO.yaml"
 
 Outputs:
 
