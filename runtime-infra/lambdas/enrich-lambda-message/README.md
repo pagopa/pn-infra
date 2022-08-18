@@ -1,6 +1,7 @@
 # Istruzione per costruire il package zip caricare su bucket
 
 ```shell
+rm -f enrich-lambda-message.zip
 pip install --target ./package requests
 cd package
 zip -r ../enrich-lambda-message.zip .

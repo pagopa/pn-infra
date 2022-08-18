@@ -18,12 +18,16 @@ def lambda_handler(event, context):
         metric_name = result["detail"]["configuration"]["metrics"][0]["metricStat"]["metric"]["name"]
         metric_namespace = result["detail"]["configuration"]["metrics"][0]["metricStat"]["metric"]["namespace"]
         log_group_response_name = get_log_group_name(metric_name, metric_namespace)
-        log_stream_response_id = get_log_stream_id(log_group_response_name)
-        metric_alarm_details_response = get_alarm_details(metric_name, metric_namespace)
-        log_name = does_log_start_with_hash(log_group_response_name)
-        cloud_watch_location = "https://eu-south-1.console.aws.amazon.com/cloudwatch/home?region="+my_region+"#logsV2:log-groups/log-group/"+log_name+"/log-events/"+encode_string(log_stream_response_id)
-        #https://eu-south-1.console.aws.amazon.com/cloudwatch/home?region=eu-south-1#logsV2:log-groups/log-group/{Log-group-name}/log-events/ID
-        print(cloud_watch_location)
+        if log_group_response_name != "NotFound":
+            log_stream_response_id = get_log_stream_id(log_group_response_name)
+            metric_alarm_details_response = get_alarm_details(metric_name, metric_namespace)
+            log_name = does_log_start_with_hash(log_group_response_name)
+            cloud_watch_location = "https://"+my_region+".console.aws.amazon.com/cloudwatch/home?region="+my_region+"#logsV2:log-groups/log-group/"+log_name+"/log-events/"+encode_string(log_stream_response_id)
+            #https://eu-south-1.console.aws.amazon.com/cloudwatch/home?region=eu-south-1#logsV2:log-groups/log-group/{Log-group-name}/log-events/ID
+
+        else:
+            cloud_watch_location = "No CloudWatch logs found for this alarm."
+
         message= {
             "AlarmName": result["detail"]["alarmName"],
             "AlarmDescription": result["detail"]["configuration"]["description"],
@@ -51,21 +55,26 @@ def lambda_handler(event, context):
             }
         }
 
-        
         response = sns_client.publish(
-            TopicArn='arn:aws:sns:eu-south-1:434125554427:'+os.environ['AlarmSNSTopicNama'],
+            TopicArn='arn:aws:sns:'+my_region+':' +result["account"] +':'+os.environ['AlarmSNSTopicName'],
             Message=json.dumps(message),
             Subject='CloudWatch Alarm',
         )
 
 # This function will return the CloudWatch Log group name
 def get_log_group_name(metric_name, metric_namespace):
-    response = logs_client.describe_metric_filters(
-        metricName=metric_name,
-        metricNamespace=metric_namespace
-    )
-    
-    log_group_name = response["metricFilters"][0]["logGroupName"]
+    log_group_name = ''
+    try:
+        response = logs_client.describe_metric_filters(
+            metricName=metric_name,
+            metricNamespace=metric_namespace
+        )
+        print(response["metricFilters"])
+
+        log_group_name = response["metricFilters"][0]["logGroupName"]
+    except:
+        log_group_name = "NotFound"
+
     return log_group_name
     
 # This function will return the CloudWatch Log Stream ID triggered by the alarm 
