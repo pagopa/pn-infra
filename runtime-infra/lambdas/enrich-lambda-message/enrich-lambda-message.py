@@ -55,7 +55,7 @@ def lambda_handler(event, context):
             }
         }
 
-        response = sns_client.publish(
+            response = sns_client.publish(
             TopicArn='arn:aws:sns:'+my_region+':' +result["account"] +':'+os.environ['AlarmSNSTopicName'],
             Message=json.dumps(message),
             Subject='CloudWatch Alarm',
