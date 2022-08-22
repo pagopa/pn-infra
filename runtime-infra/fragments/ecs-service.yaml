@@ -778,7 +778,6 @@ Resources:
                     - :root
             Resource: "*"
           - Action:
-              - kinesis:DescribeStream
               - kms:Encrypt*
               - kms:Decrypt*
               - kms:ReEncrypt*
@@ -801,6 +800,7 @@ Resources:
     Properties:
       RoleName: !Sub '${MicroServiceUniqueName}-ExecutionRole'
       AssumeRolePolicyDocument:
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -816,6 +816,7 @@ Resources:
     Properties:
       RoleName: !Sub '${MicroServiceUniqueName}-TaskRole'
       AssumeRolePolicyDocument:
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
