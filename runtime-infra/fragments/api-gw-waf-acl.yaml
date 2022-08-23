@@ -1,0 +1,191 @@
+# This templates creates a WAF Web ACL for the Rest API Gateway
+# Please provide comma-delimited list of names in the same order as
+# the comma-delimited list of vendor names.
+# The priority of the rules is assigned based on their position in the list
+# Template is created for a maximum of 5 Web ACL rules
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: Define the DNS zone for an installation of "Piattaforma Notifiche"
+
+Parameters:
+  WAFName: 
+    Description: "The name of the web ACL."
+    Type: String
+
+  WAFRuleNames:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of WAF Rule names
+    #Default: "AWSManagedRulesBotControlRuleSet, AWSManagedRulesKnownBadInputsRuleSet, AWSManagedRulesAdminProtectionRuleSet, AWSManagedRulesCommonRuleSet"
+
+  WAFRuleVendors:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of WAF Web ACL Vendors
+    #Default: "AWS, AWS, AWS, AWS"
+
+  APIGatewayARN:
+    Type: String
+    Description: The ARN of the Rest API to apply WAF
+
+#Condition to check if the index is out of bound for the !Select function.
+#If an element exists at the index, it will allow you to create the WAF rule resource from the list
+Conditions:
+  WAFRule0Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 0
+          - !Split
+            - ","
+            - !Sub
+              - ${WAFRules},,, 
+              - { WAFRules: !Join [',', !Ref WAFRuleNames] }
+        - ""
+
+  WAFRule1Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 1
+          - !Split
+            - ","
+            - !Sub
+              - ${WAFRules},,, 
+              - { WAFRules: !Join [',', !Ref WAFRuleNames] }
+        - ""
+
+  WAFRule2Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 2
+          - !Split
+            - ","
+            - !Sub
+              - ${WAFRules},,, 
+              - { WAFRules: !Join [',', !Ref WAFRuleNames] }
+        - ""
+
+  WAFRule3Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 3
+          - !Split
+            - ","
+            - !Sub
+              - ${WAFRules},,, 
+              - { WAFRules: !Join [',', !Ref WAFRuleNames] }
+        - ""
+
+  WAFRule4Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 4
+          - !Split
+            - ","
+            - !Sub
+              - ${WAFRules},,, 
+              - { WAFRules: !Join [',', !Ref WAFRuleNames] }
+        - ""
+
+Resources:
+  # AWS WAF Web ACLs
+  ApiWafWebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties: 
+      DefaultAction: 
+        Allow: {}
+      Description: Web Application Firewall for Rest API Gateway 
+      Name: !Ref WAFName
+      Rules: 
+        - !If 
+          - WAFRule0Exists
+          - Name: !Join ["-", [!Select [0, !Ref WAFRuleVendors], !Select [0, !Ref WAFRuleNames]]]
+            OverrideAction: 
+              None: {}
+            Priority: 0
+            Statement: 
+              ManagedRuleGroupStatement:
+                VendorName: !Select [0, !Ref WAFRuleVendors]
+                Name: !Select [0, !Ref WAFRuleNames]
+            VisibilityConfig: 
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ["-", ["MetricFor", !Select [0, !Ref WAFRuleNames]]]
+              SampledRequestsEnabled: true
+          - !Ref "AWS::NoValue"
+        - !If
+          - WAFRule1Exists
+          - Name: !Join ["-", [!Select [1, !Ref WAFRuleVendors], !Select [1, !Ref WAFRuleNames]]]
+            OverrideAction:
+              None: {}
+            Priority: 1
+            Statement:
+              ManagedRuleGroupStatement:
+                VendorName: !Select [1, !Ref WAFRuleVendors]
+                Name: !Select [1, !Ref WAFRuleNames]
+            VisibilityConfig:
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ["-", ["MetricFor", !Select [1, !Ref WAFRuleNames]]]
+              SampledRequestsEnabled: true
+          - !Ref "AWS::NoValue"
+        - !If
+          - WAFRule2Exists
+          - Name: !Join ["-", [!Select [2, !Ref WAFRuleVendors], !Select [2, !Ref WAFRuleNames]]]
+            OverrideAction:
+              None: {}
+            Priority: 2
+            Statement:
+              ManagedRuleGroupStatement:
+                VendorName: !Select [2, !Ref WAFRuleVendors]
+                Name: !Select [2, !Ref WAFRuleNames]
+            VisibilityConfig:
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ["-", ["MetricFor", !Select [2, !Ref WAFRuleNames]]]
+              SampledRequestsEnabled: true
+          - !Ref "AWS::NoValue"
+        - !If
+          - WAFRule3Exists
+          - Name: !Join ["-", [!Select [3, !Ref WAFRuleVendors], !Select [3, !Ref WAFRuleNames]]]
+            OverrideAction:
+              None: {}
+            Priority: 3
+            Statement:
+              ManagedRuleGroupStatement:
+                VendorName: !Select [3, !Ref WAFRuleVendors]
+                Name: !Select [3, !Ref WAFRuleNames]
+            VisibilityConfig:
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ["-", ["MetricFor", !Select [3, !Ref WAFRuleNames]]]
+              SampledRequestsEnabled: true
+          - !Ref "AWS::NoValue"
+        - !If
+          - WAFRule4Exists
+          - Name: !Join ["-", [!Select [4, !Ref WAFRuleVendors], !Select [4, !Ref WAFRuleNames]]]
+            OverrideAction:
+              None: {}
+            Priority: 4
+            Statement:
+              ManagedRuleGroupStatement:
+                VendorName: !Select [4, !Ref WAFRuleVendors]
+                Name: !Select [4, !Ref WAFRuleNames]
+            VisibilityConfig:
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ["-", ["MetricFor", !Select [4, !Ref WAFRuleNames]]]
+              SampledRequestsEnabled: true
+          - !Ref "AWS::NoValue"
+      Scope: "REGIONAL"
+      VisibilityConfig: 
+        CloudWatchMetricsEnabled: true
+        MetricName: !Join ["-", [MetricFor, !Ref WAFName]]
+        SampledRequestsEnabled: true
+
+  # Associate Web ACLs with Rest API
+  ApiWafWebAclAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties: 
+      ResourceArn: !Ref APIGatewayARN
+      WebACLArn: !GetAtt ApiWafWebAcl.Arn
+
+
+
