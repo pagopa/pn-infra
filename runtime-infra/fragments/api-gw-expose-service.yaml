@@ -329,3 +329,8 @@ Outputs:
   ApiGatewayUrlBeta:
     Value: !Sub 'https://${PublicRestApi}.execute-api.${AWS::Region}.amazonaws.com/unique/'
     Description: Base URL for API Requests
+
+  # Rest API ARN used for WAF Configuration
+  APIGatewayARN:
+    Value: !Sub 'arn:aws:apigateway:${AWS::Region}::/restapis/${PublicRestApi}/stages/${PublicRestApiStage}'
+    Description: "Rest API ARN" 
