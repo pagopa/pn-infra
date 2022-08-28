@@ -249,7 +249,7 @@ Resources:
                   - !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
                   - !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
                   - !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
-                  - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueURL"
+                  - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueARN"
   
   ExternalChannelsOutputsQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -272,7 +272,7 @@ Resources:
               - !GetAtt "ExternalChannelsOutputsQueue.Outputs.QueueARN"
               - !GetAtt "ExternalChannels2UserAttributesQueue.Outputs.QueueARN"
               - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueARN"
-              - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueURL"
+              - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueARN"
 
 
   # Send Safe Storage Response to pn-delivery-push
