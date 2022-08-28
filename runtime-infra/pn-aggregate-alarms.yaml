@@ -18,15 +18,30 @@ Parameters:
 
 Resources:
 
+  # - Everything written to this topic is an alarm
+  CompositeAlarmSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: 'Send composite alarm to queue'
+  
+  # - Alarm message queue subscription
+  CompositeAlarmSnsToDowntimeLogsCompositeAlarmQueue:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sqs
+      Endpoint: !Ref DowntimeLogsCompositeAlarmQueueARN
+      Region: !Ref AWS::Region
+      TopicArn: !Ref CompositeAlarmSNSTopic
+
   NotificationInputCompositeAlarm:
     Type: AWS::CloudWatch::CompositeAlarm
     Properties:
       AlarmName: !Sub '${ProjectName}-CompositeAlarm-NotificationInput'
       AlarmRule: !Sub 'ALARM(${ProjectName}-delivery-ErrorFatalLogs-Alarm)'
       AlarmActions:
-        - !Ref DowntimeLogsCompositeAlarmQueueARN
+        - !Ref CompositeAlarmSNSTopic
       OKActions:
-        - !Ref DowntimeLogsCompositeAlarmQueueARN
+        - !Ref CompositeAlarmSNSTopic
   
   NotificationOutputCompositeAlarm:
     Type: AWS::CloudWatch::CompositeAlarm
@@ -34,9 +49,9 @@ Resources:
       AlarmName: !Sub '${ProjectName}-CompositeAlarm-NotificationOutput'
       AlarmRule: !Sub 'ALARM(${ProjectName}-delivery-ErrorFatalLogs-Alarm) OR ALARM(${ProjectName}-delivery-push-ErrorFatalLogs-Alarm)'
       AlarmActions:
-        - !Ref DowntimeLogsCompositeAlarmQueueARN
+        - !Ref CompositeAlarmSNSTopic
       OKActions:
-        - !Ref DowntimeLogsCompositeAlarmQueueARN
+        - !Ref CompositeAlarmSNSTopic
   
   NotificationProgressCompositeAlarm:
     Type: AWS::CloudWatch::CompositeAlarm
@@ -44,6 +59,6 @@ Resources:
       AlarmName: !Sub '${ProjectName}-CompositeAlarm-NotificationProgress'
       AlarmRule: !Sub 'ALARM(${ProjectName}-delivery_push_inputs-DLQ-HasMessage) OR ALARM(${ProjectName}-delivery-push-ErrorFatalLogs-Alarm)'
       AlarmActions:
-        - !Ref DowntimeLogsCompositeAlarmQueueARN
+        - !Ref CompositeAlarmSNSTopic
       OKActions:
-        - !Ref DowntimeLogsCompositeAlarmQueueARN
+        - !Ref CompositeAlarmSNSTopic
