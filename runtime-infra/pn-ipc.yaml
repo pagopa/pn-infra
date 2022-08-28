@@ -176,6 +176,29 @@ Resources:
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
+
+  ### Queue that receive composite alarm information for DOWNTIME LOGS ###
+  CompositeAlarmQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-composite_alarms_for_downtime'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+  
+  ### Queue that receive safe-storage notification to DOWNTIME LOGS ###
+  SafeStorageToDowntimeLogsQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestore_to_downtime_logs'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+  
+
+
   ###                          PN-CORE EVENT BUS                          ###
   ###########################################################################
   # Receive events from SafeStorage and CarrierPigeon (AKA ExternalChannel) 
@@ -226,6 +249,7 @@ Resources:
                   - !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
                   - !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
                   - !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
+                  - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueURL"
   
   ExternalChannelsOutputsQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -234,6 +258,7 @@ Resources:
         - !GetAtt "ExternalChannelsOutputsQueue.Outputs.QueueURL"
         - !GetAtt "ExternalChannels2UserAttributesQueue.Outputs.QueueURL"
         - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueURL"
+        - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueURL"
       PolicyDocument:
         Statement:
           - Sid: "SendEventsToDLQ"
@@ -247,9 +272,10 @@ Resources:
               - !GetAtt "ExternalChannelsOutputsQueue.Outputs.QueueARN"
               - !GetAtt "ExternalChannels2UserAttributesQueue.Outputs.QueueARN"
               - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueARN"
+              - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueURL"
 
 
-  # Send All Safe Storage Response to pn-delivery-push
+  # Send Safe Storage Response to pn-delivery-push
   PnCoreEventBusToSafeStorageResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -258,9 +284,29 @@ Resources:
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "SafeStorageOutcomeEvent" ]
+        detail:
+          documentType: [ 'PN_AAR', 'PN_NOTIFICATION_ATTACHMENTS', 'PN_LEGAL_FACTS' ]
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryPush'
           Arn: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
+  # Send Safe Storage Response to pn-downtime-logs
+  PnCoreEventBusToDowntimeLogsSafeStorageResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route SafeStorage Events to pn-downtime-logs
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "SafeStorageOutcomeEvent" ]
+        detail:
+          documentType: [ 'PN_DOWNTIME_LEGAL_FACTS' ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DowntimeLogs'
+          Arn: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueARN
           InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
@@ -405,6 +451,28 @@ Outputs:
   ExternalChannelsOutputsQueueARN:
     Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
     Description: pn-external-channels output queue ARN
+
+  # Downtime Logs composite alarm queue
+  DowntimeLogsAggregateAlarmQueueName:
+    Value: !GetAtt CompositeAlarmQueue.Outputs.QueueName
+    Description: Aggregate alarm queue name
+  DowntimeLogsAggregateQueueURL:
+    Value: !GetAtt CompositeAlarmQueue.Outputs.QueueURL
+    Description: Aggregate alarm queue URL
+  DowntimeLogsAggregateQueueARN:
+    Value: !GetAtt CompositeAlarmQueue.Outputs.QueueARN
+    Description: Aggregate alarm queue ARN
+  
+  # Downtime Logs safe-storage events
+  DowntimeLogsSafeStorageEventsQueueName:
+    Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueName
+    Description: Events form safe-storage to pn-downtime-logs queue name
+  DowntimeLogsSafeStorageEventsQueueURL:
+    Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueURL
+    Description: Events form safe-storage to pn-downtime-logs queue URL
+  DowntimeLogsSafeStorageEventsQueueARN:
+    Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueARN
+    Description: Events form safe-storage to pn-downtime-logs queue ARN
 
   # pass-thought parameters
   NetworkLoadBalancerLink:
