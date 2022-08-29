@@ -91,6 +91,11 @@ Parameters:
     Description: health check timeout seconds
     Type: Number
     Default: 5
+  
+  HealthyThresholdCount:
+    Description: The number of consecutive health checks successes required before considering an unhealthy target healthy. 
+    Type: Number
+    Default: 5
 
   HealthCheckPath:
     Description: path called for health check
@@ -879,6 +884,7 @@ Resources:
       HealthCheckPort: 8080
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: !Ref HealthCheckTimeout
+      HealthyThresholdCount: !Ref HealthyThresholdCount
       Matcher:
         HttpCode: 200
       TargetGroupAttributes:
