@@ -93,9 +93,17 @@ Parameters:
     Default: 5
   
   HealthyThresholdCount:
-    Description: The number of consecutive health checks successes required before considering an unhealthy target healthy. 
+    Description: |
+      The number of consecutive health checks successes required before considering 
+      an unhealthy target healthy. 
     Type: Number
     Default: 5
+  
+  UnhealthyThresholdCount:
+    Description: |
+      The number of consecutive health check failures required before considering a target unhealthy. 
+    Type: Number
+    Default: 2
 
   HealthCheckPath:
     Description: path called for health check
@@ -885,6 +893,7 @@ Resources:
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: !Ref HealthCheckTimeout
       HealthyThresholdCount: !Ref HealthyThresholdCount
+      UnhealthyThresholdCount: !Ref UnhealthyThresholdCount
       Matcher:
         HttpCode: 200
       TargetGroupAttributes:
