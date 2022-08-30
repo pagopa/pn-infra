@@ -2,7 +2,8 @@
 # Please provide comma-delimited list of names in the same order as
 # the comma-delimited list of vendor names.
 # The priority of the rules is assigned based on their position in the list
-# Template is created for a maximum of 5 Web ACL rules
+# Template is created for a maximum of 5 Web ACL rules and 5 Rest APIs
+# can be adjusted based on requirements for more then 5 WAF rules and API's
 
 AWSTemplateFormatVersion: 2010-09-09
 Description: Define the DNS zone for an installation of "Piattaforma Notifiche"
@@ -22,9 +23,10 @@ Parameters:
     Description: Comma-delimited list of WAF Web ACL Vendors
     #Default: "AWS, AWS, AWS, AWS"
 
-  APIGatewayARN:
-    Type: String
-    Description: The ARN of the Rest API to apply WAF
+  APIGatewayARNs:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of API Gateway ARNS
+    #Default: "arn:aws:apigateway:eu-south-1::/restapis/id/stages/unique, arn:aws:apigateway:eu-south-1::/restapis/id/stages/dev, arn:aws:apigateway:eu-south-1::/restapis/id/stages/Prod"
 
 #Condition to check if the index is out of bound for the !Select function.
 #If an element exists at the index, it will allow you to create the WAF rule resource from the list
@@ -87,6 +89,66 @@ Conditions:
             - !Sub
               - ${WAFRules},,,,, 
               - { WAFRules: !Join [',', !Ref WAFRuleNames] }
+        - ""
+  #Check if the API exists in the position. Do not associate if it does not exist
+  APIGateway0Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 0
+          - !Split
+            - ","
+            - !Sub
+              - ${ApiArn},,,,, 
+              - { ApiArn: !Join [',', !Ref APIGatewayARNs] }
+        - ""
+
+  APIGateway1Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 1
+          - !Split
+            - ","
+            - !Sub
+              - ${ApiArn},,,,, 
+              - { ApiArn: !Join [',', !Ref APIGatewayARNs] }
+        - ""
+
+  APIGateway2Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 2
+          - !Split
+            - ","
+            - !Sub
+              - ${ApiArn},,,,, 
+              - { ApiArn: !Join [',', !Ref APIGatewayARNs] }
+        - ""
+
+  APIGateway3Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 3
+          - !Split
+            - ","
+            - !Sub
+              - ${ApiArn},,,,, 
+              - { ApiArn: !Join [',', !Ref APIGatewayARNs] }
+        - ""
+
+  APIGateway4Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 4
+          - !Split
+            - ","
+            - !Sub
+              - ${ApiArn},,,,, 
+              - { ApiArn: !Join [',', !Ref APIGatewayARNs] }
         - ""
 
 Resources:
@@ -181,10 +243,58 @@ Resources:
         SampledRequestsEnabled: true
 
   # Associate Web ACLs with Rest API
-  ApiWafWebAclAssociation:
+  ApiWafWebAclAssociation0:
+    Condition: APIGateway0Exists
     Type: AWS::WAFv2::WebACLAssociation
     Properties: 
-      ResourceArn: !Ref APIGatewayARN
+      ResourceArn: !If 
+        - APIGateway0Exists
+        - !Select [0, !Ref APIGatewayARNs]
+        - !Ref "AWS::NoValue"
+      WebACLArn: !GetAtt ApiWafWebAcl.Arn
+
+  # Associate Web ACLs with Rest API
+  ApiWafWebAclAssociation1:
+    Type: AWS::WAFv2::WebACLAssociation
+    Condition: APIGateway1Exists
+    Properties: 
+      ResourceArn: !If 
+        - APIGateway1Exists
+        - !Select [1, !Ref APIGatewayARNs]
+        - !Ref "AWS::NoValue"
+      WebACLArn: !GetAtt ApiWafWebAcl.Arn
+
+  # Associate Web ACLs with Rest API
+  ApiWafWebAclAssociation2:
+    Type: AWS::WAFv2::WebACLAssociation
+    Condition: APIGateway2Exists
+    Properties: 
+      ResourceArn: !If 
+        - APIGateway2Exists
+        - !Select [2, !Ref APIGatewayARNs]
+        - !Ref "AWS::NoValue"
+      WebACLArn: !GetAtt ApiWafWebAcl.Arn
+
+  # Associate Web ACLs with Rest API
+  ApiWafWebAclAssociation3:
+    Type: AWS::WAFv2::WebACLAssociation
+    Condition: APIGateway3Exists
+    Properties: 
+      ResourceArn: !If 
+        - APIGateway3Exists
+        - !Select [3, !Ref APIGatewayARNs]
+        - !Ref "AWS::NoValue"
+      WebACLArn: !GetAtt ApiWafWebAcl.Arn
+
+  # Associate Web ACLs with Rest API
+  ApiWafWebAclAssociation4:
+    Condition: APIGateway4Exists
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties: 
+      ResourceArn: !If 
+        - APIGateway4Exists
+        - !Select [4, !Ref APIGatewayARNs]
+        - !Ref "AWS::NoValue"
       WebACLArn: !GetAtt ApiWafWebAcl.Arn
 
 
