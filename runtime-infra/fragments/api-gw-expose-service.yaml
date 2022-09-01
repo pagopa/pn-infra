@@ -334,3 +334,25 @@ Outputs:
   APIGatewayARN:
     Value: !Sub 'arn:aws:apigateway:${AWS::Region}::/restapis/${PublicRestApi}/stages/${PublicRestApiStage}'
     Description: "Rest API ARN" 
+
+  # Authorizer ARN used for set authorization method
+  AuthorizerARN:
+    Value: 
+      Fn::If:
+        - IsB2B
+        - !Ref ApikeyAuthorizer
+        - Fn::If:
+          - IsIO
+          - !Ref IoAuthorizer
+          - !Ref JwtAuthorizer
+    Description: "Authorizer ARN"
+
+  # Rest API definition
+  RestApiId:
+    Value: !Ref PublicRestApi
+    Description: "Rest API ID" 
+
+  # Rest API parent id
+  RootResourceId:
+    Value: !GetAtt PublicRestApi.RootResourceId
+    Description: "Root resource ID" 
