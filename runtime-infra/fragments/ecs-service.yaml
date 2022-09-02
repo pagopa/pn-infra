@@ -482,7 +482,11 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
-          Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
+          Memory:  
+            'Fn::If':
+              - ShouldEnableOtelXRay
+              - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
+              - !Ref MemoryAmount
           MountPoints:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
