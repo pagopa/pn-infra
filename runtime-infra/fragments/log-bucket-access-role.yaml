@@ -39,35 +39,40 @@ Resources:
       Path: /
       Policies:
         -
-          PolicyName: !Sub '${ProjectName}-ingest-logs-to-s3-policy'
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              -
-                Action:
-                  - "s3:PutObject"
-                  - "s3:PutObjectAcl"
-                  - "s3:AbortMultipartUpload"
-                  - "s3:GetBucketLocation"
-                  - "s3:GetObject"
-                  - "s3:ListBucket"
-                  - "s3:ListBucketMultipartUploads"
-                Effect: "Allow"
-                Resource:
-                  - !Sub "arn:aws:s3:::${LogsBucketName}"
-                  - !Sub "arn:aws:s3:::${LogsBucketName}/*"             
-              - 
-                Action:
-                  - "kms:Encrypt"
-                  - "kms:GenerateDataKey"
-                  - "kms:Decrypt"
-                Effect: "Allow"
-                Resource:
-                  - !Sub 'arn:aws:kms:${AWS::Region}:${LogsAccountId}:alias/${LogsBucketName}-key-alias'
-                  - !Sub 'arn:aws:kms:${AWS::Region}:${LogsAccountId}:key/*'
-                Condition:
-                  StringEquals:
-                    "kms:ViaService": !Sub s3.${AWS::Region}.amazonaws.com
+          LogsIngestionPolicy:
+            Condition: ExportLogs
+            Type: "AWS::IAM::ManagedPolicy"
+            Properties:
+              ManagedPolicyName: !Sub '${ProjectName}-ingest-logs-to-s3-policy'
+              PolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Action:
+                      - "s3:PutObject"
+                      - "s3:PutObjectAcl"
+                      - "s3:AbortMultipartUpload"
+                      - "s3:GetBucketLocation"
+                      - "s3:GetObject"
+                      - "s3:ListBucket"
+                      - "s3:ListBucketMultipartUploads"
+                    Effect: "Allow"
+                    Resource:
+                      - !Sub "arn:aws:s3:::${LogsBucketName}"
+                      - !Sub "arn:aws:s3:::${LogsBucketName}/*"
+                  - Action:
+                      - "kms:Encrypt"
+                      - "kms:GenerateDataKey"
+                      - "kms:Decrypt"
+                    Effect: "Allow"
+                    Resource:
+                      - !Sub 'arn:aws:kms:${AWS::Region}:${LogsAccountId}:alias/${LogsBucketName}-key-alias'
+                      - !Sub 'arn:aws:kms:${AWS::Region}:${LogsAccountId}:key/*'
+                    Condition:
+                      StringEquals:
+                        "kms:ViaService": !Sub s3.${AWS::Region}.amazonaws.com
+              Roles:
+                - Ref: "LogsIngestionRole"
+
 
 Outputs:
   LogsIngestionRoleArn:
@@ -76,3 +81,9 @@ Outputs:
        - ExportLogs
        - !GetAtt LogsIngestionRole.Arn
        - ''
+  LogsIngestionPolicyArn:
+    Value:
+      Fn::If:
+        - ExportLogs
+        - !GetAtt LogsIngestionPolicy.Arn
+        - ''
