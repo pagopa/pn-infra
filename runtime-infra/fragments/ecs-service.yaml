@@ -343,19 +343,19 @@ Mappings:
     2GB:
       awsCollector: 512
       sidecarInjector: 512
-      microservice: 1GB
+      microservice: 1536
     4GB:
       awsCollector: 512
       sidecarInjector: 512
-      microservice: 2GB
+      microservice: 3584
     6GB:
       awsCollector: 512
       sidecarInjector: 512
-      microservice: 5GB
+      microservice: 5632
     8GB:
       awsCollector: 512
       sidecarInjector: 512
-      microservice: 7GB
+      microservice: 7680
 
 Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
@@ -482,7 +482,11 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
-          Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
+          Memory:  
+            'Fn::If':
+              - ShouldEnableOtelXRay
+              - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
+              - !Ref MemoryAmount
           MountPoints:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
