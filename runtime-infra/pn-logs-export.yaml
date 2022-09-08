@@ -7,7 +7,7 @@ Parameters:
     Type: String
     Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
       experimental environments without crash official development environment'
-  
+
   LogsBucketName:
     Type: String
     Description: Bucket name where the logs must be exported
@@ -44,15 +44,34 @@ Parameters:
     Description: user-attributes CDC kinesis stream encryption key ARN
 
 
+  OpenSearchClusterEndpoint:
+    Type: String
+    Description: HTTPS endpoint of the destination Open Search cluster
+  OpenSearchIndex:
+    Type: String
+    Description: Index on the destination Open Search domain
+  OpenSearchDeliveryVpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The ID of the VPC where Kinesis Firehose will create ENIs to reach the Open Search cluster
+  OpenSearchDeliverySubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: The IDs of the subnets where Kinesis Firehose will create ENIs to reach the Open Search cluster
+  OpenSearchSecretArn:
+    Type: String
+    Description: The ARN of the secret containing OpenSearch credentials
+
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic for alarms
 
 Resources:
-  
+
   ###             Export cloudwatch logs to Log saving bucket             ###
   ###########################################################################
-  
+
   # - Delivery
   PnDeliveryEcsLogsToExternalBucket:
     Type: AWS::CloudFormation::Stack
@@ -67,7 +86,7 @@ Resources:
         RetentionTag: 'ecs'
         CloudwatchFilterPattern: ''
         StreamRetentionPeriodHours: 24
-  
+
   # - Delivery Push
   PnDeliveryPushEcsLogsToExternalBucket:
     Type: AWS::CloudFormation::Stack
@@ -83,7 +102,7 @@ Resources:
         CloudwatchFilterPattern: ''
         StreamRetentionPeriodHours: 24
         StreamShardCount: 1
-  
+
   # - Mandate
   PnMandateEcsLogsToExternalBucket:
     Type: AWS::CloudFormation::Stack
@@ -98,7 +117,7 @@ Resources:
         RetentionTag: 'ecs'
         CloudwatchFilterPattern: ''
         StreamRetentionPeriodHours: 24
-  
+
   # - User Attributes
   PnUserAttributesEcsLogsToExternalBucket:
     Type: AWS::CloudFormation::Stack
@@ -113,7 +132,7 @@ Resources:
         RetentionTag: 'ecs'
         CloudwatchFilterPattern: ''
         StreamRetentionPeriodHours: 24
-  
+
   # - External Registries
   PnExternalRegistryEcsLogsToExternalBucket:
     Type: AWS::CloudFormation::Stack
@@ -128,11 +147,10 @@ Resources:
         RetentionTag: 'ecs'
         CloudwatchFilterPattern: ''
         StreamRetentionPeriodHours: 24
-  
-  
+
   ###             Export dynamo CDC to Log saving bucket             ###
   ###########################################################################
-  
+
   # Export timeline cdc to Log analysis account
   PnTimelineCdcToExternalBucket:
     Type: AWS::CloudFormation::Stack
@@ -171,7 +189,7 @@ Resources:
         LogsBucketName: !Ref LogsBucketName
         LogsExporterRoleArn: !Ref LogsExporterRoleArn
         StreamNamePrefix: pnMandateCdc
-  
+
   # Export user-attributes cdc to Log analysis account
   PnUserAttributesCdcToExternalBucket:
     Type: AWS::CloudFormation::Stack
@@ -184,3 +202,151 @@ Resources:
         LogsBucketName: !Ref LogsBucketName
         LogsExporterRoleArn: !Ref LogsExporterRoleArn
         StreamNamePrefix: pnUserAttributesCdc
+
+
+  ###             Export cloudwatch logs to OpenSearch                    ###
+  ###########################################################################
+
+  PnDeliveryEcsLogsToOpenSearch:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        StreamNamePrefix: pnDelivery
+        KinesisStreamArn: !GetAtt PnDeliveryEcsLogsToExternalBucket.Outputs.KinesisStreamArn
+        KinesisStreamKMSKeyArn: !GetAtt PnDeliveryEcsLogsToExternalBucket.Outputs.KinesisStreamKMSKeyArn
+        OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
+        OpenSearchIndex: !Ref OpenSearchIndex
+        OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
+        OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
+        OpenSearchSecretArn: !Ref OpenSearchSecretArn
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  PnDeliveryPushEcsLogsToOpenSearch:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        StreamNamePrefix: pnDeliveryPush
+        KinesisStreamArn: !GetAtt PnDeliveryPushEcsLogsToExternalBucket.Outputs.KinesisStreamArn
+        KinesisStreamKMSKeyArn: !GetAtt PnDeliveryPushEcsLogsToExternalBucket.Outputs.KinesisStreamKMSKeyArn
+        OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
+        OpenSearchIndex: !Ref OpenSearchIndex
+        OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
+        OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
+        OpenSearchSecretArn: !Ref OpenSearchSecretArn
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  PnMandateEcsLogsToOpenSearch:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        StreamNamePrefix: pnMandate
+        KinesisStreamArn: !GetAtt PnMandateEcsLogsToExternalBucket.Outputs.KinesisStreamArn
+        KinesisStreamKMSKeyArn: !GetAtt PnMandateEcsLogsToExternalBucket.Outputs.KinesisStreamKMSKeyArn
+        OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
+        OpenSearchIndex: !Ref OpenSearchIndex
+        OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
+        OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
+        OpenSearchSecretArn: !Ref OpenSearchSecretArn
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  PnUserAttributesEcsLogsToOpenSearch:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        StreamNamePrefix: pnUserAttributes
+        KinesisStreamArn: !GetAtt PnUserAttributesEcsLogsToExternalBucket.Outputs.KinesisStreamArn
+        KinesisStreamKMSKeyArn: !GetAtt PnUserAttributesEcsLogsToExternalBucket.Outputs.KinesisStreamKMSKeyArn
+        OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
+        OpenSearchIndex: !Ref OpenSearchIndex
+        OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
+        OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
+        OpenSearchSecretArn: !Ref OpenSearchSecretArn
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  PnExternalRegistryEcsLogsToOpenSearch:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        StreamNamePrefix: pnExternalRegistry
+        KinesisStreamArn: !GetAtt PnExternalRegistryEcsLogsToExternalBucket.Outputs.KinesisStreamArn
+        KinesisStreamKMSKeyArn: !GetAtt PnExternalRegistryEcsLogsToExternalBucket.Outputs.KinesisStreamKMSKeyArn
+        OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
+        OpenSearchIndex: !Ref OpenSearchIndex
+        OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
+        OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
+        OpenSearchSecretArn: !Ref OpenSearchSecretArn
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  PnMandateCdcToOpenSearch:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        StreamNamePrefix: pnMandateCdc
+        KinesisStreamArn: !Ref MandateCdcKinesisStreamArn
+        KinesisStreamKMSKeyArn: !Ref MandateCdcKinesisKeyArn
+        OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
+        OpenSearchIndex: !Ref OpenSearchIndex
+        OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
+        OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
+        OpenSearchSecretArn: !Ref OpenSearchSecretArn
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  PnUserAttributesCdcToOpenSearch:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        StreamNamePrefix: pnUserAttributesCdC
+        KinesisStreamArn: !Ref UserAttributesCdcKinesisStreamArn
+        KinesisStreamKMSKeyArn: !Ref UserAttributesCdcKinesisKeyArn
+        OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
+        OpenSearchIndex: !Ref OpenSearchIndex
+        OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
+        OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
+        OpenSearchSecretArn: !Ref OpenSearchSecretArn
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  PnTimelineCdcToOpenSearch:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        StreamNamePrefix: pnTimelineCdc
+        KinesisStreamArn: !Ref TimelineCdcKinesisStreamArn
+        KinesisStreamKMSKeyArn: !Ref TimelineCdcKinesisKeyArn
+        OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
+        OpenSearchIndex: !Ref OpenSearchIndex
+        OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
+        OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
+        OpenSearchSecretArn: !Ref OpenSearchSecretArn
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  PnNotificationCdcToOpenSearch:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        StreamNamePrefix: pnNotificationCdc
+        KinesisStreamArn: !Ref NotificationCdcKinesisStreamArn
+        KinesisStreamKMSKeyArn: !Ref NotificationCdcKinesisKeyArn
+        OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
+        OpenSearchIndex: !Ref OpenSearchIndex
+        OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
+        OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
+        OpenSearchSecretArn: !Ref OpenSearchSecretArn
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn

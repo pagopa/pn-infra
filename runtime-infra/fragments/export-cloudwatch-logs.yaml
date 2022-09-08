@@ -218,3 +218,13 @@ Resources:
           Fn::GetAtt:
             - KinesisStreamReadOnlyRole
             - Arn
+
+Outputs:
+
+  KinesisStreamArn:
+    Value: !GetAtt CloudwatchLogKinesisStream.Arn
+    Description: ARN of the Kinesis Stream
+
+  KinesisStreamKMSKeyArn:
+    Value: !GetAtt CloudwatchLogKinesisStreamEncryptionKey.Arn
+    Description: ARN of the KMS key used to encrypt Kinesis stream data
