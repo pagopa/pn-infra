@@ -282,7 +282,7 @@ nel passo successivo.
 Tutte le operazioni vanno eseguite nell'account _PN-CORE_ nella regione _eu-south-1_
 
 - Definire un secret contenente le necessarie API-Key seguendo quanto descritto nella pagina
-  confluence _Configurazioni Secrets_ ai paragrafi _pn-ExternalRegistries-Secrets_ e _DataLake_.
+  confluence _Configurazioni Secrets_ ai paragrafi _pn-ExternalRegistries_ e _DataLake_.
 - Tramite console web del servizio AWS CloudFormation effettuare il deploy del template 
   [complete-pipeline.yaml](https://github.com/pagopa/pn-cicd/blob/main/cd-cli/cnf-templates/complete-pipeline.yaml)
 - Nello stack creato al punto precedente localizzare la risorsa "Bucket S3" con nome logico _CdArtifactBucket_
