@@ -1,0 +1,612 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template creates a CloudFormation macro to transform input
+
+Resources:
+  DashboardBodyMacro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Description: CloudFormation macro to transform CloudWatch Dashboard body.
+      FunctionName: !GetAtt TransformFunction.Arn
+      Name: DashboardBodyTransform
+
+  TransformExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /     
+      Policies:
+        - PolicyName: LogsDashboardBodyTransform
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/DashboardBodyTransform'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/DashboardBodyTransform:*'
+
+  TransformFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |         
+          import json
+          import re
+
+          #dashboardList - List of dashboard widgets 
+          #data - Final compiled CloudWatch dashboard body 
+          #y_value - Y axis position of the widget
+          def lambda_handler(event, context):
+              dashboardList = []
+              data = {}
+              y_value=0
+              
+              if (event["params"]["Region"] == ""):
+                  print("Regions is empty")
+              else:
+                  localRegion = event["params"]["Region"]
+              
+                  if event["params"]["AlarmArns"] == [''] or len(event["params"]["AlarmArns"]) == 0:
+                      print("CloudWatch alarm list is empty")
+                  else:
+                      localAlarmArns = event["params"]["AlarmArns"]
+                      validatedList = validateArn(localAlarmArns, 'cloudwatch')
+                      alarmList = alarmWidgetBuiulder(validatedList, y_value ,localRegion)
+                      dashboardList = appendList(dashboardList, alarmList)
+                      y_value = y_value+9
+                      
+                  if event["params"]["QueueArns"] == [''] or len(event["params"]["QueueArns"]) == 0:
+                      print("Queue ARN is empty")
+                  else:
+                      localQueueArns = event["params"]["QueueArns"]
+                      validatedSQS = validateArn(localQueueArns, 'sqs')
+                      queueList = queueWidgetBuilder(validatedSQS, y_value ,localRegion)
+                      dashboardList = appendList(dashboardList, queueList)
+                      y_value=y_value+6
+                      
+                  if event["params"]["RestApiStageArns"] == [''] and event["params"]["RestApiName"] == ['']:
+                      print("REST API list is empty")
+                  else:
+                      localRestApiArns = event["params"]["RestApiStageArns"]
+                      validatedRestAPIArn = validateArn(localRestApiArns, 'apigateway')
+                      localRestAPINames = event["params"]["RestApiName"]
+                      restAPIList = restApiWidgetBuiulder(validatedRestAPIArn, y_value, localRegion, localRestAPINames)
+                      dashboardList = appendList(dashboardList, restAPIList)
+                      y_value=y_value+6
+              
+                  if event["params"]["DynamoDBArns"] == [''] or len(event["params"]["DynamoDBArns"]) == 0:
+                      print("DynamoDB list is empty")
+                  else:
+                      localDynamoDBArns = event["params"]["DynamoDBArns"]
+                      dynamoList = dynamoDBWidgetBuilder(localDynamoDBArns, y_value, localRegion)
+                      dashboardList = appendList(dashboardList, dynamoList)
+                  
+              data["widgets"] = dashboardList
+              
+              response = {
+                  "requestId": event["requestId"],
+                  "status": "success",
+                  "fragment": json.dumps(data)
+              }
+              return response
+          
+          #Helper function - Appends new items to the current list of array ojbjects
+          #currentArray - Current Array list
+          #appendArray - Array to append to current list
+          #Returns The updated current Array list with the appeneded new items
+          def appendList(currentArray, appendArray):
+              for x in appendArray:
+                  currentArray.append(x)
+              
+              return currentArray
+
+          #Cloudwatch Alarm Dashboard widget builder function
+          #Returns the widgets to display for Amazon CloudWatch
+          def alarmWidgetBuiulder(localArray, widgetYvalue, localRegion):
+              myList = []
+              
+              message = textSeperator("Alarm Status Widget", widgetYvalue)
+              myList.append(message)
+              alarmStatusJson={
+                  "type": "alarm",
+                  "x": 0,
+                  "y": widgetYvalue+1,
+                  "width": 24,
+                  "height": 2,
+                  "properties": {
+                      "alarms": localArray
+                  }
+              }
+              myList.append(alarmStatusJson)
+              
+              message = textSeperator("Alarm History Widgets", widgetYvalue+3)
+              myList.append(message)
+
+              width = int(24/len(localArray))
+              
+              for x in range(len(localArray)):
+                  x_value=x*width
+                  myJson={ 
+                      "type": "metric", 
+                      "x": x_value, 
+                      "y": widgetYvalue+4, 
+                      "width": width, 
+                      "height": 5, 
+                      "properties": {
+                          "stacked": False,
+                          "region": localRegion,
+                          "title": splitArnString(localArray[x]) + " Alarm history",
+                          "annotations": {
+                              "alarms": [localArray[x]]
+                          },
+                          "liveData": False,
+                          "view": "timeSeries"
+                      }
+                  }
+                  myList.append(myJson)
+                  
+              return myList
+
+          #SQS Dashboard widget builder function
+          #Returns the widgets to display for Amazon SQS     
+          def queueWidgetBuilder(localQueueArns, widgetYvalue, localRegion):
+              queueList = []
+              message = textSeperator("SQS Widgets", widgetYvalue)
+              queueList.append(message)
+              
+              # queueName = splitArnString(localQueueArns)
+              metrics = getSQSSumMetricArray(localQueueArns,localRegion)
+              
+              queueJson = {
+                  "type": "metric",
+                  "x": 0,
+                  "y": widgetYvalue+1,
+                  "width": 12,
+                  "height": 5,
+                  "properties": {
+                      "metrics": metrics,
+                      "title": "Sum of visible and not visible messages for SQS queues",
+                      "view": "timeSeries",
+                      "stacked": False,
+                      "region": localRegion,
+                      "stat": "Average",
+                      "period": 300
+                  }
+              }
+              
+              queueList.append(queueJson)
+              
+              oldestMessageJson = {
+                  "type": "metric",
+                  "x": 12,
+                  "y": widgetYvalue+1,
+                  "width": 12,
+                  "height": 5,
+                  "properties": {
+                      "metrics": getOldestSQSMessageArray(localQueueArns),
+                      "title": "Approximate Age Of Oldest Message in SQS queues",
+                      "view": "timeSeries",
+                      "stacked": False,
+                      "region": localRegion,
+                      "stat": "Average",
+                      "period": 300
+                  }
+              }
+              queueList.append(oldestMessageJson)
+                  
+              return queueList
+
+          #RestAPI Dashboard widget builder function
+          #Returns the widgets to display for Amazon API Gateway 
+          def restApiWidgetBuiulder(localArray, widgetYvalue, localRegion, localRestAPINames):
+              restList = []
+              message = textSeperator("REST API Widgets", widgetYvalue)
+              restList.append(message)
+              percentageMetrics = getRestPercentageArray(localArray, localRegion, localRestAPINames)
+              for x in range(len(localArray)):
+                  width = int(24/len(localArray))
+                  x_value=x*width
+                  restJson={ 
+                      "type": "metric",
+                      "x": x_value,
+                      "y": widgetYvalue+1,
+                      "width": width,
+                      "height": 5,
+                      "properties": {
+                          "metrics": percentageMetrics[x],
+                          "title": "Percentage REST API 4XX Errors for Stage name: "+getRestAPIStageName(localArray[x]),
+                          "sparkline": True,
+                          "view": "singleValue",
+                          "region": localRegion,
+                          "stat": "Average",
+                          "period": 300
+                      }
+                  }
+                  restList.append(restJson)
+              
+              metrics = getRestAllMetricArray(localArray, localRestAPINames)
+              
+              restHistoryJson={
+                  "height": 5,
+                  "width": 24,
+                  "y": widgetYvalue+5,
+                  "x": 0,
+                  "type": "metric",
+                  "properties": {
+                      "metrics": metrics,
+                      "title": "REST API Latency History",
+                      "view": "timeSeries",
+                      "stacked": False,
+                      "region": localRegion,
+                      "stat": "Average",
+                      "period": 300
+                  }
+              }
+              restList.append(restHistoryJson)
+              
+              return restList
+
+          #DynamoDB Dashboard widget builder function
+          #Returns the widgets to display for Amazon DynamoDB
+          def dynamoDBWidgetBuilder(localArray, widgetYvalue, localRegion):
+              dynamoList = []
+              
+              message = textSeperator("DynamoDB Widgets", widgetYvalue)
+              dynamoList.append(message)
+              
+              for x in range(len(localArray)):
+                  width = int(24/len(localArray))
+                  x_value=x*width
+                  message = textSeperator2(localArray[x], widgetYvalue, width, x_value)
+                  dynamoList.append(message)
+                  latencyJson={
+                      "height": 5,
+                      "width": width,
+                      "y": widgetYvalue+1,
+                      "x": x_value,
+                      "type": "metric",
+                      "properties": {
+                          "metrics": [
+                              [ { "expression": "SELECT SUM(SuccessfulRequestLatency) FROM SCHEMA(\"AWS/DynamoDB\", TableName) WHERE TableName ="+ f"'{localArray[x]}'", "label": "SuccessfulRequest-Latency", "id": "q1", "region": localRegion } ]
+                          ],
+                          "title": "DynamoDB Successful Request Latency for Table:" + localArray[x],
+                          "view": "timeSeries",
+                          "stacked": False,
+                          "region": localRegion,
+                          "stat": "Average",
+                          "period": 300
+                      }
+                  }
+                  dynamoList.append(latencyJson)
+              
+              for x in range(len(localArray)):
+                  width = int(24/len(localArray))
+                  x_value=x*width
+                  userErrorJson={
+                      "height": 5,
+                      "width": width,
+                      "y": widgetYvalue+5,
+                      "x": x_value,
+                      "type": "metric",
+                      "properties": {
+                          "metrics": [
+                              [ { "expression": "SELECT SUM(UserErrors) FROM SCHEMA(\"AWS/DynamoDB\", TableName) WHERE TableName ="+ f"'{localArray[x]}'", "label": "User Errors", "id": "q1", "region": localRegion } ]
+                          ],
+                          "title": "DynamoDB User Errors for Table:" + localArray[x],
+                          "view": "timeSeries",
+                          "stacked": False,
+                          "region": localRegion,
+                          "stat": "Average",
+                          "period": 300
+                      }
+                  }
+                  dynamoList.append(userErrorJson)
+                  
+                  
+              for x in range(len(localArray)):
+                  width = int(24/len(localArray))
+                  x_value=x*width
+                  failedCheckJson={
+                      "height": 5,
+                      "width": width,
+                      "y": widgetYvalue+10,
+                      "x": x_value,
+                      "type": "metric",
+                      "properties": {
+                          "metrics": [
+                              [ { "expression": "SELECT SUM(ConditionalCheckFailedRequests) FROM SCHEMA(\"AWS/DynamoDB\", TableName) WHERE TableName ="+ f"'{localArray[x]}'", "label": "ConditionalCheckFailedRequests", "id": "q1", "region": localRegion } ]
+                          ],
+                          "title": "DynamoDB Conditional Check Failed Requests for Table:" + localArray[x],
+                          "view": "timeSeries",
+                          "stacked": False,
+                          "region": localRegion,
+                          "stat": "Average",
+                          "period": 300
+                      }
+                  }
+                  dynamoList.append(failedCheckJson)
+                  
+              for x in range(len(localArray)):
+                  width = int(24/len(localArray))
+                  x_value=x*width
+                  consumedWritesJson={
+                      "width": width,
+                      "y": widgetYvalue+15,
+                      "x": x_value,
+                      "type": "metric",
+                      "properties": {
+                          "metrics": [
+                              [ "AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", f"{localArray[x]}", { "stat": "Sum", "id": "m1", "visible": False } ],
+                              [ { "expression": "m1/PERIOD(m1)", "label": "Write Capacity", "id": "e1", "color": "#0073BB", "region": localRegion } ]
+                          ],
+                          "title": "DynamoDB Write usage (average units/second) for Table:" + localArray[x],
+                          "view": "timeSeries",
+                          "stacked": False,
+                          "region": localRegion,
+                          "stat": "Average",
+                          "period": 60,
+                          "yAxis": {
+                              "left": {
+                                  "showUnits": False
+                              }
+                          }
+                      }
+                  }
+                  dynamoList.append(consumedWritesJson)
+                  
+              for x in range(len(localArray)):
+                  width = int(24/len(localArray))
+                  x_value=x*width
+                  readWritesJson={
+                      "height": 5,
+                      "width": width,
+                      "y": widgetYvalue+20,
+                      "x": x_value,
+                      "type": "metric",
+                      "properties": {
+                          "metrics": [
+                              [ "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", localArray[x], { "stat": "Sum", "id": "m1", "visible": False } ],
+                              [ { "expression": "m1/PERIOD(m1)", "label": "Read Capacity", "id": "e1", "color": "#0073BB", "region": localRegion } ]
+                          ],
+                          "title": "DynamoDB Read usage (average units/second) for Table:" + localArray[x],
+                          "view": "timeSeries",
+                          "stacked": False,
+                          "region": localRegion,
+                          "stat": "Average",
+                          "period": 60,
+                          "yAxis": {
+                              "left": {
+                                  "showUnits": False
+                              }
+                          }
+                      }
+                  }
+                  dynamoList.append(readWritesJson)
+                  
+              for x in range(len(localArray)):
+                  width = int(24/len(localArray))
+                  x_value=x*width
+                  systemErrorsJson={
+                      "height": 5,
+                      "width": width,
+                      "y": widgetYvalue+25,
+                      "x": x_value,
+                      "type": "metric",
+                      "properties": {
+                          "metrics": [
+                              [ { "expression": "SELECT SUM(SystemErrors) FROM SCHEMA(\"AWS/DynamoDB\", TableName) WHERE TableName ="+ f"'{localArray[x]}'", "label": "SystemErrors", "id": "q1", "region": localRegion } ]
+                          ],
+                          "title": "DynamoDB System errors for Table:" + localArray[x],
+                          "view": "timeSeries",
+                          "stacked": False,
+                          "region": localRegion,
+                          "stat": "Average",
+                          "period": 300
+                      }
+                  }
+                  dynamoList.append(systemErrorsJson)
+                  
+              return dynamoList
+              
+          #Helper function to split the ARN received to get the last parameter of ARN
+          #arn - arn string
+          def splitArnString(arn):
+              stringList = arn.split(":")
+              return stringList[len(stringList)-1]
+
+          #Helper function to return the API stage name from the ARN string
+          #arn - arn string
+          def getRestAPIStageName(arn):
+              newArn = splitArnString(arn)
+              stringList = newArn.split('/')
+              return stringList[len(stringList)-1]
+              
+          #Creates a list of RestApi, filtered to return the latency of each RestApi
+          #localArray - Array of RestApi ARNs
+          #localRestAPINames - Array of RestApi names, matching the ARN
+          #Returns a list of RestApi with latency metric filter applied
+          def getRestAllMetricArray(localArray, localRestAPINames):
+              # [ "AWS/ApiGateway", "", "ApiName", "final-public-api-WEB", "Stage", "unique" ],
+              # [ "...", "PetStore", ".", "dev" ],
+              # [ "...", "TestAPI", ".", "Prod" ]
+              finalList = []
+              for x in range(len(localArray)):
+                  data = [
+                      "AWS/ApiGateway", "Latency", "ApiName", localRestAPINames[x], "Stage", getRestAPIStageName(localArray[x]) 
+                  ]
+                  finalList.append(data)
+              return finalList
+              
+          #Calculates the Sum of visible and not visible messages for SQS queues
+          #localArray - Array of queueARNs
+          #localRegion - Local region of deployment
+          #Returns a list of queues with the sum of the metrics
+          def getSQSSumMetricArray(localArray, localRegion):
+              finalList = []
+              for x in range(len(localArray)):
+                  notVisibleArray = [
+                      "AWS/SQS", "ApproximateNumberOfMessagesNotVisible", "QueueName", splitArnString(localArray[x]), { "id": "m"+str(2*x+1), "visible": False }
+                      ]
+                  visibleArray = [
+                      "AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", splitArnString(localArray[x]), { "id": "m"+str(2*x+2), "visible": False }
+                      ]
+                      
+                  finalList.append(notVisibleArray)
+                  finalList.append(visibleArray)
+              
+              for y in range(len(localArray)):
+                  metric1 = 2*y+1
+                  metric2 = 2*y+2
+                  
+                  metric1String = "m"+str(metric1)
+                  metric2String = "m"+str(metric2)
+                  sumString = "SUM(["+metric1String+","+metric2String+"])"
+                  metricJson=[
+                      {"expression": sumString, "label": splitArnString(localArray[y]), "id": "e"+str(y+1), "region": localRegion} 
+                  ]
+
+                  finalList.append(metricJson)
+              return finalList
+
+          #This function performs a calculation to return the RestApi error count as a percentage
+          #localArray - Array of RestApis ARNs
+          #localRegion - The current region of deployment
+          #localRestApiNames - Array of the RestApi names
+          #Returns A json object containing the restAPI error count as a percentage
+          def getRestPercentageArray(localArray, localRegion, localRestAPINames):
+              finalList = []
+              
+              for x in range(len(localArray)):
+                  dataList = []
+                  metric1 = 2*x+1
+                  metric2 = 2*x+2
+                  
+                  metric1String = "m"+str(metric1)
+                  metric2String = "m"+str(metric2)
+                  
+                  countRestJson=[
+                      "AWS/ApiGateway", "Count", "ApiName", localRestAPINames[x], "Stage", getRestAPIStageName(localArray[x]), { "id": metric1String, "visible": False }
+                      ]
+                      
+                  errorRestJson=[
+                      "AWS/ApiGateway", "4XXError", "ApiName", localRestAPINames[x], "Stage", getRestAPIStageName(localArray[x]), { "id": metric2String, "visible": False }
+                      ]
+
+                  sumString = "SUM("+str(100)+"/["+metric1String+"]*"+metric2String+")"
+                  metricJson=[
+                      { "expression": sumString, "label": localRestAPINames[x], "id": "e"+str(x+1) }
+                  ]
+                  dataList.append(countRestJson)
+                  dataList.append(errorRestJson)
+                  dataList.append(metricJson)
+                  finalList.append(dataList)
+
+              return finalList
+
+          #Function creates an Array of of queues, applying the ApproximateAgeOfOldestMessage metric filter
+          #localArray - Array of Queue ARNs
+          #Returns the array of queues with metric filter
+          def getOldestSQSMessageArray(localArray):
+              finalList = []
+              for x in range(len(localArray)):
+                  metricsArray=[
+                      "AWS/SQS", "ApproximateAgeOfOldestMessage", "QueueName", splitArnString(localArray[x])    
+                  ]
+                  
+                  finalList.append(metricsArray)
+              
+              return finalList
+
+          #Helper function - Adds a text seperator # H1
+          #message - The text to display
+          #textYValue - The text Y position 
+          #Returns the Text as a JSON object
+          def textSeperator(message, textYValue):
+              textJson={
+                  "height": 1,
+                  "width": 24,
+                  "y": textYValue,
+                  "x": 0,
+                  "type": "text",
+                  "properties": {
+                      "markdown": "# "+message
+                  }
+              }
+              
+              return textJson
+
+          #Helper function - Adds a text seperator ## H2
+          #message - The text to display
+          #textYValue - The text Y position 
+          #width - Width of the text
+          #x_value - The text X position
+          #Returns the Text as a JSON object
+          def textSeperator2(message, textYValue, width, x_value):
+              textJson={
+                  "height": 1,
+                  "width": width,
+                  "y": textYValue,
+                  "x": x_value,
+                  "type": "text",
+                  "properties": {
+                      "markdown": "## "+message
+                  }
+              }
+              
+              return textJson
+
+          #Helper function - Uses reges to validate the ARNs received as parameters, with the know AWS ARN pattern
+          #localArray - Array of ARNs
+          #resourceType - The AWS resource type. 
+          def validateArn(localArray, resourceType):
+              correctArn = []
+              
+              if resourceType == 'cloudwatch':
+                  cwPattern = re.compile("^arn:aws([a-zA-Z]+)?:cloudwatch:[a-z]{2}-([a-z]+-)+\d{1,2}:\d{12}:alarm:.{1,255}$")
+                  correctArn = createValidatedList(cwPattern, localArray)
+                  
+              elif resourceType == 'apigateway':
+                  apiPattern = re.compile("^arn:aws:apigateway:[a-zA-Z]+-[a-zA-Z]+-\d::/restapis/id/stages/.{1,255}$")
+                  correctArn = createValidatedList(apiPattern, localArray)
+                  
+              elif resourceType == 'sqs':
+                  sqsPattern = re.compile("^arn:aws:sqs:[a-zA-Z]+-[a-zA-Z]+-\d:\d{12}:.{1,255}$")
+                  correctArn = createValidatedList(sqsPattern, localArray)
+                  
+              return correctArn
+              
+          #Helper function - Compares the current element with the regex, if it matches, it adds the ARN to the returned list
+          #regex - Regular expression used to validate the ARN
+          #localArray - Array of ARNs
+          def createValidatedList(regex, localArray):
+              correctArn = []
+              
+              for k in localArray:
+                  if regex.match(k):
+                      correctArn.append(k)
+                  else:
+                      print(k)
+              return correctArn
+
+      Handler: index.lambda_handler
+      Runtime: python3.9
+      Role: !GetAtt TransformExecutionRole.Arn
+
+  TransformFunctionPermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt TransformFunction.Arn
+      Principal: 'cloudformation.amazonaws.com'

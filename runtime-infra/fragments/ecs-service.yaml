@@ -1082,4 +1082,13 @@ Outputs:
   TaskRoleName:
     Description: Container execution role name, useful to attach custom policies
     Value: !Ref TaskRole
-
+  AutoScalingAlarmArn:
+    Description: ARN of the autoscaling alarm
+    Value:
+      !If
+        - AutoscalingEnabled
+        - !If 
+          - AutoscalingByRestApi
+          - !GetAtt AlarmHighRequests.Arn
+          - !GetAtt AlarmSQS.Arn
+        - ''
