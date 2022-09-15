@@ -189,10 +189,13 @@ Le configurazioni sono composte da due file:
   `microservice-cert-cfg.json` nella stessa posizione e modificato nei seguenti parametri:
   - __VpcId__: Id della VPC PAGOPA-CERT-CONFIDENTIALINFO-VPC
   - __VpcCidr__: CIDR della VPC PAGOPA-CERT-CONFIDENTIALINFO-VPC
-  - __VpcSubnets__: id delle sotto reti PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-A, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-B, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-C
+  - __VpcSubnets__: id, separati da virgola, delle sotto reti PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-A, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-B, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-C
   - __VpcSubnetsRoutingTables__: id della tabella di routing PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-RT
   - __PrivateHostedZone__: id della hosted zone privata `confidential.pn.internal` presente nell'account _CONFIDENTIAL-INFORMATION_,
   - __EcsDefaultSecurityGroup__: id del security group PAGOPA-CERT-CONFIDENTIALINFO-MAIN-SG,
+  - __PDVTokenizerBasePath__ : url del tokenizer del servizio PersonalDataVault di pagopa (ES: "https://api.uat.tokenizer.pdv.pagopa.it/tokenizer/v1")
+  - __PDVUserRegistryBasePath__ : url dello user registry del servizio PersonalDataVault di pagopa 
+      (ES: "https://api.uat.pdv.pagopa.it/user-registry/v1")
 - Una volta aggiornate le configurazioni il repository va aggiornato e memorizzato il __commit-id__
 
 ### Preparazione file con la versioni degli script di deploy (__desired-commit-ids-env.sh__)
@@ -257,7 +260,7 @@ Modificare i seguenti parametri:
   - __VpcCidr__: CIDR della VPC PAGOPA-CERT-PNCORE-VPC
   - __VpcSubnets__: id delle sottoreti PAGOPA-CERT-PNCORE-GENERIC-A, PAGOPA-CERT-PNCORE-GENERIC-B, PAGOPA-CERT-PNCORE-GENERIC-C
   - __VpcSubnetsRoutingTables__: id della tabella di routing PAGOPA-CERT-PNCORE-GENERIC-RT
-  - __PrivateHostedZone__: id della hosted zone privata `core.pn.internal` presente nell'account _CONFIDENTIAL-INFORMATION_,
+  - __PrivateHostedZone__: id della hosted zone privata `core.pn.internal` presente nel servizio Route53 dell'account _CONFIDENTIAL-INFORMATION_,
   - __EcsDefaultSecurityGroup__: id del security group PAGOPA-CERT-PNCORE-MAIN-SG
 - File `pn-infra/runtime-infra/pn-ipc-cert-cfg.json`
   - __ApiCertificateArn__: ARN del certificato per il DNS api.cert.pn.pagopa.it
