@@ -204,7 +204,8 @@ Le configurazioni sono composte da due file:
 ## Procedimento d'installazione
 
 Tutte le operazioni vanno eseguite nell'account _CONFIDENTIAL-INFORMATION_ nella regione _eu-south-1_
-- Definire un secret contenente le necessarie API-Key seguendo quanto descritto nella pagina
+- Definire un secret di tipo "Altro tipo di segreto" in "AWS Secrets Manager". Tale secret avrà nome 
+  "pn-PersonalDataVault-Apikey" e contenente le necessarie API-Key. Il valore è presente nella pagina 
   confluence _Configurazioni Secrets_ al paragrafo _pn-PersonalDataVault-Apikey_.
 - Tramite console web del servizio AWS CloudFormation effettuare il deploy del template 
   [data-vault-only-pipeline.yaml](https://github.com/pagopa/pn-cicd/blob/main/cd-cli/cnf-templates/data-vault-only-pipeline.yaml)
