@@ -183,8 +183,8 @@ nuovo ambiente (ad esempio cert) nella cartella pn-cicd/cd-cli/custom-config/pn-
 Le configurazioni sono composte da due file:
 
 - `cd-cli/custom-config/pn-data-vault/scripts/aws/cfn/once4account/coll.yaml` che va 
-  ricopiato in `cert.yaml` nella stessa posizione ed eventualmente personalizzare l'invio degli allarmi su slack o per mail. 
-  Fondamentale è mantenere gli output esistenti.
+  ricopiato in `cert.yaml` nella stessa posizione ed __eventualmente personalizzare l'invio degli allarmi su slack o per mail. 
+  Fondamentale è mantenere gli output esistenti__.
 - `cd-cli/custom-config/pn-data-vault/scripts/aws/cfn/microservice-coll-cfg.json`che va ricopiato in
   `microservice-cert-cfg.json` nella stessa posizione e modificato nei seguenti parametri:
   - __VpcId__: Id della VPC PAGOPA-CERT-CONFIDENTIALINFO-VPC
