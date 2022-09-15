@@ -227,6 +227,11 @@ Tutte le operazioni vanno eseguite nell'account _CONFIDENTIAL-INFORMATION_ nella
 # Installazione PN-CORE
 
 ## Precondizioni
+  
+### Networking
+Verificare che le subnet della VPC PAGOPA-COLL-PNCORE-VPC possano raggiungere i servizi di 
+SafeStorage e ExternalChannel.
+Gli URL di tali servizi sono reperibili sull'API gateway dell'account del fornitore di tali servizi.
 
 ### Pacchettizzazione Front End
 
