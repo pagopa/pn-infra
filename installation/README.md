@@ -270,8 +270,8 @@ Modificare i seguenti parametri:
   - __VpcSubnetsRoutingTables__: id della tabella di routing PAGOPA-CERT-PNCORE-GENERIC-RT
   - __PrivateHostedZone__: id della hosted zone privata `core.pn.internal` presente nel servizio Route53 dell'account _PN-CORE_,
   - __EcsDefaultSecurityGroup__: id del security group PAGOPA-CERT-PNCORE-MAIN-SG,
-  - __LogsBucketName__: nome del bucket in cui verranno memorizzati i log: "pn-logs-bucket-eu-south-1-<AccountID>-001"
-      dove <AccountID> viene sostituito con il numero dell'account AWS di PN-CORE,
+  - __LogsBucketName__: nome del bucket in cui verranno memorizzati i log: "pn-logs-bucket-eu-south-1-&lt;AccountID&gt;-001"
+      dove &lt;AccountID&gt; viene sostituito con il numero dell'account AWS di PN-CORE,
   - __LogsAccountId__: l numero dell'account AWS di PN-CORE,
   - __BucketSuffix__: "001",
   - __DataLakeAccountId1__: per certificazione va bene il numero dell'account AWS di PN-CORE per prod serve l'account id 
