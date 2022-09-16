@@ -254,19 +254,29 @@ Modificare i seguenti parametri:
   - __SandboxSafeStorageBaseUrl__: valorizzato all'url di safe-storage dello specifico ambiente
   - __ExternalChannelBaseUrl__ che va valorizzato all'url di external-channel dello specifico ambiente
 - File `pn-frontend/aws-cdn-templates/cert/env-cdn.sh`
-  - __ZONE_ID__: valorizzato con l'identificativo della zona cert.pn.pagopa.it
-  - __PORTALE_PA_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale-pa.cert.pn.pagopa.it
+  - __ZONE_ID__: valorizzato con l'identificativo della zona cert.pn.pagopa.it letto dalla console di Route53
+  - __PORTALE_PA_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale-pa.cert.pn.pagopa.it 
+      (letto sulla console del Aws Certificate Manager nella zona 'N. Virginia')
   - __PORTALE_PF_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale.cert.pn.pagopa.it
-  - __PORTALE_PF_LOGIN_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale-login.cert.pn.pagopa.i
+      (letto sulla console del Aws Certificate Manager nella zona 'N. Virginia)'
+  - __PORTALE_PF_LOGIN_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale-login.cert.pn.pagopa.it
+      (letto sulla console del Aws Certificate Manager nella zona 'N. Virginia)'
   - Frammento __&lt;NomeBucketLegalInput&gt;__: sostituito con il nome del bucket utilizzato 
-    per l'input di allegati alle notifiche per lo specifico ambiente
+    per l'input di allegati alle notifiche per lo specifico ambiente (Es: pnsafestoragecert-nonlegal-input-eu-south-1)
 - File `pn-infra/runtime-infra/pn-infra-cert-cfg.json`
   - __VpcId__: Id della VPC PAGOPA-CERT-PNCORE-VPC
   - __VpcCidr__: CIDR della VPC PAGOPA-CERT-PNCORE-VPC
   - __VpcSubnets__: id delle sottoreti PAGOPA-CERT-PNCORE-GENERIC-A, PAGOPA-CERT-PNCORE-GENERIC-B, PAGOPA-CERT-PNCORE-GENERIC-C
   - __VpcSubnetsRoutingTables__: id della tabella di routing PAGOPA-CERT-PNCORE-GENERIC-RT
-  - __PrivateHostedZone__: id della hosted zone privata `core.pn.internal` presente nel servizio Route53 dell'account _CONFIDENTIAL-INFORMATION_,
-  - __EcsDefaultSecurityGroup__: id del security group PAGOPA-CERT-PNCORE-MAIN-SG
+  - __PrivateHostedZone__: id della hosted zone privata `core.pn.internal` presente nel servizio Route53 dell'account _PN-CORE_,
+  - __EcsDefaultSecurityGroup__: id del security group PAGOPA-CERT-PNCORE-MAIN-SG,
+  - __LogsBucketName__: nome del bucket in cui verranno memorizzati i log: "pn-logs-bucket-eu-south-1-<AccountID>-001"
+      dove <AccountID> viene sostituito con il numero dell'account AWS di PN-CORE,
+  - __LogsAccountId__: l numero dell'account AWS di PN-CORE,
+  - __BucketSuffix__: "001",
+  - __DataLakeAccountId1__: per certificazione va bene il numero dell'account AWS di PN-CORE per prod serve l'account id 
+      dell'ambiente di produzione di DataLake che dovrà essere comunicato da PagoPA,
+  - __DataLakeAccountId2__: serve solo in ambiente dev, in tutti gli altri ambienti deve essere valorizzato con '-'
 - File `pn-infra/runtime-infra/pn-ipc-cert-cfg.json`
   - __ApiCertificateArn__: ARN del certificato per il DNS api.cert.pn.pagopa.it
   - __WebApiCertificateArn__: ARN del certificato per il DNS webapi.cert.pn.pagopa.it
@@ -290,8 +300,13 @@ nel passo successivo.
 
 Tutte le operazioni vanno eseguite nell'account _PN-CORE_ nella regione _eu-south-1_
 
-- Definire un secret contenente le necessarie API-Key seguendo quanto descritto nella pagina
+- Definire segreti (Amazon Secret Manager) e parametri (AWS Parameter Store); i valori vanno reperiti dalla pagina
   confluence _Configurazioni Secrets_ ai paragrafi _pn-ExternalRegistries_ e _DataLake_.
+  - un parametro con nome=MockPaList tier=standard type=string dataType=text
+  - un segreto con nome=pn-ExternalRegistries-Secrets secretType=other plaintext=&lt;il valore fornito da pagopa&gt; 
+    gli altri parametri vengono lasciati al default
+  - un segreto con nome=pn-logs-data-lake-role-access secretType=other plaintext=&lt;il valore fornito da pagopa&gt; 
+    gli altri parametri vengono lasciati al default
 - Tramite console web del servizio AWS CloudFormation effettuare il deploy del template 
   [complete-pipeline.yaml](https://github.com/pagopa/pn-cicd/blob/main/cd-cli/cnf-templates/complete-pipeline.yaml)
 - Nello stack creato al punto precedente localizzare la risorsa "Bucket S3" con nome logico _CdArtifactBucket_
