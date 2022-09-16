@@ -47,7 +47,7 @@ function createOrUpdateStack() {
 }
 
 echo "CONFIGURE ZONE"
-createOrUpdateStack $zoneProfile $zoneRegion $zoneStackName dns-zone.yaml "ParameterKey=EnvName,ParameterValue=${envName}"
+createOrUpdateStack $zoneProfile $zoneRegion $zoneStackName dns-zone.yaml "EnvName=${envName}"
 
 echo "List stack outputs"
 outputs=$( aws --profile $zoneProfile --region $zoneRegion cloudformation describe-stacks \
@@ -63,7 +63,7 @@ echo "CONFIGURE DELEGATION"
 if ( [ ! "$envName" = "prod" ] ) then
   nameserverParamValue=$( echo $nameservers | sed -e 's/,/|/g' )
   createOrUpdateStack $parentZoneProfile $parentZoneRegion $parentZoneStackName zone-delegation-recordset.yaml \
-          "ParameterKey=EnvName,ParameterValue=${envName}" "ParameterKey=NameServers,ParameterValue=${nameserverParamValue}"
+          "EnvName=${envName}" "\"NameServers=${nameserverParamValue}\""
 else
   echo " ### delegation of PRODUCTION DNS ZONE needs pull request, see engineering space on confluence"
   echo $outputs > /tmp/dns-pagopa-it-path-proposal.txt
