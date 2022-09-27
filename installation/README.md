@@ -321,3 +321,23 @@ Tutte le operazioni vanno eseguite nell'account _PN-CORE_ nella regione _eu-sout
 Testare il nuovo ambiente di PN
 
 
+
+# Appendici
+
+## Preparare il repository delle configurazioni
+Per gli account _pn-core_ e _pn-confidential-information_ degli ambienti cert e prod sarà necessario definire un repository codecommit contenente i parametri di configurazione per il software in esecuzione in tale account. 
+Eseguire i seguenti passi, sempre usando l'account in questione:
+- [Creare un repository codecommit](https://docs.aws.amazon.com/codecommit/latest/userguide/how-to-create-repository.html)
+  - con nome `<account-name>-configurations-<env-name>` ove _env-name_ può essere `cert` o `prod`.
+- [Configurare un utenza IAM](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html) 
+  - con nome config_reader, 
+  - che abbia diritto di lettura sul repository appena creato (ad esempio associandolo alla managed 
+    policy _AWSCodeCommitReadOnly_).
+- [Generare credenziali CodeCommit](https://docs.aws.amazon.com/codecommit/latest/userguide/setting-up-gc.html) 
+  per l'utenza appena creata.
+- Definire un secret di tipo "Altro tipo di segreto" in "AWS Secrets Manager". Tale secret avrà nome 
+  "pn-configurations-repository" e come valore avraà due coppie chiave valore.
+  - Nella chiave _repositoryUrl_ il valore dell'url di clone del repository con tanto di nume utente e password.
+  - Nella chiave _commitId_ la stringa da utilizzare per il checkout della corretta versione delle configurazioni.
+
+
