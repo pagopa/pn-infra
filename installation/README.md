@@ -117,7 +117,10 @@ __Prerequisiti__: account e profili descritti nel paragrafo _Prima di cominciare
     - Region _eu-south-1_: api.cert.pn.pagopa.it, webapi.cert.pn.pagopa.it, api-io.cert.pn.pagopa.it
     - Region _us-east-1_: portale.cert.pn.pagopa.it, portale-pa.cert.pn.pagopa.it, portale-login.cert.pn.pagopa.it
 
-
+## Accesso agli artefatti di cui fare deploy
+Comunicare a PagoPA gli AccountID di pn-core e pn-configential-information specifici per l'ambiente. 
+Tali account id verranno usati per l'abilitazione in lettura ai repository ECR e ai bucket contenenti 
+gli artefatti dic ui fare deploy.
 
 # Installazione SpidHub
 
@@ -336,7 +339,7 @@ Eseguire i seguenti passi, sempre usando l'account in questione:
   per l'utenza appena creata.
 - Definire un secret di tipo "Altro tipo di segreto" in "AWS Secrets Manager". Tale secret avrà nome 
   "pn-configurations-repository" e come valore avraà due coppie chiave valore.
-  - Nella chiave _repositoryUrl_ il valore dell'url di clone del repository con tanto di nume utente e password.
+  - Nella chiave _repositoryUrl_ il valore dell'url di clone del repository con tanto di nume utente e la versione url encoded della password.
   - Nella chiave _commitId_ la stringa da utilizzare per il checkout della corretta versione delle configurazioni.
 
 
