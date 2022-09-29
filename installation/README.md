@@ -210,6 +210,7 @@ Tutte le operazioni vanno eseguite nell'account _CONFIDENTIAL-INFORMATION_ nella
   confluence _Configurazioni Secrets_ al paragrafo _pn-PersonalDataVault-Apikey_.
 - Tramite console web del servizio AWS CloudFormation effettuare il deploy del template 
   [data-vault-only-pipeline.yaml](https://github.com/pagopa/pn-cicd/blob/main/cd-cli/cnf-templates/data-vault-only-pipeline.yaml)
+  __Va specificato il parametro EnvName__
 - Nello stack creato al punto precedente localizzare la risorsa "Bucket S3" con nome logico _CdArtifactBucket_
 - Nel bucket _CdArtifactBucket_ creare la cartella __config__
 - Nel bucket _CdArtifactBucket_ caricare:
@@ -305,7 +306,8 @@ Tutte le operazioni vanno eseguite nell'account _PN-CORE_ nella regione _eu-sout
   - un segreto con nome=pn-logs-data-lake-role-access secretType=other plaintext=&lt;il valore fornito da pagopa&gt; 
     gli altri parametri vengono lasciati al default
 - Tramite console web del servizio AWS CloudFormation effettuare il deploy del template 
-  [complete-pipeline.yaml](https://github.com/pagopa/pn-cicd/blob/main/cd-cli/cnf-templates/complete-pipeline.yaml)
+  [complete-pipeline.yaml](https://github.com/pagopa/pn-cicd/blob/main/cd-cli/cnf-templates/complete-pipeline.yaml).
+  __Va specificato il parametro EnvName__
 - Nello stack creato al punto precedente localizzare la risorsa "Bucket S3" con nome logico _CdArtifactBucket_
 - Nel bucket _CdArtifactBucket_ creare la cartella __config__
 - Nel bucket _CdArtifactBucket_ caricare:
