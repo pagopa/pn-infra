@@ -196,13 +196,11 @@ Le configurazioni sono composte da due file:
   - __PDVTokenizerBasePath__ : url del tokenizer del servizio PersonalDataVault di pagopa (ES: "https://api.uat.tokenizer.pdv.pagopa.it/tokenizer/v1")
   - __PDVUserRegistryBasePath__ : url dello user registry del servizio PersonalDataVault di pagopa 
       (ES: "https://api.uat.pdv.pagopa.it/user-registry/v1")
-- Una volta aggiornate le configurazioni il repository va aggiornato e memorizzato il __commit-id__
+- Caricare i file sul repository delle configurazioni preparato secondo l'appendice "Preparare il repository delle configurazioni"
 
 ### Preparazione file con la versioni degli script di deploy (__desired-commit-ids-env.sh__)
 - Va scaricato dall'ambiente di collaudo il file 
  `s3://cd-pipeline-datavault-cdartifactbucket-1lf70f4dd9hib/config/desired-commit-ids-env.sh`
- e modificato sostituendo il _cd_scripts_commitId_ con il __commit-id__ memorizzato alla fine del paragrafo
- precedente.
 
 ## Procedimento d'installazione
 
@@ -286,15 +284,14 @@ Modificare i seguenti parametri:
 - File `pn-user-attributes/scripts/aws/cfn/microservice-cert-cfg.json`
   - __ExternalChannelBasePath__: l'url di external-channel per lo specifico ambiente
 
-__N.B.:__ Una volta aggiornate le configurazioni sul repository git memorizzare il __commit-id__ da utilizzare
-nel passo successivo.
+- Caricare i file sul repository delle configurazioni preparato secondo l'appendice "Preparare il repository delle configurazioni".
+  __N.B.__: è un repository separato da quello di pn-confidentialinformation.
 
 ### Preparazione file con i _commit-id_ (__desired-commit-ids-env.sh__)
 
 - Va scaricato dall'ambiente di collaudo il file 
  `s3://cd-pipeline-cdartifactbucket-4z3nf89jd2zy/config/desired-commit-ids-env.sh`
- e va modificato sostituendo il _cd_scripts_commitId_ con il __commit-id__ memorizzato alla fine del paragrafo
- precedente.
+ 
 
 ## Procedimento d'installazione
 
