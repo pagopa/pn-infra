@@ -117,7 +117,10 @@ __Prerequisiti__: account e profili descritti nel paragrafo _Prima di cominciare
     - Region _eu-south-1_: api.cert.pn.pagopa.it, webapi.cert.pn.pagopa.it, api-io.cert.pn.pagopa.it
     - Region _us-east-1_: portale.cert.pn.pagopa.it, portale-pa.cert.pn.pagopa.it, portale-login.cert.pn.pagopa.it
 
-
+## Accesso agli artefatti di cui fare deploy
+Comunicare a PagoPA gli AccountID di pn-core e pn-configential-information specifici per l'ambiente. 
+Tali account id verranno usati per l'abilitazione in lettura ai repository ECR e ai bucket contenenti 
+gli artefatti dic ui fare deploy.
 
 # Installazione SpidHub
 
@@ -196,13 +199,11 @@ Le configurazioni sono composte da due file:
   - __PDVTokenizerBasePath__ : url del tokenizer del servizio PersonalDataVault di pagopa (ES: "https://api.uat.tokenizer.pdv.pagopa.it/tokenizer/v1")
   - __PDVUserRegistryBasePath__ : url dello user registry del servizio PersonalDataVault di pagopa 
       (ES: "https://api.uat.pdv.pagopa.it/user-registry/v1")
-- Una volta aggiornate le configurazioni il repository va aggiornato e memorizzato il __commit-id__
+- Caricare i file sul repository delle configurazioni preparato secondo l'appendice "Preparare il repository delle configurazioni"
 
 ### Preparazione file con la versioni degli script di deploy (__desired-commit-ids-env.sh__)
 - Va scaricato dall'ambiente di collaudo il file 
  `s3://cd-pipeline-datavault-cdartifactbucket-1lf70f4dd9hib/config/desired-commit-ids-env.sh`
- e modificato sostituendo il _cd_scripts_commitId_ con il __commit-id__ memorizzato alla fine del paragrafo
- precedente.
 
 ## Procedimento d'installazione
 
@@ -212,6 +213,7 @@ Tutte le operazioni vanno eseguite nell'account _CONFIDENTIAL-INFORMATION_ nella
   confluence _Configurazioni Secrets_ al paragrafo _pn-PersonalDataVault-Apikey_.
 - Tramite console web del servizio AWS CloudFormation effettuare il deploy del template 
   [data-vault-only-pipeline.yaml](https://github.com/pagopa/pn-cicd/blob/main/cd-cli/cnf-templates/data-vault-only-pipeline.yaml)
+  __Va specificato il parametro EnvName__
 - Nello stack creato al punto precedente localizzare la risorsa "Bucket S3" con nome logico _CdArtifactBucket_
 - Nel bucket _CdArtifactBucket_ creare la cartella __config__
 - Nel bucket _CdArtifactBucket_ caricare:
@@ -286,15 +288,14 @@ Modificare i seguenti parametri:
 - File `pn-user-attributes/scripts/aws/cfn/microservice-cert-cfg.json`
   - __ExternalChannelBasePath__: l'url di external-channel per lo specifico ambiente
 
-__N.B.:__ Una volta aggiornate le configurazioni sul repository git memorizzare il __commit-id__ da utilizzare
-nel passo successivo.
+- Caricare i file sul repository delle configurazioni preparato secondo l'appendice "Preparare il repository delle configurazioni".
+  __N.B.__: è un repository separato da quello di pn-confidentialinformation.
 
 ### Preparazione file con i _commit-id_ (__desired-commit-ids-env.sh__)
 
 - Va scaricato dall'ambiente di collaudo il file 
  `s3://cd-pipeline-cdartifactbucket-4z3nf89jd2zy/config/desired-commit-ids-env.sh`
- e va modificato sostituendo il _cd_scripts_commitId_ con il __commit-id__ memorizzato alla fine del paragrafo
- precedente.
+ 
 
 ## Procedimento d'installazione
 
@@ -308,7 +309,8 @@ Tutte le operazioni vanno eseguite nell'account _PN-CORE_ nella regione _eu-sout
   - un segreto con nome=pn-logs-data-lake-role-access secretType=other plaintext=&lt;il valore fornito da pagopa&gt; 
     gli altri parametri vengono lasciati al default
 - Tramite console web del servizio AWS CloudFormation effettuare il deploy del template 
-  [complete-pipeline.yaml](https://github.com/pagopa/pn-cicd/blob/main/cd-cli/cnf-templates/complete-pipeline.yaml)
+  [complete-pipeline.yaml](https://github.com/pagopa/pn-cicd/blob/main/cd-cli/cnf-templates/complete-pipeline.yaml).
+  __Va specificato il parametro EnvName__
 - Nello stack creato al punto precedente localizzare la risorsa "Bucket S3" con nome logico _CdArtifactBucket_
 - Nel bucket _CdArtifactBucket_ creare la cartella __config__
 - Nel bucket _CdArtifactBucket_ caricare:
@@ -319,5 +321,26 @@ Tutte le operazioni vanno eseguite nell'account _PN-CORE_ nella regione _eu-sout
 ## Test
 
 Testare il nuovo ambiente di PN
+
+
+
+# Appendici
+
+## Preparare il repository delle configurazioni
+Per gli account _pn-core_ e _pn-confidential-information_ degli ambienti cert e prod sarà necessario definire un repository codecommit contenente i parametri di configurazione per il software in esecuzione in tale account. 
+Eseguire i seguenti passi, sempre usando l'account in questione:
+- [Creare un repository codecommit](https://docs.aws.amazon.com/codecommit/latest/userguide/how-to-create-repository.html)
+  - con nome `<account-name>-configurations-<env-name>` ove _env-name_ può essere `cert` o `prod`.
+- [Configurare un utenza IAM](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html) 
+  - con nome config_reader, 
+  - che abbia diritto di lettura sul repository appena creato (ad esempio associandolo alla managed 
+    policy _AWSCodeCommitReadOnly_).
+- [Generare credenziali CodeCommit](https://docs.aws.amazon.com/codecommit/latest/userguide/setting-up-gc.html) 
+  per l'utenza appena creata.
+- Definire un secret di tipo "Altro tipo di segreto" in "AWS Secrets Manager". Tale secret avrà nome 
+  "pn-configurations-repository" e come valore avraà due coppie chiave valore.
+  - Nella chiave _repositoryUrl_ il valore dell'url di clone del repository con tanto di nume utente e 
+    la versione url encoded della password.
+  - Nella chiave _commitId_ la stringa da utilizzare per il checkout della corretta versione delle configurazioni.
 
 
