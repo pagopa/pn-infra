@@ -124,8 +124,8 @@ Resources:
             Ref: DeliveryStreamLogGroup
           LogStreamName:
             Ref: DeliveryStreamLogGroupS3Destination
-        Prefix: !Sub 'cdc/${StreamNamePrefix}/'
-        ErrorOutputPrefix: !Sub 'errors/cdc/${StreamNamePrefix}/'
+        Prefix: !Sub '${StreamNamePrefix}/'
+        ErrorOutputPrefix: !Sub 'errors/${StreamNamePrefix}/'
         RoleARN: !Ref LogsExporterRoleArn
       # DeliveryStreamEncryptionConfigurationInput: 
       #   KeyARN: !GetAtt LogsKinesisDeliveryStreamKmsKey.Arn
