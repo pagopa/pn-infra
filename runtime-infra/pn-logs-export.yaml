@@ -67,6 +67,9 @@ Parameters:
     Type: String
     Description: ARN of the SNS topic for alarms
 
+Conditions:
+  HasOpenSearchExport: !Not [ !Equals [ !Ref OpenSearchClusterEndpoint, "" ] ]
+
 Resources:
 
   ###             Export cloudwatch logs to Log saving bucket             ###
@@ -208,6 +211,7 @@ Resources:
   ###########################################################################
 
   PnDeliveryEcsLogsToOpenSearch:
+    Condition: HasOpenSearchExport
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
@@ -224,6 +228,7 @@ Resources:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   PnDeliveryPushEcsLogsToOpenSearch:
+    Condition: HasOpenSearchExport
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
@@ -240,6 +245,7 @@ Resources:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   PnMandateEcsLogsToOpenSearch:
+    Condition: HasOpenSearchExport
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
@@ -256,6 +262,7 @@ Resources:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   PnUserAttributesEcsLogsToOpenSearch:
+    Condition: HasOpenSearchExport
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
@@ -272,6 +279,7 @@ Resources:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   PnExternalRegistryEcsLogsToOpenSearch:
+    Condition: HasOpenSearchExport
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
@@ -288,6 +296,7 @@ Resources:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   PnMandateCdcToOpenSearch:
+    Condition: HasOpenSearchExport
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
@@ -304,6 +313,7 @@ Resources:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   PnUserAttributesCdcToOpenSearch:
+    Condition: HasOpenSearchExport
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
@@ -320,6 +330,7 @@ Resources:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   PnTimelineCdcToOpenSearch:
+    Condition: HasOpenSearchExport
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
@@ -336,6 +347,7 @@ Resources:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   PnNotificationCdcToOpenSearch:
+    Condition: HasOpenSearchExport
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
