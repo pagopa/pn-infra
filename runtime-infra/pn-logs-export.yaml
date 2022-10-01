@@ -97,7 +97,7 @@ Resources:
         SourceKinesisDataStreamKeyArn: !Ref CdcKinesisSourceStreamKeyArn
         LogsBucketName: !Ref LogsBucketName
         LogsExporterRoleArn: !Ref LogsExporterRoleArn
-        StreamNamePrefix: 'cdc/'
+        StreamNamePrefix: 'cdc'
 
   ###             Export CloudWatch Logs to Log saving bucket             ###
   ###########################################################################
@@ -111,7 +111,7 @@ Resources:
         SourceKinesisDataStreamKeyArn: !Ref LogsKinesisSourceStreamKeyArn
         LogsBucketName: !Ref LogsBucketName
         LogsExporterRoleArn: !Ref LogsExporterRoleArn
-        StreamNamePrefix: 'logs/'
+        StreamNamePrefix: 'logs'
 
   ###                   Export dynamo CDC to OpenSearch                   ###
   ###########################################################################
@@ -122,7 +122,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
-        StreamNamePrefix: pnDelivery
+        StreamNamePrefix: cdc
         KinesisStreamArn: !Ref CdcKinesisSourceStreamArn
         KinesisStreamKMSKeyArn: !Ref CdcKinesisSourceStreamKeyArn
         OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
@@ -141,7 +141,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
-        StreamNamePrefix: pnMandateCdc
+        StreamNamePrefix: logs
         KinesisStreamArn: !Ref LogsKinesisSourceStreamArn
         KinesisStreamKMSKeyArn: !Ref LogsKinesisSourceStreamKeyArn
         OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
