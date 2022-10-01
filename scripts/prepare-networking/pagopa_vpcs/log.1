@@ -1,0 +1,77 @@
+
+######      PARAMETERS      ######
+##################################
+Number of accounts: 3
+=======   Account core   =======
+ - Profile:    profilo_core
+ - Account Id: 558518206506
+ - Region:     eu-south-1
+ - Igress:     4
+ - Egress:     16
+ - Private:    32
+=======   Account helpdesk   =======
+ - Profile:    profilo_helpdesk
+ - Account Id: 498209326947
+ - Region:     eu-south-1
+ - Igress:     2
+ - Egress:     8
+ - Private:    64
+=======   Account confidential   =======
+ - Profile:    profilo_confidential
+ - Account Id: 946373734005
+ - Region:     eu-south-1
+ - Igress:     1
+ - Egress:     7
+ - Private:    65
+
+
+
+#######################################################################
+###                CREATE NETWORKING IN EACH ACCOUNT                ###
+#######################################################################
+
+
+=== AWS ACCOUNT NAME: core
+=======================================
+
+Waiting for changeset to be created..
+
+No changes to deploy. Stack MultiVpc is up to date
+
+ - Private VPC Id:          vpc-0daba44330c5e5edf
+
+
+=== AWS ACCOUNT NAME: helpdesk
+=======================================
+
+Waiting for changeset to be created..
+
+No changes to deploy. Stack MultiVpc is up to date
+
+ - Private VPC Id:          vpc-080d4612b1b333093
+
+
+=== AWS ACCOUNT NAME: confidential
+=======================================
+
+Waiting for changeset to be created..
+
+No changes to deploy. Stack MultiVpc is up to date
+
+ - Private VPC Id:          vpc-0ca1ccf89c81a6a4f
+
+
+
+#######################################################################
+###                             PEERING                             ###
+#######################################################################
+
+
+=== core ==> helpdesk
+==========================================================
+ - Source AWS CLI Profile:: profilo_core
+ - Destination Account Id: 498209326947
+ - From VPC: vpc-0daba44330c5e5edf
+ - To VPC: vpc-080d4612b1b333093
+ - Vpc Peering request Id: pcx-0ff402294db3e01be
+ = Accept the VPC peering

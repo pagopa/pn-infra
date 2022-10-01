@@ -1,19 +1,17 @@
-Guida all'installazione di un singolo ambiente di Piattaforma Notifiche
+# Guida all'installazione di un singolo ambiente di Piattaforma Notifiche
 
-# Prima di cominciare
+Questo repository contiene le fonti che compongono il file [Guida all'installazione di un singolo ambiente di Piattaforma Notifiche](https://github.com/pagopa/pn-infra/tree/develop/installation). Segnala problemi e invia richieste pull per **correzioni di contenuti** qui. 
 
-- Decidere il nome dell'ambiente, ad esempio _cert_
+## Prima di cominciare
+
+Per creare l'ambientes, sono necessarie le seguenti informazioni:
+- Decidere il nome dell'ambiente, ad esempio _cert_, _dev_, _prod_, etc.
 - Creare 4 account AWS:
-  - __SPIDHUB__
-  - __CONFIDENTIAL-INFORMATION__ 
-  - __PN-CORE__
-  - __HELPDESK__
-- Per ognuno di questi account definire un profilo di AWS CLI con i diritti di amministrazione. 
-  In seguito chiameremo questi profili:
-  - __profilo_spidhub__ (relativo all'account _SPIDHUB_)
-  - __profilo_confidential__ (relativo all'account _CONFIDENTIAL-INFORMATION_)
-  - __profilo_core__ (relativo all'account _PN-CORE_)
-  - __profilo_helpdesk__ (relativo all'account _HELPDESK_)
+	- __SPIDHUB__   
+    -  __CONFIDENTIAL-INFORMATION__   
+    -  __PN-CORE__   
+    -  __HELPDESK__
+- Per ognuno di questi account definire un profilo di AWS CLI con i diritti di amministrazione. Per ulteriori informazioni, vedere [qui](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html#cli-role-prepare).
 - Comunicare ai gestori dell'account di Continuous Integration (Team Piattaforma Notifiche core) 
   gli AWS Account id _CONFIDENTIAL-INFORMATION_, _PN-CORE_, _HELPDESK_ allo scopo di abilitare 
   l'accesso agli artefatti da installare.
@@ -28,13 +26,29 @@ Guida all'installazione di un singolo ambiente di Piattaforma Notifiche
 
 # Preparazione Networking
 
-__Prerequisiti__: account e profili descritti nel paragrafo _Prima di cominciare_
+### Prerequisiti
+ - Account e profili descritti nel paragrafo _Prima di cominciare_
+
 
 ## VPC e Transit Gateway
 - Definire networking tra account dello stesso ambiente come da diagramma
   ![Networking interno ad un installazione di Piattaforma Notifiche](hl_network_infra.drawio.png).
   _Già implementato sull'infrastruttura attuale_
 
+### Procedimento
+  - Effettuare il clone del repository github [pn-infra](https://github.com/pagopa/pn-infra)
+  - Effettuare il checkout del branch main
+  - Impostare la directory corrente al folder `scripts/prepare-networking/pagopa_vpcs`
+  - Eseguire lo script bash [create_and_share_private_hosted_zones.sh](../scripts/prepare-networking/pagopa_vpcs/
+prepare_networking_on_dev.sh ) seguendo la seguente parametrizzazione:
+
+    ./prepare_networking_on_dev.sh \
+        -r <aws-region> \
+        -p-core <aws-profile> \
+        -p-helpdesk <aws-profile> \
+        -p-confidential <aws-profile> \
+
+- `<aws-profile>` deve essere sostituito col il _Nome di profile_ creato nel _Prima di cominciare_
 
 ## Zone DNS private
 
@@ -321,7 +335,6 @@ Tutte le operazioni vanno eseguite nell'account _PN-CORE_ nella regione _eu-sout
 ## Test
 
 Testare il nuovo ambiente di PN
-
 
 
 # Appendici

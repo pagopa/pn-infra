@@ -33,7 +33,6 @@ parse_params() {
   igress_num=(4 2 1)
   egress_num=(16 8 7)
   private_num=(32 64 65)
-  account_ids=(558518206506 498209326947 946373734005)
   
   while :; do
     case "${1-}" in
@@ -68,11 +67,22 @@ parse_params() {
   return 0
 }
 
+get_account_number(){
+  account_ids=()
+  for  idx in ${!aws_profiles[@]}; do
+    account_id=$( aws --profile ${aws_profiles[$idx]} --region ${aws_region} \
+    sts get-caller-identity --query "Account" --output text  
+  )
+  account_ids[$idx]=${account_id}
+  done
+}
+
 dump_params(){
   echo ""
   echo "######      PARAMETERS      ######"
   echo "##################################"
   echo "Number of accounts: ${number_of_accounts}"
+  get_account_number
   for  idx in ${!aws_profiles[@]}; do
     echo "=======   Account ${names[$idx]}   ======="
     echo " - Profile:    ${aws_profiles[$idx]}"
@@ -124,6 +134,7 @@ for  idx in ${!aws_profiles[@]}; do
 
   echo ""
   echo " - Private VPC Id:          ${vpc_ids[$idx]}"
+ 
 done
 
 
@@ -208,6 +219,3 @@ function makeOnePeering() {
 makeOnePeering 0 1
 makeOnePeering 0 2
 makeOnePeering 1 2
-
-
-
