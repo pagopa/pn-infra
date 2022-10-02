@@ -8,8 +8,17 @@ function myGunzip( buffer ) {
 
 function decodePayload(b64Str) {
   const payloadBuf = Buffer.from(b64Str, 'base64');
-  const uncompressedBuf = myGunzip( payloadBuf );
-  return JSON.parse(uncompressedBuf.toString('utf8'));
+  
+  let parsedJson;
+  try {
+    parsedJson = JSON.parse(payloadBuf.toString('utf8'));
+  }
+  catch ( err ) {
+    const uncompressedBuf = myGunzip( payloadBuf );
+    parsedJson =  JSON.parse(uncompressedBuf.toString('utf8'));
+  }
+  
+  return parsedJson;
 }
 
 function extractKinesisData(kinesisEvent) {
