@@ -73,9 +73,16 @@ Parameters:
     Type: String
     Description: The ARN of the secret containing OpenSearch credentials
   
-  OpenSearchDeliveryLambdaZipUrl:
+  OpenSearchDeliveryLambdaS3Bucket:
     Type: String
-
+    Description: s3 bucket name of the lambda used to delivery events to opensearch
+  OpenSearchDeliveryLambdaS3Key:
+    Type: String
+    Description: s3 object key of the lambda used to delivery events to opensearch
+  OpenSearchDeliveryLambdaS3ObjectVersion:
+    Type: String
+    Description: s3 object version of the lambda used to delivery events to opensearch
+  
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
@@ -133,7 +140,10 @@ Resources:
         OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
         OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
         OpenSearchSecretArn: !Ref OpenSearchSecretArn
-        OpenSearchDeliveryLambdaZipUrl: !Ref OpenSearchDeliveryLambdaZipUrl
+        OpenSearchDeliveryLambdaS3Bucket: !Ref OpenSearchDeliveryLambdaS3Bucket
+        OpenSearchDeliveryLambdaS3Key: !Ref OpenSearchDeliveryLambdaS3Key
+        OpenSearchDeliveryLambdaS3ObjectVersion: !Ref OpenSearchDeliveryLambdaS3ObjectVersion
+  
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
   
   ###             Export cloudwatch logs to OpenSearch                    ###
@@ -153,7 +163,9 @@ Resources:
         OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
         OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
         OpenSearchSecretArn: !Ref OpenSearchSecretArn
-        OpenSearchDeliveryLambdaZipUrl: !Ref OpenSearchDeliveryLambdaZipUrl
+        OpenSearchDeliveryLambdaS3Bucket: !Ref OpenSearchDeliveryLambdaS3Bucket
+        OpenSearchDeliveryLambdaS3Key: !Ref OpenSearchDeliveryLambdaS3Key
+        OpenSearchDeliveryLambdaS3ObjectVersion: !Ref OpenSearchDeliveryLambdaS3ObjectVersion
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 

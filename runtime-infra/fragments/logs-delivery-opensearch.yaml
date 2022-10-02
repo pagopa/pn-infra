@@ -36,10 +36,16 @@ Parameters:
     Type: List<AWS::EC2::Subnet::Id>
     Description: The IDs of the subnets where Kinesis Firehose will create ENIs to reach the Open Search cluster
 
-  OpenSearchDeliveryLambdaZipUrl:
+  OpenSearchDeliveryLambdaS3Bucket:
     Type: String
-    Description: S3 url of the opensearch delivery lambda zip
-
+    Description: s3 bucket name of the lambda used to delivery events to opensearch
+  OpenSearchDeliveryLambdaS3Key:
+    Type: String
+    Description: s3 object key of the lambda used to delivery events to opensearch
+  OpenSearchDeliveryLambdaS3ObjectVersion:
+    Type: String
+    Description: s3 object version of the lambda used to delivery events to opensearch
+  
   OpenSearchSecretArn:
     Type: String
     Description: ARN of the secret containing the credentials to access the OpenSearch cluster
@@ -121,7 +127,9 @@ Resources:
           - !GetAtt DeliveryLambdaSecGroup.GroupId
         SubnetIds: !Ref OpenSearchDeliverySubnetIds
       Code:
-        ZipFile: !Ref OpenSearchDeliveryLambdaZipUrl
+        S3Bucket: !Ref OpenSearchDeliveryLambdaS3Bucket
+        S3Key: !Ref OpenSearchDeliveryLambdaS3Key
+        S3ObjectVersion: !Ref OpenSearchDeliveryLambdaS3ObjectVersion
 
   DeliveryLambdaKinesisSource:
     Type: AWS::Lambda::EventSourceMapping
