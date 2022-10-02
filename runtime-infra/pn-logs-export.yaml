@@ -107,7 +107,7 @@ Resources:
         SourceKinesisDataStreamKeyArn: !Ref CdcKinesisSourceStreamKeyArn
         LogsBucketName: !Ref LogsBucketName
         LogsExporterRoleArn: !Ref LogsExporterRoleArn
-        StreamNamePrefix: 'cdc'
+        StreamNamePrefix: 'cdcTos3'
 
   ###             Export CloudWatch Logs to Log saving bucket             ###
   ###########################################################################
@@ -121,7 +121,7 @@ Resources:
         SourceKinesisDataStreamKeyArn: !Ref LogsKinesisSourceStreamKeyArn
         LogsBucketName: !Ref LogsBucketName
         LogsExporterRoleArn: !Ref LogsExporterRoleArn
-        StreamNamePrefix: 'logs'
+        StreamNamePrefix: 'logsTos3'
 
   ###                   Export dynamo CDC to OpenSearch                   ###
   ###########################################################################
@@ -132,7 +132,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
-        StreamNamePrefix: cdc
+        StreamNamePrefix: cdcToOpenSearch
         KinesisStreamArn: !Ref CdcKinesisSourceStreamArn
         KinesisStreamKMSKeyArn: !Ref CdcKinesisSourceStreamKeyArn
         OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
@@ -143,7 +143,6 @@ Resources:
         OpenSearchDeliveryLambdaS3Bucket: !Ref OpenSearchDeliveryLambdaS3Bucket
         OpenSearchDeliveryLambdaS3Key: !Ref OpenSearchDeliveryLambdaS3Key
         OpenSearchDeliveryLambdaS3ObjectVersion: !Ref OpenSearchDeliveryLambdaS3ObjectVersion
-  
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
   
   ###             Export cloudwatch logs to OpenSearch                    ###
@@ -155,7 +154,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
-        StreamNamePrefix: logs
+        StreamNamePrefix: logsToOpenSearch
         KinesisStreamArn: !Ref LogsKinesisSourceStreamArn
         KinesisStreamKMSKeyArn: !Ref LogsKinesisSourceStreamKeyArn
         OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
