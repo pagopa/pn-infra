@@ -36,6 +36,10 @@ Parameters:
     Type: List<AWS::EC2::Subnet::Id>
     Description: The IDs of the subnets where Kinesis Firehose will create ENIs to reach the Open Search cluster
 
+  OpenSearchDeliveryLambdaZipUrl:
+    Type: String
+    Description: S3 url of the opensearch delivery lambda zip
+
   OpenSearchSecretArn:
     Type: String
     Description: ARN of the secret containing the credentials to access the OpenSearch cluster
@@ -117,10 +121,7 @@ Resources:
           - !GetAtt DeliveryLambdaSecGroup.GroupId
         SubnetIds: !Ref OpenSearchDeliverySubnetIds
       Code:
-        ZipFile: |
-          exports.handler = async (event, context) => {
-            throw new Error("Lambda code must be uploaded");
-          }
+        ZipFile: !Ref OpenSearchDeliveryLambdaZipUrl
 
   DeliveryLambdaKinesisSource:
     Type: AWS::Lambda::EventSourceMapping
