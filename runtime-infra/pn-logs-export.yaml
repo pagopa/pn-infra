@@ -72,6 +72,9 @@ Parameters:
   OpenSearchSecretArn:
     Type: String
     Description: The ARN of the secret containing OpenSearch credentials
+  
+  OpenSearchDeliveryLambdaZipUrl:
+    Type: String
 
   TemplateBucketBaseUrl:
     Type: String
@@ -130,6 +133,7 @@ Resources:
         OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
         OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
         OpenSearchSecretArn: !Ref OpenSearchSecretArn
+        OpenSearchDeliveryLambdaZipUrl: !Ref OpenSearchDeliveryLambdaZipUrl
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
   
   ###             Export cloudwatch logs to OpenSearch                    ###
@@ -149,6 +153,7 @@ Resources:
         OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
         OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
         OpenSearchSecretArn: !Ref OpenSearchSecretArn
+        OpenSearchDeliveryLambdaZipUrl: !Ref OpenSearchDeliveryLambdaZipUrl
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 
