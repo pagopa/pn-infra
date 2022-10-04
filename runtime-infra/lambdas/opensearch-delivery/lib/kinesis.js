@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer';
 import { gunzipSync } from 'node:zlib';
 
 function myGunzip( buffer ) {
-  return gunzipSync(buffer) 
+  return gunzipSync(buffer);
 }
 
 

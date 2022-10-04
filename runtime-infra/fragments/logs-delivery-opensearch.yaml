@@ -4,12 +4,12 @@ AWSTemplateFormatVersion: "2010-09-09"
 Parameters:
 
   ProjectName:
-    Type: String 
+    Type: String
     Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
       experimental environments without crash official development environment'
 
   StreamNamePrefix:
-    Type: String 
+    Type: String
     Description: to distinguish different log groups streams
 
   KinesisStreamArn:
@@ -81,7 +81,7 @@ Resources:
                   - kinesis:DescribeStreamSummary
                   - kinesis:GetShardIterator
                   - kinesis:GetRecords
-                  - kinesis:ListShards    
+                  - kinesis:ListShards
                   - kinesis:ListStreams
                   - kinesis:SubscribeToShard
                 Resource: !Ref KinesisStreamArn
