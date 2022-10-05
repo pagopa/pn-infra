@@ -7,7 +7,7 @@ Parameters:
     Type: String
     Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
       experimental environments without crash official development environment'
-  
+
   LogsBucketName:
     Type: String
     Description: Bucket name where the logs must be exported
@@ -15,172 +15,127 @@ Parameters:
     Type: String
     Description: ARN of the role used to write to external logs bucket
 
-  TimelineCdcKinesisStreamArn:
+  CdcKinesisSourceStreamArn:
+    Description: 'Kinesis source CDC stream ARN'
     Type: String
-    Description: timeline CDC kinesis stream ARN
-  TimelineCdcKinesisKeyArn:
+  CdcKinesisSourceStreamKeyArn:
+    Description: 'Kinesis source CDC stream crypto key ARN'
     Type: String
-    Description: timeline CDC kinesis stream encryption key ARN
+  
+  LogsKinesisSourceStreamArn:
+    Description: 'Kinesis source Logs stream ARN'
+    Type: String
+  LogsKinesisSourceStreamKeyArn:
+    Description: 'Kinesis source Logs stream crypto key ARN'
+    Type: String
 
-  NotificationCdcKinesisStreamArn:
+  OpenSearchClusterEndpoint:
     Type: String
-    Description: notification CDC kinesis stream ARN
-  NotificationCdcKinesisKeyArn:
+    Description: HTTPS endpoint of the destination Open Search cluster
+  OpenSearchIndex:
     Type: String
-    Description: notification CDC kinesis stream encryption key ARN
-
-  MandateCdcKinesisStreamArn:
+    Description: Index on the destination Open Search domain
+  OpenSearchDeliveryVpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The ID of the VPC where Kinesis Firehose will create ENIs to reach the Open Search cluster
+  OpenSearchDeliverySubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: The IDs of the subnets where Kinesis Firehose will create ENIs to reach the Open Search cluster
+  OpenSearchSecretArn:
     Type: String
-    Description: mandate CDC kinesis stream ARN
-  MandateCdcKinesisKeyArn:
+    Description: The ARN of the secret containing OpenSearch credentials
+  
+  OpenSearchDeliveryLambdaS3Bucket:
     Type: String
-    Description: mandate CDC kinesis stream encryption key ARN
-
-  UserAttributesCdcKinesisStreamArn:
+    Description: s3 bucket name of the lambda used to delivery events to opensearch
+  OpenSearchDeliveryLambdaS3Key:
     Type: String
-    Description: user-attributes CDC kinesis stream ARN
-  UserAttributesCdcKinesisKeyArn:
+    Description: s3 object key of the lambda used to delivery events to opensearch
+  OpenSearchDeliveryLambdaS3ObjectVersion:
     Type: String
-    Description: user-attributes CDC kinesis stream encryption key ARN
-
-
+    Description: s3 object version of the lambda used to delivery events to opensearch
+  
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic for alarms
+
+Conditions:
+  HasOpenSearchExport: !Not [ !Equals [ !Ref OpenSearchClusterEndpoint, "" ] ]
 
 Resources:
-  
-  ###             Export cloudwatch logs to Log saving bucket             ###
-  ###########################################################################
-  
-  # - Delivery
-  PnDeliveryEcsLogsToExternalBucket:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
-      Parameters:
-        ProjectName: !Ref ProjectName
-        LogsBucketName: !Ref LogsBucketName
-        LogsExporterRoleArn: !Ref LogsExporterRoleArn
-        StreamNamePrefix: pnDelivery
-        LogGroupName: '/ecs/pn-delivery'
-        RetentionTag: 'ecs'
-        CloudwatchFilterPattern: ''
-        StreamRetentionPeriodHours: 24
-  
-  # - Delivery Push
-  PnDeliveryPushEcsLogsToExternalBucket:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
-      Parameters:
-        ProjectName: !Ref ProjectName
-        LogsBucketName: !Ref LogsBucketName
-        LogsExporterRoleArn: !Ref LogsExporterRoleArn
-        StreamNamePrefix: pnDeliveryPush
-        LogGroupName: '/ecs/pn-delivery-push'
-        RetentionTag: 'ecs'
-        CloudwatchFilterPattern: ''
-        StreamRetentionPeriodHours: 24
-        StreamShardCount: 1
-  
-  # - Mandate
-  PnMandateEcsLogsToExternalBucket:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
-      Parameters:
-        ProjectName: !Ref ProjectName
-        LogsBucketName: !Ref LogsBucketName
-        LogsExporterRoleArn: !Ref LogsExporterRoleArn
-        StreamNamePrefix: pnMandate
-        LogGroupName: '/ecs/pn-mandate'
-        RetentionTag: 'ecs'
-        CloudwatchFilterPattern: ''
-        StreamRetentionPeriodHours: 24
-  
-  # - User Attributes
-  PnUserAttributesEcsLogsToExternalBucket:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
-      Parameters:
-        ProjectName: !Ref ProjectName
-        LogsBucketName: !Ref LogsBucketName
-        LogsExporterRoleArn: !Ref LogsExporterRoleArn
-        StreamNamePrefix: pnUserAttributes
-        LogGroupName: '/ecs/pn-UserAttributes'
-        RetentionTag: 'ecs'
-        CloudwatchFilterPattern: ''
-        StreamRetentionPeriodHours: 24
-  
-  # - External Registries
-  PnExternalRegistryEcsLogsToExternalBucket:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/export-cloudwatch-logs.yaml"
-      Parameters:
-        ProjectName: !Ref ProjectName
-        LogsBucketName: !Ref LogsBucketName
-        LogsExporterRoleArn: !Ref LogsExporterRoleArn
-        StreamNamePrefix: pnExternalRegistry
-        LogGroupName: '/ecs/pn-ExternalRegistry'
-        RetentionTag: 'ecs'
-        CloudwatchFilterPattern: ''
-        StreamRetentionPeriodHours: 24
-  
-  
+
   ###             Export dynamo CDC to Log saving bucket             ###
   ###########################################################################
-  
-  # Export timeline cdc to Log analysis account
-  PnTimelineCdcToExternalBucket:
+  CdcToExternalBucket:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
-        SourceKinesisDataStreamArn: !Ref TimelineCdcKinesisStreamArn
-        SourceKinesisDataStreamKeyArn: !Ref TimelineCdcKinesisKeyArn
+        SourceKinesisDataStreamArn: !Ref CdcKinesisSourceStreamArn
+        SourceKinesisDataStreamKeyArn: !Ref CdcKinesisSourceStreamKeyArn
         LogsBucketName: !Ref LogsBucketName
         LogsExporterRoleArn: !Ref LogsExporterRoleArn
-        StreamNamePrefix: pnTimelineCdc
+        StreamNamePrefix: 'cdcTos3'
 
-  # Export notification cdc to Log analysis account
-  PnNotificationCdcToExternalBucket:
+  ###             Export CloudWatch Logs to Log saving bucket             ###
+  ###########################################################################
+  LogsToExternalBucket:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
-        SourceKinesisDataStreamArn: !Ref NotificationCdcKinesisStreamArn
-        SourceKinesisDataStreamKeyArn: !Ref NotificationCdcKinesisKeyArn
+        SourceKinesisDataStreamArn: !Ref LogsKinesisSourceStreamArn
+        SourceKinesisDataStreamKeyArn: !Ref LogsKinesisSourceStreamKeyArn
         LogsBucketName: !Ref LogsBucketName
         LogsExporterRoleArn: !Ref LogsExporterRoleArn
-        StreamNamePrefix: pnNotificationCdc
+        StreamNamePrefix: 'logsTos3'
 
-  # Export mandate cdc to Log analysis account
-  PnMandateCdcToExternalBucket:
+  ###                   Export dynamo CDC to OpenSearch                   ###
+  ###########################################################################
+  CdcToOpenSearch:
+    Condition: HasOpenSearchExport
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket.yaml"
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
-        SourceKinesisDataStreamArn: !Ref MandateCdcKinesisStreamArn
-        SourceKinesisDataStreamKeyArn: !Ref MandateCdcKinesisKeyArn
-        LogsBucketName: !Ref LogsBucketName
-        LogsExporterRoleArn: !Ref LogsExporterRoleArn
-        StreamNamePrefix: pnMandateCdc
+        StreamNamePrefix: cdcToOpenSearch
+        KinesisStreamArn: !Ref CdcKinesisSourceStreamArn
+        KinesisStreamKMSKeyArn: !Ref CdcKinesisSourceStreamKeyArn
+        OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
+        OpenSearchIndex: !Ref OpenSearchIndex
+        OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
+        OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
+        OpenSearchSecretArn: !Ref OpenSearchSecretArn
+        OpenSearchDeliveryLambdaS3Bucket: !Ref OpenSearchDeliveryLambdaS3Bucket
+        OpenSearchDeliveryLambdaS3Key: !Ref OpenSearchDeliveryLambdaS3Key
+        OpenSearchDeliveryLambdaS3ObjectVersion: !Ref OpenSearchDeliveryLambdaS3ObjectVersion
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
   
-  # Export user-attributes cdc to Log analysis account
-  PnUserAttributesCdcToExternalBucket:
+  ###             Export cloudwatch logs to OpenSearch                    ###
+  ###########################################################################
+  LogsToOpenSearch:
+    Condition: HasOpenSearchExport
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket.yaml"
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
-        SourceKinesisDataStreamArn: !Ref UserAttributesCdcKinesisStreamArn
-        SourceKinesisDataStreamKeyArn: !Ref UserAttributesCdcKinesisKeyArn
-        LogsBucketName: !Ref LogsBucketName
-        LogsExporterRoleArn: !Ref LogsExporterRoleArn
-        StreamNamePrefix: pnUserAttributesCdc
+        StreamNamePrefix: logsToOpenSearch
+        KinesisStreamArn: !Ref LogsKinesisSourceStreamArn
+        KinesisStreamKMSKeyArn: !Ref LogsKinesisSourceStreamKeyArn
+        OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
+        OpenSearchIndex: !Ref OpenSearchIndex
+        OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
+        OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
+        OpenSearchSecretArn: !Ref OpenSearchSecretArn
+        OpenSearchDeliveryLambdaS3Bucket: !Ref OpenSearchDeliveryLambdaS3Bucket
+        OpenSearchDeliveryLambdaS3Key: !Ref OpenSearchDeliveryLambdaS3Key
+        OpenSearchDeliveryLambdaS3ObjectVersion: !Ref OpenSearchDeliveryLambdaS3ObjectVersion
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
