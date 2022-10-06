@@ -57,6 +57,14 @@ Parameters:
     Description: "The number of seconds that Amazon SQS retains a message. You can specify an integer 
       value from 60 seconds (1 minute) to 1,209,600 seconds (14 days)."
   
+  CdcStreamRetentionHours:
+    Type: Number
+    Description: 'Change Data Capture Kinesis Data Stream retention period in hours'
+
+  LogsStreamRetentionHours:
+    Type: Number
+    Description: 'Cloudwatch Logs Kinesis Data Stream retention period in hours'
+
   Version:
     Type: String
     Description: 'keep track of used projects commitIds'
@@ -87,6 +95,8 @@ Parameters:
 #  LogsBucketKmsKeyArn:
 #    Type: String
   LogsExporterRoleArn:
+    Type: String
+  LogsExporterPolicyArn:
     Type: String
 
 Resources:
@@ -395,6 +405,24 @@ Resources:
       OKActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
+  ## KINESIS SOURCE STREAM FOR Change Data Capture
+  CdcKinesisSourceStream:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-stream.yaml"
+      Parameters:
+        StreamName: !Sub '${ProjectName}-cdc-stream'
+        StreamRetentionPeriodHours: !Ref CdcStreamRetentionHours
+  
+  ## KINESIS SOURCE STREAM FOR Logs
+  LogsKinesisSourceStream:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-stream.yaml"
+      Parameters:
+        StreamName: !Sub '${ProjectName}-logs-stream'
+        StreamRetentionPeriodHours: !Ref LogsStreamRetentionHours
+  
 
 Outputs:
   # Web API for browsers and B2B
@@ -456,10 +484,10 @@ Outputs:
   DowntimeLogsAggregateAlarmQueueName:
     Value: !GetAtt CompositeAlarmQueue.Outputs.QueueName
     Description: Aggregate alarm queue name
-  DowntimeLogsAggregateQueueURL:
+  DowntimeLogsAggregateAlarmQueueURL:
     Value: !GetAtt CompositeAlarmQueue.Outputs.QueueURL
     Description: Aggregate alarm queue URL
-  DowntimeLogsAggregateQueueARN:
+  DowntimeLogsAggregateAlarmQueueARN:
     Value: !GetAtt CompositeAlarmQueue.Outputs.QueueARN
     Description: Aggregate alarm queue ARN
   
@@ -473,6 +501,29 @@ Outputs:
   DowntimeLogsSafeStorageEventsQueueARN:
     Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueARN
     Description: Events form safe-storage to pn-downtime-logs queue ARN
+
+  # Kinesis Source Stream containing the DynamoDB Change Data Capture events
+  CdcKinesisSourceStreamName:
+    Description: 'Kinesis source CDC stream name'
+    Value: !GetAtt CdcKinesisSourceStream.Outputs.KinesisStreamName
+  CdcKinesisSourceStreamArn:
+    Description: 'Kinesis source CDC stream ARN'
+    Value: !GetAtt CdcKinesisSourceStream.Outputs.KinesisStreamArn
+  CdcKinesisSourceStreamKeyArn:
+    Description: 'Kinesis source CDC stream crypto key ARN'
+    Value: !GetAtt CdcKinesisSourceStream.Outputs.KinesisStreamKeyArn
+
+  # Kinesis Source Stream containing the CloudWatch Logs
+  LogsKinesisSourceStreamName:
+    Description: 'Kinesis source Logs stream name'
+    Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamName
+  LogsKinesisSourceStreamArn:
+    Description: 'Kinesis source Logs stream ARN'
+    Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamArn
+  LogsKinesisSourceStreamKeyArn:
+    Description: 'Kinesis source Logs stream crypto key ARN'
+    Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamKeyArn
+
 
   # pass-thought parameters
   NetworkLoadBalancerLink:
@@ -501,3 +552,5 @@ Outputs:
   #  Value: !Ref LogsBucketKmsKeyArn
   LogsExporterRoleArn:
     Value: !Ref LogsExporterRoleArn
+  LogsExporterPolicyArn:
+    Value: !Ref LogsExporterPolicyArn

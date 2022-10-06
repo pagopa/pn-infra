@@ -10,3 +10,4 @@ TODO: da cancellare insieme a runtime-infra dopo periodo di rodaggio nuova infra
 # "Piattaforma Notifiche" cloud infrastructure definition
 - [PN runtime infrastructure definition](runtime-infra-new/)
 
+

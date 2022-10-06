@@ -352,7 +352,8 @@ Eseguire i seguenti passi, sempre usando l'account in questione:
   per l'utenza appena creata.
 - Definire un secret di tipo "Altro tipo di segreto" in "AWS Secrets Manager". Tale secret avrà nome 
   "pn-configurations-repository" e come valore avraà due coppie chiave valore.
-  - Nella chiave _repositoryUrl_ il valore dell'url di clone del repository con tanto di nume utente e la versione url encoded della password.
+  - Nella chiave _repositoryUrl_ il valore dell'url di clone del repository con tanto di nume utente e 
+    la versione url encoded della password.
   - Nella chiave _commitId_ la stringa da utilizzare per il checkout della corretta versione delle configurazioni.
 
 
