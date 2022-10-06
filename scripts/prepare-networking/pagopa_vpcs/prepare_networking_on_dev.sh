@@ -15,7 +15,7 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 usage() {
       cat <<EOF
-    Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] -r <aws-region> -p-core <aws-profile> -p-helpdesk <aws-profile> -p-confidential <aws-profile>
+    Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] -r <aws-region> -p-core <aws-profile> -p-helpdesk <aws-profile> -p-confidential <aws-profile> -p-spidhub <aws-profile>
 
     [-h]                      : this help message
     [-v]                      : verbose mode
@@ -24,7 +24,7 @@ EOF
   exit 1
 }
 
-names=(core helpdesk confidential)
+names=(core helpdesk confidential spidhub)
 
 parse_params() {
   # default values of variables set from params
@@ -52,6 +52,10 @@ parse_params() {
       ;;
     -p-confidential ) 
       aws_profiles[2]="${2-}"
+      shift
+      ;;
+    -p-spidhub )
+      aws_profiles[3]="${2-}"
       shift
       ;;
     -?*) usage ;;
