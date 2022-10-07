@@ -11,7 +11,13 @@ Per creare l'ambientes, sono necessarie le seguenti informazioni:
     -  __CONFIDENTIAL-INFORMATION__   
     -  __PN-CORE__   
     -  __HELPDESK__
-- Per ognuno di questi account definire un profilo di AWS CLI con i diritti di amministrazione. Per ulteriori informazioni, vedere [qui](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html#cli-role-prepare).
+- Per ognuno di questi account definire un profilo di AWS CLI con i diritti di amministrazione. 
+  In seguito chiameremo questi profili:
+  - __profilo_spidhub__ (relativo all'account _SPIDHUB_)
+  - __profilo_confidential__ (relativo all'account _CONFIDENTIAL-INFORMATION_)
+  - __profilo_core__ (relativo all'account _PN-CORE_)
+  - __profilo_helpdesk__ (relativo all'account _HELPDESK_)    
+ Per ulteriori informazioni, vedere [qui](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html#cli-role-prepare).
 - Comunicare ai gestori dell'account di Continuous Integration (Team Piattaforma Notifiche core) 
   gli AWS Account id _CONFIDENTIAL-INFORMATION_, _PN-CORE_, _HELPDESK_ allo scopo di abilitare 
   l'accesso agli artefatti da installare.

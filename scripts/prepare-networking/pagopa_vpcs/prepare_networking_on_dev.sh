@@ -30,9 +30,9 @@ parse_params() {
   # default values of variables set from params
   aws_profiles=()
   aws_region="eu-south-1"
-  igress_num=(4 2 1)
-  egress_num=(16 8 7)
-  private_num=(32 64 65)
+  igress_num=(4 2 1 6)
+  egress_num=(16 8 7 9)
+  private_num=(32 64 65 66)
   
   while :; do
     case "${1-}" in
