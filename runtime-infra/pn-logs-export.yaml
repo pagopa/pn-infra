@@ -35,10 +35,10 @@ Parameters:
   OpenSearchIndex:
     Type: String
     Description: Index on the destination Open Search domain
-  OpenSearchDeliveryVpcId:
+  VpcId:
     Type: AWS::EC2::VPC::Id
     Description: The ID of the VPC where Kinesis Firehose will create ENIs to reach the Open Search cluster
-  OpenSearchDeliverySubnetIds:
+  VpcSubnets:
     Type: List<AWS::EC2::Subnet::Id>
     Description: The IDs of the subnets where Kinesis Firehose will create ENIs to reach the Open Search cluster
   OpenSearchSecretArn:
@@ -109,8 +109,8 @@ Resources:
         KinesisStreamKMSKeyArn: !Ref CdcKinesisSourceStreamKeyArn
         OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
         OpenSearchIndex: !Ref OpenSearchIndex
-        OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
-        OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
+        OpenSearchDeliveryVpcId: !Ref VpcId
+        OpenSearchDeliverySubnetIds: !Join [",", !Ref VpcSubnets]
         OpenSearchSecretArn: !Ref OpenSearchSecretArn
         OpenSearchDeliveryLambdaS3Bucket: !Ref OpenSearchDeliveryLambdaS3Bucket
         OpenSearchDeliveryLambdaS3Key: !Ref OpenSearchDeliveryLambdaS3Key
@@ -131,8 +131,8 @@ Resources:
         KinesisStreamKMSKeyArn: !Ref LogsKinesisSourceStreamKeyArn
         OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
         OpenSearchIndex: !Ref OpenSearchIndex
-        OpenSearchDeliveryVpcId: !Ref OpenSearchDeliveryVpcId
-        OpenSearchDeliverySubnetIds: !Join [",", !Ref OpenSearchDeliverySubnetIds]
+        OpenSearchDeliveryVpcId: !Ref VpcId
+        OpenSearchDeliverySubnetIds: !Join [",", !Ref VpcSubnets]
         OpenSearchSecretArn: !Ref OpenSearchSecretArn
         OpenSearchDeliveryLambdaS3Bucket: !Ref OpenSearchDeliveryLambdaS3Bucket
         OpenSearchDeliveryLambdaS3Key: !Ref OpenSearchDeliveryLambdaS3Key
