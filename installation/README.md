@@ -147,6 +147,7 @@ gli artefatti dic ui fare deploy.
 ## Prerequisiti
   - aver completato con successo gli step precedenti.
   - Avere un api-key di accesso a UserRegistry. Vedere pagina "Configurazioni Secrets" di confluence
+  - [Docker](https://www.docker.com/) o altro servizio per creare immagini di container.
 
 ## Scopo
 Installare il sistema di login utilizzato dai destinatari delle notifiche.
@@ -157,6 +158,7 @@ Installare il sistema di login utilizzato dai destinatari delle notifiche.
   contenenti le configurazioni, una per ambiente. Allo stato attuale i nuovi ambienti vengono creati
   copiando una cartella e sostituendo il nome dle vecchio ambiente con il nuovo.
 
+
   Fanno eccezione alcuni parametri del file __params.json__
   - __FrontEndVpcId__: deve essere valorizzato con l'id della VPC PAGOPA-CORENETWORK-INGRESS-CERT-VPC
   - __BackEndVpcId__: deve essere valorizzato con l'id della VPC PAGOPA-CERT-HUBSPIDLOGIN-VPC
@@ -165,6 +167,7 @@ Installare il sistema di login utilizzato dai destinatari delle notifiche.
   - __InternalNlbIps__: "10.<BackEndVpc-CIDR-second-octect-from-left>.63.200,10.<BackEndVpc-CIDR-second-octect-from-left>.127.200,10.<BackEndVpc-CIDR-second-octect-from-left>.191.200"
   - __HostedZoneId__: deve essere valorizzato lo zone id della hosted zone spid.cert.pn.pagopa.it
   
+- Create a copy of any file in scripts/deploy/stacks/alarm-topic and rename to the respective enviroment name.
 
 ## Procedimento d'installazione
   - Eseguire il comando 
