@@ -53,6 +53,7 @@ prepare_networking_on_dev.sh ) seguendo la seguente parametrizzazione:
         -p-core <aws-profile> \
         -p-helpdesk <aws-profile> \
         -p-confidential <aws-profile> \
+        -p-spidhub <aws-profile> \
 
 - `<aws-profile>` deve essere sostituito col il _Nome di profile_ creato nel _Prima di cominciare_
 
@@ -160,14 +161,12 @@ Installare il sistema di login utilizzato dai destinatari delle notifiche.
 
 
   Fanno eccezione alcuni parametri del file __params.json__
-  - __FrontEndVpcId__: deve essere valorizzato con l'id della VPC PAGOPA-CORENETWORK-INGRESS-CERT-VPC
-  - __BackEndVpcId__: deve essere valorizzato con l'id della VPC PAGOPA-CERT-HUBSPIDLOGIN-VPC
-  - __FrontEndSubnets__: deve essere valorizzato con gli id delle subnet PAGOPA-CORENETWORK-INGRESS-CERT-DMZ-A, PAGOPA-CORENETWORK-INGRESS-CERT-DMZ-B, PAGOPA-CORENETWORK-INGRESS-CERT-DMZ-C
-  - __BackEndSubnets__: deve essere valorizzato con gli id delle subnet PAGOPA-CERT-HUBSPIDLOGIN-GENERIC-A, PAGOPA-CERT-HUBSPIDLOGIN-GENERIC-B, PAGOPA-CERT-HUBSPIDLOGIN-GENERIC-C
+  - __FrontEndVpcId__: deve essere valorizzato con l'id della VPC PAGOPA-HUBSPIDLOGIN-INGRESS-\<NOME_AMBIENTE\>-VPC
+  - __BackEndVpcId__: deve essere valorizzato con l'id della VPC PAGOPA-HUBSPIDLOGIN-PRIVATE-\<NOME_AMBIENTE\>-VPC
+  - __FrontEndSubnets__: deve essere valorizzato con gli id delle subnet PAGOPA-HUBSPIDLOGIN-INGRESS-\<NOME_AMBIENTE\>-DMZ-A, PAGOPA-HUBSPIDLOGIN-INGRESS-\<NOME_AMBIENTE\>-DMZ-B, PAGOPA-HUBSPIDLOGIN-INGRESS-\<NOME_AMBIENTE\>-DMZ-C
+  - __BackEndSubnets__: deve essere valorizzato con gli id delle subnet PAGOPA-HUBSPIDLOGIN-PRIVATE-\<NOME_AMBIENTE\>-GENERIC-A, PAGOPA-HUBSPIDLOGIN-PRIVATE-\<NOME_AMBIENTE\>-GENERIC-B, PAGOPA-HUBSPIDLOGIN-PRIVATE-\<NOME_AMBIENTE\>-GENERIC-C
   - __InternalNlbIps__: "10.<BackEndVpc-CIDR-second-octect-from-left>.63.200,10.<BackEndVpc-CIDR-second-octect-from-left>.127.200,10.<BackEndVpc-CIDR-second-octect-from-left>.191.200"
-  - __HostedZoneId__: deve essere valorizzato lo zone id della hosted zone spid.cert.pn.pagopa.it
-  
-- Create a copy of any file in scripts/deploy/stacks/alarm-topic and rename to the respective enviroment name.
+  - __HostedZoneId__: deve essere valorizzato lo zone id della hosted zone spid.\<nome_ambiente\>.pn.pagopa.it
 
 ## Procedimento d'installazione
   - Eseguire il comando 
@@ -180,7 +179,7 @@ Installare il sistema di login utilizzato dai destinatari delle notifiche.
   
  - Eseguire il comando
    ```
-   ./setup.sh profilo_spidhub eu-south-1 cert <UserRegistryApiKeyForPF>
+   ./setup.sh profilo_spidhub eu-south-1 <nome_ambiente> <UserRegistryApiKeyForPF>
    ```
    Ove `UserRegistryApiKeyForPF` va valorizzato con il valore _UserRegistryApiKeyForPF_ 
    del secret _pn-PersonalDataVault-Apikey_
@@ -191,9 +190,9 @@ Installare il sistema di login utilizzato dai destinatari delle notifiche.
     per supportare l'idp di test (non necessario in prod perché non sarà necessario l'idp di test).
 
 ### Test
-  - Dal proprio browser navigare all'url `https://hub-login.spid.cert.pn.pagopa.it/login?entityID=xx_testenv2&authLevel=SpidL2`
+  - Dal proprio browser navigare all'url `https://hub-login.spid.<nome-ambiente>.pn.pagopa.it/login?entityID=xx_testenv2&authLevel=SpidL2`
   - Effettuare il login con le credenziali di un utente di test
-  - Verificare che, dopo la login, la navigazione venga direzionata all'url `https://portale.cert.pn.pagopa.it/`
+  - Verificare che, dopo la login, la navigazione venga direzionata all'url `https://portale.<nome-ambiente>.pn.pagopa.it/`
 
 
 
