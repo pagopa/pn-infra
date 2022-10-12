@@ -21,6 +21,10 @@ function decodePayload(b64Str) {
   return parsedJson;
 }
 
+function mustLog(rec){
+  return rec.logStream && rec.logStream.indexOf('pn-')>=0;
+}
+
 function extractKinesisData(kinesisEvent) {
   return kinesisEvent.Records.map((rec) => {
     const decodedPayload = decodePayload(rec.kinesis.data);
@@ -28,6 +32,8 @@ function extractKinesisData(kinesisEvent) {
       kinesisSeqNumber: rec.kinesis.sequenceNumber,
       ... decodedPayload
     }
+  }).filter((rec) => {
+    return mustLog(rec);
   });
 }
 
