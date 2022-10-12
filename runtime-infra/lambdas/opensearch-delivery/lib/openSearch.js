@@ -32,7 +32,7 @@ function prepareBulkBody(logs){
                     formattedLogs.push(jsonMessage);
                 }
             } catch(e){
-                const timestamp = new Date(log.timestamp * 1000);
+                const timestamp = new Date(log.timestamp);
 
                 const fakeLog = {
                     kinesisSeqNumber: doc.kinesisSeqNumber,
@@ -41,6 +41,7 @@ function prepareBulkBody(logs){
                     message: log.message,
                     '@timestamp': timestamp.toISOString(),
                     '@version': 1,
+                    error_code: 'INVALID_JSON_MESSAGE',
                     level: 'FATAL',
                     logger_name: 'logs-to-opensearch-lambda'
                 }
