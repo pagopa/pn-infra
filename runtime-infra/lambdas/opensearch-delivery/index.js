@@ -10,12 +10,8 @@ const handler = async (event) => {
 
   const bulkBody = prepareBulkBody(logs);
 
-  console.log(JSON.stringify(bulkBody));
-
   if(bulkBody.length>0){
     const bulkResponse = await openSearch.bulk({ body: bulkBody });
-
-//  console.log(JSON.stringify(bulkResponse.body.items));
 
     const seqNumbers = failedSeqNumbers(bulkResponse, bulkBody);
 

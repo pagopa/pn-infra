@@ -21,15 +21,8 @@ function decodePayload(b64Str) {
   return parsedJson;
 }
 
-const loggableLogGroups = ['/ecs/pn-delivery', 'pn-logsaver-be-logs'];
-
 function mustLog(rec){
-  const idx = loggableLogGroups.indexOf(rec.logGroup);
-  if(idx<0){
-    return false;
-  }
-
-  if(rec.logStream.indexOf('pn-')>0) return true;
+  return rec.logStream && rec.logStream.indexOf('pn-')>=0;
 }
 
 function extractKinesisData(kinesisEvent) {
