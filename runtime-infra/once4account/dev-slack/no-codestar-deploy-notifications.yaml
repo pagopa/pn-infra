@@ -19,8 +19,9 @@ Parameters:
 Resources:  
   CodePipelineBridgeStateRule:
     Type: AWS::Events::Rule
-    Properties: 
+    Properties:
       Description: The EventBridge rule to match CodePipeline pipeline state change
+      RoleArn: !GetAtt "RulesToSnsRole.Arn"
       EventBusName: !Ref EventBusName
       EventPattern: 
         source:
@@ -38,8 +39,9 @@ Resources:
 
   CodeBuildBridgeStateRule:
     Type: AWS::Events::Rule
-    Properties: 
+    Properties:
       Description: The EventBridge rule to match CodeBuild state change
+      RoleArn: !GetAtt "RulesToSnsRole.Arn"
       EventBusName: !Ref EventBusName
       EventPattern: 
         source:
@@ -54,3 +56,24 @@ Resources:
       Targets: 
         - Arn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
           Id: Default-CodeBuild
+  
+  RulesToSnsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: putEventIntoSns
+          PolicyDocument:
+            Statement:
+              - Sid: putEvents
+                Action:
+                  - "sns:*"
+                Effect: Allow
+                Resource: 
+                  - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
