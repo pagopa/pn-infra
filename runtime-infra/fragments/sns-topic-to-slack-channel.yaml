@@ -2,19 +2,27 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   Contains SNS topics configured to send message to DevOps Engineer. At the current state has only
   one "alarm" channel sending messages to slack channel
-Parameters:
-  TopicName:
-    Type: String
-    Description: Topic logical name
 
-  SNSTopicArn:
+Parameters:
+  SlackTopicName:
     Type: String
-    Description: SNS topic ARN
+    Description: Slack Topic logical name
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: Alarm SNS topic ARN
 
   SlackInfo:
     Type: String
     Description: <slack workspace id>:<slack channel id>. 'team_notifiche_dev_alarm' by default
-    Default: TQSBH3ZS4:C02V0SRC4TV
+
+  EmailAddress:
+    Type: String
+    Description: Email address of person to be notified
+
+Conditions:
+  MilanRegion: 
+    !Equals [ !Ref 'AWS::Region', 'eu-south-1' ] 
 
 Resources:
 
@@ -24,7 +32,6 @@ Resources:
     Type: AWS::SNS::TopicPolicy
     Properties:
       PolicyDocument:
-        Version: "2012-10-17"
         Statement:
           - Sid: AllowServices
             Effect: Allow
@@ -35,23 +42,23 @@ Resources:
             Action:
               - 'sns:Publish'
             Resource:
-              - !Ref SNSTopicArn
+              - !Ref AlarmSNSTopicArn
       Topics:
-        - !Ref SNSTopicArn
+        - !Ref AlarmSNSTopicArn
 
-  # - Send alarm messages to CharBot
-  AlarmToChatbot:
+  # - Send alarm message to email address
+  AlarmToEmail:
     Type: AWS::SNS::Subscription
-    Properties:
-      TopicArn: !Ref SNSTopicArn
-      Endpoint: "https://global.sns-api.chatbot.amazonaws.com"
-      Protocol: https
+    Properties: 
+      TopicArn: !Ref AlarmSNSTopicArn
+      Endpoint: !Ref EmailAddress
+      Protocol: email
 
   # - Define Chatbot service configuration: send to slack channel defined by the SlackInfo parameter
   DevOpsChatbot:
     Type: AWS::Chatbot::SlackChannelConfiguration
     Properties:
-      ConfigurationName: !Sub '${TopicName}-DevOps-chatbot'
+      ConfigurationName: !Sub '${SlackTopicName}-DevOps-chatbot'
       IamRoleArn:
         Fn::GetAtt: [ DevOpsChatbotIAMRole, Arn ]
       LoggingLevel: INFO
@@ -68,14 +75,16 @@ Resources:
               - ":"
               - Ref: SlackInfo
       SnsTopicArns:
-        - Ref: SNSTopicArn
-
+        - !If
+            - MilanRegion
+            - !Ref 'AWS::NoValue'
+            - !Ref AlarmSNSTopicArn
 
   # - Authorize Chatbot service to read from the alarm topic
   DevOpsChatbotIAMRole:
     Type: AWS::IAM::Role
     Properties:
-      Description: !Sub 'Role for DevOps chatbot of ${TopicName} environment'
+      Description: !Sub 'Role for DevOps chatbot of ${SlackTopicName} environment'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
