@@ -9,14 +9,23 @@ const handler = async (event) => {
   console.log(`Batch size: ${logs.length} logs`);
 
   const bulkBody = prepareBulkBody(logs);
-  const bulkResponse = await openSearch.bulk({ body: bulkBody });
 
-  const seqNumbers = failedSeqNumbers(bulkResponse, bulkBody);
-  console.log(`Failed documents: ${seqNumbers.length}`);
+  if(bulkBody.length>0){
+    const bulkResponse = await openSearch.bulk({ body: bulkBody });
 
-  return {
-    batchItemFailures: seqNumbers
-  };
+    const seqNumbers = failedSeqNumbers(bulkResponse, bulkBody);
+
+    console.log(`Failed documents: ${seqNumbers.length}`);
+
+    return {
+      batchItemFailures: seqNumbers
+    }
+
+  } else {
+    return {
+      batchItemFailures: []
+    }
+  }
 };
 
 export { handler };
