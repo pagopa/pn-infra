@@ -2,9 +2,14 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: This templates enriches messages received from CloudWatch, CodePipeline and CodeBuild
 
 Parameters:
+  AlarmSNSTopicName:
+    Description: The name of the existing Alarm SNS Topic for notifications.
+    Type: String
+
   QueueName:
-      Type: String
-      Description:  Queue Name
+    Type: String
+    Description:  Queue Name
+    Default: 'Message-Enrichment'
 
   DelaySeconds:
     Description: 'The time in seconds that the delivery of all messages in the queue
@@ -12,14 +17,11 @@ Parameters:
     Type: Number
     Default: '0'
 
-  AlarmSNSTopicName:
-    Description: The name of the existing Alarm SNS Topic for notifications.
-    Type: String
-
   SNSNotificationToSlackName:
     Description: Name for SNS Topic to send enriched messages to slack.
     Type: String
-
+    Default: 'pn-bot-sns'
+  
   MessageRetentionPeriod:
     Description: 'The number of seconds that Amazon SQS retains a message. You can
       specify an integer value from 60 seconds (1 minute) to 1209600 seconds (14 days). '
@@ -115,7 +117,7 @@ Resources:
     Type: AWS::SNS::TopicPolicy
     Properties: 
       PolicyDocument: 
-        Version: '2008-10-17'
+        Version: '2012-10-17'
         Statement:
         - Sid: AllowServices
           Effect: Allow
