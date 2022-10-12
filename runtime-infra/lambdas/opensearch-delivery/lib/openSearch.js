@@ -19,7 +19,29 @@ function failedSeqNumbers(bulkResponse, bulkBody) {
 }
 
 function prepareBulkBody(logs) {
-  return logs.flatMap((doc) => [{ index: { _index: process.env.INDEX_NAME }}, doc]);
+  const formattedLogs = [];
+  logs.forEach((doc) => {
+    doc.logEvents.forEach((log) => {
+        try {
+            const jsonMessage = JSON.parse(log.message)
+            if(jsonMessage){
+                jsonMessage.kinesisSeqNumber = doc.kinesisSeqNumber
+                jsonMessage.logGroup = doc.logGroup
+                jsonMessage.logStream = doc.logStream
+                formattedLogs.push(jsonMessage);
+            }
+        } catch(e){
+            //console.log('error', e)
+        }
+    })
+  })
+
+  if(formattedLogs.length>0){
+    return formattedLogs.flatMap((doc) => [{ index: { _index: process.env.INDEX_NAME }}, doc]);
+  } else {
+    return [];
+  }
+
 }
 
 export { prepareBulkBody, failedSeqNumbers };

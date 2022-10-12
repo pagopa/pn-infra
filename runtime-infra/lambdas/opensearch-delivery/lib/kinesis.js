@@ -21,6 +21,17 @@ function decodePayload(b64Str) {
   return parsedJson;
 }
 
+const loggableLogGroups = ['/ecs/pn-delivery', 'pn-logsaver-be-logs'];
+
+function mustLog(rec){
+  const idx = loggableLogGroups.indexOf(rec.logGroup);
+  if(idx<0){
+    return false;
+  }
+
+  if(rec.logStream.indexOf('pn-')>0) return true;
+}
+
 function extractKinesisData(kinesisEvent) {
   return kinesisEvent.Records.map((rec) => {
     const decodedPayload = decodePayload(rec.kinesis.data);
@@ -28,6 +39,8 @@ function extractKinesisData(kinesisEvent) {
       kinesisSeqNumber: rec.kinesis.sequenceNumber,
       ... decodedPayload
     }
+  }).filter((rec) => {
+    return mustLog(rec);
   });
 }
 
