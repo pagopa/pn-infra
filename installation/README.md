@@ -117,7 +117,10 @@ __Prerequisiti__: account e profili descritti nel paragrafo _Prima di cominciare
     - Region _eu-south-1_: api.cert.pn.pagopa.it, webapi.cert.pn.pagopa.it, api-io.cert.pn.pagopa.it
     - Region _us-east-1_: portale.cert.pn.pagopa.it, portale-pa.cert.pn.pagopa.it, portale-login.cert.pn.pagopa.it
 
-
+## Accesso agli artefatti di cui fare deploy
+Comunicare a PagoPA gli AccountID di pn-core e pn-configential-information specifici per l'ambiente. 
+Tali account id verranno usati per l'abilitazione in lettura ai repository ECR e ai bucket contenenti 
+gli artefatti dic ui fare deploy.
 
 # Installazione SpidHub
 
@@ -183,31 +186,35 @@ nuovo ambiente (ad esempio cert) nella cartella pn-cicd/cd-cli/custom-config/pn-
 Le configurazioni sono composte da due file:
 
 - `cd-cli/custom-config/pn-data-vault/scripts/aws/cfn/once4account/coll.yaml` che va 
-  ricopiato in `cert.yaml` nella stessa posizione ed eventualmente personalizzare l'invio degli allarmi su slack o per mail. 
-  Fondamentale è mantenere gli output esistenti.
+  ricopiato in `cert.yaml` nella stessa posizione ed __eventualmente personalizzare l'invio 
+  degli allarmi su slack o per mail. 
+  Fondamentale è mantenere gli output esistenti__.
 - `cd-cli/custom-config/pn-data-vault/scripts/aws/cfn/microservice-coll-cfg.json`che va ricopiato in
   `microservice-cert-cfg.json` nella stessa posizione e modificato nei seguenti parametri:
   - __VpcId__: Id della VPC PAGOPA-CERT-CONFIDENTIALINFO-VPC
   - __VpcCidr__: CIDR della VPC PAGOPA-CERT-CONFIDENTIALINFO-VPC
-  - __VpcSubnets__: id delle sotto reti PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-A, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-B, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-C
+  - __VpcSubnets__: id, separati da virgola, delle sotto reti PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-A, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-B, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-C
   - __VpcSubnetsRoutingTables__: id della tabella di routing PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-RT
   - __PrivateHostedZone__: id della hosted zone privata `confidential.pn.internal` presente nell'account _CONFIDENTIAL-INFORMATION_,
   - __EcsDefaultSecurityGroup__: id del security group PAGOPA-CERT-CONFIDENTIALINFO-MAIN-SG,
-- Una volta aggiornate le configurazioni il repository va aggiornato e memorizzato il __commit-id__
+  - __PDVTokenizerBasePath__ : url del tokenizer del servizio PersonalDataVault di pagopa (ES: "https://api.uat.tokenizer.pdv.pagopa.it/tokenizer/v1")
+  - __PDVUserRegistryBasePath__ : url dello user registry del servizio PersonalDataVault di pagopa 
+      (ES: "https://api.uat.pdv.pagopa.it/user-registry/v1")
+- Caricare i file sul repository delle configurazioni preparato secondo l'appendice "Preparare il repository delle configurazioni"
 
 ### Preparazione file con la versioni degli script di deploy (__desired-commit-ids-env.sh__)
 - Va scaricato dall'ambiente di collaudo il file 
  `s3://cd-pipeline-datavault-cdartifactbucket-1lf70f4dd9hib/config/desired-commit-ids-env.sh`
- e modificato sostituendo il _cd_scripts_commitId_ con il __commit-id__ memorizzato alla fine del paragrafo
- precedente.
 
 ## Procedimento d'installazione
 
 Tutte le operazioni vanno eseguite nell'account _CONFIDENTIAL-INFORMATION_ nella regione _eu-south-1_
-- Definire un secret contenente le necessarie API-Key seguendo quanto descritto nella pagina
+- Definire un secret di tipo "Altro tipo di segreto" in "AWS Secrets Manager". Tale secret avrà nome 
+  "pn-PersonalDataVault-Apikey" e contenente le necessarie API-Key. Il valore è presente nella pagina 
   confluence _Configurazioni Secrets_ al paragrafo _pn-PersonalDataVault-Apikey_.
 - Tramite console web del servizio AWS CloudFormation effettuare il deploy del template 
   [data-vault-only-pipeline.yaml](https://github.com/pagopa/pn-cicd/blob/main/cd-cli/cnf-templates/data-vault-only-pipeline.yaml)
+  __Va specificato il parametro EnvName__
 - Nello stack creato al punto precedente localizzare la risorsa "Bucket S3" con nome logico _CdArtifactBucket_
 - Nel bucket _CdArtifactBucket_ creare la cartella __config__
 - Nel bucket _CdArtifactBucket_ caricare:
@@ -223,6 +230,11 @@ Tutte le operazioni vanno eseguite nell'account _CONFIDENTIAL-INFORMATION_ nella
 # Installazione PN-CORE
 
 ## Precondizioni
+  
+### Networking
+Verificare che le subnet della VPC PAGOPA-COLL-PNCORE-VPC possano raggiungere i servizi di 
+SafeStorage e ExternalChannel.
+Gli URL di tali servizi sono reperibili sull'API gateway dell'account del fornitore di tali servizi.
 
 ### Pacchettizzazione Front End
 
@@ -245,19 +257,29 @@ Modificare i seguenti parametri:
   - __SandboxSafeStorageBaseUrl__: valorizzato all'url di safe-storage dello specifico ambiente
   - __ExternalChannelBaseUrl__ che va valorizzato all'url di external-channel dello specifico ambiente
 - File `pn-frontend/aws-cdn-templates/cert/env-cdn.sh`
-  - __ZONE_ID__: valorizzato con l'identificativo della zona cert.pn.pagopa.it
-  - __PORTALE_PA_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale-pa.cert.pn.pagopa.it
+  - __ZONE_ID__: valorizzato con l'identificativo della zona cert.pn.pagopa.it letto dalla console di Route53
+  - __PORTALE_PA_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale-pa.cert.pn.pagopa.it 
+      (letto sulla console del Aws Certificate Manager nella zona 'N. Virginia')
   - __PORTALE_PF_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale.cert.pn.pagopa.it
-  - __PORTALE_PF_LOGIN_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale-login.cert.pn.pagopa.i
+      (letto sulla console del Aws Certificate Manager nella zona 'N. Virginia)'
+  - __PORTALE_PF_LOGIN_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL 
+      portale-login.cert.pn.pagopa.it (letto sulla console del Aws Certificate Manager nella zona 'N. Virginia)'
   - Frammento __&lt;NomeBucketLegalInput&gt;__: sostituito con il nome del bucket utilizzato 
-    per l'input di allegati alle notifiche per lo specifico ambiente
+    per l'input di allegati alle notifiche per lo specifico ambiente (Es: pnsafestoragecert-nonlegal-input-eu-south-1)
 - File `pn-infra/runtime-infra/pn-infra-cert-cfg.json`
   - __VpcId__: Id della VPC PAGOPA-CERT-PNCORE-VPC
   - __VpcCidr__: CIDR della VPC PAGOPA-CERT-PNCORE-VPC
   - __VpcSubnets__: id delle sottoreti PAGOPA-CERT-PNCORE-GENERIC-A, PAGOPA-CERT-PNCORE-GENERIC-B, PAGOPA-CERT-PNCORE-GENERIC-C
   - __VpcSubnetsRoutingTables__: id della tabella di routing PAGOPA-CERT-PNCORE-GENERIC-RT
-  - __PrivateHostedZone__: id della hosted zone privata `core.pn.internal` presente nell'account _CONFIDENTIAL-INFORMATION_,
-  - __EcsDefaultSecurityGroup__: id del security group PAGOPA-CERT-PNCORE-MAIN-SG
+  - __PrivateHostedZone__: id della hosted zone privata `core.pn.internal` presente nel servizio Route53 dell'account _PN-CORE_,
+  - __EcsDefaultSecurityGroup__: id del security group PAGOPA-CERT-PNCORE-MAIN-SG,
+  - __LogsBucketName__: nome del bucket in cui verranno memorizzati i log: "pn-logs-bucket-eu-south-1-&lt;AccountID&gt;-001"
+      dove &lt;AccountID&gt; viene sostituito con il numero dell'account AWS di PN-CORE,
+  - __LogsAccountId__: l numero dell'account AWS di PN-CORE,
+  - __BucketSuffix__: "001",
+  - __DataLakeAccountId1__: per certificazione va bene il numero dell'account AWS di PN-CORE per prod serve l'account id 
+      dell'ambiente di produzione di DataLake che dovrà essere comunicato da PagoPA,
+  - __DataLakeAccountId2__: serve solo in ambiente dev, in tutti gli altri ambienti deve essere valorizzato con '-'
 - File `pn-infra/runtime-infra/pn-ipc-cert-cfg.json`
   - __ApiCertificateArn__: ARN del certificato per il DNS api.cert.pn.pagopa.it
   - __WebApiCertificateArn__: ARN del certificato per il DNS webapi.cert.pn.pagopa.it
@@ -267,24 +289,28 @@ Modificare i seguenti parametri:
 - File `pn-user-attributes/scripts/aws/cfn/microservice-cert-cfg.json`
   - __ExternalChannelBasePath__: l'url di external-channel per lo specifico ambiente
 
-__N.B.:__ Una volta aggiornate le configurazioni sul repository git memorizzare il __commit-id__ da utilizzare
-nel passo successivo.
+- Caricare i file sul repository delle configurazioni preparato secondo l'appendice "Preparare il repository delle configurazioni".
+  __N.B.__: è un repository separato da quello di pn-confidentialinformation.
 
 ### Preparazione file con i _commit-id_ (__desired-commit-ids-env.sh__)
 
 - Va scaricato dall'ambiente di collaudo il file 
  `s3://cd-pipeline-cdartifactbucket-4z3nf89jd2zy/config/desired-commit-ids-env.sh`
- e va modificato sostituendo il _cd_scripts_commitId_ con il __commit-id__ memorizzato alla fine del paragrafo
- precedente.
 
 ## Procedimento d'installazione
 
 Tutte le operazioni vanno eseguite nell'account _PN-CORE_ nella regione _eu-south-1_
 
-- Definire un secret contenente le necessarie API-Key seguendo quanto descritto nella pagina
-  confluence _Configurazioni Secrets_ ai paragrafi _pn-ExternalRegistries-Secrets_ e _DataLake_.
+- Definire segreti (Amazon Secret Manager) e parametri (AWS Parameter Store); i valori vanno reperiti dalla pagina
+  confluence _Configurazioni Secrets_ ai paragrafi _pn-ExternalRegistries_ e _DataLake_.
+  - un parametro con nome=MockPaList tier=standard type=string dataType=text
+  - un segreto con nome=pn-ExternalRegistries-Secrets secretType=other plaintext=&lt;il valore fornito da pagopa&gt; 
+    gli altri parametri vengono lasciati al default
+  - un segreto con nome=pn-logs-data-lake-role-access secretType=other plaintext=&lt;il valore fornito da pagopa&gt; 
+    gli altri parametri vengono lasciati al default
 - Tramite console web del servizio AWS CloudFormation effettuare il deploy del template 
-  [complete-pipeline.yaml](https://github.com/pagopa/pn-cicd/blob/main/cd-cli/cnf-templates/complete-pipeline.yaml)
+  [complete-pipeline.yaml](https://github.com/pagopa/pn-cicd/blob/main/cd-cli/cnf-templates/complete-pipeline.yaml).
+  __Va specificato il parametro EnvName__
 - Nello stack creato al punto precedente localizzare la risorsa "Bucket S3" con nome logico _CdArtifactBucket_
 - Nel bucket _CdArtifactBucket_ creare la cartella __config__
 - Nel bucket _CdArtifactBucket_ caricare:
@@ -296,4 +322,24 @@ Tutte le operazioni vanno eseguite nell'account _PN-CORE_ nella regione _eu-sout
 
 Testare il nuovo ambiente di PN
 
+
+
+# Appendici
+
+## Preparare il repository delle configurazioni
+Per gli account _pn-core_ e _pn-confidential-information_ degli ambienti cert e prod sarà necessario definire un repository codecommit contenente i parametri di configurazione per il software in esecuzione in tale account. 
+Eseguire i seguenti passi, sempre usando l'account in questione:
+- [Creare un repository codecommit](https://docs.aws.amazon.com/codecommit/latest/userguide/how-to-create-repository.html)
+  - con nome `<account-name>-configurations-<env-name>` ove _env-name_ può essere `cert` o `prod`.
+- [Configurare un utenza IAM](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html) 
+  - con nome config_reader, 
+  - che abbia diritto di lettura sul repository appena creato (ad esempio associandolo alla managed 
+    policy _AWSCodeCommitReadOnly_).
+- [Generare credenziali CodeCommit](https://docs.aws.amazon.com/codecommit/latest/userguide/setting-up-gc.html) 
+  per l'utenza appena creata.
+- Definire un secret di tipo "Altro tipo di segreto" in "AWS Secrets Manager". Tale secret avrà nome 
+  "pn-configurations-repository" e come valore avraà due coppie chiave valore.
+  - Nella chiave _repositoryUrl_ il valore dell'url di clone del repository con tanto di nume utente e 
+    la versione url encoded della password.
+  - Nella chiave _commitId_ la stringa da utilizzare per il checkout della corretta versione delle configurazioni.
 

@@ -1,6 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Expose a microservice API using API-GW. This template can expose API for B2B or WEB usage'
 
+Transform:
+  - UpdateDeploymentTransform
+
 Parameters:
 
   ProjectName:
@@ -180,7 +183,7 @@ Resources:
       RestApiId: !Ref PublicRestApi
 
   # Deployment
-  PublicRestApiDeployment:
+  PublicRestApiDeploymentPnPlaceholderEpochSeconds:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - PublicApiProxyAnyMethod
@@ -196,7 +199,7 @@ Resources:
       RestApiId: !Ref PublicRestApi
       StageName: unique
       TracingEnabled: true
-      DeploymentId: !Ref PublicRestApiDeployment
+      DeploymentId: !Ref PublicRestApiDeploymentPnPlaceholderEpochSeconds
       AccessLogSetting:
         DestinationArn: !GetAtt "PublicApiLogGroup.Arn"
         Format: '{"requestTime":"$context.requestTime","requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","routeKey":"$context.routeKey","status":$context.status,"responseLatency":$context.responseLatency, "sourceIp": $context.identity.sourceIp}'
@@ -329,3 +332,42 @@ Outputs:
   ApiGatewayUrlBeta:
     Value: !Sub 'https://${PublicRestApi}.execute-api.${AWS::Region}.amazonaws.com/unique/'
     Description: Base URL for API Requests
+
+  # Rest API ARN used for WAF Configuration
+  APIGatewayARN:
+    Value: !Sub 'arn:aws:apigateway:${AWS::Region}::/restapis/${PublicRestApi}/stages/${PublicRestApiStage}'
+    Description: "Rest API ARN" 
+
+  # Authorizer ARN used for set authorization method
+  AuthorizerARN:
+    Value: 
+      Fn::If:
+        - IsB2B
+        - !Ref ApikeyAuthorizer
+        - Fn::If:
+          - IsIO
+          - !Ref IoAuthorizer
+          - !Ref JwtAuthorizer
+    Description: "Authorizer ARN"
+
+  # Rest API definition
+  RestApiId:
+    Value: !Ref PublicRestApi
+    Description: "Rest API ID" 
+
+  # Rest API parent id
+  RootResourceId:
+    Value: !GetAtt PublicRestApi.RootResourceId
+    Description: "Root resource ID"
+
+  RestApiName:
+    Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+    Description: "Name of the Rest API"
+
+  RestApiStageArn:
+    Value: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/${PublicRestApi}/stages/${PublicRestApiStage}"
+    Description: "Stage ARN of the Rest API"
+
+  RestApiErrorAlarmArn:
+    Value: !GetAtt APIGatewayApiErrorAlarm.Arn
+    Description: "ARN of the errors alarm"

@@ -91,6 +91,19 @@ Parameters:
     Description: health check timeout seconds
     Type: Number
     Default: 5
+  
+  HealthyThresholdCount:
+    Description: |
+      The number of consecutive health checks successes required before considering 
+      an unhealthy target healthy. 
+    Type: Number
+    Default: 5
+  
+  UnhealthyThresholdCount:
+    Description: |
+      The number of consecutive health check failures required before considering a target unhealthy. 
+    Type: Number
+    Default: 2
 
   HealthCheckPath:
     Description: path called for health check
@@ -145,6 +158,17 @@ Parameters:
     Default: ''
     Type: String
     Description: add system properties and other parameters to the JVM
+
+  # - Log exports parameters
+  CloudwatchFilterPattern:
+    Default: ''
+    Type: String
+    Description: filter expression for exported logs
+
+  CloudwatchLogKinesisStreamArn:
+    Default: ''
+    Type: String
+    Description: where to send logs
 
   # Technical parameters
   VpcId:
@@ -330,19 +354,19 @@ Mappings:
     2GB:
       awsCollector: 512
       sidecarInjector: 512
-      microservice: 1GB
+      microservice: 1536
     4GB:
       awsCollector: 512
       sidecarInjector: 512
-      microservice: 2GB
+      microservice: 3584
     6GB:
       awsCollector: 512
       sidecarInjector: 512
-      microservice: 5GB
+      microservice: 5632
     8GB:
       awsCollector: 512
       sidecarInjector: 512
-      microservice: 7GB
+      microservice: 7680
 
 Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
@@ -358,6 +382,8 @@ Conditions:
   ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, 'True' ] ]
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
+
+  SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
 
   Env1Exist: !Not [ !Equals [!Ref ContainerEnvEntry1, '']]
   Env2Exist: !Not [ !Equals [!Ref ContainerEnvEntry2, '']]
@@ -469,7 +495,11 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
-          Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
+          Memory:  
+            'Fn::If':
+              - ShouldEnableOtelXRay
+              - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
+              - !Ref MemoryAmount
           MountPoints:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
@@ -778,7 +808,6 @@ Resources:
                     - :root
             Resource: "*"
           - Action:
-              - kinesis:DescribeStream
               - kms:Encrypt*
               - kms:Decrypt*
               - kms:ReEncrypt*
@@ -801,6 +830,7 @@ Resources:
     Properties:
       RoleName: !Sub '${MicroServiceUniqueName}-ExecutionRole'
       AssumeRolePolicyDocument:
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -816,6 +846,7 @@ Resources:
     Properties:
       RoleName: !Sub '${MicroServiceUniqueName}-TaskRole'
       AssumeRolePolicyDocument:
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -878,6 +909,8 @@ Resources:
       HealthCheckPort: 8080
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: !Ref HealthCheckTimeout
+      HealthyThresholdCount: !Ref HealthyThresholdCount
+      UnhealthyThresholdCount: !Ref UnhealthyThresholdCount
       Matcher:
         HttpCode: 200
       TargetGroupAttributes:
@@ -1052,6 +1085,49 @@ Resources:
       OKActions:
         - !Ref ScaleDownPolicy
 
+  ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
+  SubscriptionFilter:
+    Condition: SendLogToKinesis
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      RoleArn:
+        Fn::GetAtt:
+          - "SubscriptionFilterServiceRole"
+          - "Arn"
+      LogGroupName: !Ref LogGroup
+      FilterPattern: !Ref CloudwatchFilterPattern
+      DestinationArn: !Ref CloudwatchLogKinesisStreamArn
+
+  ### IAM Role used by Subscription filters to allow read logs from Cloudwatch and send logs to Kinesis Firehose
+  SubscriptionFilterServiceRole:
+    Condition: SendLogToKinesis
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: logs.amazonaws.com
+        Version: "2012-10-17"
+      Path: /
+      Policies:
+        -
+          PolicyName: !Sub '${MicroServiceUniqueName}-ecs-logs-subscription-role'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - kinesis:PutRecord
+                Effect: Allow
+                Resource: "*"
+              - Action:
+                - "kms:Encrypt"
+                - "kms:GenerateDataKey"
+                - "kms:Decrypt"
+                Effect: Allow
+                Resource: "*"
+
 Outputs:
   ServiceName:
     Description: Nome del servizio di cui fare deploy
@@ -1062,4 +1138,13 @@ Outputs:
   TaskRoleName:
     Description: Container execution role name, useful to attach custom policies
     Value: !Ref TaskRole
-
+  AutoScalingAlarmArn:
+    Description: ARN of the autoscaling alarm
+    Value:
+      !If
+        - AutoscalingEnabled
+        - !If 
+          - AutoscalingByRestApi
+          - !GetAtt AlarmHighRequests.Arn
+          - !GetAtt AlarmSQS.Arn
+        - ''

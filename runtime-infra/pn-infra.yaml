@@ -113,29 +113,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-cluster.yaml"
       Parameters:
         MacroServiceName: !Sub '${ProjectName}-core'
-
-  # Role to read ecs micro services logs
-  ReadonlyEcsMicroServicesLogsRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service: logs.amazonaws.com
-        Version: "2012-10-17"
-      Policies:
-        - PolicyName: read_from_ecs_logs
-          PolicyDocument:
-            Statement:
-              - Sid: readLogs
-                Action:
-                  - "*"
-                Effect: Allow
-                Resource: 
-                  - "*"
-
+  
   ###                       LOGS STREAMS PREPARATION                      ###
   ###########################################################################
   # Logs bucket
@@ -159,6 +137,27 @@ Resources:
         LogsBucketName: !GetAtt LogsBucket.Outputs.LogsBucketName
         LogsAccountId: !Ref AWS::AccountId
 
+  B2BUsagePlanes:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-usageplans-B2B.yaml"
+  IOBackendUsagePlanes:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-usageplans-IO.yaml"
+
+  ###                       CLOUDFORMATION TRANSFORM LAMBDAS              ###
+  ###########################################################################
+
+  UpdateDeploymentTransform:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-update-deployment-transform.yaml"
+
+  CloudWatchDashboardTransform:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-cloudwatch-dashboard-transform.yaml"
 
 Outputs:
 
@@ -189,8 +188,6 @@ Outputs:
   ECSClusterName:
     Value: !GetAtt ECSCluster.Outputs.ClusterName
     Description: ECS cluster name
-  ReadonlyEcsMicroServicesLogsRoleArn:
-    Value: !GetAtt ReadonlyEcsMicroServicesLogsRole.Arn
   
   # Log exports outputs
   LogsBucketName:
@@ -199,6 +196,9 @@ Outputs:
   LogsExporterRoleArn:
     Description: Role used to export logs to external bucket
     Value: !GetAtt LogsExporterRole.Outputs.LogsIngestionRoleArn
+  LogsExporterPolicyArn:
+    Description: Policy used by LogsExporterRoleArn Role
+    Value: !GetAtt LogsExporterRole.Outputs.LogsIngestionPolicyArn
     
 
   # pass-though parameters

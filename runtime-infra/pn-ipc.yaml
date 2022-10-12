@@ -57,6 +57,14 @@ Parameters:
     Description: "The number of seconds that Amazon SQS retains a message. You can specify an integer 
       value from 60 seconds (1 minute) to 1,209,600 seconds (14 days)."
   
+  CdcStreamRetentionHours:
+    Type: Number
+    Description: 'Change Data Capture Kinesis Data Stream retention period in hours'
+
+  LogsStreamRetentionHours:
+    Type: Number
+    Description: 'Cloudwatch Logs Kinesis Data Stream retention period in hours'
+
   Version:
     Type: String
     Description: 'keep track of used projects commitIds'
@@ -87,6 +95,8 @@ Parameters:
 #  LogsBucketKmsKeyArn:
 #    Type: String
   LogsExporterRoleArn:
+    Type: String
+  LogsExporterPolicyArn:
     Type: String
 
 Resources:
@@ -176,6 +186,29 @@ Resources:
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
+
+  ### Queue that receive composite alarm information for DOWNTIME LOGS ###
+  CompositeAlarmQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-composite_alarms_for_downtime'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+  
+  ### Queue that receive safe-storage notification to DOWNTIME LOGS ###
+  SafeStorageToDowntimeLogsQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestore_to_downtime_logs'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+  
+
+
   ###                          PN-CORE EVENT BUS                          ###
   ###########################################################################
   # Receive events from SafeStorage and CarrierPigeon (AKA ExternalChannel) 
@@ -226,6 +259,7 @@ Resources:
                   - !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
                   - !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
                   - !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
+                  - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueARN"
   
   ExternalChannelsOutputsQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -234,6 +268,7 @@ Resources:
         - !GetAtt "ExternalChannelsOutputsQueue.Outputs.QueueURL"
         - !GetAtt "ExternalChannels2UserAttributesQueue.Outputs.QueueURL"
         - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueURL"
+        - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueURL"
       PolicyDocument:
         Statement:
           - Sid: "SendEventsToDLQ"
@@ -247,9 +282,10 @@ Resources:
               - !GetAtt "ExternalChannelsOutputsQueue.Outputs.QueueARN"
               - !GetAtt "ExternalChannels2UserAttributesQueue.Outputs.QueueARN"
               - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueARN"
+              - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueARN"
 
 
-  # Send All Safe Storage Response to pn-delivery-push
+  # Send Safe Storage Response to pn-delivery-push
   PnCoreEventBusToSafeStorageResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -258,9 +294,29 @@ Resources:
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "SafeStorageOutcomeEvent" ]
+        detail:
+          documentType: [ 'PN_AAR', 'PN_NOTIFICATION_ATTACHMENTS', 'PN_LEGAL_FACTS' ]
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryPush'
           Arn: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
+  # Send Safe Storage Response to pn-downtime-logs
+  PnCoreEventBusToDowntimeLogsSafeStorageResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route SafeStorage Events to pn-downtime-logs
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "SafeStorageOutcomeEvent" ]
+        detail:
+          documentType: [ 'PN_DOWNTIME_LEGAL_FACTS' ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DowntimeLogs'
+          Arn: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueARN
           InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
@@ -349,6 +405,24 @@ Resources:
       OKActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
+  ## KINESIS SOURCE STREAM FOR Change Data Capture
+  CdcKinesisSourceStream:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-stream.yaml"
+      Parameters:
+        StreamName: !Sub '${ProjectName}-cdc-stream'
+        StreamRetentionPeriodHours: !Ref CdcStreamRetentionHours
+  
+  ## KINESIS SOURCE STREAM FOR Logs
+  LogsKinesisSourceStream:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-stream.yaml"
+      Parameters:
+        StreamName: !Sub '${ProjectName}-logs-stream'
+        StreamRetentionPeriodHours: !Ref LogsStreamRetentionHours
+  
 
 Outputs:
   # Web API for browsers and B2B
@@ -406,6 +480,51 @@ Outputs:
     Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
     Description: pn-external-channels output queue ARN
 
+  # Downtime Logs composite alarm queue
+  DowntimeLogsAggregateAlarmQueueName:
+    Value: !GetAtt CompositeAlarmQueue.Outputs.QueueName
+    Description: Aggregate alarm queue name
+  DowntimeLogsAggregateAlarmQueueURL:
+    Value: !GetAtt CompositeAlarmQueue.Outputs.QueueURL
+    Description: Aggregate alarm queue URL
+  DowntimeLogsAggregateAlarmQueueARN:
+    Value: !GetAtt CompositeAlarmQueue.Outputs.QueueARN
+    Description: Aggregate alarm queue ARN
+  
+  # Downtime Logs safe-storage events
+  DowntimeLogsSafeStorageEventsQueueName:
+    Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueName
+    Description: Events form safe-storage to pn-downtime-logs queue name
+  DowntimeLogsSafeStorageEventsQueueURL:
+    Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueURL
+    Description: Events form safe-storage to pn-downtime-logs queue URL
+  DowntimeLogsSafeStorageEventsQueueARN:
+    Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueARN
+    Description: Events form safe-storage to pn-downtime-logs queue ARN
+
+  # Kinesis Source Stream containing the DynamoDB Change Data Capture events
+  CdcKinesisSourceStreamName:
+    Description: 'Kinesis source CDC stream name'
+    Value: !GetAtt CdcKinesisSourceStream.Outputs.KinesisStreamName
+  CdcKinesisSourceStreamArn:
+    Description: 'Kinesis source CDC stream ARN'
+    Value: !GetAtt CdcKinesisSourceStream.Outputs.KinesisStreamArn
+  CdcKinesisSourceStreamKeyArn:
+    Description: 'Kinesis source CDC stream crypto key ARN'
+    Value: !GetAtt CdcKinesisSourceStream.Outputs.KinesisStreamKeyArn
+
+  # Kinesis Source Stream containing the CloudWatch Logs
+  LogsKinesisSourceStreamName:
+    Description: 'Kinesis source Logs stream name'
+    Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamName
+  LogsKinesisSourceStreamArn:
+    Description: 'Kinesis source Logs stream ARN'
+    Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamArn
+  LogsKinesisSourceStreamKeyArn:
+    Description: 'Kinesis source Logs stream crypto key ARN'
+    Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamKeyArn
+
+
   # pass-thought parameters
   NetworkLoadBalancerLink:
     Value: !Ref NetworkLoadBalancerLink
@@ -433,3 +552,5 @@ Outputs:
   #  Value: !Ref LogsBucketKmsKeyArn
   LogsExporterRoleArn:
     Value: !Ref LogsExporterRoleArn
+  LogsExporterPolicyArn:
+    Value: !Ref LogsExporterPolicyArn

@@ -1,0 +1,741 @@
+# This templates creates a WAF Web ACL for the Rest API Gateway
+# Please provide comma-delimited list of names in the same order as
+# the comma-delimited list of vendor names.
+# The priority of the rules is assigned based on their position in the list
+# Template is created for a maximum of 5 Web ACL rules and 5 Rest APIs
+# can be adjusted based on requirements for more then 5 WAF rules and API's
+# For comma-delimited list: WAFRuleNames, WAFRuleVendors & APIGatewayARNS - If only one 
+# element is required, add a comma(,) to terminate the 1 element string 
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: Define the DNS zone for an installation of "Piattaforma Notifiche"
+
+Parameters:
+  WAFName: 
+    Description: "The name of the web ACL."
+    Type: String
+    Default: "WebACL"
+
+  WAFRuleNames:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of WAF Rule names
+    Default: "AWSManagedRulesCommonRuleSet"
+
+  WAFRuleVendors:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of WAF Web ACL Vendors
+    Default: "AWS"
+
+  APIGatewayARNs:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of API Gateway ARNS
+
+  ExcludedRule0:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of excluded rules for rule 1.
+    Default: "NoUserAgent_HEADER"
+
+  ExcludedRule1:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of excluded rules for rule 2.
+    Default: ''
+
+  ExcludedRule2:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of excluded rules for rule 3.
+    Default: ''
+
+  ExcludedRule3:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of excluded rules, for rule 4.
+    Default: ''
+
+  ExcludedRule4:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of excluded rules for rule 5.
+    Default: ''
+
+#Condition to check if the index is out of bound for the !Select function.
+#If an element exists at the index, it will allow you to create the WAF rule resource from the list
+Conditions:
+  WAFRule0Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 0
+          - !Split
+            - ","
+            - !Sub
+              - ${WAFRules},,,,,
+              - { WAFRules: !Join [',', !Ref WAFRuleNames] }
+        - ""
+
+  WAFRule1Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 1
+          - !Split
+            - ","
+            - !Sub
+              - ${WAFRules},,,,,
+              - { WAFRules: !Join [',', !Ref WAFRuleNames] }
+        - ""
+
+  WAFRule2Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 2
+          - !Split
+            - ","
+            - !Sub
+              - ${WAFRules},,,,,
+              - { WAFRules: !Join [',', !Ref WAFRuleNames] }
+        - ""
+
+  WAFRule3Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 3
+          - !Split
+            - ","
+            - !Sub
+              - ${WAFRules},,,,,
+              - { WAFRules: !Join [',', !Ref WAFRuleNames] }
+        - ""
+
+  WAFRule4Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 4
+          - !Split
+            - ","
+            - !Sub
+              - ${WAFRules},,,,,
+              - { WAFRules: !Join [',', !Ref WAFRuleNames] }
+        - ""
+  #Check if the API exists in the position. Do not associate if it does not exist
+  APIGateway0Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 0
+          - !Split
+            - ","
+            - !Sub
+              - ${ApiArn},,,,,
+              - { ApiArn: !Join [',', !Ref APIGatewayARNs] }
+        - ""
+
+  APIGateway1Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 1
+          - !Split
+            - ","
+            - !Sub
+              - ${ApiArn},,,,,
+              - { ApiArn: !Join [',', !Ref APIGatewayARNs] }
+        - ""
+
+  APIGateway2Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 2
+          - !Split
+            - ","
+            - !Sub
+              - ${ApiArn},,,,,
+              - { ApiArn: !Join [',', !Ref APIGatewayARNs] }
+        - ""
+
+  APIGateway3Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 3
+          - !Split
+            - ","
+            - !Sub
+              - ${ApiArn},,,,,
+              - { ApiArn: !Join [',', !Ref APIGatewayARNs] }
+        - ""
+
+  APIGateway4Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 4
+          - !Split
+            - ","
+            - !Sub
+              - ${ApiArn},,,,,
+              - { ApiArn: !Join [',', !Ref APIGatewayARNs] }
+        - ""
+
+#Check Rule Group 0 for Excluded rules - Check upto 5 rules
+  Rule0Pos0Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 0
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule0] }
+        - ""
+
+  Rule0Pos1Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 1
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule0] }
+        - ""
+
+  Rule0Pos2Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 2
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule0] }
+        - ""
+
+  Rule0Pos3Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 3
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule0] }
+        - ""
+
+  Rule0Pos4Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 4
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule0] }
+        - ""
+
+
+#Check Rule Group 1 for Excluded rules - Check upto 5 rules
+  Rule1Pos0Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 0
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule1] }
+        - ""
+
+  Rule1Pos1Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 1
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule1] }
+        - ""
+
+  Rule1Pos2Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 2
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule1] }
+        - ""
+
+  Rule1Pos3Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 3
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule1] }
+        - ""
+
+  Rule1Pos4Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 4
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule1] }
+        - ""
+
+
+#Check Rule Group 2 for Excluded rules - Check upto 5 rules
+  Rule2Pos0Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 0
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule2] }
+        - ""
+
+  Rule2Pos1Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 1
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule2] }
+        - ""
+
+  Rule2Pos2Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 2
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule2] }
+        - ""
+
+  Rule2Pos3Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 3
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule2] }
+        - ""
+
+  Rule2Pos4Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 4
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule2] }
+        - ""
+
+
+#Check Rule Group 3 for Excluded rules - Check upto 5 rules
+  Rule3Pos0Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 0
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule3] }
+        - ""
+
+  Rule3Pos1Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 1
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule3] }
+        - ""
+
+  Rule3Pos2Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 2
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule3] }
+        - ""
+
+  Rule3Pos3Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 3
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule3] }
+        - ""
+
+  Rule3Pos4Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 4
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule3] }
+        - ""
+
+
+
+#Check Rule Group 4 for Excluded rules - Check upto 5 rules
+  Rule4Pos0Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 0
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule4] }
+        - ""
+
+  Rule4Pos1Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 1
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,, 
+              - { currentRule: !Join [',', !Ref ExcludedRule4] }
+        - ""
+
+  Rule4Pos2Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 2
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule4] }
+        - ""
+
+  Rule4Pos3Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 3
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule4] }
+        - ""
+
+  Rule4Pos4Exists: 
+    !Not 
+      - !Equals
+        - !Select
+          - 4
+          - !Split
+            - ","
+            - !Sub
+              - ${currentRule},,,,,
+              - { currentRule: !Join [',', !Ref ExcludedRule4] }
+        - ""
+
+Resources:
+  # AWS WAF Web ACLs
+  ApiWafWebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties: 
+      DefaultAction: 
+        Allow: {}
+      Description: Web Application Firewall for Rest API Gateway 
+      Name: !Ref WAFName
+      Rules: 
+        - !If 
+          - WAFRule0Exists
+          - Name: !Join ["-", [!Select [0, !Ref WAFRuleVendors], !Select [0, !Ref WAFRuleNames]]]
+            OverrideAction: 
+              None: {}
+            Priority: 0
+            Statement: 
+              ManagedRuleGroupStatement:
+                VendorName: !Select [0, !Ref WAFRuleVendors]
+                Name: !Select [0, !Ref WAFRuleNames]
+                ExcludedRules:  
+                  - !If
+                    - Rule0Pos0Exists
+                    - Name: !Select [0, !Ref ExcludedRule0]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule0Pos1Exists
+                    - Name: !Select [1, !Ref ExcludedRule0]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule0Pos2Exists
+                    - Name: !Select [2, !Ref ExcludedRule0]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule0Pos3Exists
+                    - Name: !Select [3, !Ref ExcludedRule0]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule0Pos4Exists
+                    - Name: !Select [4, !Ref ExcludedRule0]
+                    - !Ref "AWS::NoValue"
+            VisibilityConfig: 
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ["-", ["MetricFor", !Select [0, !Ref WAFRuleNames]]]
+              SampledRequestsEnabled: true
+          - !Ref "AWS::NoValue"
+        - !If
+          - WAFRule1Exists
+          - Name: !Join ["-", [!Select [1, !Ref WAFRuleVendors], !Select [1, !Ref WAFRuleNames]]]
+            OverrideAction:
+              None: {}
+            Priority: 1
+            Statement:
+              ManagedRuleGroupStatement:
+                VendorName: !Select [1, !Ref WAFRuleVendors]
+                Name: !Select [1, !Ref WAFRuleNames]
+                ExcludedRules: 
+                  - !If
+                    - Rule1Pos0Exists
+                    - Name: !Select [0, !Ref ExcludedRule1]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule1Pos1Exists
+                    - Name: !Select [1, !Ref ExcludedRule1]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule1Pos2Exists
+                    - Name: !Select [2, !Ref ExcludedRule1]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule1Pos3Exists
+                    - Name: !Select [3, !Ref ExcludedRule1]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule1Pos4Exists
+                    - Name: !Select [4, !Ref ExcludedRule1]
+                    - !Ref "AWS::NoValue"
+            VisibilityConfig:
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ["-", ["MetricFor", !Select [1, !Ref WAFRuleNames]]]
+              SampledRequestsEnabled: true
+          - !Ref "AWS::NoValue"
+        - !If
+          - WAFRule2Exists
+          - Name: !Join ["-", [!Select [2, !Ref WAFRuleVendors], !Select [2, !Ref WAFRuleNames]]]
+            OverrideAction:
+              None: {}
+            Priority: 2
+            Statement:
+              ManagedRuleGroupStatement:
+                VendorName: !Select [2, !Ref WAFRuleVendors]
+                Name: !Select [2, !Ref WAFRuleNames]
+                ExcludedRules: 
+                  - !If
+                    - Rule2Pos0Exists
+                    - Name: !Select [0, !Ref ExcludedRule2]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule2Pos1Exists
+                    - Name: !Select [1, !Ref ExcludedRule2]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule2Pos2Exists
+                    - Name: !Select [2, !Ref ExcludedRule2]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule2Pos3Exists
+                    - Name: !Select [3, !Ref ExcludedRule2]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule2Pos4Exists
+                    - Name: !Select [4, !Ref ExcludedRule2]
+                    - !Ref "AWS::NoValue"
+            VisibilityConfig:
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ["-", ["MetricFor", !Select [2, !Ref WAFRuleNames]]]
+              SampledRequestsEnabled: true
+          - !Ref "AWS::NoValue"
+        - !If
+          - WAFRule3Exists
+          - Name: !Join ["-", [!Select [3, !Ref WAFRuleVendors], !Select [3, !Ref WAFRuleNames]]]
+            OverrideAction:
+              None: {}
+            Priority: 3
+            Statement:
+              ManagedRuleGroupStatement:
+                VendorName: !Select [3, !Ref WAFRuleVendors]
+                Name: !Select [3, !Ref WAFRuleNames]
+                ExcludedRules: 
+                  - !If
+                    - Rule3Pos0Exists
+                    - Name: !Select [0, !Ref ExcludedRule3]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule3Pos1Exists
+                    - Name: !Select [1, !Ref ExcludedRule3]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule3Pos2Exists
+                    - Name: !Select [2, !Ref ExcludedRule3]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule3Pos3Exists
+                    - Name: !Select [3, !Ref ExcludedRule3]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule3Pos4Exists
+                    - Name: !Select [4, !Ref ExcludedRule3]
+                    - !Ref "AWS::NoValue"
+            VisibilityConfig:
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ["-", ["MetricFor", !Select [3, !Ref WAFRuleNames]]]
+              SampledRequestsEnabled: true
+          - !Ref "AWS::NoValue"
+        - !If
+          - WAFRule4Exists
+          - Name: !Join ["-", [!Select [4, !Ref WAFRuleVendors], !Select [4, !Ref WAFRuleNames]]]
+            OverrideAction:
+              None: {}
+            Priority: 4
+            Statement:
+              ManagedRuleGroupStatement:
+                VendorName: !Select [4, !Ref WAFRuleVendors]
+                Name: !Select [4, !Ref WAFRuleNames]
+                ExcludedRules:
+                  - !If
+                    - Rule4Pos0Exists
+                    - Name: !Select [0, !Ref ExcludedRule4]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule4Pos1Exists
+                    - Name: !Select [1, !Ref ExcludedRule4]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule4Pos2Exists
+                    - Name: !Select [2, !Ref ExcludedRule4]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule4Pos3Exists
+                    - Name: !Select [3, !Ref ExcludedRule4]
+                    - !Ref "AWS::NoValue"
+                  - !If
+                    - Rule4Pos4Exists
+                    - Name: !Select [4, !Ref ExcludedRule4]
+                    - !Ref "AWS::NoValue" 
+            VisibilityConfig:
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ["-", ["MetricFor", !Select [4, !Ref WAFRuleNames]]]
+              SampledRequestsEnabled: true
+          - !Ref "AWS::NoValue"
+      Scope: "REGIONAL"
+      VisibilityConfig: 
+        CloudWatchMetricsEnabled: true
+        MetricName: !Join ["-", [MetricFor, !Ref WAFName]]
+        SampledRequestsEnabled: true
+
+  # Associate Web ACLs with Rest API
+  ApiWafWebAclAssociation0:
+    Condition: APIGateway0Exists
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties: 
+      ResourceArn: !If 
+        - APIGateway0Exists
+        - !Select [0, !Ref APIGatewayARNs]
+        - !Ref "AWS::NoValue"
+      WebACLArn: !GetAtt ApiWafWebAcl.Arn
+
+  # Associate Web ACLs with Rest API
+  ApiWafWebAclAssociation1:
+    Type: AWS::WAFv2::WebACLAssociation
+    Condition: APIGateway1Exists
+    Properties: 
+      ResourceArn: !If 
+        - APIGateway1Exists
+        - !Select [1, !Ref APIGatewayARNs]
+        - !Ref "AWS::NoValue"
+      WebACLArn: !GetAtt ApiWafWebAcl.Arn
+
+  # Associate Web ACLs with Rest API
+  ApiWafWebAclAssociation2:
+    Type: AWS::WAFv2::WebACLAssociation
+    Condition: APIGateway2Exists
+    Properties: 
+      ResourceArn: !If 
+        - APIGateway2Exists
+        - !Select [2, !Ref APIGatewayARNs]
+        - !Ref "AWS::NoValue"
+      WebACLArn: !GetAtt ApiWafWebAcl.Arn
+
+  # Associate Web ACLs with Rest API
+  ApiWafWebAclAssociation3:
+    Type: AWS::WAFv2::WebACLAssociation
+    Condition: APIGateway3Exists
+    Properties: 
+      ResourceArn: !If 
+        - APIGateway3Exists
+        - !Select [3, !Ref APIGatewayARNs]
+        - !Ref "AWS::NoValue"
+      WebACLArn: !GetAtt ApiWafWebAcl.Arn
+
+  # Associate Web ACLs with Rest API
+  ApiWafWebAclAssociation4:
+    Condition: APIGateway4Exists
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties: 
+      ResourceArn: !If 
+        - APIGateway4Exists
+        - !Select [4, !Ref APIGatewayARNs]
+        - !Ref "AWS::NoValue"
+      WebACLArn: !GetAtt ApiWafWebAcl.Arn
+
