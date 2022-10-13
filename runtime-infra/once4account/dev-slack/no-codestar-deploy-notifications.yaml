@@ -35,6 +35,7 @@ Resources:
       State: ENABLED
       Targets: 
         - Arn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+          RoleArn: !GetAtt "RulesToSnsRole.Arn"
           Id: Default-CodePipeline
 
   CodeBuildBridgeStateRule:
@@ -55,6 +56,7 @@ Resources:
       State: ENABLED
       Targets: 
         - Arn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+          RoleArn: !GetAtt "RulesToSnsRole.Arn"
           Id: Default-CodeBuild
   
   RulesToSnsRole:
