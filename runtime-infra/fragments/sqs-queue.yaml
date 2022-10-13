@@ -33,7 +33,18 @@ Parameters:
     Type: String
     Default: '-'
     Description: 'An ARN of an SNS topic where to send alarm when DLQ contain messages'
-    
+  FifoQueue: 
+    Type: Boolean
+    Default: 'false'
+    Description: 'Queue Type is FIFO, default is false'
+  ContentBasedDeduplication:
+    Type: Boolean
+    Default: 'false'
+    Description: 'For FIFO queue type enable content based deduplication, default is false'
+  DeduplicationScope:
+    Type: String
+    Default: 'queue'
+    Description: 'For FIFO queue type, set deduplication scope, default is queue'
 
 Conditions:
   DlqHasDefaultName: !Equals [ !Ref DeadLetterQueueName, '-' ]
