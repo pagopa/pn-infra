@@ -157,7 +157,6 @@ Resources:
         DelaySeconds: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
         FifoQueue: true
-        ContentBasedDeduplication: true        
 
   ### Communication TO and FROM EXTERNAL-CHANNELS ###
   ExternalChannelsInputsQueue:
@@ -206,18 +205,7 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-safestore_to_downtime_logs'
         DelaySeconds: 1
-        AlarmSNSTopicName: !Ref AlarmSNSTopicName
-  
-
-  ### Communication between PN-DELIVERY and PN-DELIVERY-PUSH ###
-  PnDeliveryInsertTriggerDLQ:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
-      Parameters:
-        QueueName: !Sub '${ProjectName}-delivery_insert_trigger_DLQ'
-        DelaySeconds: 1
-        AlarmSNSTopicName: !Ref AlarmSNSTopicName        
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName     
         
 
   ###                          PN-CORE EVENT BUS                          ###
@@ -490,17 +478,6 @@ Outputs:
   ExternalChannelsOutputsQueueARN:
     Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
     Description: pn-external-channels output queue ARN
-
-  # Delivery Insert Trigger DLQ
-  PnDeliveryInsertTriggerDLQName:
-    Value: !GetAtt PnDeliveryInsertTriggerDLQ.Outputs.QueueName
-    Description: pn-delivery_insert_trigger_DLQ queue name
-  PnDeliveryInsertTriggerDLQURL:
-    Value: !GetAtt PnDeliveryInsertTriggerDLQ.Outputs.QueueURL
-    Description: pn-delivery_insert_trigger_DLQ queue URL
-  PnDeliveryInsertTriggerDLQARN:
-    Value: !GetAtt PnDeliveryInsertTriggerDLQ.Outputs.QueueARN
-    Description: pn-delivery_insert_trigger_DLQ queue ARN
 
   # Downtime Logs composite alarm queue
   DowntimeLogsAggregateAlarmQueueName:
