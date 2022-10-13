@@ -180,15 +180,15 @@ Installare il sistema di login utilizzato dai destinatari delle notifiche.
 
 ### Preparazione configurazioni
 
-Nel repository [pn-cicd](https://github.com/pagopa/pn-cicd) aggiungere le configurazioni relative al
-nuovo ambiente (ad esempio cert) nella cartella pn-cicd/cd-cli/custom-config/pn-data-vault. 
+Nel delle configurazioni preparato secondo quanto scritto in appendice "" aggiungere le configurazioni relative al
+nuovo ambiente (ad esempio cert) nella cartella pn-data-vault. 
 
 Le configurazioni sono composte da due file:
 
-- `cd-cli/custom-config/pn-data-vault/scripts/aws/cfn/once4account/coll.yaml` che va 
+- `pn-data-vault/scripts/aws/cfn/once4account/coll.yaml` che va 
   ricopiato in `cert.yaml` nella stessa posizione ed __eventualmente personalizzare l'invio degli allarmi su slack o per mail. 
   Fondamentale è mantenere gli output esistenti__.
-- `cd-cli/custom-config/pn-data-vault/scripts/aws/cfn/microservice-coll-cfg.json`che va ricopiato in
+- `pn-data-vault/scripts/aws/cfn/microservice-cert-cfg.json`che va ricopiato in
   `microservice-cert-cfg.json` nella stessa posizione e modificato nei seguenti parametri:
   - __VpcId__: Id della VPC PAGOPA-CERT-CONFIDENTIALINFO-VPC
   - __VpcCidr__: CIDR della VPC PAGOPA-CERT-CONFIDENTIALINFO-VPC
