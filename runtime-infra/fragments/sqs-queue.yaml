@@ -50,7 +50,7 @@ Conditions:
   DlqHasDefaultName: !Equals [ !Ref DeadLetterQueueName, '-' ]
   DlqHasAlarm: !Not [ !Equals [ !Ref AlarmSNSTopicName, '-' ] ]
   IsFifo:  !Equals [ !Ref FifoQueue, 'true' ]
-  IsNotFifo:  !Not IsFifo
+  IsNotFifo:  !Not [ IsFifo ]
   IsContentBasedDeduplication: !Equals [ !Ref ContentBasedDeduplication, 'true' ]
 
 Resources:
