@@ -99,7 +99,7 @@ Resources:
       QueueName:
         Fn::If:
           - DlqHasDefaultName
-          - !Join [ '', [ !Join [ '', !Split [ '.fifo', !Ref QueueName ] ], "-DLQ" ] ]
+          - !Join [ '', [ !Join [ '', !Split [ '.fifo', !Ref QueueName ] ], "-DLQ.fifo" ] ]
           - !Ref DeadLetterQueueName
       MessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
       FifoQueue: true
