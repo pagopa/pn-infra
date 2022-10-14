@@ -65,9 +65,9 @@ Resources:
       MessageRetentionPeriod: !Ref MessageRetentionPeriod
       FifoQueue: !If [ IsFifo, true, false ]
       ContentBasedDeduplication:
-        "Fn::If": ["IsFifo",
+        "Fn::If": [IsFifo,
                 {
-                  "Fn::If": ["IsContentBasedDeduplication",
+                  "Fn::If": [IsContentBasedDeduplication,
                     {
                       true
                     },
