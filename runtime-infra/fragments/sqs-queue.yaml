@@ -95,7 +95,7 @@ Resources:
     Condition: DlqHasAlarm
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Join [ '', !Split [ '.fifo', !Ref QueueName ], "-DLQ-HasMessage" ] ]
+      AlarmName: !Join [ '', !Split [ '.fifo', !Ref QueueName ], "-DLQ-HasMessage" ]
       AlarmDescription: "Alarm dlq messages when we have 1 or more messages in DLQ"
       Namespace: "AWS/SQS"
       MetricName: "ApproximateNumberOfMessagesVisible"
