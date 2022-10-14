@@ -62,8 +62,8 @@ Resources:
         maxReceiveCount: !Ref MaxReceiveCount
       DelaySeconds: !Ref DelaySeconds
       MessageRetentionPeriod: !Ref MessageRetentionPeriod
-      FifoQueue: !Ref FifoQueue
-      ContentBasedDeduplication: !If [ IsFifo, !Ref ContentBasedDeduplication, AWS::NoValue ]
+      FifoQueue: !If [ IsFifo, true, false ]
+      ContentBasedDeduplication: !If [ IsFifo, !Equals [ !Ref ContentBasedDeduplication, 'true' ] , AWS::NoValue ]
       DeduplicationScope: !If [ IsFifo, !Ref DeduplicationScope, AWS::NoValue ]
 
   DeadLetterQueue:
