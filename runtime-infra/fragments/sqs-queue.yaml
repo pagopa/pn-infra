@@ -119,13 +119,13 @@ Outputs:
   # Queue info
   QueueName:
     Description: Name of source queue
-    Value: !GetAtt Queue.QueueName
+    Value: !If [ IsNotFifo, !GetAtt Queue.QueueName , !GetAtt QueueFifo.QueueName ]
   QueueURL:
     Description: URL of the source queue
-    Value: !Ref Queue
+    Value: !If [ IsNotFifo, !Ref Queue , !Ref QueueFifo ]
   QueueARN:
     Description: ARN of source queue
-    Value: !GetAtt Queue.Arn
+    Value: !If [ IsNotFifo, !GetAtt Queue.Arn, !GetAtt QueueFifo.Arn ]
 
   # Dead letter queue info
   DeadLetterQueueName:
