@@ -193,7 +193,9 @@ Resources:
                       sqs_message = json.loads(body['Message'])
                       SlackSNSTopic = os.environ['SlackSNSTopic']
                       sns = boto3.client('sns')
+                      print('########### INPUT MESSAGE #############')
                       print(sqs_message)
+                                
                       
                       if 'AlarmName' in sqs_message:
                           #Message type is an Alarm message
@@ -201,7 +203,7 @@ Resources:
                           metric_name = sqs_message['Trigger']['MetricName']
                           metric_namespace = sqs_message['Trigger']['Namespace']
                           log_group_response_name = get_log_group_name(metric_name, metric_namespace)
-                          print(log_group_response_name)
+                          print("==> LogGroups", log_group_response_name)
                           
                           if log_group_response_name == "NotFound":
                               #No log groups found - Send message with no enrichment
@@ -248,24 +250,21 @@ Resources:
                           caller_version = sqs_message['version']
                   
                           if resource_source == "aws.codebuild":
-                              resource_message = "Code Build failed" 
                               project_name = sqs_message['detail']['project-name']
-                              project_link = "https://"+region+".console.aws.amazon.com/codesuite/codebuild/"+account_id+"/projects/"+project_name
-                              cloudwatch_logs = sqs_message['detail']['additional-information']['logs']['deep-link']
-                              resource_data = {
-                                  "Project-Name": project_name,
-                                  "Project-Link:": project_link,
-                                  "CloudWatch-Logs": cloudwatch_logs
-                              }
+                              if project_name == "pn-RunE2eTestsCodeBuildProject":
+                                  project_link = "https://"+region+".console.aws.amazon.com/codesuite/codebuild/"+account_id+"/projects/"+project_name
+                                  cloudwatch_logs = sqs_message['detail']['additional-information']['logs']['deep-link']
+                                  resource_message = "TEST E2E FALLITI" 
+                                  resource_data = {}
+                              else:
+                                  resource_data = None
                               
                           elif resource_source == "aws.codepipeline":
-                              resource_message = "Code Pipeline failed" 
                               pipeline = sqs_message['detail']['pipeline']
                               pipeline_link = "https://"+region+".console.aws.amazon.com/codesuite/codepipeline/pipelines/"+pipeline+"/view?region="+region
-                              resource_data = {
-                                  "Project-Name": pipeline,
-                                  "Project-Link:": pipeline_link,
-                              }
+                              resource_message = "PIPELINE " + pipeline + " FALLITA" 
+                              resource_data = {}
+                              
                           
                           _message = {
                               "version":caller_version,
@@ -284,11 +283,14 @@ Resources:
                               }
                           }
                       
-                      response = sns.publish(
-                          TopicArn=SlackSNSTopic,
-                          Message=json.dumps(_message),
-                          MessageStructure='string',
-                      )
+                      print('########### OUTPUT MESSAGE #############')
+                      print(_message)
+                      if resource_data is not None:
+                          response = sns.publish(
+                              TopicArn=SlackSNSTopic,
+                              Message=json.dumps(_message),
+                              MessageStructure='string',
+                          )
                       
                       statusCode = 200
                       body = "Success"
@@ -360,6 +362,7 @@ Resources:
           # It will return an encoded string of the URL
           def encode_string(log_group_name):
               return log_group_name.replace("/", "$252F")
+
   
       Description: AWS Lambda function to customize CloudWatch Alarm notification
       Environment: 
