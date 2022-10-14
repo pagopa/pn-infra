@@ -49,6 +49,7 @@ Parameters:
 Conditions:
   DlqHasDefaultName: !Equals [ !Ref DeadLetterQueueName, '-' ]
   DlqHasAlarm: !Not [ !Equals [ !Ref AlarmSNSTopicName, '-' ] ]
+  IsFifo:  !Equals [ !Ref FifoQueue, 'true' ]
 
 Resources:
 
@@ -62,8 +63,8 @@ Resources:
       DelaySeconds: !Ref DelaySeconds
       MessageRetentionPeriod: !Ref MessageRetentionPeriod
       FifoQueue: !Ref FifoQueue
-      ContentBasedDeduplication: !Ref ContentBasedDeduplication
-      DeduplicationScope: !Ref DeduplicationScope
+      ContentBasedDeduplication: !If [ IsFifo, !Ref ContentBasedDeduplication, AWS::NoValue ]
+      DeduplicationScope: !If [ IsFifo, !Ref DeduplicationScope, AWS::NoValue ]
 
   DeadLetterQueue:
     Type: AWS::SQS::Queue
