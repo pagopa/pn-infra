@@ -64,23 +64,8 @@ Resources:
       DelaySeconds: !Ref DelaySeconds
       MessageRetentionPeriod: !Ref MessageRetentionPeriod
       FifoQueue: !If [ IsFifo, true, false ]
-      ContentBasedDeduplication:
-        "Fn::If": [IsFifo,
-                {
-                  "Fn::If": [IsContentBasedDeduplication,
-                    {
-                      'true'
-                    },
-                    {
-                      'false'
-                    }
-                    ]
-                },
-                {
-                   AWS::NoValue
-                }
-              ]
-      DeduplicationScope: !If [ IsFifo, !Ref DeduplicationScope, AWS::NoValue ]
+      ContentBasedDeduplication: !If [ IsFifo, !If [IsContentBasedDeduplication, true, false] , !Ref AWS::NoValue ]
+      DeduplicationScope: !If [ IsFifo, !Ref DeduplicationScope, !Ref AWS::NoValue ]
 
   DeadLetterQueue:
     Type: AWS::SQS::Queue
