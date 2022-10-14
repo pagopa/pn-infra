@@ -50,11 +50,14 @@ Conditions:
   DlqHasDefaultName: !Equals [ !Ref DeadLetterQueueName, '-' ]
   DlqHasAlarm: !Not [ !Equals [ !Ref AlarmSNSTopicName, '-' ] ]
   IsFifo:  !Equals [ !Ref FifoQueue, 'true' ]
+  IsNotFifo:  !Not IsFifo
   IsContentBasedDeduplication: !Equals [ !Ref ContentBasedDeduplication, 'true' ]
 
 Resources:
 
+
   Queue:
+    Condition: IsNotFifo
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Ref QueueName
@@ -63,9 +66,20 @@ Resources:
         maxReceiveCount: !Ref MaxReceiveCount
       DelaySeconds: !Ref DelaySeconds
       MessageRetentionPeriod: !Ref MessageRetentionPeriod
-      FifoQueue: !If [ IsFifo, true, false ]
-      ContentBasedDeduplication: !If [ IsFifo, !If [IsContentBasedDeduplication, true, false] , !Ref AWS::NoValue ]
-      DeduplicationScope: !If [ IsFifo, !Ref DeduplicationScope, !Ref AWS::NoValue ]
+
+  FifoQueue:
+      Condition: IsFifo
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: !Ref QueueName
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+          maxReceiveCount: !Ref MaxReceiveCount
+        DelaySeconds: !Ref DelaySeconds
+        MessageRetentionPeriod: !Ref MessageRetentionPeriod
+        FifoQueue: true
+        ContentBasedDeduplication: !If [IsContentBasedDeduplication, true, false]
+        DeduplicationScope: !Ref DeduplicationScope
 
   DeadLetterQueue:
     Type: AWS::SQS::Queue
