@@ -130,13 +130,13 @@ prepare_networking_on_dev.sh ) seguendo la seguente parametrizzazione:
     Dove `<nome-ambiente>` va sostituito, ad esempio, con _"cert"_
 ### Test
   - Da un computer esterno ad AWS 
-    - il comando `dig -t TXT testdns.cert.pn.pagopa.it` 
-      deve rispondere _"Test DNS entry for PN cert"_
-    - il comando `dig -t TXT testdns.spid.cert.pn.pagopa.it` 
-      deve rispondere _"Test DNS entry for PN SPID cert"_
+    - il comando `dig -t TXT testdns.<nome-ambiente>.pn.pagopa.it` 
+      deve rispondere _"Test DNS entry for PN <nome-ambiente>"_
+    - il comando `dig -t TXT testdns.spid.<nome-ambiente>.pn.pagopa.it` 
+      deve rispondere _"Test DNS entry for PN SPID <nome-ambiente>"_
   - Nell'account _PN-CORE_ devono essere presenti e in stato issued i seguenti certificati:
-    - Region _eu-south-1_: api.cert.pn.pagopa.it, webapi.cert.pn.pagopa.it, api-io.cert.pn.pagopa.it
-    - Region _us-east-1_: portale.cert.pn.pagopa.it, portale-pa.cert.pn.pagopa.it, portale-login.cert.pn.pagopa.it
+    - Region _eu-south-1_: api.<nome-ambiente>.pn.pagopa.it, webapi.<nome-ambiente>.pn.pagopa.it, api-io.<nome-ambiente>.pn.pagopa.it
+    - Region _us-east-1_: portale.<nome-ambiente>.pn.pagopa.it, portale-pa.<nome-ambiente>.pn.pagopa.it, portale-login.<nome-ambiente>.pn.pagopa.it
 
 ## Accesso agli artefatti di cui fare deploy
 Comunicare a PagoPA gli AccountID di pn-core e pn-configential-information specifici per l'ambiente. 
@@ -202,22 +202,22 @@ Installare il sistema di login utilizzato dai destinatari delle notifiche.
 
 ### Preparazione configurazioni
 
-Nel repository [pn-cicd](https://github.com/pagopa/pn-cicd) aggiungere le configurazioni relative al
-nuovo ambiente (ad esempio cert) nella cartella pn-cicd/cd-cli/custom-config/pn-data-vault. 
+Nel repository configurato su AWS CodeCommit nell'ambiente su cui si sta agendo e nella regione _eu-south-1_, aggiungere le configurazioni relative al
+nuovo ambiente (ad esempio cert) come descritto di seguito.
 
 Le configurazioni sono composte da due file:
 
-- `cd-cli/custom-config/pn-data-vault/scripts/aws/cfn/once4account/coll.yaml` che va 
-  ricopiato in `cert.yaml` nella stessa posizione ed __eventualmente personalizzare l'invio degli allarmi su slack o per mail. 
+- Il file `https://github.com/pagopa/pn-data-vault/blob/main/scripts/aws/cfn/once4account/dev.yaml` che va 
+  ricopiato nel nuovo repository CodeCommit in `pn-data-vault/scripts/aws/cfn/once4account/<nome_ambiente>.yaml` ed __eventualmente personalizzato con l'invio degli allarmi su slack o per mail. 
   Fondamentale è mantenere gli output esistenti__.
-- `cd-cli/custom-config/pn-data-vault/scripts/aws/cfn/microservice-coll-cfg.json`che va ricopiato in
-  `microservice-cert-cfg.json` nella stessa posizione e modificato nei seguenti parametri:
-  - __VpcId__: Id della VPC PAGOPA-CERT-CONFIDENTIALINFO-VPC
-  - __VpcCidr__: CIDR della VPC PAGOPA-CERT-CONFIDENTIALINFO-VPC
-  - __VpcSubnets__: id, separati da virgola, delle sotto reti PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-A, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-B, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-C
-  - __VpcSubnetsRoutingTables__: id della tabella di routing PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-RT
+- Il file `https://github.com/pagopa/pn-data-vault/blob/main/scripts/aws/cfn/microservice-dev-cfg.json` che va ricopiato in
+  `pn-data-vault/scripts/aws/cfn/microservice-<nome_ambiente>-cfg.json` e modificato nei seguenti parametri:
+  - __VpcId__: Id della VPC PAGOPA-\<NOME_AMBIENTE\>-CONFIDENTIALINFO-VPC
+  - __VpcCidr__: CIDR della VPC PAGOPA-\<NOME_AMBIENTE\>-CONFIDENTIALINFO-VPC
+  - __VpcSubnets__: id, separati da virgola, delle sotto reti PAGOPA-\<NOME_AMBIENTE\>-CONFIDENTIALINFO-GENERIC-A, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-B, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-C
+  - __VpcSubnetsRoutingTables__: id della tabella di routing PAGOPA-\<NOME_AMBIENTE\>-CONFIDENTIALINFO-GENERIC-RT
   - __PrivateHostedZone__: id della hosted zone privata `confidential.pn.internal` presente nell'account _CONFIDENTIAL-INFORMATION_,
-  - __EcsDefaultSecurityGroup__: id del security group PAGOPA-CERT-CONFIDENTIALINFO-MAIN-SG,
+  - __EcsDefaultSecurityGroup__: id del security group PAGOPA-\<NOME_AMBIENTE\>-CONFIDENTIALINFO-MAIN-SG,
   - __PDVTokenizerBasePath__ : url del tokenizer del servizio PersonalDataVault di pagopa (ES: "https://api.uat.tokenizer.pdv.pagopa.it/tokenizer/v1")
   - __PDVUserRegistryBasePath__ : url dello user registry del servizio PersonalDataVault di pagopa 
       (ES: "https://api.uat.pdv.pagopa.it/user-registry/v1")
@@ -226,6 +226,7 @@ Le configurazioni sono composte da due file:
 ### Preparazione file con la versioni degli script di deploy (__desired-commit-ids-env.sh__)
 - Va scaricato dall'ambiente di collaudo il file 
  `s3://cd-pipeline-datavault-cdartifactbucket-1lf70f4dd9hib/config/desired-commit-ids-env.sh`
+Nota: l'id del bucket dopo _cdartifactbucket_ è generato dinamicamente da AWS Cloud Formation.
 
 ## Procedimento d'installazione
 
@@ -245,7 +246,7 @@ Tutte le operazioni vanno eseguite nell'account _CONFIDENTIAL-INFORMATION_ nella
 
 ## Test
 - Verificare che sia stato creato un cluster ECS con nome _pn-confidential-ecs-cluster_ e che abbia
-  un servizio con nome che cominci per _pn-data-vault-microsvc-cert-DataVaultMicroservice-_ in esecuzione.
+  un servizio con nome che cominci per _pn-data-vault-microsvc-\<nome_ambiente\>-DataVaultMicroservice-_ in esecuzione.
 
 
 # Installazione PN-CORE
@@ -351,7 +352,7 @@ Testare il nuovo ambiente di PN
 Per gli account _pn-core_ e _pn-confidential-information_ degli ambienti cert e prod sarà necessario definire un repository codecommit contenente i parametri di configurazione per il software in esecuzione in tale account. 
 Eseguire i seguenti passi, sempre usando l'account in questione:
 - [Creare un repository codecommit](https://docs.aws.amazon.com/codecommit/latest/userguide/how-to-create-repository.html)
-  - con nome `<account-name>-configurations-<env-name>` ove _env-name_ può essere `cert` o `prod`.
+  - con nome `<account-name>-configurations-<env-name>` ove _env-name_ può essere `cert`, `prod` ...
 - [Configurare un utenza IAM](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html) 
   - con nome config_reader, 
   - che abbia diritto di lettura sul repository appena creato (ad esempio associandolo alla managed 
@@ -361,7 +362,7 @@ Eseguire i seguenti passi, sempre usando l'account in questione:
 - Definire un secret di tipo "Altro tipo di segreto" in "AWS Secrets Manager". Tale secret avrà nome 
   "pn-configurations-repository" e come valore avraà due coppie chiave valore.
   - Nella chiave _repositoryUrl_ il valore dell'url di clone del repository con tanto di nume utente e 
-    la versione url encoded della password.
-  - Nella chiave _commitId_ la stringa da utilizzare per il checkout della corretta versione delle configurazioni.
+    la versione url encoded della password nella forma _https://{username}:{password}@<repository_base_url>_
+  - Nella chiave _commitId_ la stringa da utilizzare per il checkout della corretta versione delle configurazioni (può essere usato anche _main_).
 
 
