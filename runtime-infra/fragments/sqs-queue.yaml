@@ -38,8 +38,8 @@ Parameters:
     Default: 'false'
     Description: 'Queue Type is FIFO, default is false'
   ContentBasedDeduplication:
-    Type: String
-    Default: 'false'
+    Type: Boolean
+    Default: false
     Description: 'For FIFO queue type enable content based deduplication, default is false'
   DeduplicationScope:
     Type: String
@@ -50,7 +50,6 @@ Conditions:
   DlqHasDefaultName: !Equals [ !Ref DeadLetterQueueName, '-' ]
   DlqHasAlarm: !Not [ !Equals [ !Ref AlarmSNSTopicName, '-' ] ]
   IsFifo:  !Equals [ !Ref FifoQueue, 'true' ]
-  IsContentBasedDeduplication: !Equals [ !Ref ContentBasedDeduplication, 'true' ]
 
 Resources:
 
@@ -64,7 +63,7 @@ Resources:
       DelaySeconds: !Ref DelaySeconds
       MessageRetentionPeriod: !Ref MessageRetentionPeriod
       FifoQueue: !If [ IsFifo, true, false ]
-      ContentBasedDeduplication: !If [ IsFifo, !If [ IsContentBasedDeduplication, true, false]  , AWS::NoValue ]
+      ContentBasedDeduplication: !If [ IsFifo, !Ref ContentBasedDeduplication , AWS::NoValue ]
       DeduplicationScope: !If [ IsFifo, !Ref DeduplicationScope, AWS::NoValue ]
 
   DeadLetterQueue:
