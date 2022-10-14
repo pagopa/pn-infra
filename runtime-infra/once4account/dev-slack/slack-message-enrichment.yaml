@@ -193,6 +193,7 @@ Resources:
                       sqs_message = json.loads(body['Message'])
                       SlackSNSTopic = os.environ['SlackSNSTopic']
                       sns = boto3.client('sns')
+                      print('########### INPUT MESSAGE #############')
                       print(sqs_message)
                       
                       if 'AlarmName' in sqs_message:
@@ -284,6 +285,8 @@ Resources:
                               }
                           }
                       
+                      print('########### OUTPUT MESSAGE #############')
+                      print(_message)
                       response = sns.publish(
                           TopicArn=SlackSNSTopic,
                           Message=json.dumps(_message),
