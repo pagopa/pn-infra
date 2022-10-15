@@ -1,0 +1,160 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates a AWS Global Accelerator, associated with an Application Load Balancer to redirect HTTP to HTTPS
+
+Parameters:
+  CertificateArn:
+    Description: The ARN of the SSL certificate.
+    Type: String
+
+  ClientAffinity:
+    AllowedValues: [ NONE, SOURCE_IP ]
+    Description: Client affinity lets you direct all requests from a user to the same endpoint.
+    Type: String
+    Default: NONE
+
+  GlobalAccName:
+    Description: The name of the accelerator.
+    Type: String
+
+  DNSHostname:
+    Description: The hostname to redirect to.
+    Type: String
+  
+  IpAddressType:
+    AllowedValues: [ dualstack, ipv4 ]
+    Description: The IP address type.
+    Default: ipv4
+    Type: String
+
+  Subnets:
+    Description: The IDs of the subnets.
+    Type: List<AWS::EC2::Subnet::Id>
+
+  VpcId:
+    Description: The ID of the VPC for the security group.
+    Type: AWS::EC2::VPC::Id
+
+Resources:
+  Accelerator:
+    Type: AWS::GlobalAccelerator::Accelerator
+    Properties: 
+      Enabled: true
+      IpAddressType: IPV4
+      Name: !Ref GlobalAccName
+
+  HttpGlobalAccListener:
+    Type: AWS::GlobalAccelerator::Listener
+    Properties: 
+      AcceleratorArn: !Ref Accelerator
+      ClientAffinity: !Ref ClientAffinity
+      PortRanges: 
+        - FromPort: 80
+          ToPort: 80
+      Protocol: TCP
+
+  HttpsGlobalAccListener:
+    Type: AWS::GlobalAccelerator::Listener
+    Properties: 
+      AcceleratorArn: !Ref Accelerator
+      ClientAffinity: !Ref ClientAffinity
+      PortRanges: 
+        - FromPort: 443
+          ToPort: 443
+      Protocol: TCP
+
+  HttpEndpointGroup:
+    Type: AWS::GlobalAccelerator::EndpointGroup
+    Properties: 
+      EndpointConfigurations: 
+        - ClientIPPreservationEnabled: true
+          EndpointId: !Ref HttpALB
+      EndpointGroupRegion: !Ref AWS::Region
+      ListenerArn: !Ref HttpGlobalAccListener
+      TrafficDialPercentage: 100
+
+  HttpsEndpointGroup:
+    Type: AWS::GlobalAccelerator::EndpointGroup
+    Properties: 
+      EndpointConfigurations: 
+        - ClientIPPreservationEnabled: true
+          EndpointId: !Ref HttpALB
+      EndpointGroupRegion: !Ref AWS::Region
+      ListenerArn: !Ref HttpsGlobalAccListener
+      TrafficDialPercentage: 100
+
+  HttpALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      IpAddressType: !Ref IpAddressType
+      Name: !Sub ${GlobalAccName}-ALB
+      Scheme: internal
+      SecurityGroups: 
+        - !Ref ALBSecurityGroup
+      Subnets: !Ref Subnets
+      Type: application
+
+  HttpALBListner:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties: 
+      DefaultActions: 
+        - Type: redirect
+          RedirectConfig: 
+            Host: !Ref DNSHostname
+            Path: "/#{path}"
+            Port: 443
+            Protocol: HTTPS
+            Query: "#{query}"
+            StatusCode: HTTP_301
+      LoadBalancerArn: !Ref HttpALB
+      Port: 80
+      Protocol: HTTP
+
+  HttpsALBListner:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties: 
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+      DefaultActions: 
+        - Type: redirect
+          RedirectConfig: 
+            Host: !Ref DNSHostname
+            Path: "/#{path}"
+            Port: 443
+            Protocol: HTTPS
+            Query: "#{query}"
+            StatusCode: HTTP_301
+      LoadBalancerArn: !Ref HttpALB
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-2016-08
+
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: !Sub  "Security group for ${GlobalAccName}-ALB"
+      GroupName: !Sub ${GlobalAccName}-ALB
+      SecurityGroupEgress: 
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
+          IpProtocol: -1
+      SecurityGroupIngress: 
+        - CidrIp: 0.0.0.0/0
+          Description: Allow HTTP requests
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+        - CidrIp: 0.0.0.0/0
+          Description: Allow HTTPS requests
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+      Tags: 
+        - Key: Name
+          Value: !Sub ${GlobalAccName}-ALB
+      VpcId: !Ref VpcId
+
+Outputs:
+  AcceleratorIPAddresses:
+    Description: Array of IPv4 addresses in the IP address set.
+    Value: !Join [", ", !GetAtt Accelerator.Ipv4Addresses]
+
