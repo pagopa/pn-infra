@@ -25,7 +25,6 @@ __N.B.__: da definire in che Account AWS avverrà il deploy della soluzione.
     sarà _www.notifichedigitali.it_
   - Parametro "GlobalAccName": _static-ip-landing-&lt;EnvName&gt;_ dove &lt;EnvName&gt; è uno tra dev, svil, 
     coll, cert, hotifx, prod
-  - Parametro "IpAddressType": lasciare il default (_ipv4_)
   - Parametro "Subnets": lista separata da virgole degli id delle 3 sottoreti richieste al punto 1.
   - Parametro "VpcId": id della VPC richieste al punto 1.
 
