@@ -20,12 +20,6 @@ Parameters:
     Description: The hostname to redirect to.
     Type: String
   
-  IpAddressType:
-    AllowedValues: [ dualstack, ipv4 ]
-    Description: The IP address type.
-    Default: ipv4
-    Type: String
-
   Subnets:
     Description: The IDs of the subnets.
     Type: List<AWS::EC2::Subnet::Id>
@@ -85,7 +79,7 @@ Resources:
   HttpALB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties: 
-      IpAddressType: !Ref IpAddressType
+      IpAddressType: IPV4
       Name: !Sub ${GlobalAccName}-ALB
       Scheme: internal
       SecurityGroups: 
