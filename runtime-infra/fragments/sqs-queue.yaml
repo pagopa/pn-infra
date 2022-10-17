@@ -71,7 +71,7 @@ Resources:
       Condition: IsFifo
       Type: AWS::SQS::Queue
       Properties:
-        QueueName: !Ref QueueName
+        QueueName: !Sub "${QueueName}.fifo"
         RedrivePolicy:
           deadLetterTargetArn: !GetAtt DeadLetterQueueFifo.Arn
           maxReceiveCount: !Ref MaxReceiveCount
@@ -99,7 +99,7 @@ Resources:
       QueueName:
         Fn::If:
           - DlqHasDefaultName
-          - !Join [ '', [ !Join [ '', !Split [ '.fifo', !Ref QueueName ] ], "-DLQ.fifo" ] ]
+          - !Sub "${QueueName}-DLQ.fifo"
           - !Ref DeadLetterQueueName
       MessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
       FifoQueue: true
@@ -108,7 +108,7 @@ Resources:
     Condition: DlqHasAlarm
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Join [ '', [ !Join [ '', !Split [ '.fifo', !Ref QueueName ] ], "-DLQ-HasMessage" ] ]
+      AlarmName: !Sub "${QueueName}-DLQ-HasMessage"
       AlarmDescription: "Alarm dlq messages when we have 1 or more messages in DLQ"
       Namespace: "AWS/SQS"
       MetricName: "ApproximateNumberOfMessagesVisible"
