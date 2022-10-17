@@ -261,40 +261,41 @@ Gli URL di tali servizi sono reperibili sull'API gateway dell'account del fornit
 ### Pacchettizzazione Front End
 
 Richiedere al team di front-end di aggiungere gli artifact dei siti web dedicati all'ambiente specifico.
+L'obiettivo è avere 
 
 ### Preparazione configurazioni
 
 Breve sintesi dei parametri da configurare per maggiori dettagli riferirsi alla pagina confluence
 [Configurazioni Prodotto](https://pagopa.atlassian.net/wiki/spaces/PN/pages/527433857/Configurazioni+prodotto).
 
-Nel repository [pn-cicd](https://github.com/pagopa/pn-cicd) aggiungere le configurazioni relative al
-nuovo ambiente (ad esempio cert) in tutte le sottocartelle di `cd-cli/custom-config`. Le configurazioni, 
-allo stato attuale, sono ottenibili da quelle di un altro ambiente sostituendo il nome dell'ambiente 
+Nel repository configurato su AWS CodeCommit nell'ambiente su cui si sta agendo e nella regione _eu-south-1_, aggiungere le configurazioni relative al
+nuovo ambiente (ad esempio cert).
+Le configurazioni, allo stato attuale, sono ottenibili da quelle di un altro ambiente sostituendo il nome dell'ambiente 
 vecchio con il nuovo.
 
 Modificare i seguenti parametri:
-- File `pn-delivery/scripts/aws/cfn/microservice-cert-cfg.json`
+- File `pn-delivery/scripts/aws/cfn/microservice-<nome_ambiente>-cfg.json`
   - __SandboxSafeStorageBaseUrl__: valorizzato all'url di safe-storage dello specifico ambiente
-- File `pn-delivery-push/scripts/aws/cfn/microservice-cert-cfg.json`
+- File `pn-delivery-push/scripts/aws/cfn/microservice-<nome_ambiente>-cfg.json`
   - __SandboxSafeStorageBaseUrl__: valorizzato all'url di safe-storage dello specifico ambiente
   - __ExternalChannelBaseUrl__ che va valorizzato all'url di external-channel dello specifico ambiente
-- File `pn-frontend/aws-cdn-templates/cert/env-cdn.sh`
+- File `pn-frontend/aws-cdn-templates/<nome_ambiente>/env-cdn.sh`
   - __ZONE_ID__: valorizzato con l'identificativo della zona cert.pn.pagopa.it letto dalla console di Route53
-  - __PORTALE_PA_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale-pa.cert.pn.pagopa.it 
+  - __PORTALE_PA_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale-pa.<nome_ambiente>.pn.pagopa.it 
       (letto sulla console del Aws Certificate Manager nella zona 'N. Virginia')
-  - __PORTALE_PF_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale.cert.pn.pagopa.it
+  - __PORTALE_PF_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale.<nome_ambiente>.pn.pagopa.it
       (letto sulla console del Aws Certificate Manager nella zona 'N. Virginia)'
-  - __PORTALE_PF_LOGIN_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale-login.cert.pn.pagopa.it
+  - __PORTALE_PF_LOGIN_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale-login.<nome_ambiente>.pn.pagopa.it
       (letto sulla console del Aws Certificate Manager nella zona 'N. Virginia)'
   - Frammento __&lt;NomeBucketLegalInput&gt;__: sostituito con il nome del bucket utilizzato 
     per l'input di allegati alle notifiche per lo specifico ambiente (Es: pnsafestoragecert-nonlegal-input-eu-south-1)
-- File `pn-infra/runtime-infra/pn-infra-cert-cfg.json`
+- File `pn-infra/runtime-infra/pn-infra-<nome_ambiente>-cfg.json`
   - __VpcId__: Id della VPC PAGOPA-CERT-PNCORE-VPC
   - __VpcCidr__: CIDR della VPC PAGOPA-CERT-PNCORE-VPC
-  - __VpcSubnets__: id delle sottoreti PAGOPA-CERT-PNCORE-GENERIC-A, PAGOPA-CERT-PNCORE-GENERIC-B, PAGOPA-CERT-PNCORE-GENERIC-C
-  - __VpcSubnetsRoutingTables__: id della tabella di routing PAGOPA-CERT-PNCORE-GENERIC-RT
+  - __VpcSubnets__: id delle sottoreti PAGOPA-<NOME_AMBIENTE>-PNCORE-GENERIC-A, PAGOPA-<NOME_AMBIENTE>-PNCORE-GENERIC-B, PAGOPA-<NOME_AMBIENTE>-PNCORE-GENERIC-C
+  - __VpcSubnetsRoutingTables__: id della tabella di routing PAGOPA-<NOME_AMBIENTE>-PNCORE-GENERIC-RT
   - __PrivateHostedZone__: id della hosted zone privata `core.pn.internal` presente nel servizio Route53 dell'account _PN-CORE_,
-  - __EcsDefaultSecurityGroup__: id del security group PAGOPA-CERT-PNCORE-MAIN-SG,
+  - __EcsDefaultSecurityGroup__: id del security group PAGOPA-<NOME_AMBIENTE>-PNCORE-MAIN-SG,
   - __LogsBucketName__: nome del bucket in cui verranno memorizzati i log: "pn-logs-bucket-eu-south-1-&lt;AccountID&gt;-001"
       dove &lt;AccountID&gt; viene sostituito con il numero dell'account AWS di PN-CORE,
   - __LogsAccountId__: l numero dell'account AWS di PN-CORE,
@@ -302,31 +303,44 @@ Modificare i seguenti parametri:
   - __DataLakeAccountId1__: per certificazione va bene il numero dell'account AWS di PN-CORE per prod serve l'account id 
       dell'ambiente di produzione di DataLake che dovrà essere comunicato da PagoPA,
   - __DataLakeAccountId2__: serve solo in ambiente dev, in tutti gli altri ambienti deve essere valorizzato con '-'
-- File `pn-infra/runtime-infra/pn-ipc-cert-cfg.json`
-  - __ApiCertificateArn__: ARN del certificato per il DNS api.cert.pn.pagopa.it
-  - __WebApiCertificateArn__: ARN del certificato per il DNS webapi.cert.pn.pagopa.it
-  - __IoApiCertificateArn__: ARN del certificato per il DNS api-io.cert.pn.pagopa.it
-  - __HostedZoneId__: l'id della zona DNS cert.pn.pagopa.it
+- File `pn-infra/runtime-infra/pn-ipc-<nome_ambiente>-cfg.json`
+  - __ApiCertificateArn__: ARN del certificato per il DNS api.<nome_ambiente>.pn.pagopa.it
+  - __WebApiCertificateArn__: ARN del certificato per il DNS webapi.<nome_ambiente>.pn.pagopa.it
+  - __IoApiCertificateArn__: ARN del certificato per il DNS api-io.<nome_ambiente>.pn.pagopa.it
+  - __HostedZoneId__: l'id della zona DNS <nome_ambiente>.pn.pagopa.it
   - __SafeStorageAccountId__: l'id dell'account AWS in cui si trovano safe-storage ed external channel
-- File `pn-user-attributes/scripts/aws/cfn/microservice-cert-cfg.json`
+- File `pn-user-attributes/scripts/aws/cfn/microservice-<nome_ambiente>>-cfg.json`
   - __ExternalChannelBasePath__: l'url di external-channel per lo specifico ambiente
 
 - Caricare i file sul repository delle configurazioni preparato secondo l'appendice "Preparare il repository delle configurazioni".
   __N.B.__: è un repository separato da quello di pn-confidentialinformation.
 
+La lista dei servizi da configurare, per i quali ci si aspetta una cartella dedicata nel repository delle configurazioni, è la seguente:
+  - pn-auth-fleet
+  - pn-delivery
+  - pn-delivery-push
+  - pn-downtime-logs
+  - pn-external-registries
+  - pn-frontend
+  - pn-infra
+  - pn-logsaver-be
+  - pn-mandate
+  - pn-radd-fsu
+  - pn-user-attributes
+
 ### Preparazione file con i _commit-id_ (__desired-commit-ids-env.sh__)
 
 - Va scaricato dall'ambiente di collaudo il file 
  `s3://cd-pipeline-cdartifactbucket-4z3nf89jd2zy/config/desired-commit-ids-env.sh`
- 
+Nota: l'id del bucket dopo _cdartifactbucket_ è generato dinamicamente da AWS Cloud Formation.
 
 ## Procedimento d'installazione
 
 Tutte le operazioni vanno eseguite nell'account _PN-CORE_ nella regione _eu-south-1_
 
-- Definire segreti (Amazon Secret Manager) e parametri (AWS Parameter Store); i valori vanno reperiti dalla pagina
-  confluence _Configurazioni Secrets_ ai paragrafi _pn-ExternalRegistries_ e _DataLake_.
+- Definire parametri su AWS Parameter Store; se non esplicitamente forniti, i valori vanno reperiti da un altro ambiente AWS già configurato, ad esempio `dev`:
   - un parametro con nome=MockPaList tier=standard type=string dataType=text
+- Definire segreti su Amazon Secret Manager; se non esplicitamente forniti, i valori vanno reperiti da un altro ambiente già configurato, ad esempio `dev`.
   - un segreto con nome=pn-ExternalRegistries-Secrets secretType=other plaintext=&lt;il valore fornito da pagopa&gt; 
     gli altri parametri vengono lasciati al default
   - un segreto con nome=pn-logs-data-lake-role-access secretType=other plaintext=&lt;il valore fornito da pagopa&gt; 
