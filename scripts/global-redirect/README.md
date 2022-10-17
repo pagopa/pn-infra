@@ -24,7 +24,7 @@ __N.B.__: da definire in che Account AWS avverrà il deploy della soluzione.
   - Parametro "DNSHostname": il valore del dominio a cui vengono ridirezionate le chiamate. In produzione 
     sarà _www.notifichedigitali.it_
   - Parametro "GlobalAccName": _static-ip-landing-&lt;EnvName&gt;_ dove &lt;EnvName&gt; è uno tra dev, svil, 
-    coll, cert, prod
+    coll, cert, hotifx, prod
   - Parametro "IpAddressType": lasciare il default (_ipv4_)
   - Parametro "Subnets": lista separata da virgole degli id delle 3 sottoreti richieste al punto 1.
   - Parametro "VpcId": id della VPC richieste al punto 1.
