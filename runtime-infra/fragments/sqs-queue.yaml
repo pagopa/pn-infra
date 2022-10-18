@@ -62,6 +62,15 @@ Conditions:
   IsContentBasedDeduplication: !Equals [ !Ref ContentBasedDeduplication, 'true' ]
   IsWithDLQ:  !Equals [ !Ref HasDLQ, 'true' ]
   IsWithAlarm:  !Equals [ !Ref QueueHasAlarm, 'true' ]
+  IsNotFifoWithDLQ: !And
+    - !Condition IsNotFifo
+    - !Condition IsWithDLQ
+  IsFifoWithDLQ: !And
+    - !Condition IsFifo
+    - !Condition IsWithDLQ
+  IsDLQHasMessagesAlarm: !And
+    - !Condition DlqHasAlarm
+    - !Condition IsWithDLQ
 
 Resources:
 
@@ -92,7 +101,7 @@ Resources:
       DeduplicationScope: !Ref DeduplicationScope
 
   DeadLetterQueue:
-    Condition: !And [IsNotFifo, IsWithDLQ] 
+    Condition: IsNotFifoWithDLQ
     Type: AWS::SQS::Queue
     Properties:
       QueueName:
@@ -103,7 +112,7 @@ Resources:
       MessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
 
   DeadLetterQueueFifo:
-    Condition: !And [IsFifo, IsWithDLQ] 
+    Condition: IsFifoWithDLQ
     Type: AWS::SQS::Queue
     Properties:
       QueueName:
@@ -138,7 +147,7 @@ Resources:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
   DLQHasMessagesAlarm:
-    Condition: !And [DlqHasAlarm, IsWithDLQ] 
+    Condition: IsDLQHasMessagesAlarm
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${QueueName}-DLQ-HasMessage"
