@@ -133,7 +133,7 @@ Resources:
       MetricName: "ApproximateNumberOfMessagesVisible"
       Dimensions:
         - Name: "QueueName"
-          Value: !If [ IsNotFifo, !Sub '${DeadLetterQueue.QueueName}', !Sub '${DeadLetterQueueFifo.QueueName}' ]
+          Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
       Statistic: "Sum"
       Period: 60  
       Threshold: 1
