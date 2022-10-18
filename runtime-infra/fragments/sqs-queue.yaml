@@ -81,8 +81,12 @@ Resources:
     Properties:
       QueueName: !Ref QueueName
       RedrivePolicy:
-        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
-        maxReceiveCount: !Ref MaxReceiveCount
+        !If
+          - IsWithDLQ
+          -
+            deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+            maxReceiveCount: !Ref MaxReceiveCount
+          - !Ref AWS::NoValue
       DelaySeconds: !Ref DelaySeconds
       MessageRetentionPeriod: !Ref MessageRetentionPeriod
 
@@ -92,8 +96,12 @@ Resources:
     Properties:
       QueueName: !Sub "${QueueName}.fifo"
       RedrivePolicy:
-        deadLetterTargetArn: !GetAtt DeadLetterQueueFifo.Arn
-        maxReceiveCount: !Ref MaxReceiveCount
+        !If
+          - IsWithDLQ
+          -
+            deadLetterTargetArn: !GetAtt DeadLetterQueueFifo.Arn
+            maxReceiveCount: !Ref MaxReceiveCount
+          - !Ref AWS::NoValue
       DelaySeconds: !Ref DelaySeconds
       MessageRetentionPeriod: !Ref MessageRetentionPeriod
       FifoQueue: true
@@ -185,10 +193,10 @@ Outputs:
   # Dead letter queue info
   DeadLetterQueueName:
     Description: Name of source queue
-    Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ], !Ref AWS::NoValue ]
+    Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ], "" ]
   DeadLetterQueueURL:
     Description: URL of dead-letter queue
-    Value: !If [IsWithDLQ, !If [ IsNotFifo, !Ref DeadLetterQueue , !Ref DeadLetterQueueFifo ], !Ref AWS::NoValue ]
+    Value: !If [IsWithDLQ, !If [ IsNotFifo, !Ref DeadLetterQueue , !Ref DeadLetterQueueFifo ], "" ]
   DeadLetterQueueARN:
     Description: ARN of dead-letter queue
-    Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.Arn , !GetAtt DeadLetterQueueFifo.Arn ], !Ref AWS::NoValue ]
+    Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.Arn , !GetAtt DeadLetterQueueFifo.Arn ], "" ]
