@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Template to create Event Routing from us-east-1 to the region parameter ($REGION)
+
+Parameters:
+  CrossRegionDestinationBus:
+    Type: String
+    Description: "ARN of the Default Destination Bus (EventBridge) in $REGION"
+
+Resources:
+  EventRuleRegion1: 
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: "Routes IAM events to the default event bus in $REGION"
+      EventPattern: |
+        {
+          "source": ["aws.iam"],
+          "detail-type": ["AWS API Call via CloudTrail"],
+          "detail": {
+            "eventSource": ["iam.amazonaws.com"],
+            "eventName": ["AddUserToGroup", "RemoveUserFromGroup"],
+            "requestParameters": {
+              "groupName": ["PagoPAAdminDev", "PagoPAAdminHotFix", "PagoPAReadOnlyDev", "PagoPAReadOnlyHotFix"]
+            }
+          }
+        }
+      Targets: 
+        - Arn: !Ref CrossRegionDestinationBus
+          Id: "CrossRegionDestinationBus"
+          RoleArn: !GetAtt EventBridgeIAMrole.Arn
+  
+  EventBridgeIAMrole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: PutEventsDestinationBus
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+              - events.amazonaws.com
+          Action: 
+            - "sts:AssumeRole"
+      Path: /
+      Policies:
+      - PolicyName: PutEventsDestinationBus
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Action:
+              - events:PutEvents
+            Resource:
+              - !Ref CrossRegionDestinationBus

@@ -1,0 +1,280 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Template to create the IAM Policies in the CICD Account
+
+Parameters:
+  RoleUpdateTrustPoliciesDEV:
+    Type: String
+    Description: 'Enter the ARN of the Role UpdateTrustPolicies in Account DEV'
+
+  RoleUpdateTrustPoliciesHOTFIX:
+    Type: String
+    Description: 'Enter the ARN of the role UpdateTrustPolicies in Account Hotfix'
+
+  RoleLambdaUpdateTrustPolicies:
+    Type: String
+    Description: 'Enter the ARN of the LambdaUpdateTrustPolicies Role in this account'
+
+  RoleAdministratorAccessDEV:
+    Type: String
+    Description: 'Enter the ARN of the AdministratorAccess Role in Account DEV'
+
+  RoleAdministratorAccessHOTFIX:
+    Type: String
+    Description: 'Enter the ARN of the AdministratorAccess Role in Account HOTFIX'
+
+  RoleReadOnlyAccessDEV:
+    Type: String
+    Description: 'Enter the ARN of the ReadOnlyAccess Role in Account DEV'
+  
+  RoleReadOnlyAccessHOTFIX:
+    Type: String
+    Description: 'Enter the ARN of the ReadOnlyAccess Role in Account HOTFIX'
+
+Resources:
+
+  ########################
+  ######### IAM ##########
+  ########################
+
+  # Policy for the Lambda Function Role, allows to assume a role in Account Dev and HotFix  
+  PolicyLambdaUpdateTrustPolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: PolicyLambdaUpdateTrustPolicies
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "sts:AssumeRole"
+            Resource:
+              - !Ref RoleUpdateTrustPoliciesDEV
+              - !Ref RoleUpdateTrustPoliciesHOTFIX
+      Roles:
+        - !Select [1, !Split ["/", !Ref RoleLambdaUpdateTrustPolicies]]
+
+  #######################
+  ####### Lambda ########
+  #######################
+
+  LambdaUpdateTrustPolicies:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import boto3
+          import logging
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          ### Environment Variables ###
+          ROLE_ADMIN_ACCOUNT_DEV_ARN = os.environ["ROLE_ADMIN_ACCOUNT_DEV_ARN"]
+          ROLE_ADMIN_ACCOUNT_HOTFIX_ARN = os.environ["ROLE_ADMIN_ACCOUNT_HOTFIX_ARN"]
+          ROLE_READONLY_ACCOUNT_DEV_ARN = os.environ["ROLE_READONLY_ACCOUNT_DEV_ARN"]
+          ROLE_READONLY_ACCOUNT_HOTFIX_ARN = os.environ["ROLE_READONLY_ACCOUNT_HOTFIX_ARN"]
+          ROLE_TO_ASSUME_DEV_ARN = os.environ["ROLE_TO_ASSUME_DEV_ARN"]
+          ROLE_TO_ASSUME_HOTFIX_ARN = os.environ["ROLE_TO_ASSUME_HOTFIX_ARN"]
+
+          ### STS Client ###
+          sts_client = boto3.client('sts')
+
+          def create_iam_client(role_to_assume_arn):
+              """
+              Assumes a Role and creates an IAM client based on these new credentials. 
+              Returns the iam client
+              """
+              response = sts_client.assume_role(
+                  RoleArn=role_to_assume_arn,
+                  RoleSessionName="lambda-update-admin-group-trust-policy"
+              )
+              ACCESS_KEY = response['Credentials']['AccessKeyId']
+              SECRET_KEY = response['Credentials']['SecretAccessKey']
+              SESSION_TOKEN = response['Credentials']['SessionToken']
+              
+              iam_client = boto3.client(
+                  "iam", 
+                  aws_access_key_id=ACCESS_KEY,
+                  aws_secret_access_key=SECRET_KEY,
+                  aws_session_token=SESSION_TOKEN
+              )
+              return iam_client
+              
+
+          ### IAM Clients ###
+          iam_client_dev = create_iam_client(ROLE_TO_ASSUME_DEV_ARN)
+          iam_client_hotfix = create_iam_client(ROLE_TO_ASSUME_HOTFIX_ARN)
+
+          ### Mapping ###
+          """
+          Each group is mapped to a role and an account. This mapping is modeled as follows:
+          GroupKey: [Role, IAMClient]
+          For example, PagoPAAdminDev maps to the role AdminAccess in the Dev Account. 
+          """
+          MAPPING_GROUP_TO_ROLE_IAM = {
+              "PagoPAAdminDev": [ROLE_ADMIN_ACCOUNT_DEV_ARN, iam_client_dev],
+              "PagoPAAdminHotFix":[ROLE_ADMIN_ACCOUNT_HOTFIX_ARN, iam_client_hotfix],
+              "PagoPAReadOnlyDev":[ROLE_READONLY_ACCOUNT_DEV_ARN, iam_client_dev],
+              "PagoPAReadOnlyHotFix":[ROLE_READONLY_ACCOUNT_HOTFIX_ARN, iam_client_hotfix]
+          }
+
+
+          def get_group_name(event):
+              """
+              Returns the name of the group from where the user was added or removed
+              Return type: str
+              """
+              group_name = event["detail"]["requestParameters"]["groupName"]
+              return group_name
+
+
+          def get_event_type(event):
+              """
+              Return the type of the event: AddUserToGroup or RemoveUserFromGroup
+              Return type: str
+              """
+              event_type = event["detail"]["eventName"]
+              return event_type
+
+
+          def get_role_name_from_arn(role_arn):
+              """
+              Returns the name of the role based on its ARN
+              Return type: str
+              """
+              role_name = role_arn.split("/")[-1]
+              return role_name
+              
+              
+          def get_user_arn(event):
+              """
+              Returns the ARN of the user that was added/removed in/from the group
+              Return type: str
+              """
+              user_name = event["detail"]["requestParameters"]["userName"]
+              account_id = event["account"]
+              user_arn = "arn:aws:iam::" + account_id + ":user/" + user_name
+              return user_arn
+
+
+          def get_trust_policy(role_arn, iam_client):
+              """
+              Returns the trust policy of a given role, based on its ARN
+              Return type: dict
+              """
+              role_name = get_role_name_from_arn(role_arn)
+              role_details = iam_client.get_role(RoleName=role_name)
+              trust_policy = role_details["Role"]["AssumeRolePolicyDocument"]
+              return trust_policy
+
+
+          def create_updated_trust_policy(trust_policy, user_arn, event_type):
+              """
+              Returns a trust policy where a user_arn is added or removed as principal depending on the event type
+              Return type: dict
+              """
+              if event_type=="AddUserToGroup":
+                  trust_policy["Statement"].append({
+                      "Effect": "Allow",
+                      "Principal": {
+                          "AWS": user_arn
+                      },
+                      "Action": "sts:AssumeRole"
+                      }
+                  )
+                  logger.info("User: " + user_arn + " is added to the Trust Policy (not yet updated)")
+              elif event_type=="RemoveUserFromGroup":
+                  try:
+                      trust_policy["Statement"].remove({
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": user_arn
+                        },
+                        "Action": "sts:AssumeRole"
+                        }
+                      )
+                      logger.info("User: " + user_arn + " is removed from the Trust Policy (not yet updated)")
+                  except ValueError:
+                      logger.error("The user " + user_arn +  " was not found in the trust policy")
+              return trust_policy
+
+
+          def update_trust_policy(role_arn, updated_trust_policy, iam_client):
+              """
+              Updates the Trust Policy of role with a new trust policy, given as input
+              Return type: None
+              """
+              role_name = get_role_name_from_arn(role_arn)
+              iam_client.update_assume_role_policy(RoleName=role_name, PolicyDocument=json.dumps(updated_trust_policy))
+              logger.info("The Trust Policy for the role " + role_arn + " is updated")
+
+
+          def lambda_handler(event, context):
+              # Get necessary information
+              user_arn = get_user_arn(event)
+              group_name = get_group_name(event)
+              event_type = get_event_type(event)
+              role_arn = MAPPING_GROUP_TO_ROLE_IAM[group_name][0]
+              iam_client = MAPPING_GROUP_TO_ROLE_IAM[group_name][1]
+              trust_policy = get_trust_policy(role_arn, iam_client)
+              
+              # Create the policy DEPENDING on the event
+              updated_trust_policy = create_updated_trust_policy(trust_policy, user_arn, event_type)
+              
+              # Update the trust policy of the role
+              update_trust_policy(role_arn, updated_trust_policy, iam_client)
+              
+              # Return result
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps(updated_trust_policy)
+              }
+      Description: "Function to update the trust policies in Account Dev and HotFix, when a user is added or removed from IAM groups"
+      FunctionName: UpdateTrustPolicies
+      Handler: "index.lambda_handler"  
+      Role: !Ref RoleLambdaUpdateTrustPolicies
+      Timeout: 10
+      Runtime: python3.9
+      Environment:
+        Variables:
+          "ROLE_ADMIN_ACCOUNT_DEV_ARN": !Ref RoleAdministratorAccessDEV
+          "ROLE_ADMIN_ACCOUNT_HOTFIX_ARN": !Ref RoleAdministratorAccessHOTFIX
+          "ROLE_READONLY_ACCOUNT_DEV_ARN": !Ref RoleReadOnlyAccessDEV
+          "ROLE_READONLY_ACCOUNT_HOTFIX_ARN": !Ref RoleReadOnlyAccessHOTFIX
+          "ROLE_TO_ASSUME_DEV_ARN": !Ref RoleUpdateTrustPoliciesDEV
+          "ROLE_TO_ASSUME_HOTFIX_ARN": !Ref RoleUpdateTrustPoliciesHOTFIX
+  
+  #######################
+  ##### EventBridge #####
+  #######################
+
+  EventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Rule triggered when a user is added or removed from specific IAM Groups"
+      EventPattern: |
+        {
+          "source": ["aws.iam"],
+          "detail-type": ["AWS API Call via CloudTrail"],
+          "detail": {
+            "eventSource": ["iam.amazonaws.com"],
+            "eventName": ["AddUserToGroup", "RemoveUserFromGroup"],
+            "requestParameters": {
+              "groupName": ["PagoPAAdminDev", "PagoPAAdminHotFix", "PagoPAReadOnlyDev", "PagoPAReadOnlyHotFix"]
+            }
+          }
+        }
+      Name: UserAddedRemovedFromIAMGroup
+      Targets:
+        - Arn: !GetAtt LambdaUpdateTrustPolicies.Arn
+          Id: LambdaUpdateTrustPolicies 
+
+  EventBridgeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt LambdaUpdateTrustPolicies.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventRule.Arn
+  

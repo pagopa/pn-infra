@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Template to create Roles in Account Dev
+  
+Resources:
+  # Read Only Access Role that can be assumed by this account
+  # There has to be a Principal, that's why this account is used as principal, but serves no use in this use case
+  RoleReadOnlyAccess:
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: ReadOnlyAccess-DEV
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              AWS: !Join
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref "AWS::AccountId"
+                  - ':root'
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+       - "arn:aws:iam::aws:policy/ReadOnlyAccess"
+
+  # Administrator Access Role that can be assumed by this account
+  RoleAdministratorAccess:
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: AdminAccess-DEV
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              AWS: !Join
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref "AWS::AccountId"
+                  - ':root'
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+       - "arn:aws:iam::aws:policy/AdministratorAccess" 
+
+Outputs:
+  RoleReadOnlyAccessARN:
+    Description: "ARN of the ReadOnlyAccess role"
+    Value: !GetAtt RoleReadOnlyAccess.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-ARN-RoleReadOnlyAccess"
+  
+  RoleAdministratorAccessARN:
+    Description: "ARN of the AdministratorAccess role"
+    Value: !GetAtt RoleAdministratorAccess.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-ARN-RoleAdministratorAccess"
