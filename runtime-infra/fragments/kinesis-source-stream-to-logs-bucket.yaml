@@ -29,8 +29,8 @@ Parameters:
     Type: String 
     Description: to distinguish different log groups streams
 
-  AlarmSNSTopicName:
-    Description: The name of the Alarm SNS Topic for notifications.
+  AlarmSNSTopicArn:
+    Description: The ARN of the Alarm SNS Topic for notifications.
     Type: String
 
 Conditions:
@@ -155,9 +155,9 @@ Resources:
       AlarmDescription: "CloudWatch alarm for when S3 firehose delivery error log has one line."
       TreatMissingData: notBreaching
       AlarmActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+        - !Ref AlarmSNSTopicArn
       OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+        - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: 1
       MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-delivery-error"
       Namespace: "AWS/Kinesis"
