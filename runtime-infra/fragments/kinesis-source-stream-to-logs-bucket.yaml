@@ -137,19 +137,23 @@ Resources:
 
   # CloudWatch metric to filer error lines, in Log group
   DeliveryStreamErrorLogsMetricFilter:
+    Condition: ExportLogs
+    DependsOn:
+      - DeliveryStreamLogGroup
     Type: AWS::Logs::MetricFilter
     Properties:
       LogGroupName: !Ref DeliveryStreamLogGroup
       FilterPattern: '?S3 ?InternalError'
       MetricTransformations:
         - MetricValue: 1
-          MetricNamespace: "AWS/Kinesis"
+          MetricNamespace: "LogsExport"
           MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-delivery-error"
 
   # Create alarm
   DeliveryStreamErrorLogsMetricAlarm:
     Type: AWS::CloudWatch::Alarm
-    DependsOn: DeliveryStreamErrorLogsMetricFilter
+    DependsOn:
+      - DeliveryStreamErrorLogsMetricFilter
     Properties:
       AlarmName: !Sub "${ProjectName}-${StreamNamePrefix}-Delivery-Alarm"
       AlarmDescription: "CloudWatch alarm for when S3 firehose delivery error log has one line."
