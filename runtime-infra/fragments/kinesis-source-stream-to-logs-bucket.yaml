@@ -147,7 +147,7 @@ Resources:
       MetricTransformations:
         - MetricValue: 1
           MetricNamespace: "LogsExport"
-          MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-delivery-error"
+          MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-kinesis-error"
 
   # Create alarm
   DeliveryStreamErrorLogsMetricAlarm:
@@ -155,7 +155,7 @@ Resources:
     DependsOn:
       - DeliveryStreamErrorLogsMetricFilter
     Properties:
-      AlarmName: !Sub "${ProjectName}-${StreamNamePrefix}-Delivery-Alarm"
+      AlarmName: !Sub "${ProjectName}-${StreamNamePrefix}-Kinesis-Alarm"
       AlarmDescription: "CloudWatch alarm for when S3 firehose delivery error log has one line."
       TreatMissingData: notBreaching
       AlarmActions:
@@ -163,7 +163,7 @@ Resources:
       OKActions:
         - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: 1
-      MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-delivery-error"
+      MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-kinesis-error"
       Namespace: "LogsExport"
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 60
