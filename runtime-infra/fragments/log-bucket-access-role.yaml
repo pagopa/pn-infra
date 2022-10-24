@@ -61,6 +61,11 @@ Resources:
               - !Sub "arn:aws:s3:::${LogsBucketName}"
               - !Sub "arn:aws:s3:::${LogsBucketName}/*"
           - Action:
+              - "logs:PutLogEvents"
+            Effect: "Allow"
+            Resource:
+              - !Sub 'arn:aws:logs:${AWS::Region}:${LogsAccountId}:log-group:pn-logs-export-*:*'
+          - Action:
               - "kms:Encrypt"
               - "kms:GenerateDataKey"
               - "kms:Decrypt"
