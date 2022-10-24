@@ -438,6 +438,9 @@ Resources:
       TaskDefinition: !Ref TaskDefinition
       EnableExecuteCommand: true
       DeploymentConfiguration:
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
         MinimumHealthyPercent: 100
         MaximumPercent: 200
       DesiredCount: !Ref MinTasksNumber
