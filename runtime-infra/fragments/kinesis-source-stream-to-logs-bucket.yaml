@@ -29,6 +29,10 @@ Parameters:
     Type: String 
     Description: to distinguish different log groups streams
 
+  AlarmSNSTopicArn:
+    Description: The ARN of the Alarm SNS Topic for notifications.
+    Type: String
+
 Conditions:
   ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
 
@@ -130,6 +134,42 @@ Resources:
       # DeliveryStreamEncryptionConfigurationInput: 
       #   KeyARN: !GetAtt LogsKinesisDeliveryStreamKmsKey.Arn
       #   KeyType: CUSTOMER_MANAGED_CMK
+
+  # CloudWatch metric to filer error lines, in Log group
+  DeliveryStreamErrorLogsMetricFilter:
+    Condition: ExportLogs
+    DependsOn:
+      - DeliveryStreamLogGroup
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref DeliveryStreamLogGroup
+      FilterPattern: '?S3 ?InternalError'
+      MetricTransformations:
+        - MetricValue: 1
+          MetricNamespace: "LogsExport"
+          MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-kinesis-error"
+
+  # Create alarm
+  DeliveryStreamErrorLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn:
+      - DeliveryStreamErrorLogsMetricFilter
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${StreamNamePrefix}-Kinesis-Alarm"
+      AlarmDescription: "CloudWatch alarm for when S3 firehose delivery error log has one line."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-kinesis-error"
+      Namespace: "LogsExport"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Statistic: Sum
+      Threshold: 1
 
   # LogsKinesisDeliveryStreamKmsKey:
   #   Condition: ExportLogs
