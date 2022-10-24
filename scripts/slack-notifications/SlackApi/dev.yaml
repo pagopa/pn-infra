@@ -1,0 +1,207 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Template containing all the once-in-an-account configurations for dev accounts'
+
+Parameters:
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+    
+  SlackInfo:
+    Type: String
+    Description: <slack channel id>. 'team_notifiche_dev_alarm' by default
+    Default: C030L43BXGE
+  
+  AlarmEmailAddress:
+    Type: String
+    Description: 'Email group address for dev alarm'
+    Default: pn-dev-pagopa-alarms@pagopa.it
+
+  SlackSNSName:
+    Description: Slack SNS topic name.
+    Type: String
+  
+  Version:
+    Type: String
+    Description: 'keep track of used projects commitIds'
+
+  QueueName:
+      Type: String
+      Description: Queue Name
+
+  DelaySeconds:
+    Description: 'The time in seconds that the delivery of all messages in the queue
+      is delayed. You can specify an integer value of 0 to 900 (15 minutes).'
+    Type: Number
+    Default: '0'
+
+  MessageRetentionPeriod:
+    Description: 'The number of seconds that Amazon SQS retains a message. You can
+      specify an integer value from 60 seconds (1 minute) to 1209600 seconds (14 days). '
+    Type: Number
+    Default: '600'
+
+  MaxReceiveCount:
+    Description: 'The number of times a message is delivered to the source queue before
+      being moved to the dead-letter queue'
+    Type: Number
+    Default: '5'
+
+  DeadLetterMessageRetentionPeriod:
+    Description: 'The number of seconds that the DLQ retains a message. You can
+      specify an integer value from 60 seconds (1 minute) to 1209600 seconds (14 days). '
+    Type: Number
+    Default: '1209600'
+
+  SlackTokenArn:
+    Description: The ARN of the Slack Token Secret.
+    Type: String
+  
+  VisibilityTimeout: 
+    Description: The length of time during which a message will be unavailable after a message is delivered from the queue.
+    Type: Number
+    Default: '15'
+
+  EventBridgeRuleName:
+    Type: String
+    Description: "The name of the rule"
+
+  EventBusName:
+    Description: The EventBridge events bus name.
+    Type: String
+    Default: default 
+
+  S3BucketName:
+    Type: String
+    Description: 'The S3 bucket where lambda is stored.'
+
+Conditions:
+  MilanRegion: 
+    !Equals [!Ref 'AWS::Region', 'eu-south-1']
+
+Resources:
+
+  ###                          DEFINE ALARM TOPIC                          ###
+  ############################################################################
+  # - Everything written to this topic is an alarm
+  AlarmSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: 'dev account alarms topic: send to SQS and slack'
+  
+  # - Alarm message queue
+  AlarmHistoryBufferQueue:
+    Type: AWS::SQS::Queue  
+
+  # - Alarm message queue subscription
+  AlarmSNSTopicToSqsHistoryBuffer:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sqs
+      Endpoint: !GetAtt AlarmHistoryBufferQueue.Arn
+      Region: !Ref AWS::Region
+      TopicArn: !Ref AlarmSNSTopic
+  
+  # - Alarm message queue policy that grant write right to SNS
+  AlarmSNSTopicToSqsHistoryPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties: 
+      Queues: 
+        - !Ref AlarmHistoryBufferQueue
+      PolicyDocument:
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "sns.amazonaws.com"
+            Action: "sqs:SendMessage"
+            Resource: !Sub ${AlarmHistoryBufferQueue.Arn}
+            Condition: 
+              ArnEquals: 
+                aws:SourceArn: !Ref AlarmSNSTopic
+
+  # - Deploy Eventbridge rules for CodePipeline/CodeBuild
+  EventBridgeNotifications:
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      Parameters: 
+        EventBusName : !Ref EventBusName
+        EventBridgeRuleName: !Ref EventBridgeRuleName
+        AlarmSNSTopicName: !GetAtt  AlarmSNSTopic.TopicName
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/State_Change_Notifications.yaml"
+      TimeoutInMinutes: 15
+
+  # - Deploy Lambda to enrich messages
+  EnrichSlackNotifications:
+    Condition: MilanRegion
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      Parameters: 
+        QueueName : !Ref QueueName
+        AlarmSNSTopicName: !GetAtt  AlarmSNSTopic.TopicName
+        DelaySeconds: !Ref DelaySeconds
+        MessageRetentionPeriod: !Ref MessageRetentionPeriod
+        MaxReceiveCount: !Ref MaxReceiveCount
+        DeadLetterMessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
+        SlackChannelId: !Ref SlackInfo
+        SlackTokenArn: !Ref SlackTokenArn
+        S3BucketName: !Ref S3BucketName
+        VisibilityTimeout: !Ref VisibilityTimeout
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/Message_enrichment.yaml"
+      TimeoutInMinutes: 15
+
+  # - Connect dev alarm to email
+  # - Send alarm message to email address
+  AlarmToEmail:
+     Type: AWS::SNS::Subscription
+     Properties: 
+       TopicArn: !Ref AlarmSNSTopic
+       Endpoint: !Ref AlarmEmailAddress
+       Protocol: email
+
+
+  # - Event Bridge events that generate an alarm
+  # "ACM Certificate Approaching Expiration": alarm
+  CertificateExpiringIsAlarmEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "EventRule"
+      EventPattern:
+        source: [ "aws.acm" ]
+        detail-type: [ "ACM Certificate Approaching Expiration" ]
+      Targets:
+        - Arn: !Ref AlarmSNSTopic
+          Id: "AlarmSnsTopic"
+
+  ###              API GATEWAY ACCOUNT-GLOBAL CONFIGURATIONS              ###
+  ###########################################################################
+  # - Enable API-Gateway access log capability
+  ApiGwAccountConfig:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt "ApiGatewayLoggingRole.Arn"
+
+  # - Grant CloudWatch write access permission to AWS API-Gateway
+  ApiGatewayLoggingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "apigateway.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+
+Outputs:
+
+  AlarmSNSTopicArn:
+    Value: !Ref AlarmSNSTopic
+    Description: ARN of the Alarm SNS Topic
+  
+  AlarmSNSTopicName:
+    Value: !GetAtt  AlarmSNSTopic.TopicName
+    Description: Name of the Alarm SNS Topic
+

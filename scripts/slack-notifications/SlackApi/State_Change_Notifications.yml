@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template creates an EventBridge rule for CodePipeline and CodeBuild to send a notification to SNS alarm topic
+
+Parameters:
+  EventBusName:
+    Description: The EventBridge events bus name.
+    Type: String
+    Default: default 
+  
+  AlarmSNSTopicName:
+    Description: The name of the Alarm SNS Topic for notifications.
+    Type: String
+    
+  EventBridgeRuleName:
+    Type: String
+    Description: "The name of the rule"
+    Default: CodeEvents
+  
+Resources:  
+  CodePipelineBridgeStateRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: The EventBridge rule to match CodePipeline pipeline state change
+      EventBusName: !Ref EventBusName
+      EventPattern: 
+        source:
+          - aws.codepipeline
+        detail-type:
+          - CodePipeline Stage Execution State Change
+        detail:
+          state:
+            - FAILED
+      Name: !Sub ${EventBridgeRuleName}-CodePipeline
+      State: ENABLED
+      Targets: 
+        - Arn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+          Id: !Sub Default-CodePipeline
+
+  CodeBuildBridgeStateRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: The EventBridge rule to match CodeBuild state change
+      EventBusName: !Ref EventBusName
+      EventPattern: 
+        source:
+          - aws.codebuild
+        detail-type:
+          - CodeBuild Build State Change
+        detail:
+          build-status:
+            - FAILED
+      Name: !Sub ${EventBridgeRuleName}-CodeBuild
+      State: ENABLED
+      Targets: 
+        - Arn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+          Id: !Sub Default-CodeBuild
