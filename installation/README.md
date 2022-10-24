@@ -5,19 +5,20 @@ Questo repository contiene le fonti che compongono il file [Guida all'installazi
 ## Prima di cominciare
 
 Per creare l'ambientes, sono necessarie le seguenti informazioni:
+
 - Decidere il nome dell'ambiente, ad esempio _cert_, _dev_, _prod_, etc.
 - Creare 4 account AWS:
-	- __SPIDHUB__   
-    -  __CONFIDENTIAL-INFORMATION__   
-    -  __PN-CORE__   
-    -  __HELPDESK__
+  - __SPIDHUB__   
+  -  __CONFIDENTIAL-INFORMATION__   
+  -  __PN-CORE__   
+  -  __HELPDESK__
 - Per ognuno di questi account definire un profilo di AWS CLI con i diritti di amministrazione. 
   In seguito chiameremo questi profili:
   - __profilo_spidhub__ (relativo all'account _SPIDHUB_)
   - __profilo_confidential__ (relativo all'account _CONFIDENTIAL-INFORMATION_)
   - __profilo_core__ (relativo all'account _PN-CORE_)
-  - __profilo_helpdesk__ (relativo all'account _HELPDESK_)    
- Per ulteriori informazioni, vedere [qui](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html#cli-role-prepare).
+  - __profilo_helpdesk__ (relativo all'account _HELPDESK_)   
+  Per ulteriori informazioni, vedere [qui](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html#cli-role-prepare).
 - Comunicare ai gestori dell'account di Continuous Integration (Team Piattaforma Notifiche core) 
   gli AWS Account id _CONFIDENTIAL-INFORMATION_, _PN-CORE_, _HELPDESK_ allo scopo di abilitare 
   l'accesso agli artefatti da installare.
@@ -74,6 +75,7 @@ prepare_networking_on_dev.sh ) seguendo la seguente parametrizzazione:
   - Impostare la directory corrente al folder `scripts/prepare-networking/private_hosted_zones`
   - Eseguire lo script bash [create_and_share_private_hosted_zones.sh](../scripts/prepare-networking/private_hosted_zones/create_and_share_private_hosted_zones.sh) 
     seguendo la seguente parametrizzazione:
+    
     ```
     ./create_and_share_private_hosted_zones.sh \
         -p-1 profilo_core \
@@ -121,6 +123,7 @@ prepare_networking_on_dev.sh ) seguendo la seguente parametrizzazione:
   - Impostare la directory corrente al folder `scripts/dns-zone-and-server-certificates`
   - Eseguire lo script bash [ensure-public-dns-and-certificates.sh](../scripts/dns-zone-and-server-certificates/ensure-public-dns-and-certificates.sh) 
     seguendo la seguente parametrizzazione:
+    
     ```
     ./ensure-public-dns-and-certificates.sh \
         -e <nome-ambiente> \
@@ -208,10 +211,10 @@ nuovo ambiente (ad esempio cert) come descritto di seguito.
 
 Le configurazioni sono composte da due file:
 
-- Il file `https://github.com/pagopa/pn-data-vault/blob/main/scripts/aws/cfn/once4account/dev.yaml` che va 
+- Il file `https://github.com/pagopa/pn-data-vault/blob/main/scripts/aws/cfn/once4account/svil.yaml` che va 
   ricopiato nel nuovo repository CodeCommit in `pn-data-vault/scripts/aws/cfn/once4account/<nome_ambiente>.yaml` ed __eventualmente personalizzato con l'invio degli allarmi su slack o per mail. 
   Fondamentale è mantenere gli output esistenti__.
-- Il file `https://github.com/pagopa/pn-data-vault/blob/main/scripts/aws/cfn/microservice-dev-cfg.json` che va ricopiato in
+- Il file `https://github.com/pagopa/pn-data-vault/blob/main/scripts/aws/cfn/microservice-svil-cfg.json` che va ricopiato in
   `pn-data-vault/scripts/aws/cfn/microservice-<nome_ambiente>-cfg.json` e modificato nei seguenti parametri:
   - __VpcId__: Id della VPC PAGOPA-\<NOME_AMBIENTE\>-CONFIDENTIALINFO-VPC
   - __VpcCidr__: CIDR della VPC PAGOPA-\<NOME_AMBIENTE\>-CONFIDENTIALINFO-VPC
@@ -262,7 +265,6 @@ Gli URL di tali servizi sono reperibili sull'API gateway dell'account del fornit
 ### Pacchettizzazione Front End
 
 Richiedere al team di front-end di aggiungere gli artifact dei siti web dedicati all'ambiente specifico.
-L'obiettivo è avere 
 
 ### Preparazione configurazioni
 
@@ -275,18 +277,19 @@ Le configurazioni, allo stato attuale, sono ottenibili da quelle di un altro amb
 vecchio con il nuovo.
 
 Modificare i seguenti parametri:
+
 - File `pn-delivery/scripts/aws/cfn/microservice-<nome_ambiente>-cfg.json`
   - __SandboxSafeStorageBaseUrl__: valorizzato all'url di safe-storage dello specifico ambiente
 - File `pn-delivery-push/scripts/aws/cfn/microservice-<nome_ambiente>-cfg.json`
   - __SandboxSafeStorageBaseUrl__: valorizzato all'url di safe-storage dello specifico ambiente
   - __ExternalChannelBaseUrl__ che va valorizzato all'url di external-channel dello specifico ambiente
 - File `pn-frontend/aws-cdn-templates/<nome_ambiente>/env-cdn.sh`
-  - __ZONE_ID__: valorizzato con l'identificativo della zona cert.pn.pagopa.it letto dalla console di Route53
-  - __PORTALE_PA_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale-pa.<nome_ambiente>.pn.pagopa.it 
+  - __ZONE_ID__: valorizzato con l'identificativo della zona \<nome-ambiente\>.pn.pagopa.it letto dalla console di Route53
+  - __PORTALE\_PA\_CERTIFICATE\_ARN__: valorizzato con l'arn del certificato per l'URL portale-pa.<nome_ambiente>.pn.pagopa.it 
       (letto sulla console del Aws Certificate Manager nella zona 'N. Virginia')
-  - __PORTALE_PF_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale.<nome_ambiente>.pn.pagopa.it
+  - __PORTALE\_PF\_CERTIFICATE\_ARN__: valorizzato con l'arn del certificato per l'URL portale.<nome_ambiente>.pn.pagopa.it
       (letto sulla console del Aws Certificate Manager nella zona 'N. Virginia)'
-  - __PORTALE_PF_LOGIN_CERTIFICATE_ARN__: valorizzato con l'arn del certificato per l'URL portale-login.<nome_ambiente>.pn.pagopa.it
+  - __PORTALE\_PF\_LOGIN\_CERTIFICATE\_ARN__: valorizzato con l'arn del certificato per l'URL portale-login.\<nome_ambiente\>.pn.pagopa.it
       (letto sulla console del Aws Certificate Manager nella zona 'N. Virginia)'
   - Frammento __&lt;NomeBucketLegalInput&gt;__: sostituito con il nome del bucket utilizzato 
     per l'input di allegati alle notifiche per lo specifico ambiente (Es: pnsafestoragecert-nonlegal-input-eu-south-1)
@@ -305,18 +308,19 @@ Modificare i seguenti parametri:
       dell'ambiente di produzione di DataLake che dovrà essere comunicato da PagoPA,
   - __DataLakeAccountId2__: serve solo in ambiente dev, in tutti gli altri ambienti deve essere valorizzato con '-'
 - File `pn-infra/runtime-infra/pn-ipc-<nome_ambiente>-cfg.json`
-  - __ApiCertificateArn__: ARN del certificato per il DNS api.<nome_ambiente>.pn.pagopa.it
-  - __WebApiCertificateArn__: ARN del certificato per il DNS webapi.<nome_ambiente>.pn.pagopa.it
-  - __IoApiCertificateArn__: ARN del certificato per il DNS api-io.<nome_ambiente>.pn.pagopa.it
-  - __HostedZoneId__: l'id della zona DNS <nome_ambiente>.pn.pagopa.it
+  - __ApiCertificateArn__: ARN del certificato per il DNS api.\<nome-ambiente\>.pn.pagopa.it
+  - __WebApiCertificateArn__: ARN del certificato per il DNS webapi.\<nome-ambiente\>.pn.pagopa.it
+  - __IoApiCertificateArn__: ARN del certificato per il DNS api-io.\<nome-ambiente\>.pn.pagopa.it
+  - __HostedZoneId__: l'id della zona DNS \<nome_ambiente\>.pn.pagopa.it
   - __SafeStorageAccountId__: l'id dell'account AWS in cui si trovano safe-storage ed external channel
-- File `pn-user-attributes/scripts/aws/cfn/microservice-<nome_ambiente>>-cfg.json`
+- File `pn-user-attributes/scripts/aws/cfn/microservice-<nome_ambiente>-cfg.json`
   - __ExternalChannelBasePath__: l'url di external-channel per lo specifico ambiente
 
 - Caricare i file sul repository delle configurazioni preparato secondo l'appendice "Preparare il repository delle configurazioni".
   __N.B.__: è un repository separato da quello di pn-confidentialinformation.
 
 La lista dei servizi da configurare, per i quali ci si aspetta una cartella dedicata nel repository delle configurazioni, è la seguente:
+
   - pn-auth-fleet
   - pn-delivery
   - pn-delivery-push
@@ -366,6 +370,7 @@ Testare il nuovo ambiente di PN
 ## Preparare il repository delle configurazioni
 Per gli account _pn-core_ e _pn-confidential-information_ degli ambienti cert e prod sarà necessario definire un repository codecommit contenente i parametri di configurazione per il software in esecuzione in tale account. 
 Eseguire i seguenti passi, sempre usando l'account in questione:
+
 - [Creare un repository codecommit](https://docs.aws.amazon.com/codecommit/latest/userguide/how-to-create-repository.html)
   - con nome `<account-name>-configurations-<env-name>` ove _env-name_ può essere `cert`, `prod` ...
 - [Configurare un utenza IAM](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html) 
