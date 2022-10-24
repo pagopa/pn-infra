@@ -45,9 +45,10 @@ Per creare l'ambientes, sono necessarie le seguenti informazioni:
   - Effettuare il clone del repository github [pn-infra](https://github.com/pagopa/pn-infra)
   - Effettuare il checkout del branch main
   - Impostare la directory corrente al folder `scripts/prepare-networking/pagopa_vpcs`
-  - Eseguire lo script bash [create_and_share_private_hosted_zones.sh](../scripts/prepare-networking/pagopa_vpcs/
+  - Eseguire lo script bash [create\_and\_share\_private\_hosted\_zones.sh](../scripts/prepare-networking/pagopa_vpcs/
 prepare_networking_on_dev.sh ) seguendo la seguente parametrizzazione:
 
+    ```
     ./prepare_networking_on_dev.sh \
         -r <aws-region> \
         -p-core <aws-profile> \
@@ -135,8 +136,8 @@ prepare_networking_on_dev.sh ) seguendo la seguente parametrizzazione:
     - il comando `dig -t TXT testdns.spid.<nome-ambiente>.pn.pagopa.it` 
       deve rispondere _"Test DNS entry for PN SPID <nome-ambiente>"_
   - Nell'account _PN-CORE_ devono essere presenti e in stato issued i seguenti certificati:
-    - Region _eu-south-1_: api.<nome-ambiente>.pn.pagopa.it, webapi.<nome-ambiente>.pn.pagopa.it, api-io.<nome-ambiente>.pn.pagopa.it
-    - Region _us-east-1_: portale.<nome-ambiente>.pn.pagopa.it, portale-pa.<nome-ambiente>.pn.pagopa.it, portale-login.<nome-ambiente>.pn.pagopa.it
+    - Region _eu-south-1_: api.\<nome-ambiente\>.pn.pagopa.it, webapi.\<nome-ambiente\>.pn.pagopa.it, api-io.\<nome-ambiente\>.pn.pagopa.it
+    - Region _us-east-1_: portale.\<nome-ambiente\>.pn.pagopa.it, portale-pa.\<nome-ambiente\>.pn.pagopa.it, portale-login.\<nome-ambiente\>.pn.pagopa.it
 
 ## Accesso agli artefatti di cui fare deploy
 Comunicare a PagoPA gli AccountID di pn-core e pn-configential-information specifici per l'ambiente. 
