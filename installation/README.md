@@ -145,12 +145,12 @@ prepare_networking_on_dev.sh ) seguendo la seguente parametrizzazione:
 ## Accesso agli artefatti di cui fare deploy
 Comunicare a PagoPA gli AccountID di pn-core e pn-configential-information specifici per l'ambiente. 
 Tali account id verranno usati per l'abilitazione in lettura ai repository ECR e ai bucket contenenti 
-gli artefatti dic ui fare deploy.
+gli artefatti di cui fare deploy.
 
 # Installazione SpidHub
 
 ## Prerequisiti
-  - aver completato con successo gli step precedenti.
+  - Aver completato con successo gli step precedenti.
   - Avere un api-key di accesso a UserRegistry. Vedere pagina "Configurazioni Secrets" di confluence
   - [Docker](https://www.docker.com/) o altro servizio per creare immagini di container.
 
