@@ -1143,7 +1143,11 @@ Outputs:
     Value: !Ref TaskRole
   FatalLogsMetricAlarm:
     Description: ARN of the fatal logs alarm
-    Value: !GetAtt ErrorFatalLogsMetricAlarm.Arn
+    Value:
+      !If
+        - HasAlarmTopic
+        - !GetAtt ErrorFatalLogsMetricAlarm.Arn
+        - ''
   AutoScalingAlarmArn:
     Description: ARN of the autoscaling alarm
     Value:
