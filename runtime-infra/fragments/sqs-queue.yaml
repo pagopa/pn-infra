@@ -200,3 +200,14 @@ Outputs:
   DeadLetterQueueARN:
     Description: ARN of dead-letter queue
     Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.Arn , !GetAtt DeadLetterQueueFifo.Arn ], "" ]
+
+  SqsDLQAlarmArn:
+    Description: ARN of the SQS DLA alarm
+    Value:
+      !If
+      - IsDLQHasMessagesAlarm
+      - !GetAtt DLQHasMessagesAlarm.Arn
+      - !If
+        - IsWithAlarm
+        - !GetAtt QueueHasMessagesAlarm.Arn
+        - ''
