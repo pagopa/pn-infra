@@ -209,22 +209,24 @@ Installare il sistema di login utilizzato dai destinatari delle notifiche.
 Nel repository configurato su AWS CodeCommit nell'ambiente su cui si sta agendo e nella regione _eu-south-1_, aggiungere le configurazioni relative al
 nuovo ambiente (ad esempio cert) come descritto di seguito.
 
-Le configurazioni sono composte da due file:
+Le configurazioni sono composte da tre file:
 
 - Il file `https://github.com/pagopa/pn-data-vault/blob/main/scripts/aws/cfn/once4account/svil.yaml` che va 
   ricopiato nel nuovo repository CodeCommit in `pn-data-vault/scripts/aws/cfn/once4account/<nome_ambiente>.yaml` ed __eventualmente personalizzato con l'invio degli allarmi su slack o per mail. 
   Fondamentale è mantenere gli output esistenti__.
 - Il file `https://github.com/pagopa/pn-data-vault/blob/main/scripts/aws/cfn/microservice-svil-cfg.json` che va ricopiato in
   `pn-data-vault/scripts/aws/cfn/microservice-<nome_ambiente>-cfg.json` e modificato nei seguenti parametri:
-  - __VpcId__: Id della VPC PAGOPA-\<NOME_AMBIENTE\>-CONFIDENTIALINFO-VPC
   - __VpcCidr__: CIDR della VPC PAGOPA-\<NOME_AMBIENTE\>-CONFIDENTIALINFO-VPC
-  - __VpcSubnets__: id, separati da virgola, delle sotto reti PAGOPA-\<NOME_AMBIENTE\>-CONFIDENTIALINFO-GENERIC-A, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-B, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-C
   - __VpcSubnetsRoutingTables__: id della tabella di routing PAGOPA-\<NOME_AMBIENTE\>-CONFIDENTIALINFO-GENERIC-RT
   - __PrivateHostedZone__: id della hosted zone privata `confidential.pn.internal` presente nell'account _CONFIDENTIAL-INFORMATION_,
   - __EcsDefaultSecurityGroup__: id del security group PAGOPA-\<NOME_AMBIENTE\>-CONFIDENTIALINFO-MAIN-SG,
   - __PDVTokenizerBasePath__ : url del tokenizer del servizio PersonalDataVault di pagopa (ES: "https://api.uat.tokenizer.pdv.pagopa.it/tokenizer/v1")
   - __PDVUserRegistryBasePath__ : url dello user registry del servizio PersonalDataVault di pagopa 
       (ES: "https://api.uat.pdv.pagopa.it/user-registry/v1")
+- Il file `https://github.com/pagopa/pn-data-vault/blob/main/scripts/aws/cfn/infra-svil-cfg.json` che va ricopiato in
+  `pn-data-vault/scripts/aws/cfn/infa-<nome_ambiente>-cfg.json` e modificato nei seguenti parametri:
+    - __VpcId__: Id della VPC PAGOPA-\<NOME_AMBIENTE\>-CONFIDENTIALINFO-VPC
+    - __VpcSubnets__: id, separati da virgola, delle sotto reti PAGOPA-\<NOME_AMBIENTE\>-CONFIDENTIALINFO-GENERIC-A, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-B, PAGOPA-CERT-CONFIDENTIALINFO-GENERIC-C
 - Caricare i file sul repository delle configurazioni preparato secondo l'appendice "Preparare il repository delle configurazioni"
 
 ### Preparazione file con la versioni degli script di deploy (__desired-commit-ids-env.sh__)
