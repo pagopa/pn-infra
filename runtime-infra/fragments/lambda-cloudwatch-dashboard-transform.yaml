@@ -58,6 +58,7 @@ Resources:
                         print("AlarmArns param is missing or empty")
                     else:
                         localAlarmArns = event["params"]["AlarmArns"]
+                        localAlarmArns = list(filter(None, localAlarmArns))
                         alarmList = alarmWidgetBuilder(localAlarmArns, y_value ,localRegion)
                         dashboardList = appendList(dashboardList, alarmList)
                         y_value = y_value+9
@@ -66,6 +67,7 @@ Resources:
                         print("QueueArns param is missing or empty")
                     else:
                         localQueueArns = event["params"]["QueueArns"]
+                        localQueueArns = list(filter(None, localQueueArns))
                         queueList = queueWidgetBuilder(localQueueArns, y_value ,localRegion)
                         dashboardList = appendList(dashboardList, queueList)
                         y_value=y_value+6
