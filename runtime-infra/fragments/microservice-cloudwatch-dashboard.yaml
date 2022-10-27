@@ -11,7 +11,7 @@ Parameters:
     Description: Comma-delimited list of CloudWatch Alarm ARNs
     Default: ''
 
-  DynamoDBArns:
+  DynamoDBTableNames:
     Type: CommaDelimitedList
     Description: Comma-delimited list of DynamoDB table names.
     Default: ''
@@ -41,7 +41,7 @@ Resources:
           Name: 'DashboardBodyTransform'
           Parameters:
             AlarmArns: !Ref AlarmArns
-            DynamoDBArns: !Ref DynamoDBArns
+            DynamoDBTableNames: !Ref DynamoDBTableNames
             RestApiStageArns: !Ref RestApiStageArns
             QueueArns: !Ref QueueArns
             Region: !Ref AWS::Region

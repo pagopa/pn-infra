@@ -58,6 +58,7 @@ Resources:
                         print("AlarmArns param is missing or empty")
                     else:
                         localAlarmArns = event["params"]["AlarmArns"]
+                        localAlarmArns = list(filter(None, localAlarmArns))
                         alarmList = alarmWidgetBuilder(localAlarmArns, y_value ,localRegion)
                         dashboardList = appendList(dashboardList, alarmList)
                         y_value = y_value+9
@@ -66,6 +67,7 @@ Resources:
                         print("QueueArns param is missing or empty")
                     else:
                         localQueueArns = event["params"]["QueueArns"]
+                        localQueueArns = list(filter(None, localQueueArns))
                         queueList = queueWidgetBuilder(localQueueArns, y_value ,localRegion)
                         dashboardList = appendList(dashboardList, queueList)
                         y_value=y_value+6
@@ -79,11 +81,11 @@ Resources:
                         dashboardList = appendList(dashboardList, restAPIList)
                         y_value=y_value+6
                 
-                    if event["params"]["DynamoDBArns"] == [''] or len(event["params"]["DynamoDBArns"]) == 0:
-                        print("DynamoDBArns param is missing or empty")
+                    if event["params"]["DynamoDBTableNames"] == [''] or len(event["params"]["DynamoDBTableNames"]) == 0:
+                        print("DynamoDBTableNames param is missing or empty")
                     else:
-                        localDynamoDBArns = event["params"]["DynamoDBArns"]
-                        dynamoList = dynamoDBWidgetBuilder(localDynamoDBArns, y_value, localRegion)
+                        localDynamoDBTableNames = event["params"]["DynamoDBTableNames"]
+                        dynamoList = dynamoDBWidgetBuilder(localDynamoDBTableNames, y_value, localRegion)
                         dashboardList = appendList(dashboardList, dynamoList)
                     
                 data["widgets"] = dashboardList

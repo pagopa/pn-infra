@@ -438,6 +438,9 @@ Resources:
       TaskDefinition: !Ref TaskDefinition
       EnableExecuteCommand: true
       DeploymentConfiguration:
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
         MinimumHealthyPercent: 100
         MaximumPercent: 200
       DesiredCount: !Ref MinTasksNumber
@@ -1138,6 +1141,13 @@ Outputs:
   TaskRoleName:
     Description: Container execution role name, useful to attach custom policies
     Value: !Ref TaskRole
+  FatalLogsMetricAlarmArn:
+    Description: ARN of the fatal logs alarm
+    Value:
+      !If
+        - HasAlarmTopic
+        - !GetAtt ErrorFatalLogsMetricAlarm.Arn
+        - ''
   AutoScalingAlarmArn:
     Description: ARN of the autoscaling alarm
     Value:
