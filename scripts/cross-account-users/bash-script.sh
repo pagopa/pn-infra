@@ -16,11 +16,23 @@ echo "CICD_PROFILE = $CICD_PROFILE"
 echo "DEV_PROFILE = $DEV_PROFILE"
 echo "HOTFIX_PROFILE = $HOTFIX_PROFILE"
 
+# Get the CICD Account ID
+CICDAccountId=$(aws sts get-caller-identity \
+--query "Account" \
+--output text \
+--profile $CICD_PROFILE)
+
 # 1. Launch the stack in the Dev and HotFix environment
 aws cloudformation deploy \
 --stack-name cross-account-1-dev \
 --template-file ./cf-templates/dev-account-1.yaml \
 --capabilities CAPABILITY_NAMED_IAM \
+--parameter-overrides \
+  TrustedAccountId=$CICDAccountId \
+  TagKeyReadOnly="pn-ro-dev" \
+  TagValueReadOnly="true" \
+  TagKeyAdminAccess="pn-admin-dev" \
+  TagValueAdminAccess="true" \
 --profile $DEV_PROFILE \
 --region $REGION
 
@@ -28,6 +40,12 @@ aws cloudformation deploy \
 --stack-name cross-account-1-hotfix \
 --template-file ./cf-templates/hotfix-account-1.yaml \
 --capabilities CAPABILITY_NAMED_IAM \
+--parameter-overrides \
+  TrustedAccountId=$CICDAccountId \
+  TagKeyReadOnly="pn-ro-hotfix" \
+  TagValueReadOnly="true" \
+  TagKeyAdminAccess="pn-admin-hotfix" \
+  TagValueAdminAccess="true" \
 --profile $HOTFIX_PROFILE \
 --region $REGION
 
@@ -48,7 +66,7 @@ RoleAdministratorAccessARN_DEV=$(aws cloudformation describe-stacks \
 --query "Stacks[0].Outputs[?OutputKey=='RoleAdministratorAccessARN'].OutputValue" \
 --output text )
 
-### HOTFIX ###
+## HOTFIX ###
 RoleReadOnlyAccessARN_HOTFIX=$(aws cloudformation describe-stacks \
 --stack-name cross-account-1-hotfix \
 --profile $HOTFIX_PROFILE \
@@ -76,71 +94,6 @@ aws cloudformation deploy \
 --profile $CICD_PROFILE \
 --region $REGION
 
-# 4. Get the ARN of Lambda's execution role in the CICD account
-RoleLambdaUpdateTrustPolicies_ARN=$(aws cloudformation describe-stacks \
---stack-name cross-account-1-cicd \
---profile $CICD_PROFILE \
---region $REGION \
---query "Stacks[0].Outputs[?OutputKey=='RoleLambdaUpdateTrustPoliciesOutput'].OutputValue" \
---output text)
-
-# 5. Deploy in DEV and HOTFIX
-
-### DEV ###
-aws cloudformation deploy \
---stack-name cross-account-2-dev \
---template-file ./cf-templates/dev-account-2.yaml \
---capabilities CAPABILITY_NAMED_IAM \
---parameter-overrides \
-  ExecutionRoleLambdaUpdateTrustPolicies=$RoleLambdaUpdateTrustPolicies_ARN \
-  RoleReadOnlyAccessARN=$RoleReadOnlyAccessARN_DEV \
-  RoleAdministratorAccessARN=$RoleAdministratorAccessARN_DEV \
---profile $DEV_PROFILE \
---region $REGION
-
-### HOTFIX ###
-aws cloudformation deploy \
---stack-name cross-account-2-hotfix \
---template-file ./cf-templates/hotfix-account-2.yaml \
---capabilities CAPABILITY_NAMED_IAM \
---parameter-overrides \
-  ExecutionRoleLambdaUpdateTrustPolicies=$RoleLambdaUpdateTrustPolicies_ARN \
-  RoleReadOnlyAccessARN=$RoleReadOnlyAccessARN_HOTFIX \
-  RoleAdministratorAccessARN=$RoleAdministratorAccessARN_HOTFIX \
---profile $HOTFIX_PROFILE \
---region $REGION
-
-# 6. Get the ARN of the role to update the trust policies in DEV and HOTFIX
-RoleUpdateTrustPolicy_ARN_DEV=$(aws cloudformation describe-stacks \
---stack-name cross-account-2-dev \
---profile $DEV_PROFILE \
---region $REGION \
---query "Stacks[0].Outputs[?OutputKey=='RoleUpdateTrustPolicy'].OutputValue" \
---output text)
-
-RoleUpdateTrustPolicy_ARN_HOTFIX=$(aws cloudformation describe-stacks \
---stack-name cross-account-2-hotfix \
---profile $HOTFIX_PROFILE \
---region $REGION \
---query "Stacks[0].Outputs[?OutputKey=='RoleUpdateTrustPolicy'].OutputValue" \
---output text)
-
-# 7. Deploy CICD 2
-aws cloudformation deploy \
---stack-name cross-account-2-cicd \
---template-file ./cf-templates/cicd-account-2.yaml \
---capabilities CAPABILITY_NAMED_IAM \
---parameter-overrides \
-  RoleUpdateTrustPoliciesDEV=$RoleUpdateTrustPolicy_ARN_DEV \
-  RoleUpdateTrustPoliciesHOTFIX=$RoleUpdateTrustPolicy_ARN_HOTFIX \
-  RoleLambdaUpdateTrustPolicies=$RoleLambdaUpdateTrustPolicies_ARN \
-  RoleAdministratorAccessDEV=$RoleAdministratorAccessARN_DEV \
-  RoleAdministratorAccessHOTFIX=$RoleAdministratorAccessARN_HOTFIX \
-  RoleReadOnlyAccessDEV=$RoleReadOnlyAccessARN_DEV \
-  RoleReadOnlyAccessHOTFIX=$RoleReadOnlyAccessARN_HOTFIX \
---profile $CICD_PROFILE \
---region $REGION
-
 # 8. If $REGION is not set to us-east-1, then deploy the event routing 
 if [[ "$REGION" != "us-east-1" ]]
 then 
@@ -161,5 +114,3 @@ then
   --profile $CICD_PROFILE \
   --region us-east-1
 fi 
-
-

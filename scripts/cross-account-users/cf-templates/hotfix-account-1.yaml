@@ -1,5 +1,26 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Template to create Roles in Account HotFix
+Description: Template to create Roles in Account Hotfix
+
+Parameters:
+  TrustedAccountId:
+    Type: String
+    Description: Enter the ID of the trusted account
+
+  TagKeyReadOnly:
+    Type: String
+    Description: Enter the Tag Key for Read Only
+
+  TagValueReadOnly:
+    Type: String
+    Description: Enter the Tag Value for Read Only
+
+  TagKeyAdminAccess:
+    Type: String
+    Description: Enter the Tag Key for Admin Access
+
+  TagValueAdminAccess:
+    Type: String
+    Description: Enter the Tag Value for AdminAccess
   
 Resources:
   # Read Only Access Role that can be assumed by this account
@@ -9,17 +30,24 @@ Resources:
     Properties: 
       RoleName: ReadOnlyAccess-HOTFIX
       AssumeRolePolicyDocument: 
-        Version: "2012-10-17"
-        Statement: 
-          - Effect: "Allow"
-            Principal: 
-              AWS: !Join
-                - ''
-                - - 'arn:aws:iam::'
-                  - !Ref "AWS::AccountId"
-                  - ':root'
-            Action: 
-              - "sts:AssumeRole"
+        !Sub |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal":{
+                  "AWS": "arn:aws:iam::${TrustedAccountId}:root"
+                },
+                "Action":"sts:AssumeRole",
+                "Condition": {
+                  "StringEquals":{
+                    "aws:PrincipalTag/${TagKeyReadOnly}": ${TagValueReadOnly}
+                  }
+                }
+              }
+            ]
+          }
       Path: "/"
       ManagedPolicyArns:
        - "arn:aws:iam::aws:policy/ReadOnlyAccess"
@@ -30,17 +58,24 @@ Resources:
     Properties: 
       RoleName: AdminAccess-HOTFIX
       AssumeRolePolicyDocument: 
-        Version: "2012-10-17"
-        Statement: 
-          - Effect: "Allow"
-            Principal: 
-              AWS: !Join
-                - ''
-                - - 'arn:aws:iam::'
-                  - !Ref "AWS::AccountId"
-                  - ':root'
-            Action: 
-              - "sts:AssumeRole"
+        !Sub |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal":{
+                  "AWS": "arn:aws:iam::${TrustedAccountId}:root"
+                },
+                "Action":"sts:AssumeRole",
+                "Condition": {
+                  "StringEquals":{
+                    "aws:PrincipalTag/${TagKeyAdminAccess}": ${TagValueAdminAccess}
+                  }
+                }
+              }
+            ]
+          }
       Path: "/"
       ManagedPolicyArns:
        - "arn:aws:iam::aws:policy/AdministratorAccess" 
