@@ -17,50 +17,65 @@ echo "DEV_PROFILE = $DEV_PROFILE"
 echo "HOTFIX_PROFILE = $HOTFIX_PROFILE"
 
 # Get the CICD Account ID
-CICDAccountId=$(aws sts get-caller-identity \
+
+
+cicdAccount=$(aws sts get-caller-identity \
 --query "Account" \
 --output text \
 --profile $CICD_PROFILE)
 
-# 1. Launch the stack in the Dev and HotFix environment
-aws cloudformation deploy \
---stack-name cross-account-1-dev \
---template-file ./cf-templates/dev-account-1.yaml \
---capabilities CAPABILITY_NAMED_IAM \
---parameter-overrides \
-  TrustedAccountId=$CICDAccountId \
-  TagKeyReadOnly="pn-ro-dev" \
-  TagValueReadOnly="true" \
-  TagKeyAdminAccess="pn-admin-dev" \
-  TagValueAdminAccess="true" \
---profile $DEV_PROFILE \
---region $REGION
+scriptDir=$( dirname "$0" )
 
-aws cloudformation deploy \
---stack-name cross-account-1-hotfix \
---template-file ./cf-templates/hotfix-account-1.yaml \
---capabilities CAPABILITY_NAMED_IAM \
---parameter-overrides \
-  TrustedAccountId=$CICDAccountId \
-  TagKeyReadOnly="pn-ro-hotfix" \
-  TagValueReadOnly="true" \
-  TagKeyAdminAccess="pn-admin-hotfix" \
-  TagValueAdminAccess="true" \
---profile $HOTFIX_PROFILE \
---region $REGION
+echo here
+
+# 1. Launch the stack in the environment
+function createOrUpdateStack() {
+  profile=$1
+  region=$2
+  stackName=$3
+  templateFile=$4
+  tagKeyAdmin=$5
+  tagValueAdmin=$6
+  tagKeyReadOnly=$7
+  tagValueReadOnly=$8
+
+
+  shift
+  shift
+  shift
+  shift
+
+  echo "Start stack ${stackName} creation or update"
+  aws --profile $profile --region $region cloudformation deploy \
+      --stack-name ${stackName} \
+      --template-file ${scriptDir}/cnf-templates/${templateFile} \
+      --capabilities CAPABILITY_NAMED_IAM \
+      --parameter-override $@ \
+        TrustedAccountId=$cicdAccount \
+        TagKeyReadOnly=$tagKeyAdmin \
+        TagValueReadOnly=$tagValueAdmin \
+        TagKeyAdminAccess=$tagKeyReadOnly \
+        TagValueAdminAccess=$tagValueReadOnly
+}
+
+echo "Deploy Dev"
+createOrUpdateStack $DEV_PROFILE $REGION cross-account-$DEV_PROFILE cross-account-role.yaml "TagKeyAdminAccess=pn-admin" "TagValueAdminAccess=true" "TagKeyReadOnly=pn-read-only" "TagValueReadOnly=true"
+
+echo "Deploy Hotfix"
+createOrUpdateStack $HOTFIX_PROFILE $REGION cross-account-$HOTFIX_PROFILE cross-account-role.yaml "TagKeyAdminAccess=pn-admin" "TagValueAdminAccess=true" "TagKeyReadOnly=pn-read-only" "TagValueReadOnly=true"
 
 # 2. Get the ARN of the AdministratorAccess and ReadOnly Access
 
 ### DEV ###
 RoleReadOnlyAccessARN_DEV=$(aws cloudformation describe-stacks \
---stack-name cross-account-1-dev \
+--stack-name cross-account-${DEV_PROFILE} \
 --profile $DEV_PROFILE \
 --region $REGION \
 --query "Stacks[0].Outputs[?OutputKey=='RoleReadOnlyAccessARN'].OutputValue" \
 --output text ) 
 
 RoleAdministratorAccessARN_DEV=$(aws cloudformation describe-stacks \
---stack-name cross-account-1-dev \
+--stack-name cross-account-${DEV_PROFILE} \
 --profile $DEV_PROFILE \
 --region $REGION \
 --query "Stacks[0].Outputs[?OutputKey=='RoleAdministratorAccessARN'].OutputValue" \
@@ -68,14 +83,14 @@ RoleAdministratorAccessARN_DEV=$(aws cloudformation describe-stacks \
 
 ## HOTFIX ###
 RoleReadOnlyAccessARN_HOTFIX=$(aws cloudformation describe-stacks \
---stack-name cross-account-1-hotfix \
+--stack-name cross-account-${HOTFIX_PROFILE} \
 --profile $HOTFIX_PROFILE \
 --region $REGION \
 --query "Stacks[0].Outputs[?OutputKey=='RoleReadOnlyAccessARN'].OutputValue" \
 --output text )
 
 RoleAdministratorAccessARN_HOTFIX=$(aws cloudformation describe-stacks \
---stack-name cross-account-1-hotfix \
+--stack-name cross-account-${HOTFIX_PROFILE} \
 --profile $HOTFIX_PROFILE \
 --region $REGION \
 --query "Stacks[0].Outputs[?OutputKey=='RoleAdministratorAccessARN'].OutputValue" \
@@ -84,7 +99,7 @@ RoleAdministratorAccessARN_HOTFIX=$(aws cloudformation describe-stacks \
 # 3. Deploy the stack in CICD Account
 aws cloudformation deploy \
 --stack-name cross-account-1-cicd \
---template-file ./cf-templates/cicd-account-1.yaml \
+--template-file ./cnf-templates/cicd-account-1.yaml \
 --capabilities CAPABILITY_NAMED_IAM \
 --parameter-overrides \
   RoleAdministratorAccessDEV=$RoleAdministratorAccessARN_DEV \
@@ -107,7 +122,7 @@ then
   ## b. Deploy cicd-account-event-routing.yaml
   aws cloudformation deploy \
   --stack-name cross-account-event-routing \
-  --template-file ./cf-templates/cicd-account-event-routing.yaml \
+  --template-file ./cnf-templates/cicd-account-event-routing.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
     CrossRegionDestinationBus=$EventBus_ARN \
