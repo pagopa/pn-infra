@@ -6,21 +6,9 @@ Parameters:
     Type: String
     Description: Enter the ID of the trusted account
 
-  TagKeyReadOnly:
+  Environment:
     Type: String
-    Description: Enter the Tag Key for Read Only
-
-  TagValueReadOnly:
-    Type: String
-    Description: Enter the Tag Value for Read Only
-
-  TagKeyAdminAccess:
-    Type: String
-    Description: Enter the Tag Key for Admin Access
-
-  TagValueAdminAccess:
-    Type: String
-    Description: Enter the Tag Value for AdminAccess
+    Description: The environment name, for example dev, hotfix
   
 Resources:
   # Read Only Access Role that can be assumed by this account
@@ -28,7 +16,7 @@ Resources:
   RoleReadOnlyAccess:
     Type: AWS::IAM::Role
     Properties: 
-      RoleName: ReadOnlyAccess-DEV
+      RoleName: !Sub ReadOnlyAccess-${Environment}
       AssumeRolePolicyDocument: 
         !Sub |
           {
@@ -42,7 +30,7 @@ Resources:
                 "Action":"sts:AssumeRole",
                 "Condition": {
                   "StringEquals":{
-                    "aws:PrincipalTag/${TagKeyReadOnly}": ${TagValueReadOnly}
+                    "aws:PrincipalTag/pn-read-only-${Environment}": "true"
                   }
                 }
               }
@@ -56,7 +44,7 @@ Resources:
   RoleAdministratorAccess:
     Type: AWS::IAM::Role
     Properties: 
-      RoleName: AdminAccess-DEV
+      RoleName: !Sub AdminAccess-${Environment}
       AssumeRolePolicyDocument: 
         !Sub |
           {
@@ -70,7 +58,7 @@ Resources:
                 "Action":"sts:AssumeRole",
                 "Condition": {
                   "StringEquals":{
-                    "aws:PrincipalTag/${TagKeyAdminAccess}": ${TagValueAdminAccess}
+                    "aws:PrincipalTag/pn-admin-${Environment}": "true"
                   }
                 }
               }
@@ -81,14 +69,5 @@ Resources:
        - "arn:aws:iam::aws:policy/AdministratorAccess" 
 
 Outputs:
-  RoleReadOnlyAccessARN:
-    Description: "ARN of the ReadOnlyAccess role"
-    Value: !GetAtt RoleReadOnlyAccess.Arn
-    Export:
-      Name: !Sub "${AWS::StackName}-ARN-RoleReadOnlyAccess"
-  
-  RoleAdministratorAccessARN:
-    Description: "ARN of the AdministratorAccess role"
-    Value: !GetAtt RoleAdministratorAccess.Arn
-    Export:
-      Name: !Sub "${AWS::StackName}-ARN-RoleAdministratorAccess"
+  RolesArnJson:
+    Value: !Sub "{\"pn-admin\": \"${RoleAdministratorAccess.Arn}\", \"pn-read-only\": \"${RoleReadOnlyAccess.Arn}\"}"

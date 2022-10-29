@@ -47,11 +47,11 @@ Remark: if users already belong to their IAM Group and Policies are already atta
 2. Launch the bash script with the following parameters:
 - REGION: region to deploy the templates in
 - CICD_PROFILE: name of the profile for the CICD account
-- DEV_PROFILE: name of the profile for the DEV account
-- HOTFIX_PROFILE: name of the profile for the HOTFIX account
+- DEV_PROFILES: list of profile names for the DEV account
+- HOTFIX_PROFILES: list of profile names for the HOTFIX account
 
 ```
-./bash-script.sh REGION=us-east-1 CICD_PROFILE=my-cicd-profile DEV_PROFILE=my-dev-profile HOTFIX_PROFILE=my-hotfix-profile
+./bash-script.sh REGION=us-east-1 CICD_PROFILE=my-cicd-profile DEV_PROFILES="my-dev-profile1, my-dev-profile2, my-dev-profile3" HOTFIX_PROFILES=my-hotfix-profile1, my-hotfix-profile2, my-hotfix-profile3
 ```
 
 
@@ -59,43 +59,24 @@ Remark: if users already belong to their IAM Group and Policies are already atta
 
 This section details the steps in the bash script. 
 
-Note: `dev-account-X.yaml` and `hotfix-account-X.yaml` are identical (except for the description)
+Note: `cross-account-roles.yaml` and `hotfix-account-X.yaml` are identical (except for the description)
 
-1. Deploy `dev-account-1.yaml` and `hotfix-account-1.yaml`. They create an AdministratorAccess role and a ReadOnly role that are to be assumed by specific groups in the CICD account. 
-
-```
-aws cloudformation deploy \
---stack-name cross-account-1-dev \
---template-file ./cf-templates/dev-account-1.yaml \
---capabilities CAPABILITY_NAMED_IAM \
---parameter-overrides \
-  TrustedAccountId=$CICDAccountId \
-  TagKeyReadOnly="pn-ro-dev" \
-  TagValueReadOnly="true" \
-  TagKeyAdminAccess="pn-admin-dev" \
-  TagValueAdminAccess="true" \
---profile $DEV_PROFILE \
---region $REGION
-```
+1. Deploy `cross-account-roles.yaml`. It creates an AdministratorAccess role and a ReadOnly role that are to be assumed by specific groups in the CICD account. 
 
 ```
-aws cloudformation deploy \
---stack-name cross-account-1-hotfix \
---template-file ./cf-templates/hotfix-account-1.yaml \
---capabilities CAPABILITY_NAMED_IAM \
---parameter-overrides \
-  TrustedAccountId=$CICDAccountId \
-  TagKeyReadOnly="pn-ro-hotfix" \
-  TagValueReadOnly="true" \
-  TagKeyAdminAccess="pn-admin-hotfix" \
-  TagValueAdminAccess="true" \
---profile $HOTFIX_PROFILE \
---region $REGION
+  aws --profile $profile --region $region cloudformation deploy \
+    --stack-name ${stackName} \
+    --template-file ${scriptDir}/cnf-templates/${templateFile} \
+    --capabilities CAPABILITY_NAMED_IAM \
+    --parameter-override $@ \
+    TrustedAccountId=$cicdAccount
+    Environment=${account}
+
 ```
 
 2. Note down the ARN of `RoleAdministratorAccess` and `RoleReadOnlyAccess` of both accounts. The CICD Account will create policies that will allow to assume those roles. 
 
-3. Deploy `cicd-account-1.yaml`. It deploys the IAM policies that are to be attached to IAM Groups, allowing a specific group to assume a specific role in the Dev and Hotfix accounts. It also creates the Lambda function and the event bridge rule that will trigger it. 
+3. Deploy `cicd-account.yaml`. It deploys the IAM policies that are to be attached to IAM Groups, allowing a specific group to assume a specific role in the Dev and Hotfix accounts. It also creates the Lambda function and the event bridge rule that will trigger it. 
 
 ```
 aws cloudformation deploy \
@@ -103,15 +84,11 @@ aws cloudformation deploy \
 --template-file ./cf-templates/cicd-account-1.yaml \
 --capabilities CAPABILITY_NAMED_IAM \
 --parameter-overrides \
-  RoleAdministratorAccessDEV=$RoleAdministratorAccessARN_DEV \
-  RoleReadOnlyAccessDEV=$RoleReadOnlyAccessARN_DEV \
-  RoleAdministratorAccessHOTFIX=$RoleAdministratorAccessARN_HOTFIX \
-  RoleReadOnlyAccessHOTFIX=$RoleReadOnlyAccessARN_HOTFIX \
 --profile $CICD_PROFILE \
 --region $REGION
 ```
 
-4. Since the IAM events are only registered in the us-east-1 region, we need to redirect these events to the specified region in the situation where $REGION is not us-east-1. Note down the ARN of the default event bus in $REGION and input it as parameter. 
+4. Since the IAM events are only registered in the us-east-1 region, in case you need to deploy the lambdas in a different region, we need to redirect these events to the specified region in the situation where $REGION is not us-east-1. Note down the ARN of the default event bus in $REGION and input it as parameter. 
 
 ```
 aws cloudformation deploy \
