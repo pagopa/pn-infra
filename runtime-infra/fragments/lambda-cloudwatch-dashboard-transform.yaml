@@ -108,6 +108,15 @@ Resources:
                         dashboardList = appendList(dashboardList, lambdaList)
                         y_value = y_value+6
                         
+                    if event["params"]["EventRuleArns"] == [''] or len(event["params"]["EventRuleArns"]) == 0:
+                        print("EventRuleArns param is missing or empty")
+                    else:
+                        localEventRuleArns = event["params"]["EventRuleArns"]
+                        localEventRuleArns = list(filter(None, localEventRuleArns))
+                        eventRuleList = eventRuleWidgetBuilder(localEventRuleArns, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, eventRuleList)
+                        y_value = y_value+6
+
                     if event["params"]["DynamoDBTableNames"] == [''] or len(event["params"]["DynamoDBTableNames"]) == 0:
                         print("DynamoDBTableNames param is missing or empty")
                     else:
@@ -222,13 +231,103 @@ Resources:
                     
                 return queueList
                 
-            def kinesisDataWidgetBuilder(localQueueArns, widgetYvalue, localRegion):
+            def eventRuleWidgetBuilder(localEventRuleArns, widgetYvalue, localRegion):
+                queueList = []
+                message = textSeparator("Event Bus Rule Widgets", widgetYvalue)
+                queueList.append(message)
+                
+                metrics = getEventRuleMetricArray(localEventRuleArns,"ThrottledRules")
+                
+                throttleJson = {
+                    "type": "metric",
+                    "x": 0,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Throttled rule runs",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                
+                queueList.append(throttleJson)
+
+                metrics = getEventRuleMetricArray(localEventRuleArns,"TriggeredRules")
+                
+                triggeredJson = {
+                    "type": "metric",
+                    "x": 6,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Triggered rule runs",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                
+                queueList.append(triggeredJson)
+
+                metrics = getEventRuleMetricArray(localEventRuleArns,"Invocations")
+                
+                invocationsJson = {
+                    "type": "metric",
+                    "x": 12,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Invocations",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                
+                queueList.append(invocationsJson)
+
+                metrics = getEventRuleMetricArray(localEventRuleArns,"InvocationsSentToDlq")
+                
+                invocationsDlqJson = {
+                    "type": "metric",
+                    "x": 18,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Invocations sent to DLQ",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                
+                queueList.append(invocationsDlqJson)
+
+                return queueList
+
+            def kinesisDataWidgetBuilder(localKinesisDataArns, widgetYvalue, localRegion):
                 queueList = []
                 message = textSeparator("Kinesis Data Widgets", widgetYvalue)
                 queueList.append(message)
                 
-                # queueName = splitArnString(localQueueArns)
-                metrics = getKinesisDataMetricArray(localQueueArns,"GetRecords.IteratorAgeMilliseconds")
+                metrics = getKinesisDataMetricArray(localKinesisDataArns, "GetRecords.IteratorAgeMilliseconds")
                 
                 iteratorAgeJson = {
                     "type": "metric",
@@ -249,7 +348,7 @@ Resources:
                 
                 queueList.append(iteratorAgeJson)
                 
-                metrics = getKinesisDataMetricArray(localQueueArns,"ReadProvisionedThroughputExceeded")
+                metrics = getKinesisDataMetricArray(localKinesisDataArns, "ReadProvisionedThroughputExceeded")
 
                 readThroughputJson = {
                     "type": "metric",
@@ -269,7 +368,7 @@ Resources:
                 }
                 queueList.append(readThroughputJson)
 
-                metrics = getKinesisDataMetricArray(localQueueArns,"WriteProvisionedThroughputExceeded")
+                metrics = getKinesisDataMetricArray(localKinesisDataArns, "WriteProvisionedThroughputExceeded")
 
                 writeThroughputJson = {
                     "type": "metric",
@@ -289,7 +388,7 @@ Resources:
                 }
                 queueList.append(writeThroughputJson)
                     
-                metrics = getKinesisDataMetricArray(localQueueArns,"IncomingRecords")
+                metrics = getKinesisDataMetricArray(localKinesisDataArns, "IncomingRecords")
 
                 incomingRecordsJson = {
                     "type": "metric",
@@ -309,7 +408,7 @@ Resources:
                 }
                 queueList.append(incomingRecordsJson)
 
-                metrics = getKinesisDataMetricArray(localQueueArns,"GetRecords.Success")
+                metrics = getKinesisDataMetricArray(localKinesisDataArns, "GetRecords.Success")
 
                 getRecordsJson = {
                     "type": "metric",
@@ -329,7 +428,7 @@ Resources:
                 }
                 queueList.append(getRecordsJson)
 
-                metrics = getKinesisDataMetricArray(localQueueArns,"PutRecords.Success")
+                metrics = getKinesisDataMetricArray(localKinesisDataArns, "PutRecords.Success")
 
                 putRecordsJson = {
                     "type": "metric",
@@ -349,7 +448,7 @@ Resources:
                 }
                 queueList.append(putRecordsJson)
 
-                metrics = getKinesisDataMetricArray(localQueueArns,"PutRecord.Success")
+                metrics = getKinesisDataMetricArray(localKinesisDataArns, "PutRecord.Success")
 
                 putRecordJson = {
                     "type": "metric",
@@ -371,12 +470,12 @@ Resources:
 
                 return queueList
 
-            def kinesisFirehoseWidgetBuilder(localQueueArns, widgetYvalue, localRegion):
+            def kinesisFirehoseWidgetBuilder(localKinesisFirehoseArns, widgetYvalue, localRegion):
                 queueList = []
                 message = textSeparator("Kinesis Firehose Widgets", widgetYvalue)
                 queueList.append(message)
                 
-                metrics = getKinesisFirehoseMetricArray(localQueueArns,"KinesisMillisBehindLatest")
+                metrics = getKinesisFirehoseMetricArray(localKinesisFirehoseArns, "KinesisMillisBehindLatest")
                 
                 millisJson = {
                     "type": "metric",
@@ -397,7 +496,7 @@ Resources:
                 
                 queueList.append(millisJson)
                 
-                metrics = getKinesisFirehoseMetricArray(localQueueArns,"ThrottledRecords")
+                metrics = getKinesisFirehoseMetricArray(localKinesisFirehoseArns, "ThrottledRecords")
 
                 throtthledJson = {
                     "type": "metric",
@@ -417,7 +516,7 @@ Resources:
                 }
                 queueList.append(throtthledJson)
 
-                metrics = getKinesisFirehoseMetricArray(localQueueArns,"DataReadFromKinesisStream.Records")
+                metrics = getKinesisFirehoseMetricArray(localKinesisFirehoseArns, "DataReadFromKinesisStream.Records")
 
                 dataReadJson = {
                     "type": "metric",
@@ -437,7 +536,7 @@ Resources:
                 }
                 queueList.append(dataReadJson)
                     
-                metrics = getKinesisFirehoseMetricArray(localQueueArns,"DeliveryToS3.DataFreshness")
+                metrics = getKinesisFirehoseMetricArray(localKinesisFirehoseArns, "DeliveryToS3.DataFreshness")
 
                 dataFreshnessJson = {
                     "type": "metric",
@@ -457,7 +556,7 @@ Resources:
                 }
                 queueList.append(dataFreshnessJson)
 
-                metrics = getKinesisFirehoseMetricArray(localQueueArns,"DeliveryToS3.Records")
+                metrics = getKinesisFirehoseMetricArray(localKinesisFirehoseArns, "DeliveryToS3.Records")
 
                 recordsJson = {
                     "type": "metric",
@@ -477,7 +576,7 @@ Resources:
                 }
                 queueList.append(recordsJson)
 
-                metrics = getKinesisFirehoseMetricArray(localQueueArns,"DeliveryToS3.Success")
+                metrics = getKinesisFirehoseMetricArray(localKinesisFirehoseArns, "DeliveryToS3.Success")
 
                 putRecordsJson = {
                     "type": "metric",
@@ -499,12 +598,12 @@ Resources:
 
                 return queueList
 
-            def lambdaWidgetBuilder(localQueueArns, widgetYvalue, localRegion):
+            def lambdaWidgetBuilder(localLambdaArns, widgetYvalue, localRegion):
                 queueList = []
                 message = textSeparator("Lambda Widgets", widgetYvalue)
                 queueList.append(message)
                 
-                metrics = getLambdaMetricArray(localQueueArns,"Invocations")
+                metrics = getLambdaMetricArray(localLambdaArns, "Invocations")
                 
                 invocationsJson = {
                     "type": "metric",
@@ -525,7 +624,7 @@ Resources:
                 
                 queueList.append(invocationsJson)
                 
-                metrics = getLambdaMetricArray(localQueueArns,"Errors")
+                metrics = getLambdaMetricArray(localLambdaArns, "Errors")
 
                 errorsJson = {
                     "type": "metric",
@@ -545,7 +644,7 @@ Resources:
                 }
                 queueList.append(errorsJson)
 
-                metrics = getLambdaMetricArray(localQueueArns,"Duration")
+                metrics = getLambdaMetricArray(localLambdaArns, "Duration")
 
                 durationJson = {
                     "type": "metric",
@@ -565,7 +664,7 @@ Resources:
                 }
                 queueList.append(durationJson)
                     
-                metrics = getLambdaMetricArray(localQueueArns,"Throttles")
+                metrics = getLambdaMetricArray(localLambdaArns, "Throttles")
 
                 throttlesJson = {
                     "type": "metric",
@@ -810,7 +909,7 @@ Resources:
                 stringList = newArn.split('/')
                 return stringList[len(stringList)-1]
 
-            def getFunctionName(arn):
+            def getEventRuleName(arn):
                 newArn = splitArnString(arn)
                 stringList = newArn.split('/')
                 return stringList[len(stringList)-1]
@@ -895,6 +994,17 @@ Resources:
                 
                 return finalList
                     
+            def getEventRuleMetricArray(localArray, metricName):
+                finalList = []
+                for x in range(len(localArray)):
+                    metricsArray=[
+                        "AWS/Events", metricName, "RuleName", getEventRuleName(localArray[x])    
+                    ]
+                    
+                    finalList.append(metricsArray)
+                
+                return finalList
+
             def getKinesisDataMetricArray(localArray, metricName):
                 finalList = []
                 for x in range(len(localArray)):
@@ -955,6 +1065,7 @@ Resources:
                 }
                 
                 return textJson
+
 
 
       Handler: index.lambda_handler
