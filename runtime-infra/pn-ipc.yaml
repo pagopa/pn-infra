@@ -445,6 +445,9 @@ Outputs:
   SafeStorageToDeliveryPushQueueARN:
     Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
     Description: SafeStorage-to-delivery-push queue ARN
+  SafeStorageToDeliveryPushQueueAlarmARN:
+    Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.SqsDLQAlarmArn
+    Description: SafeStorage-to-delivery-push queue alarm ARN
 
   # Delivery push inputs
   DeliveryPushInputsQueueName:
@@ -456,6 +459,9 @@ Outputs:
   DeliveryPushInputsQueueARN:
     Value: !GetAtt DeliveryPushInputsQueue.Outputs.QueueARN
     Description: pn-delivery-push input queue ARN
+  DeliveryPushInputsQueueAlarmARN:
+    Value: !GetAtt DeliveryPushInputsQueue.Outputs.SqsDLQAlarmArn
+    Description: pn-delivery-push input queue alarm ARN
 
   # External channels inputs
   ExternalChannelsInputsQueueName:
@@ -467,6 +473,9 @@ Outputs:
   ExternalChannelsInputsQueueARN:
     Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueARN
     Description: pn-external-channels input queue ARN
+  ExternalChannelsInputsQueueAlarmARN:
+    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.SqsDLQAlarmArn
+    Description: pn-external-channels input queue alarm ARN
 
   # External channels outputs
   ExternalChannelsOutputsQueueName:
@@ -478,6 +487,23 @@ Outputs:
   ExternalChannelsOutputsQueueARN:
     Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
     Description: pn-external-channels output queue ARN
+  ExternalChannelsOutputsQueueAlarmARN:
+    Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.SqsDLQAlarmArn
+    Description: pn-external-channels output queue alarm ARN
+
+  # External channels to user attribute outputs
+  ExternalChannels2UserAttributesQueueName:
+    Value: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueName
+    Description: pn-external-channels output to user-attributes queue name
+  ExternalChannels2UserAttributesQueueURL:
+    Value: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueURL
+    Description: pn-external-channels output to user-attributes queue URL
+  ExternalChannels2UserAttributesQueueARN:
+    Value: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
+    Description: pn-external-channels output to user-attributes queue ARN
+  ExternalChannels2UserAttributesQueueAlarmARN:
+    Value: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.SqsDLQAlarmArn
+    Description: pn-external-channels output to user-attributes queue alarm ARN
 
   # Downtime Logs composite alarm queue
   DowntimeLogsAggregateAlarmQueueName:
@@ -489,6 +515,9 @@ Outputs:
   DowntimeLogsAggregateAlarmQueueARN:
     Value: !GetAtt CompositeAlarmQueue.Outputs.QueueARN
     Description: Aggregate alarm queue ARN
+  DowntimeLogsAggregateAlarmQueueAlarmARN:
+    Value: !GetAtt CompositeAlarmQueue.Outputs.SqsDLQAlarmArn
+    Description: Aggregate alarm queue alarm ARN
   
   # Downtime Logs safe-storage events
   DowntimeLogsSafeStorageEventsQueueName:
@@ -500,6 +529,9 @@ Outputs:
   DowntimeLogsSafeStorageEventsQueueARN:
     Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueARN
     Description: Events form safe-storage to pn-downtime-logs queue ARN
+  DowntimeLogsSafeStorageEventsQueueAlarmARN:
+    Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.SqsDLQAlarmArn
+    Description: Events form safe-storage to pn-downtime-logs queue alarm ARN
 
   # Kinesis Source Stream containing the DynamoDB Change Data Capture events
   CdcKinesisSourceStreamName:
@@ -523,6 +555,27 @@ Outputs:
     Description: 'Kinesis source Logs stream crypto key ARN'
     Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamKeyArn
 
+  # Event Bus Alarm
+  EventBusDLQHasMessagesAlarmArn:
+    Description: 'Event Bus Core DLQ alarm ARN'
+    Value: !GetAtt DLQHasMessagesAlarm.Arn
+
+  # Event Bus Rule Arns
+  PnCoreEventBusToSafeStorageResponseQueueArn:
+    Description: 'Event bus to safe storage rule ARN'
+    Value: !GetAtt PnCoreEventBusToSafeStorageResponseQueue.Arn
+
+  PnCoreEventBusToDowntimeLogsSafeStorageResponseQueueArn:
+    Description: 'Event bus to downtime logs rule ARN'
+    Value: !GetAtt PnCoreEventBusToDowntimeLogsSafeStorageResponseQueue.Arn
+
+  PnCoreEventBusToExtChResponseQueueArn:
+    Description: 'Event bus to external channel rule ARN'
+    Value: !GetAtt PnCoreEventBusToExtChResponseQueue.Arn
+
+  PnCoreEventBusToUserAttributesQueueArn:
+    Description: 'Event bus to user attributes rule ARN'
+    Value: !GetAtt PnCoreEventBusToUserAttributesQueue.Arn
 
   # pass-thought parameters
   NetworkLoadBalancerLink:
