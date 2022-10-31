@@ -555,6 +555,27 @@ Outputs:
     Description: 'Kinesis source Logs stream crypto key ARN'
     Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamKeyArn
 
+  # Event Bus Alarm
+  EventBusDLQHasMessagesAlarmArn:
+    Description: 'Event Bus Core DLQ alarm ARN'
+    Value: !GetAtt DLQHasMessagesAlarm.Arn
+
+  # Event Bus Rule Arns
+  PnCoreEventBusToSafeStorageResponseQueueArn:
+    Description: 'Event bus to safe storage rule ARN'
+    Value: !GetAtt PnCoreEventBusToSafeStorageResponseQueue.Arn
+
+  PnCoreEventBusToDowntimeLogsSafeStorageResponseQueueArn:
+    Description: 'Event bus to downtime logs rule ARN'
+    Value: !GetAtt PnCoreEventBusToDowntimeLogsSafeStorageResponseQueue.Arn
+
+  PnCoreEventBusToExtChResponseQueueArn:
+    Description: 'Event bus to external channel rule ARN'
+    Value: !GetAtt PnCoreEventBusToExtChResponseQueue.Arn
+
+  PnCoreEventBusToUserAttributesQueueArn:
+    Description: 'Event bus to user attributes rule ARN'
+    Value: !GetAtt PnCoreEventBusToUserAttributesQueue.Arn
 
   # pass-thought parameters
   NetworkLoadBalancerLink:

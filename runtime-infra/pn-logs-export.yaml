@@ -142,3 +142,35 @@ Resources:
         OpenSearchDeliveryLambdaS3ObjectVersion: !Ref OpenSearchDeliveryLambdaS3ObjectVersion
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
+Outputs:
+  LogsToS3KinesisDeliverStreamArn:
+    Description: 'Logs Delivery stream to S3 ARN'
+    Value: !GetAtt LogsToExternalBucket.Outputs.DeliveryStreamArn
+
+  LogsToS3KinesisDeliveryStreamAlarmArn:
+    Description: 'Log delivery stream alarm ARN'
+    Value: !GetAtt LogsToExternalBucket.Outputs.DeliveryStreamErrorLogsMetricAlarmArn
+
+  CdcToS3KinesisDeliveryStreamArn:
+    Description: 'Cdc Delivery stream to S3 ARN'
+    Value: !GetAtt CdcToExternalBucket.Outputs.DeliveryStreamArn
+
+  CdcToS3KinesisDeliveryStreamAlarmArn:
+    Description: 'Cdc delivery stream alarm ARN'
+    Value: !GetAtt CdcToExternalBucket.Outputs.DeliveryStreamErrorLogsMetricAlarmArn
+
+  OpenSearchDeliveryLambdaAlarmArn:
+    Description: 'Lambda Logs to OpenSearch alarm ARN'
+    Value:
+      !If
+      - HasOpenSearchExport
+      - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaAlarmArn
+      - ''
+
+  OpenSearchDeliveryLambdaArn:
+    Description: 'Lambda Logs to OpenSearch ARN'
+    Value:
+      !If
+      - HasOpenSearchExport
+      - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaArn
+      - ''

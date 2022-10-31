@@ -165,3 +165,12 @@ Resources:
       EvaluationPeriods: 1
       Period: 3600 # 1 hour
       TreatMissingData: notBreaching
+
+Outputs:
+  DeliveryLambdaAlarmArn:
+    Description: 'Delivery lambda alarm ARN'
+    Value: !GetAtt DeliveryLambdaErrorsAlarm.Arn
+
+  DeliveryLambdaArn:
+    Description: 'Delivery lambda ARN'
+    Value: !GetAtt DeliveryLambda.Arn
