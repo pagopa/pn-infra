@@ -37,6 +37,14 @@ Parameters:
     Type: String
     Description: 'The ARN of Core Event Bus.'
 
+  OpenSearchDeliveryLambdaAlarmArn:
+    Type: String
+    Default: ''
+
+  OpenSearchDeliveryLambdaArn:
+    Type: String
+    Default: ''
+
 Resources:
   InfraMicroserviceCloudWatchDashboard:
     Type: AWS::CloudFormation::Stack
@@ -49,5 +57,17 @@ Resources:
           - - !Ref EventBusDLQHasMessagesAlarmArn
             - !Ref CdcToS3KinesisDeliveryStreamAlarmArn
             - !Ref LogsToS3KinesisDeliveryStreamAlarmArn
+            - !Ref OpenSearchDeliveryLambdaAlarmArn
+        LambdaArns: !Join
+          - ','
+          - - !Ref OpenSearchDeliveryLambdaArn
+        KinesisDataArns: !Join
+          - ','
+          - - !Ref CdcKinesisSourceStreamArn
+            - !Ref LogsKinesisSourceStreamArn
+        KinesisFirehoseArns: !Join
+          - ','
+          - - !Ref LogsToS3KinesisDeliverStreamArn
+            - !Ref CdcToS3KinesisDeliveryStreamArn
 
 

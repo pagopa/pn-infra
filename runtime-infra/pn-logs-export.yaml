@@ -158,3 +158,19 @@ Outputs:
   CdcToS3KinesisDeliveryStreamAlarmArn:
     Description: 'Cdc delivery stream alarm ARN'
     Value: !GetAtt CdcToExternalBucket.Outputs.DeliveryStreamErrorLogsMetricAlarmArn
+
+  OpenSearchDeliveryLambdaAlarmArn:
+    Description: 'Lambda Logs to OpenSearch alarm ARN'
+    Value:
+      !If
+      - HasOpenSearchExport
+      - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaAlarmArn
+      - ''
+
+  OpenSearchDeliveryLambdaArn:
+    Description: 'Lambda Logs to OpenSearch ARN'
+    Value:
+      !If
+      - HasOpenSearchExport
+      - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaArn
+      - ''
