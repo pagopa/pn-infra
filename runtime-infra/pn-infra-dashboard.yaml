@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys the INFRA dashboard'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
+  Version:
+    Type: String
+    Description: 'keep track of used projects commitIds'
+
+  CdcKinesisSourceStreamArn:
+    Type: String
+
+  LogsKinesisSourceStreamArn:
+    Type: String
+
+  LogsToS3KinesisDeliverStreamArn:
+    Type: String
+
+  LogsToS3KinesisDeliveryStreamAlarmArn:
+    Type: String
+
+  CdcToS3KinesisDeliveryStreamArn:
+    Type: String
+
+  CdcToS3KinesisDeliveryStreamAlarmArn:
+    Type: String
+
+  EventBusDLQHasMessagesAlarmArn:
+    Type: String
+    Description: 'The ARN of Core Event Bus.'
+
+Resources:
+  MandateMicroserviceCloudWatchDashboard:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-cloudwatch-dashboard.yaml"
+      Parameters:
+        DashboardName: !Sub "${ProjectName}-infra"
+        AlarmArns: !Join
+          - ','
+          - - !Ref EventBusDLQHasMessagesAlarmArn
+            - !Ref CdcToS3KinesisDeliveryStreamAlarmArn
+            - !Ref LogsToS3KinesisDeliveryStreamAlarmArn
+
+
