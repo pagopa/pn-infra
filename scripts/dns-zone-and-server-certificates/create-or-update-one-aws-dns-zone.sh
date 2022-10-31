@@ -58,12 +58,13 @@ echo "Extract NameServers DNSs"
 nameservers=$( echo $outputs | jq '.Stacks[0].Outputs[] | select(.OutputKey=="NameServers") | .OutputValue' | sed -e 's/"//g')
 echo $nameservers | tr "," "\n"
 
+nameserverParamValue=$( echo $nameservers | sed -e 's/,/|/g' )
+
+echo $nameserverParamValue
 
 echo "CONFIGURE DELEGATION"
 if ( [ ! "$envName" = "prod" ] ) then
-  nameserverParamValue=$( echo $nameservers | sed -e 's/,/|/g' )
-  createOrUpdateStack $parentZoneProfile $parentZoneRegion $parentZoneStackName zone-delegation-recordset.yaml \
-          "EnvName=${envName}" "\"NameServers=${nameserverParamValue}\""
+  createOrUpdateStack $parentZoneProfile $parentZoneRegion $parentZoneStackName zone-delegation-recordset.yaml "EnvName=${envName}" "NameServers=${nameserverParamValue}"
 else
   echo " ### delegation of PRODUCTION DNS ZONE needs pull request, see engineering space on confluence"
   echo $outputs > /tmp/dns-pagopa-it-path-proposal.txt

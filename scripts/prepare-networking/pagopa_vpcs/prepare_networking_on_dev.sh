@@ -15,7 +15,7 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 usage() {
       cat <<EOF
-    Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] -r <aws-region> -p-core <aws-profile> -p-helpdesk <aws-profile> -p-confidential <aws-profile>
+    Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] -r <aws-region> -p-core <aws-profile> -p-helpdesk <aws-profile> -p-confidential <aws-profile> -p-spidhub <aws-profile>
 
     [-h]                      : this help message
     [-v]                      : verbose mode
@@ -24,16 +24,15 @@ EOF
   exit 1
 }
 
-names=(core helpdesk confidential)
+names=(core helpdesk confidential spidhub)
 
 parse_params() {
   # default values of variables set from params
   aws_profiles=()
   aws_region="eu-south-1"
-  igress_num=(4 2 1)
-  egress_num=(16 8 7)
-  private_num=(32 64 65)
-  account_ids=(558518206506 498209326947 946373734005)
+  igress_num=(4 2 1 6)
+  egress_num=(16 8 7 9)
+  private_num=(32 64 65 66)
   
   while :; do
     case "${1-}" in
@@ -55,6 +54,10 @@ parse_params() {
       aws_profiles[2]="${2-}"
       shift
       ;;
+    -p-spidhub )
+      aws_profiles[3]="${2-}"
+      shift
+      ;;
     -?*) usage ;;
     *) break ;;
     esac
@@ -68,11 +71,22 @@ parse_params() {
   return 0
 }
 
+get_account_number(){
+  account_ids=()
+  for  idx in ${!aws_profiles[@]}; do
+    account_id=$( aws --profile ${aws_profiles[$idx]} --region ${aws_region} \
+    sts get-caller-identity --query "Account" --output text  
+  )
+  account_ids[$idx]=${account_id}
+  done
+}
+
 dump_params(){
   echo ""
   echo "######      PARAMETERS      ######"
   echo "##################################"
   echo "Number of accounts: ${number_of_accounts}"
+  get_account_number
   for  idx in ${!aws_profiles[@]}; do
     echo "=======   Account ${names[$idx]}   ======="
     echo " - Profile:    ${aws_profiles[$idx]}"
@@ -124,6 +138,7 @@ for  idx in ${!aws_profiles[@]}; do
 
   echo ""
   echo " - Private VPC Id:          ${vpc_ids[$idx]}"
+ 
 done
 
 
@@ -208,6 +223,3 @@ function makeOnePeering() {
 makeOnePeering 0 1
 makeOnePeering 0 2
 makeOnePeering 1 2
-
-
-
