@@ -76,7 +76,7 @@ function getRoleArn() {
 }
 
 function createAssumeRolePolicies() {
-  aws iam create-policy --policy-name $1 --tags Key=$2,Value=true --policy-document '{"Version":"2012-10-17","Statement":[{"Action":["sts:AssumeRole"],"Resource":'"$3"',"Effect":"Allow"}]}'
+  aws iam create-policy --profile $CICD_PROFILE --policy-name $1 --tags Key=$2,Value=true --policy-document '{"Version":"2012-10-17","Statement":[{"Action":["sts:AssumeRole"],"Resource":'"$3"',"Effect":"Allow"}]}'
 }
 
 # 1. Launch the stack for each environment

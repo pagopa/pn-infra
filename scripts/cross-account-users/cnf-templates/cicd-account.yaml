@@ -73,6 +73,13 @@ Resources:
   ####### Lambda ########
   #######################
 
+  LambdaUpdateUserTagsUserEventLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/UpdateUserTags_userEvent
+      RetentionInDays: 14
+
+
   LambdaUpdateUserTagsUserEvent:
     Type: AWS::Lambda::Function
     Properties:
@@ -245,6 +252,12 @@ Resources:
       Timeout: 10
       Runtime: python3.9
  
+  LambdaUpdateUserTagsPolicyEventLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/UpdateUserTags_policyEvent
+      RetentionInDays: 14
+
   LambdaUpdateUserTagsPolicyEvent:
     Type: AWS::Lambda::Function
     Properties:
