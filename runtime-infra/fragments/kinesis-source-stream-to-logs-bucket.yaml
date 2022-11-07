@@ -171,6 +171,15 @@ Resources:
       Statistic: Sum
       Threshold: 1
 
+Outputs:
+  DeliveryStreamErrorLogsMetricAlarmArn:
+    Description: 'ARN of delivery stream error log alarm'
+    Value: !GetAtt DeliveryStreamErrorLogsMetricAlarm.Arn
+
+  DeliveryStreamArn:
+    Description: 'ARN of delivery stream'
+    Value: !GetAtt LogsKinesisDeliveryStream.Arn
+
   # LogsKinesisDeliveryStreamKmsKey:
   #   Condition: ExportLogs
   #   Type: AWS::KMS::Key

@@ -31,6 +31,26 @@ Parameters:
     Type: CommaDelimitedList
     Default: ''
 
+  LambdaArns:
+    Description: Comma-delimited list of Lambda ARNs
+    Type: CommaDelimitedList
+    Default: ''
+
+  KinesisDataArns:
+    Description: Comma-delimited list of Kinesis Data ARNs
+    Type: CommaDelimitedList
+    Default: ''
+
+  KinesisFirehoseArns:
+    Description: Comma-delimited list of Kinesis Firehose ARNs
+    Type: CommaDelimitedList
+    Default: ''
+
+  EventRuleArns:
+    Description: Comma-delimited list of Event Bus Rule ARNs
+    Type: CommaDelimitedList
+    Default: ''
+
 Resources:
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard
@@ -46,3 +66,7 @@ Resources:
             QueueArns: !Ref QueueArns
             Region: !Ref AWS::Region
             RestApiNames: !Ref RestApiNames
+            LambdaArns: !Ref LambdaArns
+            KinesisDataArns: !Ref KinesisDataArns
+            KinesisFirehoseArns: !Ref KinesisFirehoseArns
+            EventRuleArns: !Ref EventRuleArns
