@@ -393,7 +393,8 @@ Resources:
         - Name: "QueueName"
           Value: !Sub '${EventBusDeadLetterQueue.QueueName}'
       Statistic: "Sum"
-      Period: 60  
+      TreatMissingData: "notBreaching"
+      Period: 60
       Threshold: 1
       ComparisonOperator: "GreaterThanOrEqualToThreshold" 
       EvaluationPeriods: 1       
