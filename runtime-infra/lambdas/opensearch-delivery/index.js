@@ -8,17 +8,21 @@ const handler = async (event) => {
   const logs = extractKinesisData(event);
   console.log(`Batch size: ${logs.length} logs`);
 
-  const bulkBody = prepareBulkBody(logs);
+  const bulkBodyBatches = prepareBulkBody(logs);
 
-  if(bulkBody.length>0){
-    const bulkResponse = await openSearch.bulk({ body: bulkBody });
-
-    const seqNumbers = failedSeqNumbers(bulkResponse, bulkBody);
+  if(bulkBodyBatches.length>0){
+    const seqNumbers = []
+    for(let i=0; i<bulkBodyBatches.length; i++){
+      const bulkBody = bulkBodyBatches[i]
+      const bulkResponse = await openSearch.bulk({ body: bulkBody });
+      const batchSeqNumbers = failedSeqNumbers(bulkResponse, bulkBody);
+      seqNumbers.append(batchSeqNumbers)      
+    }
 
     console.log(`Failed documents: ${seqNumbers.length}`);
 
     return {
-      batchItemFailures: seqNumbers
+      batchItemFailures:  [...new Set(seqNumbers)]
     }
 
   } else {
