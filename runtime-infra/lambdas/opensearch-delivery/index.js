@@ -14,9 +14,11 @@ const handler = async (event) => {
     const seqNumbers = []
     for(let i=0; i<bulkBodyBatches.length; i++){
       const bulkBody = bulkBodyBatches[i]
+      console.log(`Bulk batch size: ${bulkBody.length}`);
       const bulkResponse = await openSearch.bulk({ body: bulkBody });
       const batchSeqNumbers = failedSeqNumbers(bulkResponse, bulkBody);
-      seqNumbers.append(batchSeqNumbers)      
+      console.log(`Bulk done with ${batchSeqNumbers.length} errors`);
+      seqNumbers.push(...batchSeqNumbers);
     }
 
     console.log(`Failed documents: ${seqNumbers.length}`);
