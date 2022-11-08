@@ -22,7 +22,7 @@ function decodePayload(b64Str) {
 }
 
 function mustLog(rec){
-  return rec.logStream && rec.logStream.indexOf('pn-')>=0;
+  return rec.logStream && rec.logStream.indexOf('pn-')>=0 && rec.messageType!=='CONTROL_MESSAGE';
 }
 
 function extractKinesisData(kinesisEvent) {
