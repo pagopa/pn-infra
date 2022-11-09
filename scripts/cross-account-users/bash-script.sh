@@ -10,29 +10,30 @@ for ARGUMENT in "$@"; do
   export "$KEY"="$VALUE"
 done
 
+## Receives the profile name for CICD account and the region
 echo "REGION = $REGION"
-## Receives the profile name for CICD account
 echo "CICD_PROFILE = $CICD_PROFILE"
-## Receives a list of dev profiles, for example DEV_PROFILES=(profile1 profile2 profile3)
-echo "DEV_PROFILES = $DEV_PROFILES"
-## Receives a list of dev profiles, for example HOTFIX_PROFILES=(profile1 profile2 profile3)
-echo "HOTFIX_PROFILES = $HOTFIX_PROFILES"
 
-# Get Profiles for DEV and HOTFIX
-environments=($DEV_PROFILES $HOTFIX_PROFILES)
+## Receives a list of profiles to deploy the cross account stacks in for example DEV_PROFILE=profile1,profile2,profile3
+## String converted to Bash Array
+IFS=',' read -r -a arrDevProfiles <<< "$DEV_PROFILE"
+DEV_PROFILE=${arrDevProfiles[@]}
+echo "DEV_PROFILE = $DEV_PROFILE"
 
-echo Enviroments
-printf '%s\n' "${environments[@]}"
-# echo $accountProfile
+## Receives a list of profiles to deploy the cross account stacks in for example HOTFIX_PROFILE=profile1,profile2
+## String converted to Bash Array
+IFS=',' read -r -a arrHotfixProfiles <<< "$HOTFIX_PROFILE"
+HOTFIX_PROFILE=${arrHotfixProfiles[@]}
+echo "HOTFIX_PROFILE = $HOTFIX_PROFILE"
 
 # Get the CICD Account ID
-
-cicdAccount=$(aws sts get-caller-identity \
+cicdAccountId=$(aws sts get-caller-identity \
   --query "Account" \
   --output text \
   --profile $CICD_PROFILE)
 
 scriptDir=$(dirname "$0")
+echo $scriptDir
 
 ## Create stack function
 function createOrUpdateStack() {
@@ -41,64 +42,74 @@ function createOrUpdateStack() {
   stackName=$3
   templateFile=$4
 
-  shift
-  shift
-  shift
-  shift
+  shift 4
 
   echo "Start stack ${stackName} creation or update"
-  aws --profile $profile --region $region cloudformation deploy \
-    --stack-name ${stackName} \
-    --template-file ${scriptDir}/cnf-templates/${templateFile} \
-    --capabilities CAPABILITY_NAMED_IAM \
-    --parameter-override $@ \
-    TrustedAccountId=$cicdAccount
+  if [[ ! -z $@ ]]; then
+    aws --profile $profile --region $region cloudformation deploy \
+      --stack-name ${stackName} \
+      --template-file ${scriptDir}/cnf-templates/${templateFile} \
+      --capabilities CAPABILITY_NAMED_IAM \
+      --parameter-override $@
+  else
+    aws --profile $profile --region $region cloudformation deploy \
+      --stack-name ${stackName} \
+      --template-file ${scriptDir}/cnf-templates/${templateFile} \
+      --capabilities CAPABILITY_NAMED_IAM
+  fi 
 }
 
 # Get the ARN of the AdministratorAccess and ReadOnly Access
 function getRoleArn() {
+  profile=$1
+  region=$2
+
+  # Global variables
   arraVar=$(aws cloudformation describe-stacks \
-    --stack-name cross-account-$1 \
-    --profile $1 \
-    --region $REGION \
+    --stack-name cross-account-$profile \
+    --profile $profile \
+    --region $region \
     --query "Stacks[0].Outputs[?OutputKey=='RolesArnJson'].OutputValue" \
     --output text)
-
-  readOnlyRoleArn=$(echo $arraVar | jq '."pn-read-only"')
-  adminRoleArn=$(echo $arraVar | jq '."pn-admin"')
-
-  ## Creating IAM roles
-  createAssumeRolePolicies assume-role-read-only-$1 pn-read-only-$account $readOnlyRoleArn
-  createAssumeRolePolicies assume-role-admin-$1 pn-admin-$account $adminRoleArn
-
-  echo "ReadOnly: $readOnlyRoleArn"
-  echo "Admin: $adminRoleArn"
+  keys=$(echo $arraVar | jq 'keys[]')
 }
 
 function createAssumeRolePolicies() {
-  aws iam create-policy --profile $CICD_PROFILE --policy-name $1 --tags Key=$2,Value=true --policy-document '{"Version":"2012-10-17","Statement":[{"Action":["sts:AssumeRole"],"Resource":'"$3"',"Effect":"Allow"}]}'
+  echo "Creating Assume Role Policy $1"
+  aws iam --profile $CICD_PROFILE --region $REGION create-policy \
+    --policy-name $1 \
+    --tags Key=$2,Value=true \
+    --policy-document '{"Version":"2012-10-17","Statement":[{"Action":["sts:AssumeRole"],"Resource":'"$3"',"Effect":"Allow"}]}'
 }
 
-# 1. Launch the stack for each environment
-for environment in ${environments[@]}; do
-
-  for account in ${environment[@]}; do
-
-    echo "Deploying Stack in $account"
-    createOrUpdateStack $account $REGION cross-account-$account cross-account-role.yaml "Environment=${account}"
-
-    ## 2. Create Assumerole policies in CICD account
-    getRoleArn $account
-
+# 1.a Launch the stack for each Dev Profile
+for profile in ${DEV_PROFILE[@]}; do
+  createOrUpdateStack $profile $REGION cross-account-$profile cross-account-role.yaml "Environment=${profile}" "TrustedAccountId=${cicdAccountId}"
+  getRoleArn $profile $REGION
+  # Create Policies in CICD Account
+  for key in $keys; do
+    key=$(echo $key | tr -d '"')
+    value=$(echo $arraVar | jq --arg key "$key" '.[$key]')
+    createAssumeRolePolicies assume-role-$key-$profile $key-$profile $value
   done
 done
 
-# 3. Deploy the stack in CICD Account
+# 1.b Launch the stacks for each Hotfix Profile
+for profile in ${HOTFIX_PROFILE[@]}; do
+  createOrUpdateStack $profile $REGION cross-account-$profile cross-account-role.yaml "Environment=${profile}" "TrustedAccountId=${cicdAccountId}"
+  getRoleArn $profile $REGION
+  # Create Policies in CICD Account
+  for key in $keys; do
+    key=$(echo $key | tr -d '"')
+    value=$(echo $arraVar | jq --arg key "$key" '.[$key]')
+    createAssumeRolePolicies assume-role-$key-$profile $key-$profile $value
+  done
+done
 
-echo "Deploying Stack in $CICD_PROFILE account"
+# 2. Deploy the stack in CICD Account
 createOrUpdateStack $CICD_PROFILE $REGION cross-account-cicd cicd-account.yaml
 
-# 4. If $REGION is not set to us-east-1, then deploy the event routing
+# 3. If $REGION is not set to us-east-1, then deploy the event routing
 if [[ "$REGION" != "us-east-1" ]]; then
   ## a. Get the ARN of the default event bus for the CICD account in $REGION
   EventBus_ARN=$(aws events list-event-buses \
@@ -108,12 +119,5 @@ if [[ "$REGION" != "us-east-1" ]]; then
     --output text)
 
   ## b. Deploy cicd-account-event-routing.yaml
-  aws cloudformation deploy \
-    --stack-name cross-account-event-routing \
-    --template-file ./cnf-templates/cicd-account-event-routing.yaml \
-    --capabilities CAPABILITY_NAMED_IAM \
-    --parameter-overrides \
-    CrossRegionDestinationBus=$EventBus_ARN \
-    --profile $CICD_PROFILE \
-    --region us-east-1
+  createOrUpdateStack $CICD_PROFILE us-east-1 cross-account-event-routing-cicd cicd-account-event-routing.yaml CrossRegionDestinationBus=$EventBus_ARN
 fi
