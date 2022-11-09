@@ -18,14 +18,21 @@ function failedSeqNumbers(bulkResponse, bulkBody) {
   return [...new Set(seqNumbers)];
 }
 
+function chunk(arr, size) {
+  return Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
+    arr.slice(i * size, i * size + size)
+  );
+}
+
 function prepareBulkBody(logs){
-    const formattedLogs = []
+    let formattedLogs = []
 
     logs.forEach((doc) => {
         doc.logEvents.forEach((log) => {
             try {
                 const jsonMessage = JSON.parse(log.message)
                 if(jsonMessage){
+                    jsonMessage._id = log.id
                     jsonMessage.kinesisSeqNumber = doc.kinesisSeqNumber
                     jsonMessage.logGroup = doc.logGroup
                     jsonMessage.logStream = doc.logStream
@@ -35,6 +42,7 @@ function prepareBulkBody(logs){
                 const timestamp = new Date(log.timestamp);
 
                 const fakeLog = {
+                    _id: log.id,
                     kinesisSeqNumber: doc.kinesisSeqNumber,
                     logGroup: doc.logGroup,
                     logStream: doc.logStream,
@@ -52,7 +60,12 @@ function prepareBulkBody(logs){
     })
 
     if(formattedLogs.length>0){
-        return formattedLogs.flatMap((doc) => [{ index: { _index: process.env.INDEX_NAME }}, doc]);
+        formattedLogs = chunk(formattedLogs, 500)
+        return formattedLogs.map((formattedLogBatch) => {
+          return formattedLogBatch.flatMap((doc) => [{ index: { _index: process.env.INDEX_NAME, _id: doc._id }}, doc]
+          
+          );
+        })
       } else {
         return [];
     }
