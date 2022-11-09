@@ -51,7 +51,7 @@ Remark: if users already belong to their IAM Group and Policies are already atta
 - HOTFIX_PROFILE: list of profiles to deploy the cross account stacks in for example HOTFIX_PROFILE=profile1,profile2
 
 ```
-/bash-script-2.sh REGION=eu-south-1 CICD_PROFILE=pagopa-cicd DEV_PROFILE=pagopa-dev1,pagopa-dev1 HOTFIX_PROFILE=pagopa-hotfix1,pagopa-hotfix2
+/bash-script.sh REGION=eu-south-1 CICD_PROFILE=pagopa-cicd DEV_PROFILE=pagopa-dev1,pagopa-dev1 HOTFIX_PROFILE=pagopa-hotfix1,pagopa-hotfix2
 ```
 
 
