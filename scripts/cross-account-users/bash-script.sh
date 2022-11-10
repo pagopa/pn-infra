@@ -16,15 +16,11 @@ echo "CICD_PROFILE = $CICD_PROFILE"
 
 ## Receives a list of profiles to deploy the cross account stacks in for example DEV_PROFILE=profile1,profile2,profile3
 ## String converted to Bash Array
-IFS=',' read -r -a arrDevProfiles <<< "$DEV_PROFILE"
-DEV_PROFILE=${arrDevProfiles[@]}
-echo "DEV_PROFILE = $DEV_PROFILE"
+IFS=',' read -r -a arrProfiles <<< "$PROFILES"
+PROFILES=${arrProfiles[@]}
+echo "PROFILES = $PROFILES"
 
-## Receives a list of profiles to deploy the cross account stacks in for example HOTFIX_PROFILE=profile1,profile2
-## String converted to Bash Array
-IFS=',' read -r -a arrHotfixProfiles <<< "$HOTFIX_PROFILE"
-HOTFIX_PROFILE=${arrHotfixProfiles[@]}
-echo "HOTFIX_PROFILE = $HOTFIX_PROFILE"
+IFS=',' read -r -a ACCOUNT_NAMES <<< "$ACCOUNT_NAMES"
 
 # Get the CICD Account ID
 cicdAccountId=$(aws sts get-caller-identity \
@@ -63,10 +59,11 @@ function createOrUpdateStack() {
 function getRoleArn() {
   profile=$1
   region=$2
+  accountName=$3
 
   # Global variables
   arraVar=$(aws cloudformation describe-stacks \
-    --stack-name cross-account-$profile \
+    --stack-name cross-account-$accountName \
     --profile $profile \
     --region $region \
     --query "Stacks[0].Outputs[?OutputKey=='RolesArnJson'].OutputValue" \
@@ -82,28 +79,20 @@ function createAssumeRolePolicies() {
     --policy-document '{"Version":"2012-10-17","Statement":[{"Action":["sts:AssumeRole"],"Resource":'"$3"',"Effect":"Allow"}]}'
 }
 
-# 1.a Launch the stack for each Dev Profile
-for profile in ${DEV_PROFILE[@]}; do
-  createOrUpdateStack $profile $REGION cross-account-$profile cross-account-role.yaml "Environment=${profile}" "TrustedAccountId=${cicdAccountId}"
-  getRoleArn $profile $REGION
+INDEX=0
+# 1. Launch the stack for each Dev Profile
+for profile in ${PROFILES[@]}; do
+  accountName=${ACCOUNT_NAMES[$INDEX]}
+  echo "Working on $profile and $accountName"
+  createOrUpdateStack $profile $REGION cross-account-$accountName cross-account-role.yaml "Environment=${accountName}" "TrustedAccountId=${cicdAccountId}"
+  getRoleArn $profile $REGION $accountName
   # Create Policies in CICD Account
   for key in $keys; do
     key=$(echo $key | tr -d '"')
     value=$(echo $arraVar | jq --arg key "$key" '.[$key]')
-    createAssumeRolePolicies assume-role-$key-$profile $key-$profile $value
+    createAssumeRolePolicies assume-role-$key-$accountName $key-$accountName $value
   done
-done
-
-# 1.b Launch the stacks for each Hotfix Profile
-for profile in ${HOTFIX_PROFILE[@]}; do
-  createOrUpdateStack $profile $REGION cross-account-$profile cross-account-role.yaml "Environment=${profile}" "TrustedAccountId=${cicdAccountId}"
-  getRoleArn $profile $REGION
-  # Create Policies in CICD Account
-  for key in $keys; do
-    key=$(echo $key | tr -d '"')
-    value=$(echo $arraVar | jq --arg key "$key" '.[$key]')
-    createAssumeRolePolicies assume-role-$key-$profile $key-$profile $value
-  done
+  ((INDEX=INDEX+1))
 done
 
 # 2. Deploy the stack in CICD Account

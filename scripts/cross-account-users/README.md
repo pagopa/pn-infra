@@ -47,11 +47,11 @@ Remark: if users already belong to their IAM Group and Policies are already atta
 2. Launch the bash script with the following parameters:
 - REGION: region to deploy the templates in
 - CICD_PROFILE: name of the profile for the CICD account
-- DEV_PROFILE: list of profiles to deploy the cross account stacks in for example DEV_PROFILE=profile1,profile2,profile3
-- HOTFIX_PROFILE: list of profiles to deploy the cross account stacks in for example HOTFIX_PROFILE=profile1,profile2
+- PROFILES: list of profiles to deploy the cross account stacks in for example PROFILES=profile1,profile2,profile3
+- ACCOUNT_NAMES: list of account names to be used as suffix for AWS resources (roles, policies) for example ACCOUNT_NAMES=confidential-hotfix,confidential-dev,helpdesk-hotfix,helpdesk-dev. Please make sure the account name complies with AWS stack name (\[a-zA-Z0-9/-\]). **Important: the order of ACCOUNT_NAMES must match with the PROFILES one.**
 
 ```
-/bash-script.sh REGION=eu-south-1 CICD_PROFILE=pagopa-cicd DEV_PROFILE=pagopa-dev1,pagopa-dev1 HOTFIX_PROFILE=pagopa-hotfix1,pagopa-hotfix2
+./bash-script.sh REGION=eu-south-1 CICD_PROFILE=pagopa-cicd PROFILES=pagopa-helpdesk-hotfix,pagopa-confidential-hotfix ACCOUNT_NAMES=helpdesk-hotfix,confidential-hotfix
 ```
 
 
@@ -59,36 +59,23 @@ Remark: if users already belong to their IAM Group and Policies are already atta
 
 This section details the steps in the bash script. 
 
-1. Deploy `cross-account-role.yaml` in the accounts you wish to deploy an AdminAccess and ReadOnly role. `$profile` corresponds to one of the profile in OTHER_PROFILES. 
+1. Deploy `cross-account-role.yaml` in the accounts you wish to deploy an AdminAccess and ReadOnly role. `$profile` corresponds to one of the profile in PROFILES and `$accountName` corresponse to one of the account name in ACCOUNT_NAMES. 
 
 ```
 aws cloudformation deploy \
---stack-name cross-account-role \
+--stack-name cross-account-role-${accountName} \
 --template-file ./cnf-templates/cross-account-role.yaml \
 --capabilities CAPABILITY_NAMED_IAM \
 --parameter-overrides \
   TrustedAccountId=$CICDAccountId \
-  Environment=$profile \
+  Environment=$accountName \
 --profile $profile\
 --region $REGION
 ```
 
-2. Note down the ARN of `RoleAdministratorAccess` and `RoleReadOnlyAccess` for every account you deployed the template in. The CICD Account will create policies that will allow to assume those roles. 
+2. Note down the ARN of all the roles (e.g. `RoleAdministratorAccess`, `RoleReadOnlyAccess`) for every account you deployed the template in. The CICD Account will create policies that will allow to assume those roles. 
 
-3. Deploy `cicd-account-policies.yaml`. It deploys the IAM policies that are to be attached to the IAM Groups. Input the ARN of `RoleAdministratorAccess` and `RoleReadOnlyAccess`. Deploy and repeat this process for every account you deployed `cross-account-role.yaml` in.
-
-```
-aws cloudformation deploy \
---stack-name cicd-policies-for-X \
---template-file ./cnf-templates/cicd-account-policies.yaml \
---capabilities CAPABILITY_NAMED_IAM \
---parameter-overrides \
-  Environment=$profile \
-  AdminAccessRoleArn=X \
-  ReadOnlyRoleArn=Y \
---profile $profile \
---region $REGION
-```
+3. Deploy `cicd-account-policies.yaml`. It deploys the IAM policies that are to be attached to the IAM Groups. Input the ARN of the roles created at step 1 (e.g. `RoleAdministratorAccess` and `RoleReadOnlyAccess`). Deploy and repeat this process for every account you deployed `cross-account-role.yaml` in.
 
 4. Deploy `cicd-account.yaml`. It creates the Lambda functions and the event bridge rules that will update the user tags based on the policies' tags attached to the IAM Groups. 
 
