@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Define the DNS zone for an installation of "Piattaforma Notifiche"
+
+Parameters:
+  EnvName:
+    Type: String
+    Default: 'prod'
+    Description: The name of the installation devel, beta, uat, preprod, ...
+
+Conditions:
+  CreateParentZone:
+    Fn::Equals:
+      - !Ref EnvName
+      - "prod"
+
+Resources:
+  HostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      Name:
+        Fn::If:
+          - CreateParentZone
+          - 'spid.pn.pagopa.it'
+          - !Sub 'spid.${EnvName}.pn.pagopa.it'
+      HostedZoneConfig:
+        Comment: !Sub Public zone for 'Piattaforma notifiche' ambiente ${EnvName}
+
+
+  TextRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZone
+      Name:
+        Fn::If:
+          - CreateParentZone
+          - 'testdns.spid.pn.pagopa.it'
+          - !Sub 'testdns.spid.${EnvName}.pn.pagopa.it'
+      Comment: !Sub "Entry DNS di prova per SPID PN ${EnvName}"
+      ResourceRecords:
+        - !Sub '"Test DNS entry for PN SPID ${EnvName}"'
+      TTL: 120
+      Type: TXT
+      Weight: 1
+      SetIdentifier: unique
+
+  CAARecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZone
+      Name: 
+        !If
+          - CreateParentZone
+          - 'spid.pn.pagopa.it'
+          - !Sub 'spid.${EnvName}.pn.pagopa.it'
+      Comment: !Sub "CAA DNS record for PN ${EnvName}"
+      ResourceRecords: 
+        - '0 issue "amazonaws.com"'
+      TTL: 120
+      Type: CAA
+
+Outputs:
+  NameServers:
+    Value:
+      Fn::Join: [ ',', {Fn::GetAtt: [HostedZone, NameServers]}]
+    Description: 'Nameserver list for zone'
+
+  ZoneId:
+    Value: !Ref HostedZone
+    Description: 'Zone Id useful if you want add records'
+

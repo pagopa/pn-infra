@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template creates an EventBridge rule for CodePipeline and CodeBuild to send a notification to SNS alarm topic
+
+Parameters:
+  EventBusName:
+    Description: The EventBridge events bus name.
+    Type: String
+    Default: default 
+  
+  AlarmSNSTopicName:
+    Description: The name of the Alarm SNS Topic for notifications.
+    Type: String
+    
+  EventBridgeRuleName:
+    Type: String
+    Description: "The name of the rule"
+    Default: CodeEvents
+  
+Resources:  
+  CodePipelineBridgeStateRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: The EventBridge rule to match CodePipeline pipeline state change
+      RoleArn: !GetAtt "RulesToSnsRole.Arn"
+      EventBusName: !Ref EventBusName
+      EventPattern: 
+        source:
+          - aws.codepipeline
+        detail-type:
+          - CodePipeline Stage Execution State Change
+        detail:
+          state:
+            - FAILED
+      Name: !Sub ${EventBridgeRuleName}-CodePipeline
+      State: ENABLED
+      Targets: 
+        - Arn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+          Id: Default-CodePipeline
+
+  CodeBuildBridgeStateRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: The EventBridge rule to match CodeBuild state change
+      RoleArn: !GetAtt "RulesToSnsRole.Arn"
+      EventBusName: !Ref EventBusName
+      EventPattern: 
+        source:
+          - aws.codebuild
+        detail-type:
+          - CodeBuild Build State Change
+        detail:
+          build-status:
+            - FAILED
+      Name: !Sub ${EventBridgeRuleName}-CodeBuild
+      State: ENABLED
+      Targets: 
+        - Arn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+          Id: Default-CodeBuild
+  
+  RulesToSnsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: putEventIntoSns
+          PolicyDocument:
+            Statement:
+              - Sid: putEvents
+                Action:
+                  - "sns:*"
+                Effect: Allow
+                Resource: 
+                  - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'

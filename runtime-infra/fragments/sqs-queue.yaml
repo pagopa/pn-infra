@@ -1,0 +1,214 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Template to configure a SQS queue
+
+Parameters:
+  QueueName:
+    Type: String
+    Description:  Queue Name
+  DelaySeconds:
+    Description: 'The time in seconds that the delivery of all messages in the queue
+      is delayed. You can specify an integer value of 0 to 900 (15 minutes).'
+    Type: Number
+    Default: '5'
+  MessageRetentionPeriod:
+    Description: 'The number of seconds that Amazon SQS retains a message. You can
+      specify an integer value from 60 seconds (1 minute) to 1209600 seconds (14 days). '
+    Type: Number
+    Default: '1209600'
+  DeadLetterQueueName:
+    Type: String
+    Description: 'Dead Letter Queue Name; use <QueueName>-DLQ if not specified.'
+    Default: '-'
+  MaxReceiveCount:
+    Description: 'The number of times a message is delivered to the source queue before
+     being moved to the dead-letter queue'
+    Type: Number
+    Default: '5'
+  DeadLetterMessageRetentionPeriod:
+    Description: 'The number of seconds that the DLQ retains a message. You can
+      specify an integer value from 60 seconds (1 minute) to 1209600 seconds (14 days). '
+    Type: Number
+    Default: '1209600'
+  AlarmSNSTopicName:
+    Type: String
+    Default: '-'
+    Description: 'An ARN of an SNS topic where to send alarm when DLQ contain messages'
+  FifoQueue: 
+    Type: String
+    Default: 'false'
+    Description: 'Queue Type is FIFO, default is false'
+  ContentBasedDeduplication:
+    Type: String
+    Default: 'false'
+    Description: 'For FIFO queue type enable content based deduplication, default is false'
+  DeduplicationScope:
+    Type: String
+    Default: 'queue'
+    Description: 'For FIFO queue type, set deduplication scope, default is queue'
+  HasDLQ:
+    Type: String
+    Default: 'true'
+    Description: 'For this queue, set if there is a DLQ to create'
+  QueueHasAlarm:
+    Type: String
+    Default: 'false'
+    Description: 'For this queue, set if there is an alarm to create'
+
+Conditions:
+  DlqHasDefaultName: !Equals [ !Ref DeadLetterQueueName, '-' ]
+  DlqHasAlarm: !Not [ !Equals [ !Ref AlarmSNSTopicName, '-' ] ]
+  IsFifo:  !Equals [ !Ref FifoQueue, 'true' ]
+  IsNotFifo:  !Not [ !Equals [ !Ref FifoQueue, 'true' ] ]
+  IsContentBasedDeduplication: !Equals [ !Ref ContentBasedDeduplication, 'true' ]
+  IsWithDLQ:  !Equals [ !Ref HasDLQ, 'true' ]
+  IsWithAlarm:  !Equals [ !Ref QueueHasAlarm, 'true' ]
+  IsNotFifoWithDLQ: !And
+    - !Condition IsNotFifo
+    - !Condition IsWithDLQ
+  IsFifoWithDLQ: !And
+    - !Condition IsFifo
+    - !Condition IsWithDLQ
+  IsDLQHasMessagesAlarm: !And
+    - !Condition DlqHasAlarm
+    - !Condition IsWithDLQ
+
+Resources:
+
+
+  Queue:
+    Condition: IsNotFifo
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Ref QueueName
+      RedrivePolicy:
+        !If
+          - IsWithDLQ
+          -
+            deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+            maxReceiveCount: !Ref MaxReceiveCount
+          - !Ref AWS::NoValue
+      DelaySeconds: !Ref DelaySeconds
+      MessageRetentionPeriod: !Ref MessageRetentionPeriod
+
+  QueueFifo:
+    Condition: IsFifo
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${QueueName}.fifo"
+      RedrivePolicy:
+        !If
+          - IsWithDLQ
+          -
+            deadLetterTargetArn: !GetAtt DeadLetterQueueFifo.Arn
+            maxReceiveCount: !Ref MaxReceiveCount
+          - !Ref AWS::NoValue
+      DelaySeconds: !Ref DelaySeconds
+      MessageRetentionPeriod: !Ref MessageRetentionPeriod
+      FifoQueue: true
+      ContentBasedDeduplication: !If [IsContentBasedDeduplication, true, false]
+      DeduplicationScope: !Ref DeduplicationScope
+
+  DeadLetterQueue:
+    Condition: IsNotFifoWithDLQ
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName:
+        Fn::If:
+          - DlqHasDefaultName
+          - !Sub "${QueueName}-DLQ"
+          - !Ref DeadLetterQueueName
+      MessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
+
+  DeadLetterQueueFifo:
+    Condition: IsFifoWithDLQ
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName:
+        Fn::If:
+          - DlqHasDefaultName
+          - !Sub "${QueueName}-DLQ.fifo"
+          - !Ref DeadLetterQueueName
+      MessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
+      FifoQueue: true
+
+  QueueHasMessagesAlarm:
+    Condition: IsWithAlarm
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${QueueName}-HasMessage"
+      AlarmDescription: "Alarm messages when we have 1 or more messages in QUEUE"
+      Namespace: "AWS/SQS"
+      MetricName: "ApproximateNumberOfMessagesVisible"
+      Dimensions:
+        - Name: "QueueName"
+          Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
+      Statistic: "Sum"
+      Period: 60  
+      Threshold: 1
+      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 1       
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      InsufficientDataActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+
+  DLQHasMessagesAlarm:
+    Condition: IsDLQHasMessagesAlarm
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${QueueName}-DLQ-HasMessage"
+      AlarmDescription: "Alarm dlq messages when we have 1 or more messages in DLQ"
+      Namespace: "AWS/SQS"
+      MetricName: "ApproximateNumberOfMessagesVisible"
+      Dimensions:
+        - Name: "QueueName"
+          Value: !If [ IsNotFifo, !Sub '${DeadLetterQueue.QueueName}', !Sub '${DeadLetterQueueFifo.QueueName}' ]
+      Statistic: "Sum"
+      Period: 60  
+      Threshold: 1
+      TreatMissingData: "notBreaching"
+      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 1       
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      InsufficientDataActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+
+
+Outputs:
+  # Queue info
+  QueueName:
+    Description: Name of source queue
+    Value: !If [ IsNotFifo, !GetAtt Queue.QueueName , !GetAtt QueueFifo.QueueName ]
+  QueueURL:
+    Description: URL of the source queue
+    Value: !If [ IsNotFifo, !Ref Queue , !Ref QueueFifo ]
+  QueueARN:
+    Description: ARN of source queue
+    Value: !If [ IsNotFifo, !GetAtt Queue.Arn, !GetAtt QueueFifo.Arn ]
+
+  # Dead letter queue info
+  DeadLetterQueueName:
+    Description: Name of source queue
+    Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ], "" ]
+  DeadLetterQueueURL:
+    Description: URL of dead-letter queue
+    Value: !If [IsWithDLQ, !If [ IsNotFifo, !Ref DeadLetterQueue , !Ref DeadLetterQueueFifo ], "" ]
+  DeadLetterQueueARN:
+    Description: ARN of dead-letter queue
+    Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.Arn , !GetAtt DeadLetterQueueFifo.Arn ], "" ]
+
+  SqsDLQAlarmArn:
+    Description: ARN of the SQS DLA alarm
+    Value:
+      !If
+      - IsDLQHasMessagesAlarm
+      - !GetAtt DLQHasMessagesAlarm.Arn
+      - !If
+        - IsWithAlarm
+        - !GetAtt QueueHasMessagesAlarm.Arn
+        - ''

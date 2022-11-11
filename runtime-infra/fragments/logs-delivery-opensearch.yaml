@@ -1,0 +1,176 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+
+Parameters:
+
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  StreamNamePrefix:
+    Type: String
+    Description: to distinguish different log groups streams
+
+  KinesisStreamArn:
+    Type: String
+    Description: ARN of the Kinesis Stream ingesting the microservice logs
+
+  KinesisStreamKMSKeyArn:
+    Type: String
+    Description: ARN of the KMS key used by Kinesis stream to encrypt data
+
+  OpenSearchClusterEndpoint:
+    Type: String
+    Description: HTTPS endpoint of the destination Open Search cluster
+
+  OpenSearchIndex:
+    Type: String
+    Description: Index on the destination Open Search domain
+
+  OpenSearchDeliveryVpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The ID of the VPC where Kinesis Firehose will create ENIs to reach the Open Search cluster
+
+  OpenSearchDeliverySubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: The IDs of the subnets where Kinesis Firehose will create ENIs to reach the Open Search cluster
+
+  OpenSearchDeliveryLambdaS3Bucket:
+    Type: String
+    Description: s3 bucket name of the lambda used to delivery events to opensearch
+  OpenSearchDeliveryLambdaS3Key:
+    Type: String
+    Description: s3 object key of the lambda used to delivery events to opensearch
+  OpenSearchDeliveryLambdaS3ObjectVersion:
+    Type: String
+    Description: s3 object version of the lambda used to delivery events to opensearch
+  
+  OpenSearchSecretArn:
+    Type: String
+    Description: ARN of the secret containing the credentials to access the OpenSearch cluster
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic for alarms
+
+Conditions:
+  IsSNSTopicPresent: !Not [!Equals [!Ref AlarmSNSTopicArn, '']]
+
+Resources:
+  DeliveryLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-${StreamNamePrefix}-lambda-opensearch-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+      Policies:
+        - PolicyName: !Sub '${ProjectName}-${StreamNamePrefix}-lambda-kinesis-readonly-policy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: readRecordsAndListShards
+                Effect: Allow
+                Action:
+                  - kinesis:DescribeStream
+                  - kinesis:DescribeStreamSummary
+                  - kinesis:GetShardIterator
+                  - kinesis:GetRecords
+                  - kinesis:ListShards
+                  - kinesis:ListStreams
+                  - kinesis:SubscribeToShard
+                Resource: !Ref KinesisStreamArn
+              - Sid: decryptMessages
+                Action: kms:Decrypt
+                Effect: Allow
+                Resource: !Ref KinesisStreamKMSKeyArn
+        - PolicyName: !Sub '${ProjectName}-${StreamNamePrefix}-lambda-opensearch-secret-policy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: SecretActions
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref OpenSearchSecretArn
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+  DeliveryLambdaSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${ProjectName}-${StreamNamePrefix}-lambda-opensearch'
+      VpcId: !Ref OpenSearchDeliveryVpcId
+
+  DeliveryLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-${StreamNamePrefix}-opensearch-delivery'
+      Runtime: nodejs16.x
+      Role: !GetAtt DeliveryLambdaRole.Arn
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 900 # 15 minutes
+      Environment:
+        Variables:
+          CLUSTER_ENDPOINT : !Ref OpenSearchClusterEndpoint
+          INDEX_NAME : !Ref OpenSearchIndex
+          CLUSTER_SECRET_ARN: !Ref OpenSearchSecretArn
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt DeliveryLambdaSecGroup.GroupId
+        SubnetIds: !Ref OpenSearchDeliverySubnetIds
+      Code:
+        S3Bucket: !Ref OpenSearchDeliveryLambdaS3Bucket
+        S3Key: !Ref OpenSearchDeliveryLambdaS3Key
+        S3ObjectVersion: !Ref OpenSearchDeliveryLambdaS3ObjectVersion
+
+  DeliveryLambdaKinesisSource:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 100
+      BisectBatchOnFunctionError: true
+      EventSourceArn: !Ref KinesisStreamArn
+      FunctionName: !Ref DeliveryLambda
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+      MaximumBatchingWindowInSeconds: 300 # 5 minutes
+      StartingPosition: LATEST
+
+  DeliveryLambdaErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-${StreamNamePrefix}-opensearch-delivery-errors'
+      AlarmActions:
+        !If
+          - IsSNSTopicPresent
+          - 
+            - !Ref AlarmSNSTopicArn
+          - !Ref AWS::NoValue
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+      - Name: FunctionName
+        Value: !Ref DeliveryLambda
+      Statistic: Sum
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Threshold: 1
+      DatapointsToAlarm: 1
+      EvaluationPeriods: 1
+      Period: 3600 # 1 hour
+      TreatMissingData: notBreaching
+
+Outputs:
+  DeliveryLambdaAlarmArn:
+    Description: 'Delivery lambda alarm ARN'
+    Value: !GetAtt DeliveryLambdaErrorsAlarm.Arn
+
+  DeliveryLambdaArn:
+    Description: 'Delivery lambda ARN'
+    Value: !GetAtt DeliveryLambda.Arn

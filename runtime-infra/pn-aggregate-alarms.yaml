@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys the queues needed for communication between microservices and 
+              API gateway custom domains'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+  
+  DowntimeLogsCompositeAlarmQueueARN:
+    Type: String
+    Description: 'downtime logs alarm collectors queue ARN'
+  
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
+Resources:
+
+  # - Everything written to this topic is an alarm
+  CompositeAlarmSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: 'Send composite alarm to queue'
+  
+  # - Alarm message queue subscription
+  CompositeAlarmSnsToDowntimeLogsCompositeAlarmQueue:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sqs
+      Endpoint: !Ref DowntimeLogsCompositeAlarmQueueARN
+      Region: !Ref AWS::Region
+      TopicArn: !Ref CompositeAlarmSNSTopic
+
+  NotificationInputCompositeAlarm:
+    Type: AWS::CloudWatch::CompositeAlarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-CompositeAlarm-NotificationInput'
+      AlarmRule: 'FALSE'
+      AlarmActions:
+        - !Ref CompositeAlarmSNSTopic
+      OKActions:
+        - !Ref CompositeAlarmSNSTopic
+  
+  NotificationOutputCompositeAlarm:
+    Type: AWS::CloudWatch::CompositeAlarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-CompositeAlarm-NotificationOutput'
+      AlarmRule: 'FALSE'
+      AlarmActions:
+        - !Ref CompositeAlarmSNSTopic
+      OKActions:
+        - !Ref CompositeAlarmSNSTopic
+  
+  NotificationProgressCompositeAlarm:
+    Type: AWS::CloudWatch::CompositeAlarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-CompositeAlarm-NotificationProgress'
+      AlarmRule: 'FALSE'
+      AlarmActions:
+        - !Ref CompositeAlarmSNSTopic
+      OKActions:
+        - !Ref CompositeAlarmSNSTopic

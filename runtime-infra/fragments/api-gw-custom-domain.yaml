@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Define a rest api custom domain ad its recordset'
+
+Parameters:
+
+  DnsName:
+    Type: String
+    Description: 'The DNS name used for B2B rest API.'
+
+  CertificateArn:
+    Type: String
+    Description: 'The certificate used for B2B rest API.'
+
+  HostedZoneId:
+    Description: "Hosted Zone Id in which you want to add record"
+    Type: String
+
+
+Resources:
+
+  ###            COMMON RESOURCES FOR WEB API AND DISTRIBUTIONS            ###
+  ############################################################################
+  RestApiCustomDomain:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName: !Ref DnsName
+      RegionalCertificateArn: !Ref CertificateArn
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      SecurityPolicy: TLS_1_2
+
+  Route53RecordSetGroup:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Ref DnsName
+      Type: A
+      HostedZoneId: !Ref HostedZoneId
+      AliasTarget:
+        DNSName: !GetAtt RestApiCustomDomain.RegionalDomainName
+        EvaluateTargetHealth: false
+        HostedZoneId: !GetAtt RestApiCustomDomain.RegionalHostedZoneId

@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create Kinesis Streams from DynamoDB Table and CloudWatch LogGroups
+
+Parameters:
+  StreamName:
+    Type: String
+    Description: 'Kinesis stream name'
+  
+  StreamRetentionPeriodHours:
+    Type: Number
+    Description: 'Stream retention period in hours'
+
+  StreamShardCount:
+    Type: Number
+    Default: 0
+    Description: 'Number of shards in the stream'
+
+  StreamMode:
+    Description: Stream Mode.
+    Default: ON_DEMAND
+    Type: String
+    AllowedValues: [ON_DEMAND, PROVISIONED]
+
+Conditions: 
+  OnDemandDisabled: !Not [!Equals [!Ref StreamMode, ON_DEMAND]]
+
+Resources:
+
+  ### AWS KMS / Server-side encryption for Kinesis Stream 
+  # https://docs.aws.amazon.com/streams/latest/dev/server-side-encryption.html
+  KinesisServerSideEncryptionKey:
+    Type: AWS::KMS::Key
+    Properties:
+      KeyPolicy:
+        Statement:
+          - Action: kms:*
+            Effect: Allow
+            Principal:
+              AWS:
+                Fn::Join:
+                  - ""
+                  - - "arn:"
+                    - Ref: AWS::Partition
+                    - ":iam::"
+                    - Ref: AWS::AccountId
+                    - :root
+            Resource: "*"
+        Version: "2012-10-17"
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+
+  ### Kinesis Data Stream 
+  KinesisStream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      Name: !Ref StreamName
+      RetentionPeriodHours: !Ref StreamRetentionPeriodHours
+      ShardCount: !If [OnDemandDisabled, !Ref StreamShardCount, !Ref "AWS::NoValue"]
+      StreamEncryption:
+        EncryptionType: KMS
+        KeyId:
+          Fn::GetAtt:
+            - KinesisServerSideEncryptionKey
+            - Arn
+      StreamModeDetails:
+        StreamMode: !Ref StreamMode    
+
+Outputs:
+  
+  KinesisStreamName:
+    Value: !Ref KinesisStream
+    Description: 'Kinesis source stream name'
+  
+  KinesisStreamArn:
+    Value: !GetAtt KinesisStream.Arn
+    Description: 'Kinesis source stream name ARN'
+
+  KinesisStreamKeyArn:
+    Value: !GetAtt KinesisServerSideEncryptionKey.Arn
+    Description: 'Arn of the KMS key used to encrypt the Kinesis source stream'
+

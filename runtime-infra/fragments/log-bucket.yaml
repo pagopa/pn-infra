@@ -1,0 +1,235 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: S3 Data Lake - Data Account
+
+Parameters:
+  
+  ProjectName:
+    Type: String
+    Default: pn
+    Description: Base name for pn project
+  
+  BucketSuffix:
+    Type: String
+    Description: Suffix to the log bucket name
+  
+  DataLakeAccountId1:
+    Type: String
+    Default: '-'
+    Description: Data lake can read logs
+  
+  DataLakeAccountId2:
+    Type: String
+    Default: '-'
+    Description: Data lake can read logs
+  
+  # ActivateCrossAccountRole:
+  #   Type: String
+  #   Default: false
+  #   Description: Update to true after writer role creation
+  
+  # PnCoreAccount:
+  #   Type: String
+  #   Description: Account that can write logs
+
+Conditions:
+  # ActivateCrossAccountCondition: !Equals [ !Ref ActivateCrossAccountRole, true ]
+  MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
+  
+  ActivateDataLakeRead1Condition: !Not [ !Equals [ !Ref DataLakeAccountId1, '-' ]]
+  ActivateDataLakeRead2Condition: !Not [ !Equals [ !Ref DataLakeAccountId2, '-' ]]
+  ActivateDataLakeReadAnyCondition: 
+    Fn::Or: 
+      - !Not [ !Equals [ !Ref DataLakeAccountId1, '-' ]] 
+      - !Not [ !Equals [ !Ref DataLakeAccountId2, '-' ]] 
+
+Resources:
+  
+  ### - S3 Bucket for logs storages
+  ###########################################
+  LogsBucket:
+    Condition: MakeBucketCondition
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub '${ProjectName}-logs-bucket-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:${LogsBucketKmsAlias}'              
+              SSEAlgorithm: 'aws:kms'
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration: 
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # - Log storage cryptography key alias
+  LogsBucketKmsAlias:
+    Condition: MakeBucketCondition
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/${ProjectName}-logs-bucket-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}-key-alias'
+      TargetKeyId: !Ref LogsBucketKmsKey
+
+  # - Log storage cryptography key 
+  LogsBucketKmsKey:
+    Condition: MakeBucketCondition
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Used by Assumed Roles to Encrypt/Decrypt raw data
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: !Ref AWS::StackName
+        Statement:
+          - Sid: Allow data account to do everything
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action:
+              - "kms:Create*"
+              - "kms:Describe*"
+              - "kms:Enable*"
+              - "kms:List*"
+              - "kms:Put*"
+              - "kms:Update*"
+              - "kms:Revoke*"
+              - "kms:Disable*"
+              - "kms:Get*"
+              - "kms:Delete*"
+              - "kms:ScheduleKeyDeletion"
+              - "kms:CancelKeyDeletion"
+              - kms:*Tag*
+              - kms:*tag*
+            Resource: "*"
+          - Sid: Allow target accounts to use key for encrypt/decrypt
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub arn:aws:iam::${AWS::AccountId}:root
+                # - Fn::If:
+                #   - ActivateCrossAccountCondition
+                #   - !Sub 'arn:aws:iam::${PnCoreAccount}:role/${ProjectName}-logs-ingestion-role'
+                #   - !Ref AWS::NoValue
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+            Resource: "*"
+
+  # - Bucket access policy
+  LogsBucketPolicy:
+    Condition: MakeBucketCondition
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref LogsBucket
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:*
+            Effect: Allow
+            Resource:
+              - !Sub arn:aws:s3:::${LogsBucket}
+              - !Sub arn:aws:s3:::${LogsBucket}/*
+            Principal:
+              AWS:
+                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
+          - Action:
+              - "s3:PutObject"
+              - "s3:PutObjectAcl"
+              - "s3:AbortMultipartUpload"
+              - "s3:GetBucketLocation"
+              - "s3:GetObject"
+              - "s3:ListBucket"
+              - "s3:ListBucketMultipartUploads"
+            Effect: Allow
+            Resource:
+              - !Sub arn:aws:s3:::${LogsBucket}
+              - !Sub arn:aws:s3:::${LogsBucket}/*
+            Principal:
+              AWS:
+                - !Sub arn:aws:iam::${AWS::AccountId}:root
+                # - Fn::If:
+                #   - ActivateCrossAccountCondition
+                #   - !Sub 'arn:aws:iam::${PnCoreAccount}:role/${ProjectName}-logs-ingestion-role'
+                #   - !Ref AWS::NoValue
+
+
+  ### - IAM role assumed by data lake
+  ###########################################
+  LogBucketReadOnlyRole:
+    Condition: ActivateDataLakeReadAnyCondition
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: "Allow"
+            Action: "sts:AssumeRole"
+            Principal:
+              AWS: 
+                - Fn::If: 
+                  - ActivateDataLakeRead1Condition
+                  - !Sub arn:aws:iam::${DataLakeAccountId1}:root
+                  - !Ref AWS::NoValue
+                - Fn::If: 
+                  - ActivateDataLakeRead2Condition
+                  - !Sub arn:aws:iam::${DataLakeAccountId2}:root
+                  - !Ref AWS::NoValue
+            Condition:
+              StringEquals:
+                "sts:ExternalId": !Sub "{{resolve:secretsmanager:${ProjectName}-logs-data-lake-role-access:SecretString:ExternalId}}"
+      Path: "/"
+      Policies:
+        - PolicyName: ReadLogBucketPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            # Allow data lake to read the bucket items
+            - Effect: Allow
+              Action:
+                - "s3:Get*"
+                - "s3:List*"
+                - "s3-object-lambda:Get*"
+                - "s3-object-lambda:List*"
+              Resource: 
+                - !Sub "arn:aws:s3:::${LogsBucket}"
+                - !Sub "arn:aws:s3:::${LogsBucket}/*"
+            # Allow the use of encryption key
+            - Effect: Allow
+              Action:
+                - kms:Encrypt
+                - kms:Decrypt
+                - kms:ReEncrypt*
+                - kms:GenerateDataKey*
+                - kms:DescribeKey
+              Resource: 
+                - !Sub "${LogsBucketKmsKey.Arn}"
+                - !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/${ProjectName}-logs-bucket-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}-key-alias'
+Outputs:
+  LogsBucketKmsKeyArn:
+    Value: 
+      Fn::If:
+        - MakeBucketCondition
+        - !GetAtt LogsBucketKmsKey.Arn
+        - ''
+  
+  LogsBucketName:
+    Value: 
+      Fn::If:
+        - MakeBucketCondition
+        - !Ref LogsBucket
+        - ''
+  
+  LogsBucketReadOnlyRoleArn:
+    Value: 
+      Fn::If:
+        - ActivateDataLakeReadAnyCondition
+        - !GetAtt LogBucketReadOnlyRole.Arn
+        - ''

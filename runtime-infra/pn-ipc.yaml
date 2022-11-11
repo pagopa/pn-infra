@@ -1,0 +1,609 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys the queues needed for comuication between microservices and 
+              API gateway custom domains'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
+  ApiDnsName:
+    Type: String
+    Description: 'The DNS name used for B2B rest API.'
+
+  ApiCertificateArn:
+    Type: String
+    Description: 'The certificate used for B2B rest API.'
+
+  WebApiDnsName:
+    Type: String
+    Description: 'The DNS name used for browser rest API.'
+
+  WebApiCertificateArn:
+    Type: String
+    Description: 'The certificate used for browser rest API.'
+
+  IoApiDnsName:
+    Type: String
+    Description: 'The DNS name used for IO API rest'
+
+  IoApiCertificateArn:
+    Type: String
+    Description: 'The certificate used for browser rest IO API.'
+
+  HostedZoneId:
+    Description: "Hosted Zone Id in which you want to add record"
+    Type: String
+  
+  SafeStorageAccountId:
+    Description: "SafeStorage AWS Account id. Useful to grant rights to send feedback to EventBus"
+    Type: String
+  
+  DeliveryPushExtChUser:
+    Description: "external channel user dedicated to pn-delivery-push"
+    Type: String
+
+  UserAttributesExtChUser:
+    Description: "SafeStorage AWS Account id. Useful to grant rights to send feedback to EventBus"
+    Type: String
+
+  EventBusDeadLetterQueueMaximumRetentionPeriod:
+    Type: Number
+    Description: "The number of seconds that Amazon SQS retains a message. You can specify an integer 
+      value from 60 seconds (1 minute) to 1,209,600 seconds (14 days)."
+  
+  CdcStreamRetentionHours:
+    Type: Number
+    Description: 'Change Data Capture Kinesis Data Stream retention period in hours'
+
+  LogsStreamRetentionHours:
+    Type: Number
+    Description: 'Cloudwatch Logs Kinesis Data Stream retention period in hours'
+
+  Version:
+    Type: String
+    Description: 'keep track of used projects commitIds'
+
+  # pass-though parameters
+  NetworkLoadBalancerLink:
+    Type: String
+  ApplicationLoadBalancerListenerArn:
+    Type: String
+  ApplicationLoadBalancerDomain:
+    Type: String
+  AlarmSNSTopicArn:
+    Type: String
+  AlarmSNSTopicName:
+    Type: String
+  VpcId:
+    Type: String
+  SubnetsIds:
+    Type: String
+  ECSClusterName:
+    Type: String
+  CorsAllowedDomains:
+    Type: String
+  EcsDefaultSecurityGroup:
+    Type: String
+  LogsBucketName:
+    Type: String
+#  LogsBucketKmsKeyArn:
+#    Type: String
+  LogsExporterRoleArn:
+    Type: String
+  LogsExporterPolicyArn:
+    Type: String
+
+Resources:
+
+  ###            COMMON RESOURCES FOR WEB API AND DISTRIBUTIONS            ###
+  ############################################################################
+
+  # Custom domain for B2B api
+  ApiCustomDomain:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
+      Parameters:
+        DnsName: !Ref ApiDnsName
+        CertificateArn: !Ref ApiCertificateArn
+        HostedZoneId: !Ref HostedZoneId
+
+  # Custom domain for B2B api
+  WebApiCustomDomain:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
+      Parameters:
+        DnsName: !Ref WebApiDnsName
+        CertificateArn: !Ref WebApiCertificateArn
+        HostedZoneId: !Ref HostedZoneId
+
+  # Custom domain for IO api
+  IoApiCustomDomain:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
+      Parameters:
+        DnsName: !Ref IoApiDnsName
+        CertificateArn: !Ref IoApiCertificateArn
+        HostedZoneId: !Ref HostedZoneId
+
+  ###                    QUEUES BETWEEN MICRO SERVICES                    ###
+  ###########################################################################
+
+  ### Communication FROM SafeStorage TO pn-delivery-push ###
+  SafeStorageToDeliveryPushQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestore_to_deliverypush'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  ### Communication between PN-DELIVERY and PN-DELIVERY-PUSH ###
+  DeliveryPushInputsQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-delivery_push_inputs'
+        DelaySeconds: 10        
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+        FifoQueue: true
+
+  ### Communication TO and FROM EXTERNAL-CHANNELS ###
+  ExternalChannelsInputsQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-external_channel_inputs'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  ExternalChannelsOutputsQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-external_channel_outputs'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+  
+  ExternalChannels2UserAttributesQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-external_channel_to_user_attributes'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+
+  ### Queue that receive composite alarm information for DOWNTIME LOGS ###
+  CompositeAlarmQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-composite_alarms_for_downtime'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+  
+  ### Queue that receive safe-storage notification to DOWNTIME LOGS ###
+  SafeStorageToDowntimeLogsQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestore_to_downtime_logs'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName     
+        
+
+  ###                          PN-CORE EVENT BUS                          ###
+  ###########################################################################
+  # Receive events from SafeStorage and CarrierPigeon (AKA ExternalChannel) 
+  # and redirect to the right SQS queue
+  PnCoreEventBus:
+    Type: AWS::Events::EventBus
+    Properties: 
+      Name: !Sub '${ProjectName}-CoreEventBus'
+  
+  # Allow access from partner system
+  PnCoreEventBusSafeStoreAccessPolicy: 
+    Type: AWS::Events::EventBusPolicy
+    Properties: 
+      EventBusName: !Ref PnCoreEventBus
+      StatementId: "AllowEventPutBySafeStorage"
+      Statement: 
+        Effect: "Allow"
+        Principal: 
+            AWS: !Sub "arn:aws:iam::${SafeStorageAccountId}:root"
+        Action: "events:PutEvents"
+        Resource: !GetAtt "PnCoreEventBus.Arn"
+
+  # Allow event bus rules to write to queues
+  EventBusEnqueueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: putEventIntoQueues
+          PolicyDocument:
+            Statement:
+              - Sid: putEvents
+                Action:
+                  - sqs:ChangeMessageVisibility
+                  - sqs:ChangeMessageVisibilityBatch
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:SendMessage
+                  - sqs:SendMessageBatch
+                Effect: Allow
+                Resource: 
+                  - !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
+                  - !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
+                  - !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
+                  - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueARN"
+  
+  ExternalChannelsOutputsQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !GetAtt "ExternalChannelsOutputsQueue.Outputs.QueueURL"
+        - !GetAtt "ExternalChannels2UserAttributesQueue.Outputs.QueueURL"
+        - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueURL"
+        - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueURL"
+      PolicyDocument:
+        Statement:
+          - Sid: "SendEventsToDLQ"
+            Effect: "Allow"
+            Principal: 
+              Service: 
+                - "events.amazonaws.com"
+            Action: 
+              - "SQS:SendMessage"
+            Resource:
+              - !GetAtt "ExternalChannelsOutputsQueue.Outputs.QueueARN"
+              - !GetAtt "ExternalChannels2UserAttributesQueue.Outputs.QueueARN"
+              - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueARN"
+              - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueARN"
+
+
+  # Send Safe Storage Response to pn-delivery-push
+  PnCoreEventBusToSafeStorageResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route SafeStorage Events to pn-delivery-push
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "SafeStorageOutcomeEvent" ]
+        detail:
+          documentType: [ 'PN_AAR', 'PN_NOTIFICATION_ATTACHMENTS', 'PN_LEGAL_FACTS' ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryPush'
+          Arn: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
+  # Send Safe Storage Response to pn-downtime-logs
+  PnCoreEventBusToDowntimeLogsSafeStorageResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route SafeStorage Events to pn-downtime-logs
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "SafeStorageOutcomeEvent" ]
+        detail:
+          documentType: [ 'PN_DOWNTIME_LEGAL_FACTS' ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DowntimeLogs'
+          Arn: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
+  # Send ExternalChannel Response to pn-delivery-push
+  PnCoreEventBusToExtChResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route ExternalChannel Events to pn-delivery-push
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "ExternalChannelOutcomeEvent" ]
+        detail:
+          clientId: [ !Ref DeliveryPushExtChUser ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2DeliveryPush'
+          Arn: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+  
+  # Send ExternalChannel Response to pn-user-attributes
+  PnCoreEventBusToUserAttributesQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route ExternalChannel Events to pn-user-attributes
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "ExternalChannelOutcomeEvent" ]
+        detail:
+          clientId: [ !Ref UserAttributesExtChUser ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2UserAttributes'
+          Arn: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
+  # Standard Queue for events Dead Letter Queue
+  EventBusDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: !Ref EventBusDeadLetterQueueMaximumRetentionPeriod
+      QueueName: !Sub '${ProjectName}-CoreEventBus-DLQ'
+
+  # Dead Letter Queue policy 
+  EventBusDeadLetterQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref "EventBusDeadLetterQueue"
+      PolicyDocument:
+        Statement:
+          - Sid: "SendEventsToDLQ"
+            Effect: "Allow"
+            Principal: 
+              Service: 
+                - "events.amazonaws.com"
+            Action: 
+              - "SQS:SendMessage"
+            Resource:
+              - !GetAtt "EventBusDeadLetterQueue.Arn"
+  
+  # Alarm for Dead letter queue has messages
+  DLQHasMessagesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-CoreEventBus-DLQ-HasMessage'
+      AlarmDescription: "CloudWatch alarm for when DLQ has 1 or more messages."
+      Namespace: "AWS/SQS"
+      MetricName: "ApproximateNumberOfMessagesVisible"
+      Dimensions:
+        - Name: "QueueName"
+          Value: !Sub '${EventBusDeadLetterQueue.QueueName}'
+      Statistic: "Sum"
+      TreatMissingData: "notBreaching"
+      Period: 60
+      Threshold: 1
+      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 1       
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      InsufficientDataActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+
+  ## KINESIS SOURCE STREAM FOR Change Data Capture
+  CdcKinesisSourceStream:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-stream.yaml"
+      Parameters:
+        StreamName: !Sub '${ProjectName}-cdc-stream'
+        StreamRetentionPeriodHours: !Ref CdcStreamRetentionHours
+  
+  ## KINESIS SOURCE STREAM FOR Logs
+  LogsKinesisSourceStream:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-stream.yaml"
+      Parameters:
+        StreamName: !Sub '${ProjectName}-logs-stream'
+        StreamRetentionPeriodHours: !Ref LogsStreamRetentionHours
+  
+
+Outputs:
+  # Web API for browsers and B2B
+  ApiDnsName:
+    Value: !Ref ApiDnsName
+    Description: 'The DNS name used for B2B rest API.'
+  WebApiDnsName:
+    Value: !Ref WebApiDnsName
+    Description: 'The DNS name used for browser rest API.'
+  IoApiDnsName:
+    Value: !Ref IoApiDnsName
+    Description: 'The DNS name used for browser rest API.'
+
+  # SafeStorage to DeliveryPush
+  SafeStorageToDeliveryPushQueueName:
+    Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueName
+    Description: SafeStorage-to-delivery-push queue name
+  SafeStorageToDeliveryPushQueueURL:
+    Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueURL
+    Description: SafeStorage-to-delivery-push queue URL
+  SafeStorageToDeliveryPushQueueARN:
+    Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
+    Description: SafeStorage-to-delivery-push queue ARN
+  SafeStorageToDeliveryPushQueueAlarmARN:
+    Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.SqsDLQAlarmArn
+    Description: SafeStorage-to-delivery-push queue alarm ARN
+
+  # Delivery push inputs
+  DeliveryPushInputsQueueName:
+    Value: !GetAtt DeliveryPushInputsQueue.Outputs.QueueName
+    Description: pn-delivery-push input queue name
+  DeliveryPushInputsQueueURL:
+    Value: !GetAtt DeliveryPushInputsQueue.Outputs.QueueURL
+    Description: pn-delivery-push input queue URL
+  DeliveryPushInputsQueueARN:
+    Value: !GetAtt DeliveryPushInputsQueue.Outputs.QueueARN
+    Description: pn-delivery-push input queue ARN
+  DeliveryPushInputsQueueAlarmARN:
+    Value: !GetAtt DeliveryPushInputsQueue.Outputs.SqsDLQAlarmArn
+    Description: pn-delivery-push input queue alarm ARN
+
+  # External channels inputs
+  ExternalChannelsInputsQueueName:
+    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueName
+    Description: pn-external-channels input queue name
+  ExternalChannelsInputsQueueURL:
+    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueURL
+    Description: pn-external-channels input queue URL
+  ExternalChannelsInputsQueueARN:
+    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueARN
+    Description: pn-external-channels input queue ARN
+  ExternalChannelsInputsQueueAlarmARN:
+    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.SqsDLQAlarmArn
+    Description: pn-external-channels input queue alarm ARN
+
+  # External channels outputs
+  ExternalChannelsOutputsQueueName:
+    Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueName
+    Description: pn-external-channels output queue name
+  ExternalChannelsOutputsQueueURL:
+    Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueURL
+    Description: pn-external-channels output queue URL
+  ExternalChannelsOutputsQueueARN:
+    Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
+    Description: pn-external-channels output queue ARN
+  ExternalChannelsOutputsQueueAlarmARN:
+    Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.SqsDLQAlarmArn
+    Description: pn-external-channels output queue alarm ARN
+
+  # External channels to user attribute outputs
+  ExternalChannels2UserAttributesQueueName:
+    Value: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueName
+    Description: pn-external-channels output to user-attributes queue name
+  ExternalChannels2UserAttributesQueueURL:
+    Value: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueURL
+    Description: pn-external-channels output to user-attributes queue URL
+  ExternalChannels2UserAttributesQueueARN:
+    Value: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
+    Description: pn-external-channels output to user-attributes queue ARN
+  ExternalChannels2UserAttributesQueueAlarmARN:
+    Value: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.SqsDLQAlarmArn
+    Description: pn-external-channels output to user-attributes queue alarm ARN
+
+  # Downtime Logs composite alarm queue
+  DowntimeLogsAggregateAlarmQueueName:
+    Value: !GetAtt CompositeAlarmQueue.Outputs.QueueName
+    Description: Aggregate alarm queue name
+  DowntimeLogsAggregateAlarmQueueURL:
+    Value: !GetAtt CompositeAlarmQueue.Outputs.QueueURL
+    Description: Aggregate alarm queue URL
+  DowntimeLogsAggregateAlarmQueueARN:
+    Value: !GetAtt CompositeAlarmQueue.Outputs.QueueARN
+    Description: Aggregate alarm queue ARN
+  DowntimeLogsAggregateAlarmQueueAlarmARN:
+    Value: !GetAtt CompositeAlarmQueue.Outputs.SqsDLQAlarmArn
+    Description: Aggregate alarm queue alarm ARN
+  
+  # Downtime Logs safe-storage events
+  DowntimeLogsSafeStorageEventsQueueName:
+    Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueName
+    Description: Events form safe-storage to pn-downtime-logs queue name
+  DowntimeLogsSafeStorageEventsQueueURL:
+    Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueURL
+    Description: Events form safe-storage to pn-downtime-logs queue URL
+  DowntimeLogsSafeStorageEventsQueueARN:
+    Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueARN
+    Description: Events form safe-storage to pn-downtime-logs queue ARN
+  DowntimeLogsSafeStorageEventsQueueAlarmARN:
+    Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.SqsDLQAlarmArn
+    Description: Events form safe-storage to pn-downtime-logs queue alarm ARN
+
+  # Kinesis Source Stream containing the DynamoDB Change Data Capture events
+  CdcKinesisSourceStreamName:
+    Description: 'Kinesis source CDC stream name'
+    Value: !GetAtt CdcKinesisSourceStream.Outputs.KinesisStreamName
+  CdcKinesisSourceStreamArn:
+    Description: 'Kinesis source CDC stream ARN'
+    Value: !GetAtt CdcKinesisSourceStream.Outputs.KinesisStreamArn
+  CdcKinesisSourceStreamKeyArn:
+    Description: 'Kinesis source CDC stream crypto key ARN'
+    Value: !GetAtt CdcKinesisSourceStream.Outputs.KinesisStreamKeyArn
+
+  # Kinesis Source Stream containing the CloudWatch Logs
+  LogsKinesisSourceStreamName:
+    Description: 'Kinesis source Logs stream name'
+    Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamName
+  LogsKinesisSourceStreamArn:
+    Description: 'Kinesis source Logs stream ARN'
+    Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamArn
+  LogsKinesisSourceStreamKeyArn:
+    Description: 'Kinesis source Logs stream crypto key ARN'
+    Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamKeyArn
+
+  # Event Bus Alarm
+  EventBusDLQHasMessagesAlarmArn:
+    Description: 'Event Bus Core DLQ alarm ARN'
+    Value: !GetAtt DLQHasMessagesAlarm.Arn
+
+  # Event Bus Rule Arns
+  PnCoreEventBusToSafeStorageResponseQueueArn:
+    Description: 'Event bus to safe storage rule ARN'
+    Value: !GetAtt PnCoreEventBusToSafeStorageResponseQueue.Arn
+
+  PnCoreEventBusToDowntimeLogsSafeStorageResponseQueueArn:
+    Description: 'Event bus to downtime logs rule ARN'
+    Value: !GetAtt PnCoreEventBusToDowntimeLogsSafeStorageResponseQueue.Arn
+
+  PnCoreEventBusToExtChResponseQueueArn:
+    Description: 'Event bus to external channel rule ARN'
+    Value: !GetAtt PnCoreEventBusToExtChResponseQueue.Arn
+
+  PnCoreEventBusToUserAttributesQueueArn:
+    Description: 'Event bus to user attributes rule ARN'
+    Value: !GetAtt PnCoreEventBusToUserAttributesQueue.Arn
+
+  # pass-thought parameters
+  NetworkLoadBalancerLink:
+    Value: !Ref NetworkLoadBalancerLink
+  ApplicationLoadBalancerListenerArn:
+    Value: !Ref ApplicationLoadBalancerListenerArn
+  ApplicationLoadBalancerDomain:
+    Value: !Ref ApplicationLoadBalancerDomain
+  AlarmSNSTopicArn:
+    Value: !Ref AlarmSNSTopicArn
+  AlarmSNSTopicName:
+    Value: !Ref AlarmSNSTopicName
+  VpcId:
+    Value: !Ref VpcId
+  SubnetsIds:
+    Value: !Ref SubnetsIds
+  ECSClusterName:
+    Value: !Ref ECSClusterName
+  CorsAllowedDomains:
+    Value: !Ref CorsAllowedDomains
+  EcsDefaultSecurityGroup:
+    Value: !Ref EcsDefaultSecurityGroup
+  LogsBucketName:
+    Value: !Ref LogsBucketName
+  #LogsBucketKmsKeyArn:
+  #  Value: !Ref LogsBucketKmsKeyArn
+  LogsExporterRoleArn:
+    Value: !Ref LogsExporterRoleArn
+  LogsExporterPolicyArn:
+    Value: !Ref LogsExporterPolicyArn

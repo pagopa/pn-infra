@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Template to create Roles in Destination Accounts
+
+Parameters:
+  TrustedAccountId:
+    Type: String
+    Description: Enter the ID of the trusted account
+
+  Environment:
+    Type: String
+    Description: The environment name, for example dev, hotfix
+  
+Resources:
+  # Read Only Access Role that can be assumed by this account
+  # There has to be a Principal, that's why this account is used as principal, but serves no use in this use case
+  RoleReadOnlyAccess:
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: !Sub ReadOnlyAccess-${Environment}
+      AssumeRolePolicyDocument: 
+        !Sub |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal":{
+                  "AWS": "arn:aws:iam::${TrustedAccountId}:root"
+                },
+                "Action":"sts:AssumeRole",
+                "Condition": {
+                  "StringEquals":{
+                    "aws:PrincipalTag/pn-read-only-${Environment}": "true"
+                  }
+                }
+              }
+            ]
+          }
+      Path: "/"
+      ManagedPolicyArns:
+       - "arn:aws:iam::aws:policy/ReadOnlyAccess"
+
+  # Administrator Access Role that can be assumed by this account
+  RoleAdministratorAccess:
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: !Sub AdminAccess-${Environment}
+      AssumeRolePolicyDocument: 
+        !Sub |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal":{
+                  "AWS": "arn:aws:iam::${TrustedAccountId}:root"
+                },
+                "Action":"sts:AssumeRole",
+                "Condition": {
+                  "StringEquals":{
+                    "aws:PrincipalTag/pn-admin-${Environment}": "true"
+                  }
+                }
+              }
+            ]
+          }
+      Path: "/"
+      ManagedPolicyArns:
+       - "arn:aws:iam::aws:policy/AdministratorAccess" 
+
+Outputs:
+  RolesArnJson:
+    Value: !Sub "{\"pn-admin\": \"${RoleAdministratorAccess.Arn}\", \"pn-read-only\": \"${RoleReadOnlyAccess.Arn}\"}"

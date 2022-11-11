@@ -1,0 +1,176 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys the queues needed for communication between microservices and 
+              API gateway custom domains'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  LogsBucketName:
+    Type: String
+    Description: Bucket name where the logs must be exported
+  LogsExporterRoleArn:
+    Type: String
+    Description: ARN of the role used to write to external logs bucket
+
+  CdcKinesisSourceStreamArn:
+    Description: 'Kinesis source CDC stream ARN'
+    Type: String
+  CdcKinesisSourceStreamKeyArn:
+    Description: 'Kinesis source CDC stream crypto key ARN'
+    Type: String
+  
+  LogsKinesisSourceStreamArn:
+    Description: 'Kinesis source Logs stream ARN'
+    Type: String
+  LogsKinesisSourceStreamKeyArn:
+    Description: 'Kinesis source Logs stream crypto key ARN'
+    Type: String
+
+  OpenSearchClusterEndpoint:
+    Type: String
+    Description: HTTPS endpoint of the destination Open Search cluster
+  OpenSearchIndex:
+    Type: String
+    Description: Index on the destination Open Search domain
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The ID of the VPC where Kinesis Firehose will create ENIs to reach the Open Search cluster
+  SubnetsIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: The IDs of the subnets where Kinesis Firehose will create ENIs to reach the Open Search cluster
+  OpenSearchSecretArn:
+    Type: String
+    Description: The ARN of the secret containing OpenSearch credentials
+  
+  OpenSearchDeliveryLambdaS3Bucket:
+    Type: String
+    Description: s3 bucket name of the lambda used to delivery events to opensearch
+  OpenSearchDeliveryLambdaS3Key:
+    Type: String
+    Description: s3 object key of the lambda used to delivery events to opensearch
+  OpenSearchDeliveryLambdaS3ObjectVersion:
+    Type: String
+    Description: s3 object version of the lambda used to delivery events to opensearch
+  
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic for alarms
+
+Conditions:
+  HasOpenSearchExport: !Not [ !Equals [ !Ref OpenSearchClusterEndpoint, "" ] ]
+
+Resources:
+
+  ###             Export dynamo CDC to Log saving bucket             ###
+  ###########################################################################
+  CdcToExternalBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        SourceKinesisDataStreamArn: !Ref CdcKinesisSourceStreamArn
+        SourceKinesisDataStreamKeyArn: !Ref CdcKinesisSourceStreamKeyArn
+        LogsBucketName: !Ref LogsBucketName
+        LogsExporterRoleArn: !Ref LogsExporterRoleArn
+        StreamNamePrefix: 'cdcTos3'
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  ###             Export CloudWatch Logs to Log saving bucket             ###
+  ###########################################################################
+  LogsToExternalBucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        SourceKinesisDataStreamArn: !Ref LogsKinesisSourceStreamArn
+        SourceKinesisDataStreamKeyArn: !Ref LogsKinesisSourceStreamKeyArn
+        LogsBucketName: !Ref LogsBucketName
+        LogsExporterRoleArn: !Ref LogsExporterRoleArn
+        StreamNamePrefix: 'logsTos3'
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  ###                   Export dynamo CDC to OpenSearch                   ###
+  ###########################################################################
+  ### Da usare nella issue PN-2365 ###
+  #CdcToOpenSearch:
+  #  Condition: HasOpenSearchExport
+  #  Type: AWS::CloudFormation::Stack
+  #  Properties:
+  #    TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
+  #    Parameters:
+  #      ProjectName: !Ref ProjectName
+  #      StreamNamePrefix: cdcToOpenSearch
+  #      KinesisStreamArn: !Ref CdcKinesisSourceStreamArn
+  #      KinesisStreamKMSKeyArn: !Ref CdcKinesisSourceStreamKeyArn
+  #      OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
+  #      OpenSearchIndex: !Ref OpenSearchIndex
+  #      OpenSearchDeliveryVpcId: !Ref VpcId
+  #      OpenSearchDeliverySubnetIds: !Join [",", !Ref SubnetsIds]
+  #      OpenSearchSecretArn: !Ref OpenSearchSecretArn
+  #      OpenSearchDeliveryLambdaS3Bucket: !Ref OpenSearchDeliveryLambdaS3Bucket
+  #      OpenSearchDeliveryLambdaS3Key: !Ref OpenSearchDeliveryLambdaS3Key
+  #      OpenSearchDeliveryLambdaS3ObjectVersion: !Ref OpenSearchDeliveryLambdaS3ObjectVersion
+  #      AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+  
+  ###             Export cloudwatch logs to OpenSearch                    ###
+  ###########################################################################
+  LogsToOpenSearch:
+    Condition: HasOpenSearchExport
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        StreamNamePrefix: logsToOpenSearch
+        KinesisStreamArn: !Ref LogsKinesisSourceStreamArn
+        KinesisStreamKMSKeyArn: !Ref LogsKinesisSourceStreamKeyArn
+        OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
+        OpenSearchIndex: !Ref OpenSearchIndex
+        OpenSearchDeliveryVpcId: !Ref VpcId
+        OpenSearchDeliverySubnetIds: !Join [",", !Ref SubnetsIds]
+        OpenSearchSecretArn: !Ref OpenSearchSecretArn
+        OpenSearchDeliveryLambdaS3Bucket: !Ref OpenSearchDeliveryLambdaS3Bucket
+        OpenSearchDeliveryLambdaS3Key: !Ref OpenSearchDeliveryLambdaS3Key
+        OpenSearchDeliveryLambdaS3ObjectVersion: !Ref OpenSearchDeliveryLambdaS3ObjectVersion
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+Outputs:
+  LogsToS3KinesisDeliverStreamArn:
+    Description: 'Logs Delivery stream to S3 ARN'
+    Value: !GetAtt LogsToExternalBucket.Outputs.DeliveryStreamArn
+
+  LogsToS3KinesisDeliveryStreamAlarmArn:
+    Description: 'Log delivery stream alarm ARN'
+    Value: !GetAtt LogsToExternalBucket.Outputs.DeliveryStreamErrorLogsMetricAlarmArn
+
+  CdcToS3KinesisDeliveryStreamArn:
+    Description: 'Cdc Delivery stream to S3 ARN'
+    Value: !GetAtt CdcToExternalBucket.Outputs.DeliveryStreamArn
+
+  CdcToS3KinesisDeliveryStreamAlarmArn:
+    Description: 'Cdc delivery stream alarm ARN'
+    Value: !GetAtt CdcToExternalBucket.Outputs.DeliveryStreamErrorLogsMetricAlarmArn
+
+  OpenSearchDeliveryLambdaAlarmArn:
+    Description: 'Lambda Logs to OpenSearch alarm ARN'
+    Value:
+      !If
+      - HasOpenSearchExport
+      - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaAlarmArn
+      - ''
+
+  OpenSearchDeliveryLambdaArn:
+    Description: 'Lambda Logs to OpenSearch ARN'
+    Value:
+      !If
+      - HasOpenSearchExport
+      - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaArn
+      - ''

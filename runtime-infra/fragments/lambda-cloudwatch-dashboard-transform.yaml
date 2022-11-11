@@ -1,0 +1,1080 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template creates a CloudFormation macro to transform input
+
+Resources:
+  DashboardBodyMacro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Description: CloudFormation macro to transform CloudWatch Dashboard body.
+      FunctionName: !GetAtt TransformFunction.Arn
+      Name: DashboardBodyTransform
+
+  TransformExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /     
+      Policies:
+        - PolicyName: LogsDashboardBodyTransform
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/DashboardBodyTransform'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/DashboardBodyTransform:*'
+
+  TransformFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+            import json
+
+            def lambda_handler(event, context):
+                dashboardList = []
+                data = {}
+                y_value=0
+                
+                if (event["params"]["Region"] == ""):
+                    print("Region param is missing")
+                else:
+                    localRegion = event["params"]["Region"]
+                
+                    if event["params"]["AlarmArns"] == [''] or len(event["params"]["AlarmArns"]) == 0:
+                        print("AlarmArns param is missing or empty")
+                    else:
+                        localAlarmArns = event["params"]["AlarmArns"]
+                        localAlarmArns = list(filter(None, localAlarmArns))
+                        alarmList = alarmWidgetBuilder(localAlarmArns, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, alarmList)
+                        y_value = y_value+9
+                        
+                    if event["params"]["QueueArns"] == [''] or len(event["params"]["QueueArns"]) == 0:
+                        print("QueueArns param is missing or empty")
+                    else:
+                        localQueueArns = event["params"]["QueueArns"]
+                        localQueueArns = list(filter(None, localQueueArns))
+                        queueList = queueWidgetBuilder(localQueueArns, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, queueList)
+                        y_value=y_value+6
+                        
+                    if event["params"]["RestApiStageArns"] == [''] and event["params"]["RestApiNames"] == ['']:
+                        print("RestApiStageArns and RestApiNames params are missing or empty")
+                    else:
+                        localRestApiArns = event["params"]["RestApiStageArns"]
+                        localRestAPINames = event["params"]["RestApiNames"]
+                        restAPIList = restApiWidgetBuilder(localRestApiArns, y_value, localRegion, localRestAPINames)
+                        dashboardList = appendList(dashboardList, restAPIList)
+                        y_value=y_value+6
+                
+                    if event["params"]["KinesisDataArns"] == [''] or len(event["params"]["KinesisDataArns"]) == 0:
+                        print("KinesisDataArns param is missing or empty")
+                    else:
+                        localKinesisDataArns = event["params"]["KinesisDataArns"]
+                        localKinesisDataArns = list(filter(None, localKinesisDataArns))
+                        kinesisDataList = kinesisDataWidgetBuilder(localKinesisDataArns, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, kinesisDataList)
+                        y_value = y_value+12
+
+                    if event["params"]["KinesisFirehoseArns"] == [''] or len(event["params"]["KinesisFirehoseArns"]) == 0:
+                        print("KinesisFirehoseArns param is missing or empty")
+                    else:
+                        localKinesisFirehoseArns = event["params"]["KinesisFirehoseArns"]
+                        localKinesisFirehoseArns = list(filter(None, localKinesisFirehoseArns))
+                        kinesisFirehoseList = kinesisFirehoseWidgetBuilder(localKinesisFirehoseArns, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, kinesisFirehoseList)
+                        y_value = y_value+12
+
+                    if event["params"]["LambdaArns"] == [''] or len(event["params"]["LambdaArns"]) == 0:
+                        print("LambdaArns param is missing or empty")
+                    else:
+                        localLambdaArns = event["params"]["LambdaArns"]
+                        localLambdaArns = list(filter(None, localLambdaArns))
+                        lambdaList = lambdaWidgetBuilder(localLambdaArns, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, lambdaList)
+                        y_value = y_value+6
+                        
+                    if event["params"]["EventRuleArns"] == [''] or len(event["params"]["EventRuleArns"]) == 0:
+                        print("EventRuleArns param is missing or empty")
+                    else:
+                        localEventRuleArns = event["params"]["EventRuleArns"]
+                        localEventRuleArns = list(filter(None, localEventRuleArns))
+                        eventRuleList = eventRuleWidgetBuilder(localEventRuleArns, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, eventRuleList)
+                        y_value = y_value+6
+
+                    if event["params"]["DynamoDBTableNames"] == [''] or len(event["params"]["DynamoDBTableNames"]) == 0:
+                        print("DynamoDBTableNames param is missing or empty")
+                    else:
+                        localDynamoDBTableNames = event["params"]["DynamoDBTableNames"]
+                        dynamoList = dynamoDBWidgetBuilder(localDynamoDBTableNames, y_value, localRegion)
+                        dashboardList = appendList(dashboardList, dynamoList)
+                    
+                data["widgets"] = dashboardList
+                print(data)
+                
+                response = {
+                    "requestId": event["requestId"],
+                    "status": "success",
+                    "fragment": json.dumps(data)
+                }
+                return response
+                
+            def appendList(currentArray, appendArray):
+                for x in appendArray:
+                    currentArray.append(x)
+                
+                return currentArray
+
+            def alarmWidgetBuilder(localArray, widgetYvalue, localRegion):
+                myList = []
+                
+                message = textSeparator("Alarm Status Widget", widgetYvalue)
+                myList.append(message)
+                alarmStatusJson={
+                    "type": "alarm",
+                    "x": 0,
+                    "y": widgetYvalue+1,
+                    "width": 24,
+                    "height": 2,
+                    "properties": {
+                        "alarms": localArray
+                    }
+                }
+                myList.append(alarmStatusJson)
+                
+                message = textSeparator("Alarm History Widgets", widgetYvalue+3)
+                myList.append(message)
+
+                width = int(24/len(localArray))
+                for x in range(len(localArray)):
+                    x_value=x*width
+                    myJson={ 
+                        "type": "metric", 
+                        "x": x_value, 
+                        "y": widgetYvalue+4, 
+                        "width": width, 
+                        "height": 5, 
+                        "properties": {
+                            "stacked": False,
+                            "region": localRegion,
+                            "title": splitArnString(localArray[x]) + " Alarm history",
+                            "annotations": {
+                                "alarms": [localArray[x]]
+                            },
+                            "liveData": False,
+                            "view": "timeSeries"
+                        }
+                    }
+                    myList.append(myJson)
+                    
+                return myList
+                
+            def queueWidgetBuilder(localQueueArns, widgetYvalue, localRegion):
+                queueList = []
+                message = textSeparator("SQS Widgets", widgetYvalue)
+                queueList.append(message)
+                
+                # queueName = splitArnString(localQueueArns)
+                metrics = getSQSSumMetricArray(localQueueArns,localRegion)
+                
+                queueJson = {
+                    "type": "metric",
+                    "x": 0,
+                    "y": widgetYvalue+1,
+                    "width": 12,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Sum of visible and not visible messages for SQS queues",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Average",
+                        "period": 300
+                    }
+                }
+                
+                queueList.append(queueJson)
+                
+                oldestMessageJson = {
+                    "type": "metric",
+                    "x": 12,
+                    "y": widgetYvalue+1,
+                    "width": 12,
+                    "height": 5,
+                    "properties": {
+                        "metrics": getOldestSQSMessageArray(localQueueArns),
+                        "title": "Approximate Age Of Oldest Message in SQS queues",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Average",
+                        "period": 300
+                    }
+                }
+                queueList.append(oldestMessageJson)
+                    
+                return queueList
+                
+            def eventRuleWidgetBuilder(localEventRuleArns, widgetYvalue, localRegion):
+                queueList = []
+                message = textSeparator("Event Bus Rule Widgets", widgetYvalue)
+                queueList.append(message)
+                
+                metrics = getEventRuleMetricArray(localEventRuleArns,"ThrottledRules")
+                
+                throttleJson = {
+                    "type": "metric",
+                    "x": 0,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Throttled rule runs",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                
+                queueList.append(throttleJson)
+
+                metrics = getEventRuleMetricArray(localEventRuleArns,"TriggeredRules")
+                
+                triggeredJson = {
+                    "type": "metric",
+                    "x": 6,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Triggered rule runs",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                
+                queueList.append(triggeredJson)
+
+                metrics = getEventRuleMetricArray(localEventRuleArns,"Invocations")
+                
+                invocationsJson = {
+                    "type": "metric",
+                    "x": 12,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Invocations",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                
+                queueList.append(invocationsJson)
+
+                metrics = getEventRuleMetricArray(localEventRuleArns,"InvocationsSentToDlq")
+                
+                invocationsDlqJson = {
+                    "type": "metric",
+                    "x": 18,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Invocations sent to DLQ",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                
+                queueList.append(invocationsDlqJson)
+
+                return queueList
+
+            def kinesisDataWidgetBuilder(localKinesisDataArns, widgetYvalue, localRegion):
+                queueList = []
+                message = textSeparator("Kinesis Data Widgets", widgetYvalue)
+                queueList.append(message)
+                
+                metrics = getKinesisDataMetricArray(localKinesisDataArns, "GetRecords.IteratorAgeMilliseconds")
+                
+                iteratorAgeJson = {
+                    "type": "metric",
+                    "x": 0,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Iterator maximuma age",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Maximum",
+                        "period": 300
+                    }
+                }
+                
+                queueList.append(iteratorAgeJson)
+                
+                metrics = getKinesisDataMetricArray(localKinesisDataArns, "ReadProvisionedThroughputExceeded")
+
+                readThroughputJson = {
+                    "type": "metric",
+                    "x": 6,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Read throughput exceeded",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Average",
+                        "period": 300
+                    }
+                }
+                queueList.append(readThroughputJson)
+
+                metrics = getKinesisDataMetricArray(localKinesisDataArns, "WriteProvisionedThroughputExceeded")
+
+                writeThroughputJson = {
+                    "type": "metric",
+                    "x": 12,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Write throughput exceeded",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Average",
+                        "period": 300
+                    }
+                }
+                queueList.append(writeThroughputJson)
+                    
+                metrics = getKinesisDataMetricArray(localKinesisDataArns, "IncomingRecords")
+
+                incomingRecordsJson = {
+                    "type": "metric",
+                    "x": 18,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Incoming records",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                queueList.append(incomingRecordsJson)
+
+                metrics = getKinesisDataMetricArray(localKinesisDataArns, "GetRecords.Success")
+
+                getRecordsJson = {
+                    "type": "metric",
+                    "x": 0,
+                    "y": widgetYvalue+6,
+                    "width": 8,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "GetRecords.Success",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                queueList.append(getRecordsJson)
+
+                metrics = getKinesisDataMetricArray(localKinesisDataArns, "PutRecords.Success")
+
+                putRecordsJson = {
+                    "type": "metric",
+                    "x": 8,
+                    "y": widgetYvalue+6,
+                    "width": 8,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "PutRecords.Success",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                queueList.append(putRecordsJson)
+
+                metrics = getKinesisDataMetricArray(localKinesisDataArns, "PutRecord.Success")
+
+                putRecordJson = {
+                    "type": "metric",
+                    "x": 16,
+                    "y": widgetYvalue+6,
+                    "width": 8,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "PutRecord.Success",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                queueList.append(putRecordJson)
+
+                return queueList
+
+            def kinesisFirehoseWidgetBuilder(localKinesisFirehoseArns, widgetYvalue, localRegion):
+                queueList = []
+                message = textSeparator("Kinesis Firehose Widgets", widgetYvalue)
+                queueList.append(message)
+                
+                metrics = getKinesisFirehoseMetricArray(localKinesisFirehoseArns, "KinesisMillisBehindLatest")
+                
+                millisJson = {
+                    "type": "metric",
+                    "x": 0,
+                    "y": widgetYvalue+1,
+                    "width": 8,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Last record vs newest record diff",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Maximum",
+                        "period": 300
+                    }
+                }
+                
+                queueList.append(millisJson)
+                
+                metrics = getKinesisFirehoseMetricArray(localKinesisFirehoseArns, "ThrottledRecords")
+
+                throtthledJson = {
+                    "type": "metric",
+                    "x": 8,
+                    "y": widgetYvalue+1,
+                    "width": 8,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Throttled records",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                queueList.append(throtthledJson)
+
+                metrics = getKinesisFirehoseMetricArray(localKinesisFirehoseArns, "DataReadFromKinesisStream.Records")
+
+                dataReadJson = {
+                    "type": "metric",
+                    "x": 16,
+                    "y": widgetYvalue+1,
+                    "width": 8,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Records read from kinesis sream",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                queueList.append(dataReadJson)
+                    
+                metrics = getKinesisFirehoseMetricArray(localKinesisFirehoseArns, "DeliveryToS3.DataFreshness")
+
+                dataFreshnessJson = {
+                    "type": "metric",
+                    "x": 0,
+                    "y": widgetYvalue+1,
+                    "width": 8,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Oldest firehose record age",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Maximum",
+                        "period": 300
+                    }
+                }
+                queueList.append(dataFreshnessJson)
+
+                metrics = getKinesisFirehoseMetricArray(localKinesisFirehoseArns, "DeliveryToS3.Records")
+
+                recordsJson = {
+                    "type": "metric",
+                    "x": 8,
+                    "y": widgetYvalue+6,
+                    "width": 8,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Records delivered to S3",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                queueList.append(recordsJson)
+
+                metrics = getKinesisFirehoseMetricArray(localKinesisFirehoseArns, "DeliveryToS3.Success")
+
+                putRecordsJson = {
+                    "type": "metric",
+                    "x": 16,
+                    "y": widgetYvalue+6,
+                    "width": 8,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Successful S3 put commands",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                queueList.append(putRecordsJson)
+
+                return queueList
+
+            def lambdaWidgetBuilder(localLambdaArns, widgetYvalue, localRegion):
+                queueList = []
+                message = textSeparator("Lambda Widgets", widgetYvalue)
+                queueList.append(message)
+                
+                metrics = getLambdaMetricArray(localLambdaArns, "Invocations")
+                
+                invocationsJson = {
+                    "type": "metric",
+                    "x": 0,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Invocations",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                
+                queueList.append(invocationsJson)
+                
+                metrics = getLambdaMetricArray(localLambdaArns, "Errors")
+
+                errorsJson = {
+                    "type": "metric",
+                    "x": 6,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Errors",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                queueList.append(errorsJson)
+
+                metrics = getLambdaMetricArray(localLambdaArns, "Duration")
+
+                durationJson = {
+                    "type": "metric",
+                    "x": 12,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Duration",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Average",
+                        "period": 300
+                    }
+                }
+                queueList.append(durationJson)
+                    
+                metrics = getLambdaMetricArray(localLambdaArns, "Throttles")
+
+                throttlesJson = {
+                    "type": "metric",
+                    "x": 18,
+                    "y": widgetYvalue+1,
+                    "width": 6,
+                    "height": 5,
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "Throttles",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Sum",
+                        "period": 300
+                    }
+                }
+                queueList.append(throttlesJson)
+
+                return queueList
+
+            def restApiWidgetBuilder(localArray, widgetYvalue, localRegion, localRestAPINames):
+                restList = []
+                message = textSeparator("REST API Widgets", widgetYvalue)
+                restList.append(message)
+                percentageMetrics = getRestPercentageArray(localArray, localRegion, localRestAPINames)
+                for x in range(len(localArray)):
+                    width = int(24/len(localArray))
+                    x_value=x*width
+                    restJson={ 
+                        "type": "metric",
+                        "x": x_value,
+                        "y": widgetYvalue+1,
+                        "width": width,
+                        "height": 5,
+                        "properties": {
+                            "metrics": percentageMetrics[x],
+                            "title": "Percentage REST API 4XX Errors for Stage name: "+getRestAPIStageName(localArray[x]),
+                            "sparkline": True,
+                            "view": "singleValue",
+                            "region": localRegion,
+                            "stat": "Average",
+                            "period": 300
+                        }
+                    }
+                    restList.append(restJson)
+                
+                metrics = getRestAllMetricArray(localArray, localRestAPINames)
+                
+                restHistoryJson={
+                    "height": 5,
+                    "width": 24,
+                    "y": widgetYvalue+5,
+                    "x": 0,
+                    "type": "metric",
+                    "properties": {
+                        "metrics": metrics,
+                        "title": "REST API Latency History",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Average",
+                        "period": 300
+                    }
+                }
+                restList.append(restHistoryJson)
+                
+                return restList
+                
+            def dynamoDBWidgetBuilder(localArray, widgetYvalue, localRegion):
+                dynamoList = []
+                
+                message = textSeparator("DynamoDB Widgets", widgetYvalue)
+                dynamoList.append(message)
+                
+                for x in range(len(localArray)):
+                    width = int(24/len(localArray))
+                    x_value=x*width
+                    message = textSeparator2(localArray[x], widgetYvalue, width, x_value)
+                    dynamoList.append(message)
+                    latencyJson={
+                        "height": 5,
+                        "width": width,
+                        "y": widgetYvalue+1,
+                        "x": x_value,
+                        "type": "metric",
+                        "properties": {
+                            "metrics": [
+                                [ { "expression": "SELECT SUM(SuccessfulRequestLatency) FROM SCHEMA(\"AWS/DynamoDB\", TableName) WHERE TableName ="+ f"'{localArray[x]}'", "label": "SuccessfulRequest-Latency", "id": "q1", "region": localRegion } ]
+                            ],
+                            "title": "DynamoDB Successful Request Latency for Table:" + localArray[x],
+                            "view": "timeSeries",
+                            "stacked": False,
+                            "region": localRegion,
+                            "stat": "Average",
+                            "period": 300
+                        }
+                    }
+                    dynamoList.append(latencyJson)
+                
+                for x in range(len(localArray)):
+                    width = int(24/len(localArray))
+                    x_value=x*width
+                    userErrorJson={
+                        "height": 5,
+                        "width": width,
+                        "y": widgetYvalue+5,
+                        "x": x_value,
+                        "type": "metric",
+                        "properties": {
+                            "metrics": [
+                                [ { "expression": "SELECT SUM(UserErrors) FROM SCHEMA(\"AWS/DynamoDB\", TableName) WHERE TableName ="+ f"'{localArray[x]}'", "label": "User Errors", "id": "q1", "region": localRegion } ]
+                            ],
+                            "title": "DynamoDB User Errors for Table:" + localArray[x],
+                            "view": "timeSeries",
+                            "stacked": False,
+                            "region": localRegion,
+                            "stat": "Average",
+                            "period": 300
+                        }
+                    }
+                    dynamoList.append(userErrorJson)
+                    
+                    
+                for x in range(len(localArray)):
+                    width = int(24/len(localArray))
+                    x_value=x*width
+                    failedCheckJson={
+                        "height": 5,
+                        "width": width,
+                        "y": widgetYvalue+10,
+                        "x": x_value,
+                        "type": "metric",
+                        "properties": {
+                            "metrics": [
+                                [ { "expression": "SELECT SUM(ConditionalCheckFailedRequests) FROM SCHEMA(\"AWS/DynamoDB\", TableName) WHERE TableName ="+ f"'{localArray[x]}'", "label": "ConditionalCheckFailedRequests", "id": "q1", "region": localRegion } ]
+                            ],
+                            "title": "DynamoDB Conditional Check Failed Requests for Table:" + localArray[x],
+                            "view": "timeSeries",
+                            "stacked": False,
+                            "region": localRegion,
+                            "stat": "Average",
+                            "period": 300
+                        }
+                    }
+                    dynamoList.append(failedCheckJson)
+                    
+                for x in range(len(localArray)):
+                    width = int(24/len(localArray))
+                    x_value=x*width
+                    consumedWritesJson={
+                        "width": width,
+                        "y": widgetYvalue+15,
+                        "x": x_value,
+                        "type": "metric",
+                        "properties": {
+                            "metrics": [
+                                [ "AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", f"{localArray[x]}", { "stat": "Sum", "id": "m1", "visible": False } ],
+                                [ { "expression": "m1/PERIOD(m1)", "label": "Write Capacity", "id": "e1", "color": "#0073BB", "region": localRegion } ]
+                            ],
+                            "title": "DynamoDB Write usage (average units/second) for Table:" + localArray[x],
+                            "view": "timeSeries",
+                            "stacked": False,
+                            "region": localRegion,
+                            "stat": "Average",
+                            "period": 60,
+                            "yAxis": {
+                                "left": {
+                                    "showUnits": False
+                                }
+                            }
+                        }
+                    }
+                    dynamoList.append(consumedWritesJson)
+                    
+                for x in range(len(localArray)):
+                    width = int(24/len(localArray))
+                    x_value=x*width
+                    readWritesJson={
+                        "height": 5,
+                        "width": width,
+                        "y": widgetYvalue+20,
+                        "x": x_value,
+                        "type": "metric",
+                        "properties": {
+                            "metrics": [
+                                [ "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", localArray[x], { "stat": "Sum", "id": "m1", "visible": False } ],
+                                [ { "expression": "m1/PERIOD(m1)", "label": "Read Capacity", "id": "e1", "color": "#0073BB", "region": localRegion } ]
+                            ],
+                            "title": "DynamoDB Read usage (average units/second) for Table:" + localArray[x],
+                            "view": "timeSeries",
+                            "stacked": False,
+                            "region": localRegion,
+                            "stat": "Average",
+                            "period": 60,
+                            "yAxis": {
+                                "left": {
+                                    "showUnits": False
+                                }
+                            }
+                        }
+                    }
+                    dynamoList.append(readWritesJson)
+                    
+                for x in range(len(localArray)):
+                    width = int(24/len(localArray))
+                    x_value=x*width
+                    systemErrorsJson={
+                        "height": 5,
+                        "width": width,
+                        "y": widgetYvalue+25,
+                        "x": x_value,
+                        "type": "metric",
+                        "properties": {
+                            "metrics": [
+                                [ { "expression": "SELECT SUM(SystemErrors) FROM SCHEMA(\"AWS/DynamoDB\", TableName) WHERE TableName ="+ f"'{localArray[x]}'", "label": "SystemErrors", "id": "q1", "region": localRegion } ]
+                            ],
+                            "title": "DynamoDB System errors for Table:" + localArray[x],
+                            "view": "timeSeries",
+                            "stacked": False,
+                            "region": localRegion,
+                            "stat": "Average",
+                            "period": 300
+                        }
+                    }
+                    dynamoList.append(systemErrorsJson)
+                    
+                return dynamoList
+                
+            #Helper function to split the ARN received to get the last parameter of ARN
+            def splitArnString(arn):
+                stringList = arn.split(":")
+                return stringList[len(stringList)-1]
+                
+            def getRestAPIStageName(arn):
+                newArn = splitArnString(arn)
+                stringList = newArn.split('/')
+                return stringList[len(stringList)-1]
+
+            def getStreamNameName(arn):
+                newArn = splitArnString(arn)
+                stringList = newArn.split('/')
+                return stringList[len(stringList)-1]
+
+            def getEventRuleName(arn):
+                newArn = splitArnString(arn)
+                stringList = newArn.split('/')
+                return stringList[len(stringList)-1]
+
+            def getRestAllMetricArray(localArray, localRestAPINames):
+                # [ "AWS/ApiGateway", "", "ApiName", "final-public-api-WEB", "Stage", "unique" ],
+                # [ "...", "PetStore", ".", "dev" ],
+                # [ "...", "TestAPI", ".", "Prod" ]
+                finalList = []
+                for x in range(len(localArray)):
+                    data = [
+                        "AWS/ApiGateway", "Latency", "ApiName", localRestAPINames[x], "Stage", getRestAPIStageName(localArray[x]) 
+                    ]
+                    finalList.append(data)
+                return finalList
+                
+            def getSQSSumMetricArray(localArray, localRegion):
+                finalList = []
+                for x in range(len(localArray)):
+                    notVisibleArray = [
+                        "AWS/SQS", "ApproximateNumberOfMessagesNotVisible", "QueueName", splitArnString(localArray[x]), { "id": "m"+str(2*x+1), "visible": False }
+                        ]
+                    visibleArray = [
+                        "AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", splitArnString(localArray[x]), { "id": "m"+str(2*x+2), "visible": False }
+                        ]
+                        
+                    finalList.append(notVisibleArray)
+                    finalList.append(visibleArray)
+                
+                for y in range(len(localArray)):
+                    metric1 = 2*y+1
+                    metric2 = 2*y+2
+                    
+                    metric1String = "m"+str(metric1)
+                    metric2String = "m"+str(metric2)
+                    sumString = "SUM(["+metric1String+","+metric2String+"])"
+                    metricJson=[
+                        {"expression": sumString, "label": splitArnString(localArray[y]), "id": "e"+str(y+1), "region": localRegion} 
+                    ]
+
+                    finalList.append(metricJson)
+                return finalList
+                
+            def getRestPercentageArray(localArray, localRegion, localRestAPINames):
+                finalList = []
+                
+                for x in range(len(localArray)):
+                    dataList = []
+                    metric1 = 2*x+1
+                    metric2 = 2*x+2
+                    
+                    metric1String = "m"+str(metric1)
+                    metric2String = "m"+str(metric2)
+                    
+                    countRestJson=[
+                        "AWS/ApiGateway", "Count", "ApiName", localRestAPINames[x], "Stage", getRestAPIStageName(localArray[x]), { "id": metric1String, "visible": False }
+                        ]
+                        
+                    errorRestJson=[
+                        "AWS/ApiGateway", "4XXError", "ApiName", localRestAPINames[x], "Stage", getRestAPIStageName(localArray[x]), { "id": metric2String, "visible": False }
+                        ]
+
+                    sumString = "SUM("+str(100)+"/["+metric1String+"]*"+metric2String+")"
+                    metricJson=[
+                        { "expression": sumString, "label": localRestAPINames[x], "id": "e"+str(x+1) }
+                    ]
+                    dataList.append(countRestJson)
+                    dataList.append(errorRestJson)
+                    dataList.append(metricJson)
+                    finalList.append(dataList)
+
+                return finalList
+                
+            def getOldestSQSMessageArray(localArray):
+                finalList = []
+                for x in range(len(localArray)):
+                    metricsArray=[
+                        "AWS/SQS", "ApproximateAgeOfOldestMessage", "QueueName", splitArnString(localArray[x])    
+                    ]
+                    
+                    finalList.append(metricsArray)
+                
+                return finalList
+                    
+            def getEventRuleMetricArray(localArray, metricName):
+                finalList = []
+                for x in range(len(localArray)):
+                    metricsArray=[
+                        "AWS/Events", metricName, "RuleName", getEventRuleName(localArray[x])    
+                    ]
+                    
+                    finalList.append(metricsArray)
+                
+                return finalList
+
+            def getKinesisDataMetricArray(localArray, metricName):
+                finalList = []
+                for x in range(len(localArray)):
+                    metricsArray=[
+                        "AWS/Kinesis", metricName, "StreamName", getStreamNameName(localArray[x])    
+                    ]
+                    
+                    finalList.append(metricsArray)
+                
+                return finalList
+
+            def getKinesisFirehoseMetricArray(localArray, metricName):
+                finalList = []
+                for x in range(len(localArray)):
+                    metricsArray=[
+                        "AWS/Firehose", metricName, "DeliveryStreamName", getStreamNameName(localArray[x])    
+                    ]
+                    
+                    finalList.append(metricsArray)
+                
+                return finalList
+
+            def getLambdaMetricArray(localArray, metricName):
+                finalList = []
+                for x in range(len(localArray)):
+                    metricsArray=[
+                        "AWS/Lambda", metricName, "FunctionName", splitArnString(localArray[x]),  { "label": splitArnString(localArray[x]) }
+                    ]
+                    
+                    finalList.append(metricsArray)
+                
+                return finalList
+
+            def textSeparator(message, textYValue):
+                textJson={
+                    "height": 1,
+                    "width": 24,
+                    "y": textYValue,
+                    "x": 0,
+                    "type": "text",
+                    "properties": {
+                        "markdown": "# "+message
+                    }
+                }
+                
+                return textJson
+                
+            def textSeparator2(message, textYValue, width, x_value):
+                textJson={
+                    "height": 1,
+                    "width": width,
+                    "y": textYValue,
+                    "x": x_value,
+                    "type": "text",
+                    "properties": {
+                        "markdown": "## "+message
+                    }
+                }
+                
+                return textJson
+
+
+
+      Handler: index.lambda_handler
+      Runtime: python3.9
+      Role: !GetAtt TransformExecutionRole.Arn
+
+  TransformFunctionPermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt TransformFunction.Arn
+      Principal: 'cloudformation.amazonaws.com'

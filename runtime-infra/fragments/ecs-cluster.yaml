@@ -1,0 +1,22 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: ECS cluster definition for use with fargate
+
+Parameters:
+  MacroServiceName:
+    Type: String
+    Description: Name of the microservice logical group
+
+Resources:
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ${MacroServiceName}-ecs-cluster
+
+Outputs:
+  ClusterName:
+    Description: ECS cluster name
+    Value: !Ref ECSCluster
+
+  CluserArn:
+    Description: ECS cluster ARN
+    Value: !Sub '${ECSCluster.Arn}'

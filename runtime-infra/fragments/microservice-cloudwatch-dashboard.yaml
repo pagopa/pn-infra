@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template creates an Amazon CloudWatch Microservices Dashboard.
+
+Parameters:
+  DashboardName:
+    Description: The name of the microservice dashboard
+    Type: String
+ 
+  AlarmArns:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of CloudWatch Alarm ARNs
+    Default: ''
+
+  DynamoDBTableNames:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of DynamoDB table names.
+    Default: ''
+
+  RestApiStageArns:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of REST API stages ARNs.
+    Default: ''
+
+  RestApiNames:
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of REST API names matching above stages.
+    Default: ''
+
+  QueueArns:
+    Description: Comma-delimited list of SQS Queue ARNs
+    Type: CommaDelimitedList
+    Default: ''
+
+  LambdaArns:
+    Description: Comma-delimited list of Lambda ARNs
+    Type: CommaDelimitedList
+    Default: ''
+
+  KinesisDataArns:
+    Description: Comma-delimited list of Kinesis Data ARNs
+    Type: CommaDelimitedList
+    Default: ''
+
+  KinesisFirehoseArns:
+    Description: Comma-delimited list of Kinesis Firehose ARNs
+    Type: CommaDelimitedList
+    Default: ''
+
+  EventRuleArns:
+    Description: Comma-delimited list of Event Bus Rule ARNs
+    Type: CommaDelimitedList
+    Default: ''
+
+Resources:
+  MicroservicesDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Ref DashboardName
+      DashboardBody: 
+        'Fn::Transform':
+          Name: 'DashboardBodyTransform'
+          Parameters:
+            AlarmArns: !Ref AlarmArns
+            DynamoDBTableNames: !Ref DynamoDBTableNames
+            RestApiStageArns: !Ref RestApiStageArns
+            QueueArns: !Ref QueueArns
+            Region: !Ref AWS::Region
+            RestApiNames: !Ref RestApiNames
+            LambdaArns: !Ref LambdaArns
+            KinesisDataArns: !Ref KinesisDataArns
+            KinesisFirehoseArns: !Ref KinesisFirehoseArns
+            EventRuleArns: !Ref EventRuleArns
