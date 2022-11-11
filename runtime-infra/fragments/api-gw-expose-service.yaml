@@ -309,7 +309,7 @@ Resources:
     Properties: 
       LogGroupName: 
         !Ref PublicApiLogGroup
-      FilterPattern: '{($.status="4*") || ($.status="5*") && ($.path="*/{proxy}")}'
+      FilterPattern: '{(($.status="4*") || ($.status="5*")) && ($.path="*/{proxy}")}'
       MetricTransformations: 
         - MetricValue: 1
           MetricNamespace: "APIGateway"
