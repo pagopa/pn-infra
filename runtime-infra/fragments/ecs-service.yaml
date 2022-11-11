@@ -348,6 +348,14 @@ Parameters:
     Description: 40th container environment entry in the form key=value
     Type: String
     Default: ''
+  ContainerEnvEntry41:
+    Description: 41th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry42:
+    Description: 42th container environment entry in the form key=value
+    Type: String
+    Default: ''
 
 Mappings:
   ContainerMemory:
@@ -425,6 +433,8 @@ Conditions:
   Env38Exist: !Not [ !Equals [ !Ref ContainerEnvEntry38, '' ] ]
   Env39Exist: !Not [ !Equals [ !Ref ContainerEnvEntry39, '' ] ]
   Env40Exist: !Not [ !Equals [ !Ref ContainerEnvEntry40, '' ] ]
+  Env41Exist: !Not [ !Equals [ !Ref ContainerEnvEntry41, '' ] ]
+  Env42Exist: !Not [ !Equals [ !Ref ContainerEnvEntry42, '' ] ]
 
 
 Resources:
@@ -730,6 +740,16 @@ Resources:
                 - Env40Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry40 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry40 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env42Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry41 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry41 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env42Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry42 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry42 ] ]
                 - !Ref "AWS::NoValue"
           PortMappings:
             - ContainerPort: 8080
