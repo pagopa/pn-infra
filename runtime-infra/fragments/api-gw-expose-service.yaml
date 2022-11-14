@@ -160,8 +160,8 @@ Resources:
             - !Ref JwtAuthorizer
       RequestParameters:
         method.request.path.proxy: true
-        method.request.header.x-pagopa-cx-taxid: !If [ IsIO, true, false]
-        method.request.header.Authorization: !If [ IsWeb, true, false]
+        method.request.header.x-pagopa-cx-taxid: !If [ IsIO, true, AWS::NoValue]
+        method.request.header.Authorization: !If [ IsWeb, true, AWS::NoValue]
       Integration:
         ConnectionType: VPC_LINK
         ConnectionId: !Ref NetworkLoadBalancerLink
