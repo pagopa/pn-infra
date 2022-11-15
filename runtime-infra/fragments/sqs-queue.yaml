@@ -139,6 +139,7 @@ Resources:
       AlarmDescription: "Alarm messages when we have 1 or more messages in QUEUE"
       Namespace: "AWS/SQS"
       MetricName: "ApproximateNumberOfMessagesVisible"
+      TreatMissingData: "notBreaching"
       Dimensions:
         - Name: "QueueName"
           Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
