@@ -1,6 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: 'Create application load balancer, network load balancer and VPC link for
-API gateway integration'
+Description: 'Create application load balancer, network load balancer and VPC link for API gateway integration'
 
 # See https://aws.amazon.com/it/blogs/networking-and-content-delivery/application-load-balancer-type-target-group-for-network-load-balancer/
 
@@ -45,17 +44,40 @@ Resources:
             MessageBody: "{ \"error\": \"404\", \"message\": \"Load balancer rule not configured\" }"
           Order: 1
 
+  # Application load balancer https listener
+  #ApplicationLoadBalancerHttpsListener:
+  #  Type: AWS::ElasticLoadBalancingV2::Listener
+  #  Properties:
+  #    LoadBalancerArn: !Ref ApplicationLoadBalancer
+  #    Protocol: HTTPS
+  #    Certificates:
+      # TODO: define CertificateArn
+  #      - CertificateArn: !Ref CertificateArn 
+  #    Port: 8443
+  #    SslPolicy: ELBSecurityPolicy-2016-08      
+  #    DefaultActions:
+   #     - Type: fixed-response
+   #       FixedResponseConfig:
+   #         StatusCode: 404
+   #         ContentType: "application/json"
+   #         MessageBody: "{ \"error\": \"404\", \"message\": \"Load balancer rule not configured\" }"
+   #       Order: 1
+
   # Application security groups
   WebappSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupName: !Sub ${LoadBalancerName}-webapp-security-group
-      GroupDescription: "ingres tcp 8080, egress all"
+      GroupDescription: "ingres tcp 8080 and 8443, egress all"
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 8080
           ToPort: 8080
           CidrIp: "0.0.0.0/0"
+#        - IpProtocol: tcp
+#          FromPort: 8443
+#          ToPort: 8443
+#          CidrIp: "0.0.0.0/0"
       VpcId: !Ref VpcId
 
 
@@ -83,6 +105,23 @@ Resources:
           TargetGroupArn: !Ref NetworkToApplicationLoadBalancerTargetGroup
           Order: 1
 
+  # Network load balancer https listener
+  NetworkLoadBalancerHttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref NetworkLoadBalancer
+      Certificates:
+        - CertificateArn: !Ref xxx
+      Protocol: TLS
+      AlpnPolicy: 
+        - None
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Port: 8443
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref NetworkToApplicationLoadBalancerTargetGroup
+          Order: 1
+
   # Network load balancer forward to application load balancer
   NetworkToApplicationLoadBalancerTargetGroup:
     DependsOn: ApplicationLoadBalancerListener
@@ -94,7 +133,6 @@ Resources:
       Targets:
         - Id: !Ref ApplicationLoadBalancer
       VpcId: !Ref VpcId
-
 
   ###                        API GATEWAY INTEGRATION                        ###
   #############################################################################
@@ -126,8 +164,12 @@ Outputs:
 
   ApplicationLoadBalancerListenerArn:
     Value: !Ref ApplicationLoadBalancerListener
-    Description: Application Load Balancerlistener Arn
+    Description: Application Load Balancer listener Arn
 
+#  ApplicationLoadBalancerHttpsListenerArn:
+#    Value: !Ref ApplicationLoadBalancerHttpsListener
+#    Description: Application Load Balancer https listener Aarn
+    
   ApplicationLoadBalancerDomain:
     Value: !Sub '${ApplicationLoadBalancer.DNSName}'
     Description: Application Load Balancer Domain to use for http URL
