@@ -129,16 +129,16 @@ Resources:
           Order: 1
 
   # Network load balancer listener
-  NetworkLoadBalancerAdditionalListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      LoadBalancerArn: !Ref NetworkLoadBalancer
-      Protocol: TCP
-      Port: 8081
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref NetworkToApplicationLoadBalancerTargetGroup
-          Order: 1
+  #NetworkLoadBalancerAdditionalListener:
+  #  Type: AWS::ElasticLoadBalancingV2::Listener
+  #  Properties:
+  #    LoadBalancerArn: !Ref NetworkLoadBalancer
+  #    Protocol: TCP
+  #    Port: 8081
+  #    DefaultActions:
+  #      - Type: forward
+  #        TargetGroupArn: !Ref NetworkToApplicationLoadBalancerTargetGroup
+  #        Order: 1
 
   # Network load balancer https listener
   NetworkLoadBalancerHttpsListener:
@@ -187,7 +187,7 @@ Resources:
     Properties:
       HealthCheckEnabled: false
       Protocol: TCP
-      Port: 8081
+      Port: 8080
       VpcId: !Ref VpcId
       TargetType: ip
       Targets:
