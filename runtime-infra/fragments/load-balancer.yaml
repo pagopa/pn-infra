@@ -26,6 +26,10 @@ Parameters:
     Type: String
     Description: Hosted Zone ID
 
+  InternalNlbIps:
+    Type: List<String>
+    Description: List of network load balancer IPs
+
 Resources:
 
   ###                       APPLICATION LOAD BALANCER                       ###
@@ -103,7 +107,14 @@ Resources:
       Type: network
       Scheme: internal
       IpAddressType: ipv4
-      Subnets: !Ref Subnets
+      SubnetMappings:
+        - SubnetId: !Select [ 0, !Ref Subnets] 
+          PrivateIPv4Address: !Select [ 0, !Ref InternalNlbIps ]
+        - SubnetId: !Select [ 1, !Ref Subnets] 
+          PrivateIPv4Address: !Select [ 1, !Ref InternalNlbIps ]
+        - SubnetId: !Select [ 2, !Ref Subnets] 
+          PrivateIPv4Address: !Select [ 2, !Ref InternalNlbIps ]
+      
 
   # Network load balancer listener
   NetworkLoadBalancerListener:
@@ -112,6 +123,18 @@ Resources:
       LoadBalancerArn: !Ref NetworkLoadBalancer
       Protocol: TCP
       Port: 8080
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref NetworkToApplicationLoadBalancerTargetGroup
+          Order: 1
+
+  # Network load balancer listener
+  NetworkLoadBalancerAdditionalListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref NetworkLoadBalancer
+      Protocol: TCP
+      Port: 8081
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref NetworkToApplicationLoadBalancerTargetGroup
@@ -131,7 +154,7 @@ Resources:
       Port: 8443
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref NetworkToApplicationLoadBalancerTargetGroup
+          TargetGroupArn: !Ref NetworkToApplicationLoadBalancerIPTargetGroup
           Order: 1
 
   NetworkLoadBalancerDNSRecord:
@@ -156,6 +179,24 @@ Resources:
       Targets:
         - Id: !Ref ApplicationLoadBalancer
       VpcId: !Ref VpcId
+
+  NetworkToApplicationLoadBalancerIpTargetGroup:
+    DependsOn:
+      - NetworkToApplicationLoadBalancerTargetGroup
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: false
+      Protocol: TCP
+      Port: 8081
+      VpcId: !Ref VpcId
+      TargetType: ip
+      Targets:
+        - Id: !Select [ 0, !Ref InternalNlbIps ]
+          AvailabilityZone: all
+        - Id: !Select [ 1, !Ref InternalNlbIps ]
+          AvailabilityZone: all
+        - Id: !Select [ 2, !Ref InternalNlbIps ]
+          AvailabilityZone: all
 
   ###                        API GATEWAY INTEGRATION                        ###
   #############################################################################
