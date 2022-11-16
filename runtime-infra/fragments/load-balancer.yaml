@@ -107,6 +107,14 @@ Resources:
       Type: network
       Scheme: internal
       IpAddressType: ipv4
+      Subnets: !Ref Subnets
+      
+  NetworkLoadBalancerStatic:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: network
+      Scheme: internal
+      IpAddressType: ipv4
       SubnetMappings:
         - SubnetId: !Select [ 0, !Ref Subnets] 
           PrivateIPv4Address: !Select [ 0, !Ref InternalNlbIps ]
@@ -114,7 +122,6 @@ Resources:
           PrivateIPv4Address: !Select [ 1, !Ref InternalNlbIps ]
         - SubnetId: !Select [ 2, !Ref Subnets] 
           PrivateIPv4Address: !Select [ 2, !Ref InternalNlbIps ]
-      
 
   # Network load balancer listener
   NetworkLoadBalancerListener:
@@ -129,16 +136,16 @@ Resources:
           Order: 1
 
   # Network load balancer listener
-  #NetworkLoadBalancerAdditionalListener:
-  #  Type: AWS::ElasticLoadBalancingV2::Listener
-  #  Properties:
-  #    LoadBalancerArn: !Ref NetworkLoadBalancer
-  #    Protocol: TCP
-  #    Port: 8081
-  #    DefaultActions:
-  #      - Type: forward
-  #        TargetGroupArn: !Ref NetworkToApplicationLoadBalancerTargetGroup
-  #        Order: 1
+  NetworkLoadBalancerStaticListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref NetworkLoadBalancerStatic
+      Protocol: TCP
+      Port: 8080
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref NetworkToApplicationLoadBalancerTargetGroup
+          Order: 1
 
   # Network load balancer https listener
   NetworkLoadBalancerHttpsListener:
