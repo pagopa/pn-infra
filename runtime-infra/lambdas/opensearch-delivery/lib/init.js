@@ -18,7 +18,9 @@ async function getOpenSearchSecret() {
 async function initOpenSearchClient() {
   const credentials = await getOpenSearchSecret();
 
-  const clusterAuth = `${credentials.username}:${credentials.password}`
+  const username = encodeURIComponent(credentials.username);
+  const password = encodeURIComponent(credentials.password);
+  const clusterAuth = `${username}:${password}`
   const clusterHost = process.env.CLUSTER_ENDPOINT.replace(/^http[s]?:\/\//, '');
 
   const openSearch = new Client({
