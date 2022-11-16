@@ -1,0 +1,251 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Template to create a sample API Gateway
+
+Parameters:
+  ApiGatewayStageName:
+    Type: String
+    Default: dev
+    Description: Name of the stage to deploy the API in API Gateway
+  
+  CognitoUserPoolArn:
+    Type: String
+    Description: ARN of the Cognito User Pool in Account A
+
+  CognitoDomain:
+    Type: String
+    Description: Name of the domain that is created in Cognito
+  
+  CognitoClientId:
+    Type: String
+    Description: Id of the App Client used in Cognito
+  
+Resources:
+  ###################
+  ### API Gateway ###
+  ###################
+
+  MyAPIGatewayAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: CognitoAuthorizer
+      Type: COGNITO_USER_POOLS
+      IdentitySource: method.request.header.Authorization
+      RestApiId: !Ref MyAPIGateway
+      ProviderARNs:
+        - !Ref CognitoUserPoolArn
+
+  MyAPIGateway:
+    Type: "AWS::ApiGateway::RestApi"
+    Properties:
+      Name: "MyAPIGateway"
+      EndpointConfiguration:
+        Types:  
+          - REGIONAL
+  
+  AuthResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt MyAPIGateway.RootResourceId
+      PathPart: auth
+      RestApiId: !Ref MyAPIGateway
+
+  HelloResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt MyAPIGateway.RootResourceId
+      PathPart: hello
+      RestApiId: !Ref MyAPIGateway
+
+  HelloMethod:
+    Type: AWS::ApiGateway::Method
+    DependsOn: LambdaHelloCognito
+    Properties:
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref MyAPIGatewayAuthorizer
+      HttpMethod: GET
+      Integration:
+        ConnectionType: INTERNET
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaHelloCognito.Arn}/invocations'
+      ResourceId: !Ref HelloResource
+      RestApiId: !Ref MyAPIGateway
+
+  AuthMethod:
+    Type: AWS::ApiGateway::Method
+    DependsOn: LambdaApiAuth
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        ConnectionType: INTERNET
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaApiAuth.Arn}/invocations'
+      ResourceId: !Ref AuthResource
+      RestApiId: !Ref MyAPIGateway
+
+  APIDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: [AuthMethod, HelloMethod]
+    Properties:
+      RestApiId: !Ref MyAPIGateway
+      StageName: !Ref ApiGatewayStageName
+
+  ###################
+  ###### Lambda #####
+  ###################
+
+  LambdaHelloCognito:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import json
+
+          def lambda_handler(event, context):
+              username = event["requestContext"]["authorizer"]["claims"]["cognito:username"]
+              response = {"response": "Hello " + username}
+              return {
+                  "isBase64Encoded": False,
+                  "statusCode": 200,
+                  "body": json.dumps(response)
+              }
+      Description: "Simple Lambda function to illustrate the use case"
+      FunctionName: "hello-cognito"
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt RoleLambdaHelloCognito.Arn
+      Runtime: python3.9
+      Timeout: 10
+
+  LambdaApiAuth:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import json
+          import requests
+          import boto3
+          import os
+
+          COGNITO_DOMAIN = os.environ["COGNITO_DOMAIN"]
+          CLIENT_ID = os.environ["CLIENT_ID"]
+          REDIRECT_URI = os.environ["REDIRECT_URI"]
+          REST_API_ID = os.environ["REST_API_ID"]
+
+
+          def get_auth_code(event):
+              cognito_code = event["queryStringParameters"]["code"]
+              return cognito_code
+
+
+          def get_id_token(cognito_domain, client_id, cognito_code, redirect_uri):
+              url = "https://{}.auth.us-east-1.amazoncognito.com/oauth2/token".format(cognito_domain)
+              headers = {
+                  'Content-Type': 'application/x-www-form-urlencoded'
+              }
+              params = {
+                  'grant_type': 'authorization_code',
+                  'client_id': client_id,
+                  'code': cognito_code,
+                  'redirect_uri': redirect_uri
+              }
+              response = requests.post(url, params=params, headers=headers)
+              id_token = json.loads(response.text)["id_token"]
+              return id_token
+              
+
+          def call_hello_api(id_token, rest_api_id):
+              url = "https://{}.execute-api.us-east-1.amazonaws.com/dev/hello".format(rest_api_id)
+              headers = {"Authorization": id_token}
+              response = requests.get(url, headers=headers)
+              return response
+              
+
+          def lambda_handler(event, context):
+              # Collect the authorization code
+              cognito_code = get_auth_code(event)
+              
+              # Make the request to get the ID TOKEN
+              id_token = get_id_token(COGNITO_DOMAIN, CLIENT_ID, cognito_code, REDIRECT_URI)
+              print(id_token)
+              
+              # Call an authorized method in API Gateway
+              response = call_hello_api(id_token, REST_API_ID)
+              
+              return {
+                  'statusCode': 200,
+                  'body': response.text
+              }
+
+      Description: "Simple Lambda function to illustrate the use case"
+      FunctionName: "api-auth"
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt RoleLambdaApiAuth.Arn
+      Runtime: python3.9
+      Timeout: 10
+      Environment:
+        Variables: 
+          COGNITO_DOMAIN: !Ref CognitoDomain
+          CLIENT_ID: !Ref CognitoClientId
+          REDIRECT_URI: !Sub "https://${MyAPIGateway}.execute-api.${AWS::Region}.amazonaws.com/${ApiGatewayStageName}/auth"
+          REST_API_ID: !Ref MyAPIGateway
+  
+  ###################
+  ### PERMISSIONS ###
+  ###################
+
+  RoleLambdaHelloCognito:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: '2012-10-17'
+        Statement: 
+          - Effect: 'Allow'
+            Principal: 
+              Service: 
+                - 'lambda.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+  RoleLambdaApiAuth:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: '2012-10-17'
+        Statement: 
+          - Effect: 'Allow'
+            Principal: 
+              Service: 
+                - 'lambda.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+  LambdaApiGatewayInvokeHello:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt LambdaHelloCognito.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${MyAPIGateway}/*/*/*
+
+  LambdaApiGatewayInvokeApiAuth:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt LambdaApiAuth.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${MyAPIGateway}/*/*/*
+
+Outputs:
+  CallbackURL:
+    Description: "URL to call after users sign in with Cognito in the hosted UI"
+    Value: !Sub "https://${MyAPIGateway}.execute-api.${AWS::Region}.amazonaws.com/${ApiGatewayStageName}/auth"
+    Export:
+      Name: !Sub "${AWS::StackName}-CallbackURL"

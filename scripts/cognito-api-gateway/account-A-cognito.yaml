@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Template to create a Cognito User Pool in Account A
+
+Parameters:
+  DomainName:
+    Type: String
+    Description: Enter a domain name for Cognito that is likely to be unique, otherwise the template will fail
+
+Resources:
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: my-user-pool
+  
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      UserPoolId: !Ref UserPool
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Ref DomainName
+      UserPoolId: !Ref UserPool
+
+  UserPoolUI:
+    Type: AWS::Cognito::UserPoolUICustomizationAttachment
+    Properties:
+      ClientId: !Ref UserPoolClient
+      UserPoolId: !Ref UserPool
+    
+  UserPoolUser:
+    Type: AWS::Cognito::UserPoolUser
+    Properties:
+      UserAttributes:
+        - Name: email
+          Value: myemailexample@mydomain.com
+      Username: cognito-user
+      UserPoolId: !Ref UserPool
+
+Outputs:
+  UserPoolARN:
+    Description: "ARN of the Cognito User Pool"
+    Value: !GetAtt UserPool.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-ARN-UserPool"
+
+  ClientId:
+    Description: "Id of the Cognito Client"
+    Value: !Ref UserPoolClient
+    Export:
+      Name: !Sub "${AWS::StackName}-ID-Client"
+  
