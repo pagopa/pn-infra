@@ -36,6 +36,9 @@ Parameters:
     Type: String
     Description: hosted zone where register the network load balancer
 
+  InternalNlbIps:
+    Description: The list of ips of the internal network load balancer
+    Type: List<String>
 
   BucketSuffix:
     Type: String
@@ -104,6 +107,7 @@ Resources:
         RaddApiCertificateArn: !Ref RaddApiCertificateArn
         RaddApiDnsName: !Ref RaddApiDnsName
         HostedZoneId: !Ref HostedZoneId
+        InternalNlbIps: !Ref InternalNlbIps
   
   # Load balancer private fixed DNS
   Route53RecordSetGroup:
