@@ -192,11 +192,11 @@ Resources:
       TargetType: ip
       Targets:
         - Id: !Select [ 0, !Ref InternalNlbIps ]
-          AvailabilityZone: all
+          AvailabilityZone: !Select [ 0, !GetAZs '' ]
         - Id: !Select [ 1, !Ref InternalNlbIps ]
-          AvailabilityZone: all
+          AvailabilityZone: !Select [ 1, !GetAZs '' ]
         - Id: !Select [ 2, !Ref InternalNlbIps ]
-          AvailabilityZone: all
+          AvailabilityZone: !Select [ 2, !GetAZs '' ]
 
   ###                        API GATEWAY INTEGRATION                        ###
   #############################################################################
