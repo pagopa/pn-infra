@@ -23,7 +23,20 @@ Parameters:
   PrivateHostedZone:
     Type: String
     Description: private hosted zone where register the application load balancer
-  
+
+  RaddApiCertificateArn:
+    Type: String
+    Description: Radd Api certificate ARN
+
+  RaddApiDnsName:
+    Type: String
+    Description: Radd Api DNS Name
+
+  HostedZoneId:
+    Type: String
+    Description: hosted zone where register the network load balancer
+
+
   BucketSuffix:
     Type: String
     Default: "001"
@@ -88,6 +101,9 @@ Resources:
         LoadBalancerName: !Ref ProjectName
         Subnets: !Ref VpcSubnets
         VpcId: !Ref VpcId
+        RaddApiCertificateArn: !Ref RaddApiCertificateArn
+        RaddApiDnsName: !Ref RaddApiDnsName
+        HostedZoneId: !Ref HostedZoneId
   
   # Load balancer private fixed DNS
   Route53RecordSetGroup:

@@ -14,6 +14,18 @@ Parameters:
   Subnets:
     Type: List<AWS::EC2::Subnet::Id>
 
+  RaddApiCertificateArn:
+    Type: String
+    Description: Radd Api certificate ARN
+
+  RaddApiDnsName:
+    Type: String
+    Description: Radd Api DNS Name
+
+  HostedZoneId:
+    Type: String
+    Description: Hosted Zone ID
+
 Resources:
 
   ###                       APPLICATION LOAD BALANCER                       ###
@@ -68,7 +80,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupName: !Sub ${LoadBalancerName}-webapp-security-group
-      GroupDescription: "ingres tcp 8080 and 8443, egress all"
+      GroupDescription: "ingres tcp 8080, egress all"
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 8080
@@ -111,7 +123,7 @@ Resources:
     Properties:
       LoadBalancerArn: !Ref NetworkLoadBalancer
       Certificates:
-        - CertificateArn: !Ref xxx
+        - CertificateArn: !Ref RaddApiCertificateArn
       Protocol: TLS
       AlpnPolicy: 
         - None
@@ -121,6 +133,17 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref NetworkToApplicationLoadBalancerTargetGroup
           Order: 1
+
+  NetworkLoadBalancerDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      AliasTarget:
+        DNSName: !GetAtt NetworkLoadBalancer.DNSName
+        EvaluateTargetHealth: false
+        HostedZoneId: !GetAtt NetworkLoadBalancer.CanonicalHostedZoneID
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref RaddApiDnsName
+      Type: A
 
   # Network load balancer forward to application load balancer
   NetworkToApplicationLoadBalancerTargetGroup:
