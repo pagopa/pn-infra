@@ -309,22 +309,9 @@ Resources:
       RestApiId: !Ref PublicRestApi
       Stage: !Ref PublicRestApiStage
 
-  # Rest API CloudWatch Logs Metric Filter
-  APIGatewayApiErrorMetric: 
-    Type: AWS::Logs::MetricFilter
-    Properties: 
-      LogGroupName: 
-        !Ref PublicApiLogGroup
-      FilterPattern: '{($.status="4*") || ($.status="5*") && ($.path="*/{proxy}")}'
-      MetricTransformations: 
-        - MetricValue: 1
-          MetricNamespace: "APIGateway"
-          MetricName: !Sub "${ProjectName}-APIGatewayMetric"
-  
   # Rest API CloudWatch alarm 
   APIGatewayApiErrorAlarm:
     Type: AWS::CloudWatch::Alarm
-    DependsOn: APIGatewayApiErrorMetric
     Properties:
       AlarmName: !Sub "${ProjectName}-${MicroServiceUniqueName}-${IntendedUsage}-ApiGwAlarm"
       AlarmDescription: "CloudWatch alarm for when API Gateway has 4xx or 5xx error."
@@ -335,15 +322,36 @@ Resources:
       OKActions:
         - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: 1
-      MetricName: !Sub "${ProjectName}-APIGatewayMetric"
-      Namespace: APIGateway
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 5
-      Period: 60
-      Statistic: Sum
       Threshold: 1
       TreatMissingData: notBreaching
-
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: ApiName
+                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+              MetricName: 4XXError
+              Namespace: AWS/ApiGateway
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m2
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: ApiName
+                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+              MetricName: 5XXError
+              Namespace: AWS/ApiGateway
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: e1
+          Expression: SUM([m1,m2])
+          Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-APIGatewayErrorMetric"
 
   ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
   SubscriptionFilter:
