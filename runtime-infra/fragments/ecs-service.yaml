@@ -159,6 +159,15 @@ Parameters:
     Type: String
     Description: add system properties and other parameters to the JVM
 
+## Enable/Disable ECS Monitoring task for OOM
+  MonitorStatus:
+    Type: String
+    Description: "Enable / Disable monitor."
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Default: ENABLED    
+
   # - Log exports parameters
   CloudwatchFilterPattern:
     Default: ''
@@ -1087,6 +1096,7 @@ Resources:
         - !Ref ScaleUpPolicy
       OKActions:
         - !Ref ScaleDownPolicy
+        
 
   ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
   SubscriptionFilter:
@@ -1130,6 +1140,35 @@ Resources:
                 - "kms:Decrypt"
                 Effect: Allow
                 Resource: "*"
+
+## Event rule created to alert when the ECS task is terminated with OOM.
+  EventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: ECSStoppedTasksEvent
+      Description: Triggered when an Amazon ECS Task is stopped
+      EventPattern:
+        source:
+          - aws.ecs
+        detail-type:
+          - ECS Task State Change
+        detail:
+          desiredStatus:
+            - STOPPED
+          lastStatus:
+            - STOPPED
+          containers:
+            reason:
+              - prefix: "OutOfMemory"
+      State: !Ref MonitorStatus
+      Targets:
+        - Arn: !Ref AlarmSNSTopicArn
+          Id: ECSOOMStoppedTasks
+          InputTransformer:
+            InputPathsMap:
+              taskArn: $.detail.taskArn
+            InputTemplate: >
+                "Task '<taskArn>' was stopped due to OutOfMemory."                
 
 Outputs:
   ServiceName:
