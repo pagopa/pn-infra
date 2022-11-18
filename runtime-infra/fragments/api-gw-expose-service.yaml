@@ -159,9 +159,15 @@ Resources:
             - !Ref IoAuthorizer
             - !Ref JwtAuthorizer
       RequestParameters:
-        method.request.path.proxy: true
-        method.request.header.x-pagopa-cx-taxid: !If [ IsIO, true, false]
-        method.request.header.Authorization: !If [ IsWeb, true, false]
+        Fn::If:
+          - IsIO
+          - method.request.path.proxy: true
+            method.request.header.x-pagopa-cx-taxid: true
+          - Fn::If:
+              - IsWeb
+              - method.request.path.proxy: true
+                method.request.header.Authorization: true
+              - method.request.path.proxy: true
       Integration:
         ConnectionType: VPC_LINK
         ConnectionId: !Ref NetworkLoadBalancerLink
