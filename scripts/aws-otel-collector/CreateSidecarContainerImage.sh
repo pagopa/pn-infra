@@ -4,19 +4,19 @@
 
 CICD_PROFILE=cicd
 AWS_REGION=eu-central-1
-
-SOURCE_IMAGE=amazon/aws-otel-collector:latest
+TAG=v0.23.0
+SOURCE_IMAGE=amazon/aws-otel-collector:$TAG
 REPOSITORY=aws-otel-collector ## ECR repository to host the container image - needs to be created before run this script
-IMAGE=$REPOSITORY:latest
+IMAGE=$REPOSITORY:$TAG
 CICD_ACCOUNT=$(aws sts get-caller-identity --profile $CICD_PROFILE --query 'Account')
-TAG=latest
+
 
 echo "Creating repo ${REPOSITORY} on account ${CICD_ACCOUNT}"
 # Create repository
 aws ecr describe-repositories --repository-names ${REPOSITORY} --profile $CICD_PROFILE || aws ecr create-repository --repository-name ${REPOSITORY} --profile $CICD_PROFILE
 
 # pull source image
-docker pull amazon/aws-otel-collector:latest
+docker pull $SOURCE_IMAGE
 
 # docker login
 aws ecr get-login-password --region $AWS_REGION --profile $CICD_PROFILE | docker login --username AWS --password-stdin $CICD_ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com
