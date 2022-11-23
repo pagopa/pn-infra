@@ -193,6 +193,10 @@ Installare il sistema di login utilizzato dai destinatari delle notifiche.
   - Riavviare tutti i task del servizio `spidhub-<nome-ambiente>-hub-login`. Questo riavvio serve
     per supportare l'idp di test (non necessario in prod perché non sarà necessario l'idp di test).
 
+### Caricamento file metadata
+Se necessario per l'ambiente di riferimento, caricare sul bucket `spidhub-<NOME_AMBIENTE>-eu-south-1-spid` il file `metadata-signed.xml` nell path `metadata/metadata-signed.xml`. 
+*NOTA*: Il file viene cancellato in caso di nuovo deployment di SpidHub
+
 ### Test
   - Dal proprio browser navigare all'url `https://hub-login.spid.<nome-ambiente>.pn.pagopa.it/login?entityID=xx_testenv2&authLevel=SpidL2`
   - Effettuare il login con le credenziali di un utente di test
