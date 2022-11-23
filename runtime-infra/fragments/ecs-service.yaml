@@ -1161,12 +1161,15 @@ Resources:
                 Effect: Allow
                 Resource: "*"
 
-## Event rule created to alert when the ECS task is terminated with OOM.
+
+  ###                            Event adn Alarm                           ###
+  ############################################################################
+
   EventRule:
     Type: AWS::Events::Rule
     Properties:
-      Name: ECSStoppedTasksEvent
-      Description: Triggered when an Amazon ECS Task is stopped
+      Name: !Sub "ECSStoppedTasksEvent-${ECSService.Name}"
+      Description: Triggered when an Amazon ECS Task is stopped due to OOM
       EventPattern:
         source:
           - aws.ecs
@@ -1177,18 +1180,88 @@ Resources:
             - STOPPED
           lastStatus:
             - STOPPED
+          group: 
+            - !Sub "service:${ECSService.Name}"
           containers:
             reason:
               - prefix: "OutOfMemory"
-      State: !Ref MonitorStatus
+      State: ENABLED
       Targets:
-        - Arn: !Ref AlarmSNSTopicArn
-          Id: ECSOOMStoppedTasks
-          InputTransformer:
-            InputPathsMap:
-              taskArn: $.detail.taskArn
-            InputTemplate: >
-                "Task '<taskArn>' was stopped due to OutOfMemory."                
+        - Arn: !GetAtt LogGroupOOMEvents.Arn
+          Id: LogTarget
+    
+  # Creating a log group for monitoring the OOM events
+  LogGroupOOMEvents:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/events/ecs-oom-errors-${MicroServiceUniqueName}"
+      RetentionInDays: 3
+      KmsKeyId:
+        Fn::GetAtt:
+          - LogGroupKmsKey
+          - Arn
+
+  # Resource based policy to allow EventBridge to publish to CloudWatch Logs
+  LogGroupOOMEventsPolicy:
+    Type: AWS::Logs::ResourcePolicy
+    Properties:
+      PolicyName: !Sub "EventBridgeToCWLogsPolicy-${ECSService.Name}"
+      PolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "EventBridgetoCWLogsCreateLogStreamPolicy",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "events.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "logs:CreateLogStream"
+              ],
+              "Resource": [
+                "${LogGroupOOMEvents.Arn}"
+              ]
+            },
+            {
+              "Sid": "EventBridgetoCWLogsPutLogEventsPolicy",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "events.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "logs:PutLogEvents"
+              ],
+              "Resource": [
+                "${LogGroupOOMEvents.Arn}"
+              ],
+              "Condition": {
+                "ArnEquals": {"AWS:SourceArn": "${EventRule.Arn}"}
+              }
+            }
+          ]
+        }
+
+  CloudWatchAlarmOOM:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "ECSOutOfMemory-${ECSService.Name}"
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1 # For testing purpose, the alarm is triggered whenever an event arrives
+      Dimensions: 
+        - Name: RuleName
+          Value: !Select [1, !Split ["/", !GetAtt EventRule.Arn]]
+      MetricName: TriggeredRules
+      Namespace: AWS/Events              
 
 Outputs:
   ServiceName:
