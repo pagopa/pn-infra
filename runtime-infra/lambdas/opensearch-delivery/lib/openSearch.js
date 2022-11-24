@@ -29,11 +29,20 @@ function extractIun(message){
     return null;
   }  
 
-  const regex = /([A-Z]{4}\-[A-Z]{4}\-[A-Z]{4}\-[0-9]{6}\-[A-Z]{1}\-[0-9]{1})/g;
+  const regex = /iun\=([A-Z]{4}\-[A-Z]{4}\-[A-Z]{4}\-[0-9]{6}\-[A-Z]{1}\-[0-9]{1})/;
   const matches = message.match(regex);
 
-  if(matches && matches.length>0){
-    return matches[0]
+  /**
+   * Example: matches [
+      'iun=VPKT-HLHE-QWXZ-202210-G-1',
+      'VPKT-HLHE-QWXZ-202210-G-1',
+      index: 37,
+      input: 'Check if documents are available for iun=VPKT-HLHE-QWXZ-202210-G-1',
+      groups: undefined
+  ]
+   */
+  if(matches && matches.length>1){
+    return matches[1]
   } else {
     return null;
   }
