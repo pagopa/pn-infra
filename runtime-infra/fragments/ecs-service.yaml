@@ -1245,32 +1245,9 @@ Resources:
           ]
         }
 
-  # Create alarm
-  ErrorFatalLogsMetricAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Condition: HasAlarmTopic
-    DependsOn: ErrorFatalLogsMetricFilter
-    Properties:
-      AlarmName: !Sub "${MicroServiceUniqueName}-ErrorFatalLogs-Alarm"
-      AlarmDescription: "CloudWatch alarm for when ECS LogGroup has ERROR or FATAL line."
-      TreatMissingData: notBreaching
-      AlarmActions: 
-        - !Ref AlarmSNSTopicArn
-      #InsufficientDataActions:
-      #  - !Ref AlarmSNSTopicArn
-      OKActions:
-        - !Ref AlarmSNSTopicArn
-      DatapointsToAlarm: 1
-      MetricName: !Sub "${MicroServiceUniqueName}-ErrorFatalMetric"
-      Namespace: "ErrorFatalLogs"
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
-      Period: 60
-      Statistic: Sum
-      Threshold: 1
-
   CloudWatchAlarmOOM:
     Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmTopic
     Properties:
       AlarmName: !Sub "${ECSService.Name}-ECSOutOfMemory-Alarm"
       AlarmDescription: "CloudWatch alarm for when ECS task stop with OOM errors."
@@ -1304,7 +1281,11 @@ Outputs:
         - ''
   CloudWatchAlarmOOMArn:
     Description: ARN of the ECS OOM alarm
-    Value: !GetAtt CloudWatchAlarmOOM.Arn
+    Value:
+      !If
+        - HasAlarmTopic
+        - !GetAtt CloudWatchAlarmOOM.Arn
+        - ''
   AutoScalingAlarmArn:
     Description: ARN of the autoscaling alarm
     Value:
