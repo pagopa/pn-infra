@@ -1161,7 +1161,6 @@ Resources:
                 Effect: Allow
                 Resource: "*"
 
-
   ###                            Event adn Alarm                           ###
   ############################################################################
 
@@ -1185,7 +1184,7 @@ Resources:
           containers:
             reason:
               - prefix: "OutOfMemory"
-      State: ENABLED
+      State: !Ref MonitorStatus
       Targets:
         - Arn: !GetAtt LogGroupOOMEvents.Arn
           Id: LogTarget
@@ -1195,7 +1194,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/events/ecs-oom-errors-${MicroServiceUniqueName}"
-      RetentionInDays: 3
+      RetentionInDays: 14
       KmsKeyId:
         Fn::GetAtt:
           - LogGroupKmsKey
@@ -1246,22 +1245,45 @@ Resources:
           ]
         }
 
+  # Create alarm
+  ErrorFatalLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmTopic
+    DependsOn: ErrorFatalLogsMetricFilter
+    Properties:
+      AlarmName: !Sub "${MicroServiceUniqueName}-ErrorFatalLogs-Alarm"
+      AlarmDescription: "CloudWatch alarm for when ECS LogGroup has ERROR or FATAL line."
+      TreatMissingData: notBreaching
+      AlarmActions: 
+        - !Ref AlarmSNSTopicArn
+      #InsufficientDataActions:
+      #  - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      MetricName: !Sub "${MicroServiceUniqueName}-ErrorFatalMetric"
+      Namespace: "ErrorFatalLogs"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Statistic: Sum
+      Threshold: 1
+
   CloudWatchAlarmOOM:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "ECSOutOfMemory-${ECSService.Name}"
+      AlarmName: !Sub "${ECSService.Name}-ECSOutOfMemory-Alarm"
+      AlarmDescription: "CloudWatch alarm for when ECS task stop with OOM errors."
+      TreatMissingData: notBreaching        
       AlarmActions:
         - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1            
       ComparisonOperator: GreaterThanOrEqualToThreshold
-      Statistic: Sum
+      EvaluationPeriods: 60
       Period: 60
-      EvaluationPeriods: 1
-      Threshold: 1 # For testing purpose, the alarm is triggered whenever an event arrives
-      Dimensions: 
-        - Name: RuleName
-          Value: !Select [1, !Split ["/", !GetAtt EventRule.Arn]]
-      MetricName: TriggeredRules
-      Namespace: AWS/Events              
+      MetricName: !Sub "${MicroServiceUniqueName}-ECSOutOfMemoryTriggeredRules"
+      Statistic: Sum
+      Threshold: 1 # For testing purpose, the alarm is triggered whenever an event arrives     
 
 Outputs:
   ServiceName:
@@ -1280,6 +1302,9 @@ Outputs:
         - HasAlarmTopic
         - !GetAtt ErrorFatalLogsMetricAlarm.Arn
         - ''
+  CloudWatchAlarmOOMArn:
+    Description: ARN of the ECS OOM alarm
+    Value: !GetAtt CloudWatchAlarmOOM.Arn
   AutoScalingAlarmArn:
     Description: ARN of the autoscaling alarm
     Value:
