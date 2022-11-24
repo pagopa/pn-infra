@@ -1167,7 +1167,7 @@ Resources:
   EventRule:
     Type: AWS::Events::Rule
     Properties:
-      Name: !Sub "ECSStoppedTasksEvent-${ECSService.Name}"
+      Name: !Sub "ECSStoppedTasksEvent-${MicroServiceUniqueName}"
       Description: Triggered when an Amazon ECS Task is stopped due to OOM
       EventPattern:
         source:
@@ -1204,7 +1204,7 @@ Resources:
   LogGroupOOMEventsPolicy:
     Type: AWS::Logs::ResourcePolicy
     Properties:
-      PolicyName: !Sub "EventBridgeToCWLogsPolicy-${ECSService.Name}"
+      PolicyName: !Sub "EventBridgeToCWLogsPolicy-${MicroServiceUniqueName}"
       PolicyDocument: !Sub |
         {
           "Version": "2012-10-17",
@@ -1249,7 +1249,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Condition: HasAlarmTopic
     Properties:
-      AlarmName: !Sub "${ECSService.Name}-ECSOutOfMemory-Alarm"
+      AlarmName: !Sub "${MicroServiceUniqueName}-ECSOutOfMemory-Alarm"
       AlarmDescription: "CloudWatch alarm for when ECS task stop with OOM errors."
       TreatMissingData: notBreaching        
       AlarmActions:
