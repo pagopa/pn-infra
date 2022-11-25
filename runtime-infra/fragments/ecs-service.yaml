@@ -751,7 +751,7 @@ Resources:
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry40 ] ]
                 - !Ref "AWS::NoValue"
             - 'Fn::If':
-                - Env42Exist
+                - Env41Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry41 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry41 ] ]
                 - !Ref "AWS::NoValue"
@@ -1245,6 +1245,18 @@ Resources:
           ]
         }
 
+  # CloudWatch metric to filer ERROR - FATAL lines, in Log group
+  OutOfMemoryLogsMetricFilter: 
+    Condition: HasAlarmTopic
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: !Ref LogGroupOOMEvents
+      FilterPattern: ' '
+      MetricTransformations: 
+        - MetricValue: 1
+          MetricNamespace: "OutOfMemoryErrors"
+          MetricName: !Sub "${MicroServiceUniqueName}-ECSOutOfMemory"
+
   CloudWatchAlarmOOM:
     Type: AWS::CloudWatch::Alarm
     Condition: HasAlarmTopic
@@ -1258,10 +1270,10 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 60
       Period: 60
-      MetricName: !Sub "${MicroServiceUniqueName}-ECSOutOfMemoryTriggeredRules"
-      Statistic: Sum
-      Threshold: 1 # For testing purpose, the alarm is triggered whenever an event arrives  
       Namespace: OutOfMemoryErrors   
+      MetricName: !Sub "${MicroServiceUniqueName}-ECSOutOfMemory"
+      Statistic: Sum
+      Threshold: 1
 
 Outputs:
   ServiceName:
