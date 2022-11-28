@@ -121,13 +121,8 @@ Resources:
               method.response.header.x-pagopa-pn-cx-role: context.authorizer.claims.custom:Role
             ResponseTemplates:
               application/json: "{ 
-                \"User-Data\" : { 
-                    \"Roles\" : [
-                        \"#foreach($i in $context.authorizer.claims['custom:Role'].split(','))\" {
-                            \"User-Role\": $i
-                        }
-                        \"#end\"
-                    \"]\",
+                \"UserData\" : { 
+                    \"Roles\" : \"$context.authorizer.claims['custom:Role']\", 
                     \"email\" : \"$context.authorizer.claims['email']\"
                   }
                 }"
