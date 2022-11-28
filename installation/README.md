@@ -193,6 +193,10 @@ Installare il sistema di login utilizzato dai destinatari delle notifiche.
   - Riavviare tutti i task del servizio `spidhub-<nome-ambiente>-hub-login`. Questo riavvio serve
     per supportare l'idp di test (non necessario in prod perché non sarà necessario l'idp di test).
 
+### Caricamento file metadata
+Se necessario per l'ambiente di riferimento, caricare sul bucket `spidhub-<NOME_AMBIENTE>-eu-south-1-spid` il file `metadata-signed.xml` nell path `metadata/metadata-signed.xml`. 
+*NOTA*: Il file viene cancellato in caso di nuovo deployment di SpidHub
+
 ### Test
   - Dal proprio browser navigare all'url `https://hub-login.spid.<nome-ambiente>.pn.pagopa.it/login?entityID=xx_testenv2&authLevel=SpidL2`
   - Effettuare il login con le credenziali di un utente di test
@@ -309,6 +313,11 @@ Modificare i seguenti parametri:
   - __DataLakeAccountId1__: per certificazione va bene il numero dell'account AWS di PN-CORE per prod serve l'account id 
       dell'ambiente di produzione di DataLake che dovrà essere comunicato da PagoPA,
   - __DataLakeAccountId2__: serve solo in ambiente dev, in tutti gli altri ambienti deve essere valorizzato con '-'
+  - __RaddApiCertificateArn__: ARN del certificato per api-radd.\<NOME_AMBIENTE\>.pn.pagopa.it
+  - __RaddApiDnsName__: Nome del DNS per la RADD API, api-radd.\<NOME_AMBIENTE\>.pn.pagopa.it
+  - __HostedZoneId__: ID della hosted zone dove registrare il DNS della RADD API
+  - __InternalNlbIps__: Lista degli IP degli internal NLB; bisogna scegliere IP della private subnet nella VPC interna, non ancora utilizzati (prendere uno degli ultimi disponibili)
+
 - File `pn-infra/runtime-infra/pn-ipc-<nome_ambiente>-cfg.json`
   - __ApiCertificateArn__: ARN del certificato per il DNS api.\<nome-ambiente\>.pn.pagopa.it
   - __WebApiCertificateArn__: ARN del certificato per il DNS webapi.\<nome-ambiente\>.pn.pagopa.it
