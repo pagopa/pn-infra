@@ -72,6 +72,7 @@ Resources:
           Value: !Ref IntendedUsage
       Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
       FailOnWarnings: true
+      ApiKeySourceType: AUTHORIZER
       EndpointConfiguration:
         Types:
           - REGIONAL
@@ -153,7 +154,7 @@ Resources:
       AuthorizerId:
         Fn::If:
           - IsB2B
-          - !Ref ApikeyAuthorizer
+          - !Ref ApikeyAuthorizerV2
           - Fn::If:
             - IsIO
             - !Ref IoAuthorizer
@@ -238,21 +239,21 @@ Resources:
   ApiKeyLambdaPermission:
     Condition: IsB2B
     Type: AWS::Lambda::Permission
-    DependsOn: ApikeyAuthorizer
+    DependsOn: ApikeyAuthorizerV2
     Properties:
-      FunctionName: !Sub '${ProjectName}-apikeyAuthorizerLambda'
+      FunctionName: !Sub '${ProjectName}-ApikeyAuthorizerV2Lambda'
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${ApikeyAuthorizer}"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${ApikeyAuthorizerV2}"
 
-  ApikeyAuthorizer:
+  ApikeyAuthorizerV2:
     Condition: IsB2B
     Type: AWS::ApiGateway::Authorizer
     Properties:
-      Name: pn-auth-fleet_apikeyAuthorizer
+      Name: pn-auth-fleet_ApikeyAuthorizerV2
       Type: REQUEST
       AuthorizerResultTtlInSeconds: '300'
-      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-apikeyAuthorizerLambda/invocations'
+      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-ApikeyAuthorizerV2Lambda/invocations'
       IdentitySource: method.request.header.x-api-key
       RestApiId: !Ref PublicRestApi
 
@@ -413,7 +414,7 @@ Outputs:
     Value: 
       Fn::If:
         - IsB2B
-        - !Ref ApikeyAuthorizer
+        - !Ref ApikeyAuthorizerV2
         - Fn::If:
           - IsIO
           - !Ref IoAuthorizer
