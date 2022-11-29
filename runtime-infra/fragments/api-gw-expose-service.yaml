@@ -154,7 +154,7 @@ Resources:
       AuthorizerId:
         Fn::If:
           - IsB2B
-          - !Ref ApikeyAuthorizerV2
+          - !Ref ApiKeyAuthorizerV2
           - Fn::If:
             - IsIO
             - !Ref IoAuthorizer
@@ -239,21 +239,21 @@ Resources:
   ApiKeyLambdaPermission:
     Condition: IsB2B
     Type: AWS::Lambda::Permission
-    DependsOn: ApikeyAuthorizerV2
+    DependsOn: ApiKeyAuthorizerV2
     Properties:
-      FunctionName: !Sub '${ProjectName}-ApikeyAuthorizerV2Lambda'
+      FunctionName: !Sub '${ProjectName}-ApiKeyAuthorizerV2Lambda'
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${ApikeyAuthorizerV2}"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${ApiKeyAuthorizerV2}"
 
-  ApikeyAuthorizerV2:
+  ApiKeyAuthorizerV2:
     Condition: IsB2B
     Type: AWS::ApiGateway::Authorizer
     Properties:
-      Name: pn-auth-fleet_ApikeyAuthorizerV2
+      Name: pn-auth-fleet_ApiKeyAuthorizerV2
       Type: REQUEST
       AuthorizerResultTtlInSeconds: '300'
-      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-ApikeyAuthorizerV2Lambda/invocations'
+      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-ApiKeyAuthorizerV2Lambda/invocations'
       IdentitySource: method.request.header.x-api-key
       RestApiId: !Ref PublicRestApi
 
@@ -414,7 +414,7 @@ Outputs:
     Value: 
       Fn::If:
         - IsB2B
-        - !Ref ApikeyAuthorizerV2
+        - !Ref ApiKeyAuthorizerV2
         - Fn::If:
           - IsIO
           - !Ref IoAuthorizer
