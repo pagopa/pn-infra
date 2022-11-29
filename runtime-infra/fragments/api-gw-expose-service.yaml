@@ -154,7 +154,7 @@ Resources:
       AuthorizerId:
         Fn::If:
           - IsB2B
-          - !Ref ApikeyAuthorizerV2
+          - !Ref ApiKeyAuthorizerV2
           - Fn::If:
             - IsIO
             - !Ref IoAuthorizer
@@ -253,7 +253,7 @@ Resources:
       Name: pn-auth-fleet_ApiKeyAuthorizerV2
       Type: REQUEST
       AuthorizerResultTtlInSeconds: '300'
-      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-ApikeyAuthorizerV2Lambda/invocations'
+      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-ApiKeyAuthorizerV2Lambda/invocations'
       IdentitySource: method.request.header.x-api-key
       RestApiId: !Ref PublicRestApi
 
@@ -414,7 +414,7 @@ Outputs:
     Value: 
       Fn::If:
         - IsB2B
-        - !Ref ApikeyAuthorizerV2
+        - !Ref ApiKeyAuthorizerV2
         - Fn::If:
           - IsIO
           - !Ref IoAuthorizer
