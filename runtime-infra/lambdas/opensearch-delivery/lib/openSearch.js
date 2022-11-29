@@ -24,6 +24,29 @@ function chunk(arr, size) {
   );
 }
 
+function extractIun(message){
+  if(!message){
+    return null;
+  }  
+
+  const regex = /([A-Z]{4}\-[A-Z]{4}\-[A-Z]{4}\-[0-9]{6}\-[A-Z]{1}\-[0-9]{1})/g;
+  const matches = message.match(regex);
+
+  if(matches && matches.length>0){
+    return matches[0]
+  } else {
+    return null;
+  }
+}
+
+function truncateMessage(message, limit = 30000){
+  if(message.length>limit){
+    return message.slice(0, limit);
+  } else {
+    return message;
+  }
+}
+
 function prepareBulkBody(logs){
     let formattedLogs = []
 
@@ -32,6 +55,14 @@ function prepareBulkBody(logs){
             try {
                 const jsonMessage = JSON.parse(log.message)
                 if(jsonMessage){
+                    if(!jsonMessage.iun){
+                      const extractedIun = extractIun(jsonMessage.message)
+                      if(extractedIun){
+                        jsonMessage.iun = extractedIun;
+                      }
+                    }
+
+                    jsonMessage.message = truncateMessage(jsonMessage.message, 30000)
                     jsonMessage._id = log.id
                     jsonMessage.kinesisSeqNumber = doc.kinesisSeqNumber
                     jsonMessage.logGroup = doc.logGroup
@@ -41,12 +72,13 @@ function prepareBulkBody(logs){
             } catch(e){
                 const timestamp = new Date(log.timestamp);
 
+                
                 const fakeLog = {
                     _id: log.id,
                     kinesisSeqNumber: doc.kinesisSeqNumber,
                     logGroup: doc.logGroup,
                     logStream: doc.logStream,
-                    message: log.message,
+                    message: truncateMessage(log.message, 30000),
                     '@timestamp': timestamp.toISOString(),
                     '@version': 1,
                     error_code: 'INVALID_JSON_MESSAGE',
