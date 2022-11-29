@@ -120,22 +120,29 @@ Resources:
             ResponseParameters:
               method.response.header.x-pagopa-pn-cx-role: context.authorizer.claims.custom:Role
             ResponseTemplates:
-              application/json: "{ 
-                #set($userRoles = [])
-                #set($itemAdded = false)
+              application/json: "
+                  #set($userRoles = []) 
+                  #set($itemAdded = false)
+                  #set($UserDataPayload = {})
 
-                #foreach($i in $context.authorizer.claims['custom:Role'].split(',')) {
 
-                #set($itemAdded = $userRoles.add($i))
-                }
-                #end
+                  #foreach($i in $context.authorizer.claims[\"custom:Role\"].split(',')) 
+                  #set($itemAdded = $userRoles.add($i.trim())) 
+                  #end
 
-                {
-                    \"User-Data\" : {
-                        \"Roles\" : $userRoles,
-                        \"email\" : \"$context.authorizer.claims['email']\"
-                    }
-                }"
+                  #set($UserDataPayload[\"Roles\"] = $userRoles)
+                  #set($UserDataPayload[\"Email\"] = $context.authorizer.claims[\"email\"])
+
+                  {
+                      \"email\": \"$UserDataPayload.Email\",
+                      \"roles\": 
+                        [
+                            #foreach($elem in $UserDataPayload.Roles) 
+                                  \"$elem\"
+                                #if($foreach.hasNext),#end
+                            #end
+                        ]
+                  }"
         PassthroughBehavior: WHEN_NO_TEMPLATES
         RequestParameters: 
           integration.request.header.x-pagopa-pn-cx-role: context.authorizer.claims.custom:Role
