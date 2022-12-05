@@ -67,6 +67,11 @@ function prepareBulkBody(logs){
                     jsonMessage.kinesisSeqNumber = doc.kinesisSeqNumber
                     jsonMessage.logGroup = doc.logGroup
                     jsonMessage.logStream = doc.logStream
+
+                    if(jsonMessage.stack_trace) {
+                      jsonMessage.stack_trace = truncateMessage(jsonMessage.stack_trace, 20000)
+                    }
+                    
                     formattedLogs.push(jsonMessage);
                 }
             } catch(e){
