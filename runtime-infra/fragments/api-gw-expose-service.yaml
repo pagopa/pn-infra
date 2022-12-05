@@ -72,7 +72,7 @@ Resources:
           Value: !Ref IntendedUsage
       Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
       FailOnWarnings: true
-      ApiKeySourceType: AUTHORIZER
+      ApiKeySourceType: !If [ IsB2B, AUTHORIZER, HEADER ]
       EndpointConfiguration:
         Types:
           - REGIONAL
