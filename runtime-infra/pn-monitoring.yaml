@@ -11,6 +11,14 @@ Parameters:
     Type: String
     Description: ARN of the SNS topic for alarms
 
+  CloudwatchLogKinesisStreamArn:
+    Default: ''
+    Type: String
+    Description: where to send logs
+
+Conditions:
+  SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
+
 Resources:
  ###                            Event adn Alarm                           ###
   ############################################################################
@@ -118,6 +126,47 @@ Resources:
       Statistic: Sum
       Threshold: 1
  
+  SubscriptionFilterServiceRole:
+    Condition: SendLogToKinesis
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: logs.amazonaws.com
+        Version: "2012-10-17"
+      Path: /
+      Policies:
+        -
+          PolicyName: !Sub '${ProjectName}-monitoring-subscription-role'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - kinesis:PutRecord
+                Effect: Allow
+                Resource: "*"
+              - Action:
+                - "kms:Encrypt"
+                - "kms:GenerateDataKey"
+                - "kms:Decrypt"
+                Effect: Allow
+                Resource: "*"
+
+  OomSubscriptionFilter:
+    Condition: SendLogToKinesis
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      RoleArn:
+        Fn::GetAtt:
+          - "SubscriptionFilterServiceRole"
+          - "Arn"
+      LogGroupName: !Ref LogGroupOOMEvents
+      FilterPattern: ' '
+      DestinationArn: !Ref CloudwatchLogKinesisStreamArn
+
 Outputs:
   OOMAlarmArn:
     Value: !GetAtt CloudWatchAlarmOOM.Arn
