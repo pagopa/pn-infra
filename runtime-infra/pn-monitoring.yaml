@@ -1,0 +1,159 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys the queues needed for monitoring'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic for alarms
+
+Resources:
+ ###                            Event adn Alarm                           ###
+  ############################################################################
+
+  EventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${ProjectName}-ECSOutOfMemoryStoppedTasksEvent"
+      Description: Triggered when an Amazon ECS Task is stopped due to OOM
+      EventPattern:
+        source:
+          - aws.ecs
+        detail-type:
+          - ECS Task State Change
+        detail:
+          desiredStatus:
+            - STOPPED
+          lastStatus:
+            - STOPPED
+          containers:
+            reason:
+              - prefix: "OutOfMemory"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LogGroupOOMEvents.Arn
+          Id: LogTarget
+    
+  # KMS Key for Encrypt log data in CloudWatch Logs
+  LogGroupKmsKey:
+    Type: AWS::KMS::Key
+    Properties:
+      KeyPolicy:
+        Statement:
+          - Action: kms:*
+            Effect: Allow
+            Principal:
+              AWS:
+                Fn::Join:
+                  - ""
+                  - - "arn:"
+                    - Ref: AWS::Partition
+                    - ":iam::"
+                    - Ref: AWS::AccountId
+                    - :root
+            Resource: "*"
+          - Action:
+              - kms:Encrypt*
+              - kms:Decrypt*
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:Describe*
+            Effect: Allow      
+            Principal:
+                Service: !Sub logs.${AWS::Region}.amazonaws.com
+            Resource: '*'
+            Condition:
+                ArnLike:
+                    'kms:EncryptionContext:aws:logs:arn': !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*' 
+        Version: "2012-10-17"
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
+
+  # Creating a log group for monitoring the OOM events
+  LogGroupOOMEvents:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/events/${ProjectName}-ecs-oom-errors"
+      RetentionInDays: 14
+      KmsKeyId:
+        Fn::GetAtt:
+          - LogGroupKmsKey
+          - Arn
+
+  # Resource based policy to allow EventBridge to publish to CloudWatch Logs
+  LogGroupOOMEventsPolicy:
+    Type: AWS::Logs::ResourcePolicy
+    Properties:
+      PolicyName: !Sub "${ProjectName}-EventBridgeToCWLogsPolicy"
+      PolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "EventBridgetoCWLogsCreateLogStreamPolicy",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "events.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "logs:CreateLogStream"
+              ],
+              "Resource": [
+                "${LogGroupOOMEvents.Arn}"
+              ]
+            },
+            {
+              "Sid": "EventBridgetoCWLogsPutLogEventsPolicy",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "events.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "logs:PutLogEvents"
+              ],
+              "Resource": [
+                "${LogGroupOOMEvents.Arn}"
+              ],
+              "Condition": {
+                "ArnEquals": {"AWS:SourceArn": "${EventRule.Arn}"}
+              }
+            }
+          ]
+        }
+
+  # CloudWatch metric to filer ERROR - FATAL lines, in Log group
+  OutOfMemoryLogsMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: !Ref LogGroupOOMEvents
+      FilterPattern: ' '
+      MetricTransformations: 
+        - MetricValue: 1
+          MetricNamespace: "OutOfMemoryErrors"
+          MetricName: !Sub "${ProjectName}-ECSOutOfMemory"
+
+  CloudWatchAlarmOOM:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-ECSOutOfMemory-Alarm"
+      AlarmDescription: "CloudWatch alarm for when ECS task stop with OOM errors."
+      TreatMissingData: notBreaching        
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1            
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Namespace: OutOfMemoryErrors   
+      MetricName: !Sub "${ProjectName}-ECSOutOfMemory"
+      Statistic: Sum
+      Threshold: 1
+ 
