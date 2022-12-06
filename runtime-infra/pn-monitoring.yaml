@@ -11,13 +11,13 @@ Parameters:
     Type: String
     Description: ARN of the SNS topic for alarms
 
-  CloudwatchLogKinesisStreamArn:
+  LogsKinesisSourceStreamArn:
     Default: ''
     Type: String
     Description: where to send logs
 
 Conditions:
-  SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
+  SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
 
 Resources:
  ###                            Event adn Alarm                           ###
@@ -165,7 +165,7 @@ Resources:
           - "Arn"
       LogGroupName: !Ref LogGroupOOMEvents
       FilterPattern: ' '
-      DestinationArn: !Ref CloudwatchLogKinesisStreamArn
+      DestinationArn: !Ref LogsKinesisSourceStreamArn
 
 Outputs:
   OOMAlarmArn:
