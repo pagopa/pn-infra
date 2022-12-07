@@ -117,21 +117,21 @@ Resources:
                         dashboardList = appendList(dashboardList, eventRuleList)
                         y_value = y_value+6
 
+                    if event["params"]["BucketNames"] == [''] or len(event["params"]["BucketNames"]) == 0:
+                        print("BucketNames param is missing or empty")
+                    else:
+                        localBucketNames = event["params"]["BucketNames"]
+                        localBucketNames = list(filter(None, localBucketNames))
+                        bucketWidgetList = bucketWidgetBuilder(localBucketNames, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, bucketWidgetList)
+                        y_value = y_value+6
+
                     if event["params"]["DynamoDBTableNames"] == [''] or len(event["params"]["DynamoDBTableNames"]) == 0:
                         print("DynamoDBTableNames param is missing or empty")
                     else:
                         localDynamoDBTableNames = event["params"]["DynamoDBTableNames"]
                         dynamoList = dynamoDBWidgetBuilder(localDynamoDBTableNames, y_value, localRegion)
                         dashboardList = appendList(dashboardList, dynamoList)
-                    
-                    if event["params"]["BucketNames"] == [''] or len(event["params"]["BucketNames"]) == 0:
-                        print("BucketNames param is missing or empty")
-                    else:
-                        localBucketNames = event["params"]["BucketNames"]
-                        localBucketNames = list(filter(None, localKinesisFirehoseArns))
-                        bucketWidgetList = bucketWidgetBuilder(localBucketNames, y_value ,localRegion)
-                        dashboardList = appendList(dashboardList, bucketWidgetList)
-                        y_value = y_value+6
 
                 data["widgets"] = dashboardList
                 print(data)
