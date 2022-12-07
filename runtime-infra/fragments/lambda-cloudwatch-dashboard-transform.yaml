@@ -124,6 +124,15 @@ Resources:
                         dynamoList = dynamoDBWidgetBuilder(localDynamoDBTableNames, y_value, localRegion)
                         dashboardList = appendList(dashboardList, dynamoList)
                     
+                    if event["params"]["BucketNames"] == [''] or len(event["params"]["BucketNames"]) == 0:
+                        print("BucketNames param is missing or empty")
+                    else:
+                        localBucketNames = event["params"]["BucketNames"]
+                        localBucketNames = list(filter(None, localKinesisFirehoseArns))
+                        bucketWidgetList = bucketWidgetBuilder(localBucketNames, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, bucketWidgetList)
+                        y_value = y_value+6
+
                 data["widgets"] = dashboardList
                 print(data)
                 
@@ -893,7 +902,37 @@ Resources:
                     dynamoList.append(systemErrorsJson)
                     
                 return dynamoList
+
+            def bucketWidgetBuilder(localArray, widgetYvalue, localRegion):
+                bucketList = []
                 
+                message = textSeparator("Bucket Widgets", widgetYvalue)
+                bucketList.append(message)
+                for x in range(len(localArray)):
+                    width = int(24/len(localArray))
+                    x_value=x*width
+                    metrics = getBucketMetric(localArray[x], "BucketSizeBytes")
+                    usageJson={
+                        "height": 5,
+                        "width": width,
+                        "y": widgetYvalue+25,
+                        "x": x_value,
+                        "type": "metric",
+                        "properties": {
+                            "metrics": metrics,
+                            "title": "Used space for bucket: " + localArray[x],
+                            "view": "timeSeries",
+                            "stacked": False,
+                            "region": localRegion,
+                            "stat": "Average",
+                            "period": 300
+                        }
+                    }
+                    bucketList.append(usageJson)
+                    
+                return bucketList
+
+
             #Helper function to split the ARN received to get the last parameter of ARN
             def splitArnString(arn):
                 stringList = arn.split(":")
@@ -1037,6 +1076,13 @@ Resources:
                     finalList.append(metricsArray)
                 
                 return finalList
+
+            def getBucketMetric(bucketName, metricName):
+                def metricsArray=[
+                    "AWS/S3", metricName, "BucketName", bucketName, { "label": bucketName }
+                ]
+
+                return metricArray
 
             def textSeparator(message, textYValue):
                 textJson={

@@ -15,6 +15,15 @@ Parameters:
     Type: String
     Description: 'keep track of used projects commitIds'
 
+  LogsBucketName:
+    Type: String
+    Description: Bucket name where the logs must be exported
+  
+  LogsBucketLimit:
+    Type: Number
+    Description: Limit of logs bucket in bytes
+    Default: 536870912000
+
   CdcKinesisSourceStreamArn:
     Type: String
 
@@ -61,7 +70,34 @@ Parameters:
     Type: String
     Description: 'Event bus to user attributes rule ARN'
 
+  AlarmSNSTopicName:
+    Type: String
+    Default: '-'
+    Description: 'An ARN of an SNS topic where to send alarm when DLQ contain messages'
+
 Resources:
+
+  LogsBucketAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: "LogsBucket-Storage-Limit-Exceeded"
+      AlarmDescription: "Alarm messages when the logs bucket used space exceeds the limit"
+      Namespace: "AWS/S3"
+      MetricName: "BucketSizeBytes"
+      TreatMissingData: "notBreaching"
+      Dimensions:
+        - Name: "BucketName"
+          Value: !Ref LogsBucketName
+      Statistic: "Average"
+      Period: 300  
+      Threshold: !Ref LogsBucketLimit
+      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 1       
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+
   InfraMicroserviceCloudWatchDashboard:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -74,9 +110,13 @@ Resources:
             - !Ref CdcToS3KinesisDeliveryStreamAlarmArn
             - !Ref LogsToS3KinesisDeliveryStreamAlarmArn
             - !Ref OpenSearchDeliveryLambdaAlarmArn
+            - !Ref LogsBucketAlarm
         LambdaArns: !Join
           - ','
           - - !Ref OpenSearchDeliveryLambdaArn
+        BucketNames: !Join
+          - ','
+          - - !Ref LogsBucketName
         KinesisDataArns: !Join
           - ','
           - - !Ref CdcKinesisSourceStreamArn
@@ -92,3 +132,7 @@ Resources:
             - !Ref PnCoreEventBusToExtChResponseQueueArn
             - !Ref PnCoreEventBusToUserAttributesQueueArn
 
+Outputs:
+  Version:
+    Value: !Ref Version
+    Description: 'keep track of used projects commitIds'
