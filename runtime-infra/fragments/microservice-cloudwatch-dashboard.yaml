@@ -51,19 +51,15 @@ Parameters:
     Type: CommaDelimitedList
     Default: ''
 
-  AlarmSNSTopicName:
+  AlarmSNSTopicArn:
     Type: String
-    Default: '-'
-    Description: 'An ARN of an SNS topic where to send alarm when DLQ contain messages'
+    Default: ''
+    Description: 'An ARN of an SNS topic where to send alarm'
 
-Conditions:
-  HasAlarm: !Not [ !Equals [ !Ref AlarmSNSTopicName, '-' ] ]
-  
 Resources:
 
   MicroserviceCompositeAlarm:
     Type: AWS::CloudWatch::CompositeAlarm
-    Condition: HasAlarm
     Properties:
       AlarmName: !Sub '${DashboardName}-CompositeAlarm'
       AlarmRule: 
@@ -77,9 +73,9 @@ Resources:
                     - !Ref AlarmArns
             - ')'
       AlarmActions:
-        - !Ref AlarmSNSTopicName
+        - !Ref AlarmSNSTopicArn
       OKActions:
-        - !Ref AlarmSNSTopicName
+        - !Ref AlarmSNSTopicArn
 
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard
@@ -99,3 +95,8 @@ Resources:
             KinesisDataArns: !Ref KinesisDataArns
             KinesisFirehoseArns: !Ref KinesisFirehoseArns
             EventRuleArns: !Ref EventRuleArns
+
+Outputs:
+  MicroserviceCompositeAlarmArn:
+    Value: !GetAtt MicroserviceCompositeAlarm.Arn
+    Description: 'Arn of microservice composite alarm'
