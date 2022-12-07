@@ -923,7 +923,6 @@ Resources:
                             "title": "Used space for bucket: " + localArray[x],
                             "view": "timeSeries",
                             "stacked": False,
-                            "region": localRegion,
                             "stat": "Average",
                             "period": 86400
                         }
@@ -1079,7 +1078,7 @@ Resources:
 
             def getBucketMetric(bucketName, metricName):
                 metricsArray=[
-                    [ "AWS/S3", metricName, "BucketName", bucketName, { "label": bucketName } ]
+                    [ "AWS/S3", metricName, "BucketName", bucketName, "StorageType", "StandardStorage", { "label": bucketName } ]
                 ]
 
                 return metricsArray
