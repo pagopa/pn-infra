@@ -22,7 +22,7 @@ Parameters:
   LogsBucketLimit:
     Type: Number
     Description: Limit of logs bucket in bytes
-    Default: 536870912000
+    Default: 500000000000
 
   CdcKinesisSourceStreamArn:
     Type: String
@@ -89,7 +89,7 @@ Resources:
         - Name: "BucketName"
           Value: !Ref LogsBucketName
       Statistic: "Average"
-      Period: 300  
+      Period: 86400  
       Threshold: !Ref LogsBucketLimit
       ComparisonOperator: "GreaterThanOrEqualToThreshold" 
       EvaluationPeriods: 1       
