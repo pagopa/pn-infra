@@ -58,7 +58,7 @@ Parameters:
 
 Conditions:
   HasAlarm: !Not [ !Equals [ !Ref AlarmSNSTopicName, '-' ] ]
-
+  
 Resources:
 
   MicroserviceCompositeAlarm:
@@ -66,11 +66,16 @@ Resources:
     Condition: HasAlarm
     Properties:
       AlarmName: !Sub '${DashboardName}-CompositeAlarm'
-      AlarmRule: 'FALSE'
-#        Fn::Join:
-#                - ''
-#                - - !Sub ""
-#                  - !Sub ''
+      AlarmRule: 
+        Fn::Join:
+          - ''
+          - - 'ALARM('
+            - Fn::Join:
+                  - ') OR ALARM('
+                  - Fn::Split: 
+                    - ','
+                    - !Ref AlarmArns
+            - ')'
       AlarmActions:
         - !Ref AlarmSNSTopicName
       OKActions:
