@@ -70,10 +70,10 @@ Parameters:
     Type: String
     Description: 'Event bus to user attributes rule ARN'
 
-  AlarmSNSTopicName:
+  AlarmSNSTopicArn:
     Type: String
-    Default: '-'
-    Description: 'An ARN of an SNS topic where to send alarm when DLQ contain messages'
+    Default: ''
+    Description: 'An ARN of an SNS topic where to send alarm'
 
 Resources:
 
@@ -96,9 +96,9 @@ Resources:
       ComparisonOperator: "GreaterThanOrEqualToThreshold" 
       EvaluationPeriods: 1       
       AlarmActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+        - !Ref AlarmSNSTopicArn
       OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+        - !Ref AlarmSNSTopicArn
 
   InfraMicroserviceCloudWatchDashboard:
     Type: AWS::CloudFormation::Stack
