@@ -169,6 +169,13 @@ Parameters:
     Default: ''
     Type: String
     Description: where to send logs
+  
+  TaskRoleManagedPolicyArn:
+    Default: ''
+    Type: String
+    Description: |
+        Managed policy containing specific policy that allow access to resources needed by the specific 
+        microservice. For example queues and dynamo tables.
 
   # Technical parameters
   VpcId:
@@ -392,6 +399,8 @@ Conditions:
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
   SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
+
+  HasTaskRoleManagedPolicyArn: !Not [ !Equals [ !Ref TaskRoleManagedPolicyArn, '' ] ] 
 
   Env1Exist: !Not [ !Equals [!Ref ContainerEnvEntry1, '']]
   Env2Exist: !Not [ !Equals [!Ref ContainerEnvEntry2, '']]
@@ -876,7 +885,11 @@ Resources:
               Service: ecs-tasks.amazonaws.com
             Action: 'sts:AssumeRole'
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
+        Fn::If:
+          - HasTaskRoleManagedPolicyArn
+          - - !Ref TaskRoleManagedPolicyArn
+            - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
+          - - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
 
   # Role policy needed to access the ECR registry of the CiCd account
   EcrAccessTaskPolicy:
