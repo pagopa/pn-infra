@@ -51,6 +51,14 @@ Parameters:
     Type: CommaDelimitedList
     Default: ''
 
+Conditions:
+  HasRest0: !Not [ !Equals [ !Select [ 0, !Ref RestApiStageArns ], '' ] ]
+  HasRest1: !Not [ !Equals [ !Select [ 1, !Ref RestApiStageArns ], '' ] ]
+  HasRest2: !Not [ !Equals [ !Select [ 2, !Ref RestApiStageArns ], '' ] ]
+  HasRest3: !Not [ !Equals [ !Select [ 3, !Ref RestApiStageArns ], '' ] ]
+  HasRest4: !Not [ !Equals [ !Select [ 4, !Ref RestApiStageArns ], '' ] ]
+  HasRest5: !Not [ !Equals [ !Select [ 5, !Ref RestApiStageArns ], '' ] ]          
+
 Resources:
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard
