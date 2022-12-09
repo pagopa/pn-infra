@@ -58,18 +58,18 @@ Parameters:
 
 Resources:
 
-  MicroserviceCompositeAlarm:
-    Type: AWS::CloudWatch::CompositeAlarm
-    Properties:
-      AlarmName: !Sub '${DashboardName}-CompositeAlarm'
-      AlarmRule: 
-        Fn::Join:
-          - ''
-          - - 'ALARM('
-            - Fn::Join:
-                  - ') OR ALARM('
-                  - !Ref AlarmArns
-            - ')'
+#  MicroserviceCompositeAlarm:
+#    Type: AWS::CloudWatch::CompositeAlarm
+#    Properties:
+#      AlarmName: !Sub '${DashboardName}-CompositeAlarm'
+#      AlarmRule: 
+#        Fn::Join:
+#          - ''
+#          - - 'ALARM('
+#            - Fn::Join:
+#                  - ') OR ALARM('
+#                  - !Ref AlarmArns
+#            - ')'
 
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard
@@ -92,6 +92,17 @@ Resources:
             BucketNames: !Ref BucketNames
 
 Outputs:
-  MicroserviceCompositeAlarmArn:
-    Value: !GetAtt MicroserviceCompositeAlarm.Arn
-    Description: 'Arn of microservice composite alarm'
+#  MicroserviceCompositeAlarmArn:
+#    Value: !GetAtt MicroserviceCompositeAlarm.Arn
+#    Description: 'Arn of microservice composite alarm'
+
+  MicroserviceCompositeExpression:
+    Value:         
+      Fn::Join:
+        - ''
+        - - 'ALARM('
+          - Fn::Join:
+                - ') OR ALARM('
+                - !Ref AlarmArns
+          - ')'
+    Description: 'Composite alarm expression'
