@@ -61,6 +61,10 @@ Parameters:
     Type: String
     Description: 'Event bus to user attributes rule ARN'
 
+  OOMAlarmArn:
+    Type: String
+    Description: 'Out of memory ECS alarm'
+
 Resources:
   InfraMicroserviceCloudWatchDashboard:
     Type: AWS::CloudFormation::Stack
@@ -74,6 +78,7 @@ Resources:
             - !Ref CdcToS3KinesisDeliveryStreamAlarmArn
             - !Ref LogsToS3KinesisDeliveryStreamAlarmArn
             - !Ref OpenSearchDeliveryLambdaAlarmArn
+            - !Ref OOMAlarmArn
         LambdaArns: !Join
           - ','
           - - !Ref OpenSearchDeliveryLambdaArn
