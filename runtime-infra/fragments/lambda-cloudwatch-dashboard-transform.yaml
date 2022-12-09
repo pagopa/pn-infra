@@ -913,11 +913,11 @@ Resources:
                         "type": "metric",
                         "properties": {
                             "metrics": [
-                                [ "AWS/Lambda", "Invocations", "FunctionName", splitArnString(localArray[x]),  { "label": "Invocations "+splitArnString(localArray[x]) } ],
-                                [ "AWS/Lambda", "Errors", "FunctionName", splitArnString(localArray[x]),  { "label": "Errors "+splitArnString(localArray[x]) } ],
-                                [ "AWS/Lambda", "Throttles", "FunctionName", splitArnString(localArray[x]),  { "label": "Throttles "+splitArnString(localArray[x]) } ],
+                                [ "AWS/Lambda", "Invocations", "FunctionName", splitArnString(localArray[x]),  { "label": "Invocations for "+splitArnString(localArray[x]) } ],
+                                [ "AWS/Lambda", "Errors", "FunctionName", splitArnString(localArray[x]),  { "label": "Errors for "+splitArnString(localArray[x]) } ],
+                                [ "AWS/Lambda", "Throttles", "FunctionName", splitArnString(localArray[x]),  { "label": "Throttles for "+splitArnString(localArray[x]) } ],
                             ],
-                            "title": "Base Metrics for Lambda: " + localArray[x],
+                            "title": "Base Metrics for Lambda: " + splitArnString(localArray[x]),
                             "view": "timeSeries",
                             "stacked": False,
                             "region": localRegion,
@@ -927,7 +927,7 @@ Resources:
                     }
                     lambdaList.append(baseMetricsJson)
                 
-                durationMetrics = getLambdaMetricArray(localLambdaArns, "Duration")
+                durationMetrics = getLambdaMetricArray(localArray, "Duration")
 
                 durationJson = {
                     "type": "metric",
