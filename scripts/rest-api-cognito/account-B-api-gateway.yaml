@@ -1,0 +1,175 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Template to create a sample REST API Gateway with authorization
+
+Parameters:
+  ApiGatewayStageName:
+    Description: Name of the stage to deploy the API in API Gateway
+    Type: String
+    Default: dev
+  
+  CognitoUserPoolArn:
+    Description: ARN of the Cognito User Pool in Account A
+    Type: String
+    
+  ApiGatewayName:
+    Description: The name of the Rest API Gateway.
+    Type: String
+    Default: Cognito-Rest-API
+
+  AuthorizerResultTtlInSeconds:
+    Description: The time-to-live (TTL) period, in seconds, that specifies how long API Gateway caches authorizer results.
+    Type: String
+    Default: '300'
+
+  NLBArn:
+    Description: The ARN of network load balancer of the VPC targeted by the VPC link
+    Type: String
+
+  APIURI:
+    Description: The Uniform Resource Identifier (URI) for the REST API integration 
+    Type: String
+
+  TimeoutInMillis:
+    Description: Custom timeout between 50 and 29,000 milliseconds.
+    Type: Number
+    Default: '29000'
+  
+Resources:
+  ###################
+  ### API Gateway ###
+  ###################
+
+  MyAPIGatewayAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      AuthorizerResultTtlInSeconds: !Ref AuthorizerResultTtlInSeconds
+      IdentitySource: method.request.header.Authorization
+      Name: CognitoAuthorizer
+      ProviderARNs:
+        - !Ref CognitoUserPoolArn
+      RestApiId: !Ref MyAPIGateway
+      Type: COGNITO_USER_POOLS
+
+  MyAPIGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: Example API Gateway
+      EndpointConfiguration:
+        Types:  
+          - REGIONAL
+      Name: !Ref ApiGatewayName
+
+  WhoAmIResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt MyAPIGateway.RootResourceId
+      PathPart: whoami
+      RestApiId: !Ref MyAPIGateway
+
+  ECSResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt MyAPIGateway.RootResourceId
+      PathPart: ecs
+      RestApiId: !Ref MyAPIGateway
+
+  ECSMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref MyAPIGatewayAuthorizer
+      HttpMethod: ANY
+      Integration:
+        ConnectionId: !Ref ApiPrivateLink
+        ConnectionType: VPC_LINK
+        IntegrationHttpMethod: ANY
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseTemplates:
+              application/json: "{}"
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        RequestParameters: 
+          integration.request.header.x-pagopa-pn-cx-role: context.authorizer.claims.custom:Role
+        TimeoutInMillis: !Ref TimeoutInMillis
+        Type: HTTP_PROXY
+        Uri: !Ref APIURI
+      MethodResponses: #Sending back headers to client for verification of role headers
+        - StatusCode: 200
+      ResourceId: !Ref ECSResource
+      RestApiId: !Ref MyAPIGateway
+
+  ApiPrivateLink:
+    Type: AWS::ApiGateway::VpcLink
+    Properties: 
+      Description: "API Gateway VPC link for a REST API"
+      Name: !Sub ${ApiGatewayName}-VPC-link
+      TargetArns: 
+        - !Ref NLBArn
+
+  WhoAmIMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref MyAPIGatewayAuthorizer
+      HttpMethod: POST
+      Integration:
+        ConnectionType: INTERNET
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.x-pagopa-pn-cx-role: context.authorizer.claims.custom:Role
+            ResponseTemplates:
+              application/json: "
+                  #set($userRoles = []) 
+                  #set($itemAdded = false)
+                  #set($UserDataPayload = {})
+
+
+                  #foreach($i in $context.authorizer.claims[\"custom:Role\"].split(',')) 
+                  #set($itemAdded = $userRoles.add($i.trim())) 
+                  #end
+
+                  #set($UserDataPayload[\"Roles\"] = $userRoles)
+                  #set($UserDataPayload[\"Email\"] = $context.authorizer.claims[\"email\"])
+
+                  {
+                      \"email\": \"$UserDataPayload.Email\",
+                      \"roles\": 
+                        [
+                            #foreach($elem in $UserDataPayload.Roles) 
+                                  \"$elem\"
+                                #if($foreach.hasNext),#end
+                            #end
+                        ]
+                  }"
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        RequestParameters: 
+          integration.request.header.x-pagopa-pn-cx-role: context.authorizer.claims.custom:Role
+        RequestTemplates: 
+          application/json : "{
+              \"context\" : {
+                \"Role\" : \"$context.authorizer.claims['custom:Role']\"
+              },
+              \"statusCode\": 200
+            }"
+        TimeoutInMillis: !Ref TimeoutInMillis
+        Type: MOCK
+      MethodResponses: #Sending back headers to client for verification of role headers
+        - ResponseParameters:
+            method.response.header.x-pagopa-pn-cx-role: false
+          StatusCode: 200
+      ResourceId: !Ref WhoAmIResource
+      RestApiId: !Ref MyAPIGateway
+
+  APIDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: [WhoAmIMethod, ECSMethod]
+    Properties:
+      RestApiId: !Ref MyAPIGateway
+      StageName: !Ref ApiGatewayStageName
+
+Outputs:
+  CallbackURL:
+    Description: "API Gateway endpoint"
+    Value: !Sub "https://${MyAPIGateway}.execute-api.${AWS::Region}.amazonaws.com/${ApiGatewayStageName}"
