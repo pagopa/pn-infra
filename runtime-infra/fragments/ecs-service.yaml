@@ -54,12 +54,12 @@ Parameters:
   ContainerImageOtelURI:
     Type: String
     Description: Container image URI for Open telemetry
-    Default: amazon/aws-otel-collector:v0.23.0
+    Default: 911845998067.dkr.ecr.eu-central-1.amazonaws.com/aws-otel-collector:v0.23.0
 
   ContainerImageInjectorURI:
     Type: String
     Description: Container image URI for Open telemetry
-    Default: alpine
+    Default: 911845998067.dkr.ecr.eu-central-1.amazonaws.com/alpine:3.14
 
 # The AWS collector comes with two configs baked in for ECS:
 #
@@ -158,15 +158,6 @@ Parameters:
     Default: ''
     Type: String
     Description: add system properties and other parameters to the JVM
-
-## Enable/Disable ECS Monitoring task for OOM
-  MonitorStatus:
-    Type: String
-    Description: "Enable / Disable monitor."
-    AllowedValues:
-      - ENABLED
-      - DISABLED
-    Default: ENABLED    
 
   # - Log exports parameters
   CloudwatchFilterPattern:
@@ -1161,120 +1152,6 @@ Resources:
                 Effect: Allow
                 Resource: "*"
 
-  ###                            Event adn Alarm                           ###
-  ############################################################################
-
-  EventRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Name: !Sub "ECSStoppedTasksEvent-${MicroServiceUniqueName}"
-      Description: Triggered when an Amazon ECS Task is stopped due to OOM
-      EventPattern:
-        source:
-          - aws.ecs
-        detail-type:
-          - ECS Task State Change
-        detail:
-          desiredStatus:
-            - STOPPED
-          lastStatus:
-            - STOPPED
-          group: 
-            - !Sub "service:${ECSService.Name}"
-          containers:
-            reason:
-              - prefix: "OutOfMemory"
-      State: !Ref MonitorStatus
-      Targets:
-        - Arn: !GetAtt LogGroupOOMEvents.Arn
-          Id: LogTarget
-    
-  # Creating a log group for monitoring the OOM events
-  LogGroupOOMEvents:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub "/aws/events/ecs-oom-errors-${MicroServiceUniqueName}"
-      RetentionInDays: 14
-      KmsKeyId:
-        Fn::GetAtt:
-          - LogGroupKmsKey
-          - Arn
-
-  # Resource based policy to allow EventBridge to publish to CloudWatch Logs
-  LogGroupOOMEventsPolicy:
-    Type: AWS::Logs::ResourcePolicy
-    Properties:
-      PolicyName: !Sub "EventBridgeToCWLogsPolicy-${MicroServiceUniqueName}"
-      PolicyDocument: !Sub |
-        {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Sid": "EventBridgetoCWLogsCreateLogStreamPolicy",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": [
-                  "events.amazonaws.com"
-                ]
-              },
-              "Action": [
-                "logs:CreateLogStream"
-              ],
-              "Resource": [
-                "${LogGroupOOMEvents.Arn}"
-              ]
-            },
-            {
-              "Sid": "EventBridgetoCWLogsPutLogEventsPolicy",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": [
-                  "events.amazonaws.com"
-                ]
-              },
-              "Action": [
-                "logs:PutLogEvents"
-              ],
-              "Resource": [
-                "${LogGroupOOMEvents.Arn}"
-              ],
-              "Condition": {
-                "ArnEquals": {"AWS:SourceArn": "${EventRule.Arn}"}
-              }
-            }
-          ]
-        }
-
-  # CloudWatch metric to filer ERROR - FATAL lines, in Log group
-  OutOfMemoryLogsMetricFilter: 
-    Condition: HasAlarmTopic
-    Type: AWS::Logs::MetricFilter
-    Properties: 
-      LogGroupName: !Ref LogGroupOOMEvents
-      FilterPattern: ' '
-      MetricTransformations: 
-        - MetricValue: 1
-          MetricNamespace: "OutOfMemoryErrors"
-          MetricName: !Sub "${MicroServiceUniqueName}-ECSOutOfMemory"
-
-  CloudWatchAlarmOOM:
-    Type: AWS::CloudWatch::Alarm
-    Condition: HasAlarmTopic
-    Properties:
-      AlarmName: !Sub "${MicroServiceUniqueName}-ECSOutOfMemory-Alarm"
-      AlarmDescription: "CloudWatch alarm for when ECS task stop with OOM errors."
-      TreatMissingData: notBreaching        
-      AlarmActions:
-        - !Ref AlarmSNSTopicArn
-      DatapointsToAlarm: 1            
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
-      Period: 60
-      Namespace: OutOfMemoryErrors   
-      MetricName: !Sub "${MicroServiceUniqueName}-ECSOutOfMemory"
-      Statistic: Sum
-      Threshold: 1
-
 Outputs:
   ServiceName:
     Description: Nome del servizio di cui fare deploy
@@ -1291,13 +1168,6 @@ Outputs:
       !If
         - HasAlarmTopic
         - !GetAtt ErrorFatalLogsMetricAlarm.Arn
-        - ''
-  CloudWatchAlarmOOMArn:
-    Description: ARN of the ECS OOM alarm
-    Value:
-      !If
-        - HasAlarmTopic
-        - !GetAtt CloudWatchAlarmOOM.Arn
         - ''
   AutoScalingAlarmArn:
     Description: ARN of the autoscaling alarm
