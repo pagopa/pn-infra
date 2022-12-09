@@ -104,9 +104,9 @@ Resources:
                     else:
                         localLambdaArns = event["params"]["LambdaArns"]
                         localLambdaArns = list(filter(None, localLambdaArns))
-                        lambdaList = lambdaWidgetBuilder(localLambdaArns, y_value ,localRegion)
+                        lambdaList = lambdaNewWidgetBuilder(localLambdaArns, y_value ,localRegion)
                         dashboardList = appendList(dashboardList, lambdaList)
-                        y_value = y_value+6
+                        y_value = y_value+18
                         
                     if event["params"]["EventRuleArns"] == [''] or len(event["params"]["EventRuleArns"]) == 0:
                         print("EventRuleArns param is missing or empty")
@@ -893,7 +893,62 @@ Resources:
                     dynamoList.append(systemErrorsJson)
                     
                 return dynamoList
+
+            def lambdaNewWidgetBuilder(localArray, widgetYvalue, localRegion):
+                lambdaList = []
                 
+                message = textSeparator("Lambda Widgets", widgetYvalue)
+                lambdaList.append(message)
+                
+                for x in range(len(localArray)):
+                    width = int(24/len(localArray))
+                    x_value=x*width
+                    message = textSeparator2(localArray[x], widgetYvalue, width, x_value)
+                    lambdaList.append(message)
+                    baseMetricsJson={
+                        "height": 5,
+                        "width": width,
+                        "y": widgetYvalue+1,
+                        "x": x_value,
+                        "type": "metric",
+                        "properties": {
+                            "metrics": [
+                                [ "AWS/Lambda", "Invocations", "FunctionName", splitArnString(localArray[x]),  { "label": "Invocations "+splitArnString(localArray[x]) } ],
+                                [ "AWS/Lambda", "Errors", "FunctionName", splitArnString(localArray[x]),  { "label": "Errors "+splitArnString(localArray[x]) } ],
+                                [ "AWS/Lambda", "Throttles", "FunctionName", splitArnString(localArray[x]),  { "label": "Throttles "+splitArnString(localArray[x]) } ],
+                            ],
+                            "title": "Base Metrics for Lambda: " + localArray[x],
+                            "view": "timeSeries",
+                            "stacked": False,
+                            "region": localRegion,
+                            "stat": "Sum",
+                            "period": 300
+                        }
+                    }
+                    lambdaList.append(baseMetricsJson)
+                
+                durationMetrics = getLambdaMetricArray(localLambdaArns, "Duration")
+
+                durationJson = {
+                    "type": "metric",
+                    "x": 0,
+                    "y": widgetYvalue+6,
+                    "width": 24,
+                    "height": 5,
+                    "properties": {
+                        "metrics": durationMetrics,
+                        "title": "Duration",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Average",
+                        "period": 300
+                    }
+                }
+                lambdaList.append(durationJson)
+
+                return lambdaList
+
             #Helper function to split the ARN received to get the last parameter of ARN
             def splitArnString(arn):
                 stringList = arn.split(":")
