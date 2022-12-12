@@ -947,6 +947,26 @@ Resources:
                 }
                 lambdaList.append(durationJson)
 
+                memoryUsageMetrics = getLambdaInsightsMetricArray(localArray, "used_memory_max")
+
+                durationJson = {
+                    "type": "metric",
+                    "x": 0,
+                    "y": widgetYvalue+6,
+                    "width": 24,
+                    "height": 5,
+                    "properties": {
+                        "metrics": memoryUsageMetrics,
+                        "title": "Memory usage",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Maximum",
+                        "period": 300
+                    }
+                }
+                lambdaList.append(durationJson)
+
                 return lambdaList
 
             #Helper function to split the ARN received to get the last parameter of ARN
@@ -1087,6 +1107,17 @@ Resources:
                 for x in range(len(localArray)):
                     metricsArray=[
                         "AWS/Lambda", metricName, "FunctionName", splitArnString(localArray[x]),  { "label": splitArnString(localArray[x]) }
+                    ]
+                    
+                    finalList.append(metricsArray)
+                
+                return finalList
+
+            def getLambdaInsightsMetricArray(localArray, metricName):
+                finalList = []
+                for x in range(len(localArray)):
+                    metricsArray=[
+                        "LambdaInsights", metricName, "FunctionName", splitArnString(localArray[x]),  { "label": splitArnString(localArray[x]) }
                     ]
                     
                     finalList.append(metricsArray)
