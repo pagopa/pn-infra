@@ -51,7 +51,29 @@ Parameters:
     Type: CommaDelimitedList
     Default: ''
 
+  BucketNames:
+    Description: Comma-delimited list of Bucket Names
+    Type: CommaDelimitedList
+    Default: ''
+
 Resources:
+
+  MicroserviceCompositeAlarm:
+    Type: AWS::CloudWatch::CompositeAlarm
+    Properties:
+      AlarmName: !Sub '${DashboardName}-CompositeAlarm'
+      AlarmRule: 
+        Fn::Join:
+          - ''
+          - - 'ALARM('
+            - Fn::Join:
+              - ') OR ALARM('
+              - 'Fn::Transform':
+                  Name: 'TrimListTransform'
+                  Parameters:
+                    Arns: !Ref AlarmArns
+            - ')'
+
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard
     Properties:
@@ -70,3 +92,20 @@ Resources:
             KinesisDataArns: !Ref KinesisDataArns
             KinesisFirehoseArns: !Ref KinesisFirehoseArns
             EventRuleArns: !Ref EventRuleArns
+            BucketNames: !Ref BucketNames
+
+Outputs:
+#  MicroserviceCompositeAlarmArn:
+#    Value: !GetAtt MicroserviceCompositeAlarm.Arn
+#    Description: 'Arn of microservice composite alarm'
+
+  MicroserviceCompositeExpression:
+    Value:         
+      Fn::Join:
+        - ''
+        - - 'ALARM('
+          - Fn::Join:
+                - ') OR ALARM('
+                - !Ref AlarmArns
+          - ')'
+    Description: 'Composite alarm expression'

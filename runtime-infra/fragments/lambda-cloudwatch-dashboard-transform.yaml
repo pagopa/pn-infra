@@ -9,6 +9,13 @@ Resources:
       FunctionName: !GetAtt TransformFunction.Arn
       Name: DashboardBodyTransform
 
+  TrimListMacro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Description: CloudFormation macro to filter comma separated list of arns from empty ones.
+      FunctionName: !GetAtt TrimListFunction.Arn
+      Name: TrimListTransform
+
   TransformExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -36,6 +43,59 @@ Resources:
                   - logs:PutLogEvents
                 Resource:
                   - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/DashboardBodyTransform:*'
+
+  TrimListExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /     
+      Policies:
+        - PolicyName: TrimListTransform
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/TrimListTransform'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/TrimListTransform:*'
+
+  TrimListFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+        Code:
+            ZipFile: |
+                def lambda_handler(event, context):
+                    arnList = event["params"]["Arns"]
+
+                    response = {
+                        "requestId": event["requestId"],
+                        "status": "success"
+                    }
+
+                    trimmedList = list(filter(None, arnList))
+                    if len(trimmedList)>0:
+                        response['fragment'] = trimmedList
+                    else:
+                        response['fragment'] = ['false']
+
+                    return response
+        Handler: index.lambda_handler
+        Runtime: python3.9
+        Role: !GetAtt TrimListExecutionRole.Arn
+                
 
   TransformFunction:
     Type: AWS::Lambda::Function
@@ -117,13 +177,22 @@ Resources:
                         dashboardList = appendList(dashboardList, eventRuleList)
                         y_value = y_value+6
 
+                    if event["params"]["BucketNames"] == [''] or len(event["params"]["BucketNames"]) == 0:
+                        print("BucketNames param is missing or empty")
+                    else:
+                        localBucketNames = event["params"]["BucketNames"]
+                        localBucketNames = list(filter(None, localBucketNames))
+                        bucketWidgetList = bucketWidgetBuilder(localBucketNames, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, bucketWidgetList)
+                        y_value = y_value+6
+
                     if event["params"]["DynamoDBTableNames"] == [''] or len(event["params"]["DynamoDBTableNames"]) == 0:
                         print("DynamoDBTableNames param is missing or empty")
                     else:
                         localDynamoDBTableNames = event["params"]["DynamoDBTableNames"]
                         dynamoList = dynamoDBWidgetBuilder(localDynamoDBTableNames, y_value, localRegion)
                         dashboardList = appendList(dashboardList, dynamoList)
-                    
+
                 data["widgets"] = dashboardList
                 print(data)
                 
@@ -969,6 +1038,36 @@ Resources:
 
                 return lambdaList
 
+            def bucketWidgetBuilder(localArray, widgetYvalue, localRegion):
+                bucketList = []
+                
+                message = textSeparator("Bucket Widgets", widgetYvalue)
+                bucketList.append(message)
+                for x in range(len(localArray)):
+                    width = int(24/len(localArray))
+                    x_value=x*width
+                    metrics = getBucketMetric(localArray[x], "BucketSizeBytes")
+                    usageJson={
+                        "height": 5,
+                        "width": width,
+                        "y": widgetYvalue+25,
+                        "x": x_value,
+                        "type": "metric",
+                        "properties": {
+                            "metrics": metrics,
+                            "title": "Used space for bucket: " + localArray[x],
+                            "region": localRegion,
+                            "view": "timeSeries",
+                            "stacked": False,
+                            "stat": "Average",
+                            "period": 86400
+                        }
+                    }
+                    bucketList.append(usageJson)
+                    
+                return bucketList
+
+
             #Helper function to split the ARN received to get the last parameter of ARN
             def splitArnString(arn):
                 stringList = arn.split(":")
@@ -1123,6 +1222,12 @@ Resources:
                     finalList.append(metricsArray)
                 
                 return finalList
+            def getBucketMetric(bucketName, metricName):
+                metricsArray=[
+                    [ "AWS/S3", metricName, "BucketName", bucketName, "StorageType", "StandardStorage", { "label": bucketName } ]
+                ]
+
+                return metricsArray
 
             def textSeparator(message, textYValue):
                 textJson={
@@ -1164,3 +1269,10 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !GetAtt TransformFunction.Arn
       Principal: 'cloudformation.amazonaws.com'
+
+  TrimListFunctionPermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+        Action: 'lambda:InvokeFunction'
+        FunctionName: !GetAtt TrimListFunction.Arn
+        Principal: 'cloudformation.amazonaws.com'
