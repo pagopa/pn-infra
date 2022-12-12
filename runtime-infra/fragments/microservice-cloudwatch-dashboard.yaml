@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: 2010-09-09
+runtime-infra/fragments/microservice-cloudwatch-dashboard.yamlAWSTemplateFormatVersion: 2010-09-09
 Description: This template creates an Amazon CloudWatch Microservices Dashboard.
 
 Parameters:
@@ -58,18 +58,25 @@ Parameters:
 
 Resources:
 
-#  MicroserviceCompositeAlarm:
-#    Type: AWS::CloudWatch::CompositeAlarm
-#    Properties:
-#      AlarmName: !Sub '${DashboardName}-CompositeAlarm'
-#      AlarmRule: 
-#        Fn::Join:
-#          - ''
-#          - - 'ALARM('
-#            - Fn::Join:
-#                  - ') OR ALARM('
-#                  - !Ref AlarmArns
-#            - ')'
+  MicroserviceCompositeAlarm:
+    Type: AWS::CloudWatch::CompositeAlarm
+    Properties:
+      AlarmName: !Sub '${DashboardName}-CompositeAlarm'
+      AlarmRule: 
+#        'Fn::Transform':
+#          Name:  'RemoveEmptyTransform'
+#          Parameters:
+#            Arns: !Ref AlarmArns
+        Fn::Join:
+          - ''
+          - - 'ALARM('
+            - Fn::Join:
+              - ') OR ALARM('
+              - 'Fn::Transform':
+                  Name: 'RemoveEmptyTransform'
+                  Parameters:
+                    Arns: !Ref AlarmArns
+            - ')'
 
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard
