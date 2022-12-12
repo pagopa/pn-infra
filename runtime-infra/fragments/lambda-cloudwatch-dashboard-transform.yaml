@@ -9,12 +9,12 @@ Resources:
       FunctionName: !GetAtt TransformFunction.Arn
       Name: DashboardBodyTransform
 
-  AlarmRuleMacro:
+  TrimListMacro:
     Type: AWS::CloudFormation::Macro
     Properties:
       Description: CloudFormation macro to filter comma separated list of arns from empty ones.
-      FunctionName: !GetAtt AlarmRuleFunction.Arn
-      Name: AlarmRuleTransform
+      FunctionName: !GetAtt TrimListFunction.Arn
+      Name: TrimListTransform
 
   TransformExecutionRole:
     Type: AWS::IAM::Role
@@ -44,7 +44,7 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/DashboardBodyTransform:*'
 
-  AlarmRuleExecutionRole:
+  TrimListExecutionRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -56,7 +56,7 @@ Resources:
             Action: ['sts:AssumeRole']
       Path: /     
       Policies:
-        - PolicyName: AlarmRuleTransform
+        - PolicyName: TrimListTransform
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -64,15 +64,15 @@ Resources:
                 Action:
                   - logs:CreateLogGroup
                 Resource:
-                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/AlarmRuleTransform'
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/TrimListTransform'
               - Effect: Allow
                 Action:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/AlarmRuleTransform:*'
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/TrimListTransform:*'
 
-  AlarmRuleFunction:
+  TrimListFunction:
     Type: AWS::Lambda::Function
     Properties:
         Code:
@@ -91,14 +91,10 @@ Resources:
                     else:
                         response['fragment'] = ['false']
 
-                    #if len(trimmedList)>0:
-                    #    response['fragment'] = 'ALARM('+') OR ALARM('.join(trimmedList)+')'
-                    #else:
-                    #    response['fragment'] = 'ALARM(false)'
                     return response
         Handler: index.lambda_handler
         Runtime: python3.9
-        Role: !GetAtt AlarmRuleExecutionRole.Arn
+        Role: !GetAtt TrimListExecutionRole.Arn
                 
 
   TransformFunction:
@@ -1189,9 +1185,9 @@ Resources:
       FunctionName: !GetAtt TransformFunction.Arn
       Principal: 'cloudformation.amazonaws.com'
 
-  AlarmRuleFunctionPermissions:
+  TrimListFunctionPermissions:
     Type: AWS::Lambda::Permission
     Properties:
         Action: 'lambda:InvokeFunction'
-        FunctionName: !GetAtt AlarmRuleFunction.Arn
+        FunctionName: !GetAtt TrimListFunction.Arn
         Principal: 'cloudformation.amazonaws.com'

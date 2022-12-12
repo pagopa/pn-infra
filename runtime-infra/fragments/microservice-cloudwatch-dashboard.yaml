@@ -63,17 +63,13 @@ Resources:
     Properties:
       AlarmName: !Sub '${DashboardName}-CompositeAlarm'
       AlarmRule: 
-#        'Fn::Transform':
-#          Name:  'AlarmRuleTransform'
-#          Parameters:
-#            Arns: !Ref AlarmArns
         Fn::Join:
           - ''
           - - 'ALARM('
             - Fn::Join:
               - ') OR ALARM('
               - 'Fn::Transform':
-                  Name: 'AlarmRuleTransform'
+                  Name: 'TrimListTransform'
                   Parameters:
                     Arns: !Ref AlarmArns
             - ')'
