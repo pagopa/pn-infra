@@ -54,6 +54,11 @@ Parameters:
     Type: String
     Description: where to send logs
 
+  ApiGwLatencyLimit:
+    Default: 1000
+    Type: Number
+    Description: Latency limit before raising alarm
+
 Conditions:
   IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
   IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
@@ -311,6 +316,29 @@ Resources:
       Stage: !Ref PublicRestApiStage
 
   # Rest API CloudWatch alarm 
+  APIGatewayApiLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${MicroServiceUniqueName}-${IntendedUsage}-ApiGwLatencyAlarm"
+      AlarmDescription: "CloudWatch alarm for when API Gateway latency exceeds the limit."
+      AlarmActions: 
+        - !Ref AlarmSNSTopicArn
+      InsufficientDataActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 5
+      Threshold: !Ref ApiGwLatencyLimit
+      TreatMissingData: notBreaching
+      Namespace: "AWS/ApiGateway"
+      MetricName: "Latency"
+      Dimensions:
+        - Name: ApiName
+          Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+      Statistic: "Maximum"
+
   APIGatewayApiErrorAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -442,3 +470,7 @@ Outputs:
   RestApiErrorAlarmArn:
     Value: !GetAtt APIGatewayApiErrorAlarm.Arn
     Description: "ARN of the errors alarm"
+
+  RestApiLatencyErrorAlarmArn:
+    Value: !GetAtt APIGatewayApiLatencyAlarm.Arn
+    Description: "ARN of the latency alarm"
