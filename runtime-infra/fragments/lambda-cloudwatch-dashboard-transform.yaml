@@ -85,8 +85,10 @@ Resources:
                         "status": "success"
                     }
 
-                    response["fragment"] = list(filter(None, arnList))
+                    trimmedList = list(filter(None, arnList))
 
+                    rule = 'ALARM('+trimmedList.join(') OR ALARM(')+')'
+                    response['fragment'] = response
                     return response
 
         Handler: index.lambda_handler
