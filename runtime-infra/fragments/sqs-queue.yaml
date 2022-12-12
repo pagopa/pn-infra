@@ -214,7 +214,7 @@ Resources:
       AlarmName: !Sub "${QueueName}-DLQ-HasOldMessage"
       AlarmDescription: "Alarm dla messages when the oldest message in dlq queue is older than limit QueueOldestAgeLimit"
       Namespace: "AWS/SQS"
-      MetricName: "ApproximateNumberOfMessagesVisible"
+      MetricName: "ApproximateAgeOfOldestMessage"
       Dimensions:
         - Name: "QueueName"
           Value: !If [ IsNotFifo, !Sub '${DeadLetterQueue.QueueName}', !Sub '${DeadLetterQueueFifo.QueueName}' ]
