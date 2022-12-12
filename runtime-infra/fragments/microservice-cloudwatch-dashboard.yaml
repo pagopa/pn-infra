@@ -63,20 +63,20 @@ Resources:
     Properties:
       AlarmName: !Sub '${DashboardName}-CompositeAlarm'
       AlarmRule: 
-        'Fn::Transform':
-          Name:  'AlarmRuleTransform'
-          Parameters:
-            Arns: !Ref AlarmArns
-#        Fn::Join:
-#          - ''
-#          - - 'ALARM('
-#            - Fn::Join:
-#              - ') OR ALARM('
-#              - 'Fn::Transform':
-#                  Name: 'RemoveEmptyTransform'
-#                  Parameters:
-#                    Arns: !Ref AlarmArns
-#            - ')'
+#        'Fn::Transform':
+#          Name:  'AlarmRuleTransform'
+#          Parameters:
+#            Arns: !Ref AlarmArns
+        Fn::Join:
+          - ''
+          - - 'ALARM('
+            - Fn::Join:
+              - ') OR ALARM('
+              - 'Fn::Transform':
+                  Name: 'RemoveEmptyTransform'
+                  Parameters:
+                    Arns: !Ref AlarmArns
+            - ')'
 
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard

@@ -87,9 +87,14 @@ Resources:
 
                     trimmedList = list(filter(None, arnList))
                     if len(trimmedList)>0:
-                        response['fragment'] = 'ALARM('+') OR ALARM('.join(trimmedList)+')'
+                        response['fragment'] = trimmedList
                     else:
-                        response['fragment'] = 'ALARM(false)'
+                        response['fragment'] = ['false']
+
+                    #if len(trimmedList)>0:
+                    #    response['fragment'] = 'ALARM('+') OR ALARM('.join(trimmedList)+')'
+                    #else:
+                    #    response['fragment'] = 'ALARM(false)'
                     return response
         Handler: index.lambda_handler
         Runtime: python3.9
