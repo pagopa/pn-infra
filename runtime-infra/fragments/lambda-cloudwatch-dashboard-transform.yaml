@@ -9,6 +9,13 @@ Resources:
       FunctionName: !GetAtt TransformFunction.Arn
       Name: DashboardBodyTransform
 
+  TrimListMacro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Description: CloudFormation macro to filter comma separated list of arns from empty ones.
+      FunctionName: !GetAtt TrimListFunction.Arn
+      Name: TrimListTransform
+
   TransformExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -36,6 +43,59 @@ Resources:
                   - logs:PutLogEvents
                 Resource:
                   - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/DashboardBodyTransform:*'
+
+  TrimListExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /     
+      Policies:
+        - PolicyName: TrimListTransform
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/TrimListTransform'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/TrimListTransform:*'
+
+  TrimListFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+        Code:
+            ZipFile: |
+                def lambda_handler(event, context):
+                    arnList = event["params"]["Arns"]
+
+                    response = {
+                        "requestId": event["requestId"],
+                        "status": "success"
+                    }
+
+                    trimmedList = list(filter(None, arnList))
+                    if len(trimmedList)>0:
+                        response['fragment'] = trimmedList
+                    else:
+                        response['fragment'] = ['false']
+
+                    return response
+        Handler: index.lambda_handler
+        Runtime: python3.9
+        Role: !GetAtt TrimListExecutionRole.Arn
+                
 
   TransformFunction:
     Type: AWS::Lambda::Function
@@ -1124,3 +1184,10 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !GetAtt TransformFunction.Arn
       Principal: 'cloudformation.amazonaws.com'
+
+  TrimListFunctionPermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+        Action: 'lambda:InvokeFunction'
+        FunctionName: !GetAtt TrimListFunction.Arn
+        Principal: 'cloudformation.amazonaws.com'

@@ -58,18 +58,21 @@ Parameters:
 
 Resources:
 
-#  MicroserviceCompositeAlarm:
-#    Type: AWS::CloudWatch::CompositeAlarm
-#    Properties:
-#      AlarmName: !Sub '${DashboardName}-CompositeAlarm'
-#      AlarmRule: 
-#        Fn::Join:
-#          - ''
-#          - - 'ALARM('
-#            - Fn::Join:
-#                  - ') OR ALARM('
-#                  - !Ref AlarmArns
-#            - ')'
+  MicroserviceCompositeAlarm:
+    Type: AWS::CloudWatch::CompositeAlarm
+    Properties:
+      AlarmName: !Sub '${DashboardName}-CompositeAlarm'
+      AlarmRule: 
+        Fn::Join:
+          - ''
+          - - 'ALARM('
+            - Fn::Join:
+              - ') OR ALARM('
+              - 'Fn::Transform':
+                  Name: 'TrimListTransform'
+                  Parameters:
+                    Arns: !Ref AlarmArns
+            - ')'
 
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard
