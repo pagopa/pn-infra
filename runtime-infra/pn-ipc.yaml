@@ -370,6 +370,56 @@ Resources:
       LogGroupName: /aws/events/core-event-bus-matched-events
       RetentionInDays: 14
 
+  CoreEventBusEventsLogGroupSubscriptionFilter:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      RoleArn:
+        Fn::GetAtt:
+          - "SubscriptionFilterServiceRole"
+          - "Arn"
+      LogGroupName: !Ref CoreEventBusEventsLogGroup
+      FilterPattern: ' '
+      DestinationArn: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamArn
+
+  CoreEventBusMatchedEventsLogGroupSubscriptionFilter:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      RoleArn:
+        Fn::GetAtt:
+          - "SubscriptionFilterServiceRole"
+          - "Arn"
+      LogGroupName: !Ref CoreEventBusEventsLogGroup
+      FilterPattern: ' '
+      DestinationArn: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamArn
+
+  SubscriptionFilterServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: logs.amazonaws.com
+        Version: "2012-10-17"
+      Path: /
+      Policies:
+        -
+          PolicyName: !Sub '${ProjectName}-core-event-bus-subscription-role'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - kinesis:PutRecord
+                Effect: Allow
+                Resource: "*"
+              - Action:
+                - "kms:Encrypt"
+                - "kms:GenerateDataKey"
+                - "kms:Decrypt"
+                Effect: Allow
+                Resource: "*"
+
   PnCoreEventBusToLogGroup:
     Type: AWS::Events::Rule
     Properties: 
