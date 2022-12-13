@@ -53,6 +53,10 @@ Parameters:
     Type: String
     Default: 'false'
     Description: 'For this queue, set if there is an alarm to create'
+  QueueOldestAgeLimit:
+    Type: Number
+    Default: '21600'
+    Description: 'Oldest job age (in seconds) before raising an alarm'
 
 Conditions:
   DlqHasDefaultName: !Equals [ !Ref DeadLetterQueueName, '-' ]
@@ -179,7 +183,30 @@ Resources:
       OKActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
-
+  QueueHasOldMessagesAlarm:
+    Condition: IsWithDLQ
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${QueueName}-HasOldMessage"
+      AlarmDescription: "Alarm messages when the oldest message in queue is older than limit QueueOldestAgeLimit"
+      Namespace: "AWS/SQS"
+      MetricName: "ApproximateAgeOfOldestMessage"
+      TreatMissingData: "notBreaching"
+      Dimensions:
+        - Name: "QueueName"
+          Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
+      Statistic: "Maximum"
+      Period: 60  
+      Threshold: !Ref QueueOldestAgeLimit
+      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 1       
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      InsufficientDataActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+  
 Outputs:
   # Queue info
   QueueName:
@@ -213,3 +240,11 @@ Outputs:
         - IsWithAlarm
         - !GetAtt QueueHasMessagesAlarm.Arn
         - ''
+
+  SqsAgeAlarmArn:
+    Description: ARN of the SQS Age alarm
+    Value:
+      !If
+      - IsWithDLQ
+      - !GetAtt QueueHasOldMessagesAlarm.Arn
+      - ''
