@@ -290,7 +290,8 @@ Resources:
                 "logs:CreateLogStream"
               ],
               "Resource": [
-                "${CoreEventBusEventsLogGroup.Arn}"
+                "${CoreEventBusEventsLogGroup.Arn}",
+                "${CoreEventBusMatchedEventsLogGroup.Arn}"
               ]
             },
             {
@@ -305,12 +306,12 @@ Resources:
                 "logs:PutLogEvents"
               ],
               "Resource": [
-                "${CoreEventBusEventsLogGroup.Arn}"
+                "${CoreEventBusEventsLogGroup.Arn}",
+                "${CoreEventBusMatchedEventsLogGroup.Arn}"
               ]
             }
           ]
         }
-
 
   EventBusLogRole:
     Type: AWS::IAM::Role
