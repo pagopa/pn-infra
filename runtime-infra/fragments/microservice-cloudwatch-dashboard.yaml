@@ -95,17 +95,6 @@ Resources:
             BucketNames: !Ref BucketNames
 
 Outputs:
-#  MicroserviceCompositeAlarmArn:
-#    Value: !GetAtt MicroserviceCompositeAlarm.Arn
-#    Description: 'Arn of microservice composite alarm'
-
-  MicroserviceCompositeExpression:
-    Value:         
-      Fn::Join:
-        - ''
-        - - 'ALARM('
-          - Fn::Join:
-                - ') OR ALARM('
-                - !Ref AlarmArns
-          - ')'
-    Description: 'Composite alarm expression'
+  MicroserviceCompositeAlarmArn:
+    Value: !GetAtt MicroserviceCompositeAlarm.Arn
+    Description: 'Arn of microservice composite alarm'
