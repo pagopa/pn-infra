@@ -251,11 +251,6 @@ Resources:
                   - logs:PutLogEvents
                 Effect: Allow
                 Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
-              - Sid: AllowEventBusToCreateLogGroup
-                Action:
-                  - logs:CreateLogGroup
-                Effect: Allow
-                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"      
         - PolicyName: putEventIntoQueues
           PolicyDocument:
             Statement:
@@ -274,6 +269,49 @@ Resources:
                   - !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
                   - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueARN"
   
+  # Resource based policy to allow EventBridge to publish to CloudWatch Logs
+  LogGroupCoreEventBusPolicy:
+    Type: AWS::Logs::ResourcePolicy
+    Properties:
+      PolicyName: !Sub "${ProjectName}-CoreEventBusToCWLogsPolicy"
+      PolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "CoreEventBustoCWLogsCreateLogStreamPolicy",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "events.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "logs:CreateLogStream"
+              ],
+              "Resource": [
+                "${CoreEventBusEventsLogGroup.Arn}"
+              ]
+            },
+            {
+              "Sid": "CoreEventBustoCWLogsPutLogEventsPolicy",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "events.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "logs:PutLogEvents"
+              ],
+              "Resource": [
+                "${CoreEventBusEventsLogGroup.Arn}"
+              ]
+            }
+          ]
+        }
+
+
   EventBusLogRole:
     Type: AWS::IAM::Role
     Properties:
@@ -292,11 +330,6 @@ Resources:
                 Action:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Effect: Allow
-                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
-              - Sid: AllowEventBusToCreateLogGroup
-                Action:
-                  - logs:CreateLogGroup
                 Effect: Allow
                 Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
 
@@ -343,8 +376,8 @@ Resources:
       RoleArn: !GetAtt "EventBusLogRole.Arn"
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
-        account:
-          - !Ref AWS::AccountId
+        source:
+          - prefix: ""
       Targets: 
         - Arn: !GetAtt CoreEventBusEventsLogGroup.Arn
           Id: LogTarget
@@ -650,6 +683,15 @@ Outputs:
   PnCoreEventBusToUserAttributesQueueArn:
     Description: 'Event bus to user attributes rule ARN'
     Value: !GetAtt PnCoreEventBusToUserAttributesQueue.Arn
+
+  #
+  CoreEventBusEventsLogGroupArn:
+    Value: !GetAtt CoreEventBusEventsLogGroup.Arn
+    Description: Core event bus matched events log group
+
+  CoreEventBusMatchedEventsLogGroupArn:
+    Value: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
+    Description: Core event bus matched events log group
 
   # pass-thought parameters
   NetworkLoadBalancerLink:
