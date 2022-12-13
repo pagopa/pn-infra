@@ -242,6 +242,20 @@ Resources:
               Service: events.amazonaws.com
         Version: "2012-10-17"
       Policies:
+        - PolicyName: logMatchedEventToCloudwatch
+          PolicyDocument:
+            Statement:
+              - Sid: AllowEventBusToCreateLogs
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Effect: Allow
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+              - Sid: AllowEventBusToCreateLogGroup
+                Action:
+                  - logs:CreateLogGroup
+                Effect: Allow
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"      
         - PolicyName: putEventIntoQueues
           PolicyDocument:
             Statement:
@@ -260,6 +274,32 @@ Resources:
                   - !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
                   - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueARN"
   
+  EventBusLogRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: logEventToCloudwatch
+          PolicyDocument:
+            Statement:
+              - Sid: AllowEventBusToCreateLogs
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Effect: Allow
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+              - Sid: AllowEventBusToCreateLogGroup
+                Action:
+                  - logs:CreateLogGroup
+                Effect: Allow
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+
   ExternalChannelsOutputsQueuePolicy:
     Type: AWS::SQS::QueuePolicy
     Properties:
@@ -283,6 +323,31 @@ Resources:
               - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueARN"
               - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueARN"
 
+  # Log all events
+  CoreEventBusEventsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/events/core-event-bus-input-events
+      RetentionInDays: 14
+
+  CoreEventBusMatchedEventsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/events/core-event-bus-matched-events
+      RetentionInDays: 14
+
+  PnCoreEventBusToLogGroup:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route SafeStorage Events to log group
+      RoleArn: !GetAtt "EventBusLogRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        account:
+          - !Ref AWS::AccountId
+      Targets: 
+        - Arn: !GetAtt CoreEventBusEventsLogGroup.Arn
+          Id: LogTarget
 
   # Send Safe Storage Response to pn-delivery-push
   PnCoreEventBusToSafeStorageResponseQueue:
@@ -296,6 +361,8 @@ Resources:
         detail:
           documentType: [ 'PN_AAR', 'PN_NOTIFICATION_ATTACHMENTS', 'PN_LEGAL_FACTS' ]
       Targets: 
+        - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
+          Id: !Sub ${ProjectName}-LogGroup-SafeStore2DeliveryPush
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryPush'
           Arn: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
           InputPath: $.detail
@@ -314,6 +381,8 @@ Resources:
         detail:
           documentType: [ 'PN_DOWNTIME_LEGAL_FACTS' ]
       Targets: 
+        - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
+          Id: !Sub ${ProjectName}-LogGroup-DowntimeLogs2SafeStorage
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DowntimeLogs'
           Arn: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueARN
           InputPath: $.detail
@@ -332,6 +401,8 @@ Resources:
         detail:
           clientId: [ !Ref DeliveryPushExtChUser ]
       Targets: 
+        - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
+          Id: !Sub ${ProjectName}-LogGroup-ExtChToDeliveryPush  
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2DeliveryPush'
           Arn: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
           InputPath: $.detail
@@ -350,6 +421,8 @@ Resources:
         detail:
           clientId: [ !Ref UserAttributesExtChUser ]
       Targets: 
+        - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
+          Id: !Sub ${ProjectName}-LogGroup-UserAttributes2ExtCh  
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2UserAttributes'
           Arn: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
           InputPath: $.detail
