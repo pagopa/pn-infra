@@ -164,9 +164,9 @@ Resources:
                     else:
                         localLambdaArns = event["params"]["LambdaArns"]
                         localLambdaArns = list(filter(None, localLambdaArns))
-                        lambdaList = lambdaWidgetBuilder(localLambdaArns, y_value ,localRegion)
+                        lambdaList = lambdaNewWidgetBuilder(localLambdaArns, y_value ,localRegion)
                         dashboardList = appendList(dashboardList, lambdaList)
-                        y_value = y_value+6
+                        y_value = y_value+18
                         
                     if event["params"]["EventRuleArns"] == [''] or len(event["params"]["EventRuleArns"]) == 0:
                         print("EventRuleArns param is missing or empty")
@@ -666,95 +666,7 @@ Resources:
                 queueList.append(putRecordsJson)
 
                 return queueList
-
-            def lambdaWidgetBuilder(localLambdaArns, widgetYvalue, localRegion):
-                queueList = []
-                message = textSeparator("Lambda Widgets", widgetYvalue)
-                queueList.append(message)
-                
-                metrics = getLambdaMetricArray(localLambdaArns, "Invocations")
-                
-                invocationsJson = {
-                    "type": "metric",
-                    "x": 0,
-                    "y": widgetYvalue+1,
-                    "width": 6,
-                    "height": 5,
-                    "properties": {
-                        "metrics": metrics,
-                        "title": "Invocations",
-                        "view": "timeSeries",
-                        "stacked": False,
-                        "region": localRegion,
-                        "stat": "Sum",
-                        "period": 300
-                    }
-                }
-                
-                queueList.append(invocationsJson)
-                
-                metrics = getLambdaMetricArray(localLambdaArns, "Errors")
-
-                errorsJson = {
-                    "type": "metric",
-                    "x": 6,
-                    "y": widgetYvalue+1,
-                    "width": 6,
-                    "height": 5,
-                    "properties": {
-                        "metrics": metrics,
-                        "title": "Errors",
-                        "view": "timeSeries",
-                        "stacked": False,
-                        "region": localRegion,
-                        "stat": "Sum",
-                        "period": 300
-                    }
-                }
-                queueList.append(errorsJson)
-
-                metrics = getLambdaMetricArray(localLambdaArns, "Duration")
-
-                durationJson = {
-                    "type": "metric",
-                    "x": 12,
-                    "y": widgetYvalue+1,
-                    "width": 6,
-                    "height": 5,
-                    "properties": {
-                        "metrics": metrics,
-                        "title": "Duration",
-                        "view": "timeSeries",
-                        "stacked": False,
-                        "region": localRegion,
-                        "stat": "Average",
-                        "period": 300
-                    }
-                }
-                queueList.append(durationJson)
-                    
-                metrics = getLambdaMetricArray(localLambdaArns, "Throttles")
-
-                throttlesJson = {
-                    "type": "metric",
-                    "x": 18,
-                    "y": widgetYvalue+1,
-                    "width": 6,
-                    "height": 5,
-                    "properties": {
-                        "metrics": metrics,
-                        "title": "Throttles",
-                        "view": "timeSeries",
-                        "stacked": False,
-                        "region": localRegion,
-                        "stat": "Sum",
-                        "period": 300
-                    }
-                }
-                queueList.append(throttlesJson)
-
-                return queueList
-
+ 
             def restApiWidgetBuilder(localArray, widgetYvalue, localRegion, localRestAPINames):
                 restList = []
                 message = textSeparator("REST API Widgets", widgetYvalue)
@@ -963,6 +875,81 @@ Resources:
                     
                 return dynamoList
 
+            def lambdaNewWidgetBuilder(localArray, widgetYvalue, localRegion):
+                lambdaList = []
+                
+                message = textSeparator("Lambda Widgets", widgetYvalue)
+                lambdaList.append(message)
+                
+                for x in range(len(localArray)):
+                    width = int(24/len(localArray))
+                    x_value=x*width
+                    message = textSeparator2(localArray[x], widgetYvalue, width, x_value)
+                    lambdaList.append(message)
+                    baseMetricsJson={
+                        "height": 5,
+                        "width": width,
+                        "y": widgetYvalue+1,
+                        "x": x_value,
+                        "type": "metric",
+                        "properties": {
+                            "metrics": [
+                                [ "AWS/Lambda", "Invocations", "FunctionName", splitArnString(localArray[x]),  { "label": "Invocations for "+splitArnString(localArray[x]) } ],
+                                [ "AWS/Lambda", "Errors", "FunctionName", splitArnString(localArray[x]),  { "label": "Errors for "+splitArnString(localArray[x]) } ],
+                                [ "AWS/Lambda", "Throttles", "FunctionName", splitArnString(localArray[x]),  { "label": "Throttles for "+splitArnString(localArray[x]) } ],
+                            ],
+                            "title": "Base Metrics for Lambda: " + splitArnString(localArray[x]),
+                            "view": "timeSeries",
+                            "stacked": False,
+                            "region": localRegion,
+                            "stat": "Sum",
+                            "period": 300
+                        }
+                    }
+                    lambdaList.append(baseMetricsJson)
+                
+                durationMetrics = getLambdaMetricArray(localArray, "Duration")
+
+                durationJson = {
+                    "type": "metric",
+                    "x": 0,
+                    "y": widgetYvalue+6,
+                    "width": 24,
+                    "height": 5,
+                    "properties": {
+                        "metrics": durationMetrics,
+                        "title": "Duration",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Average",
+                        "period": 300
+                    }
+                }
+                lambdaList.append(durationJson)
+
+                memoryUsageMetrics = getLambdaInsightsMetricArray(localArray, "used_memory_max")
+
+                durationJson = {
+                    "type": "metric",
+                    "x": 0,
+                    "y": widgetYvalue+6,
+                    "width": 24,
+                    "height": 5,
+                    "properties": {
+                        "metrics": memoryUsageMetrics,
+                        "title": "Memory usage",
+                        "view": "timeSeries",
+                        "stacked": False,
+                        "region": localRegion,
+                        "stat": "Maximum",
+                        "period": 300
+                    }
+                }
+                lambdaList.append(durationJson)
+
+                return lambdaList
+
             def bucketWidgetBuilder(localArray, widgetYvalue, localRegion):
                 bucketList = []
                 
@@ -1137,6 +1124,16 @@ Resources:
                 
                 return finalList
 
+            def getLambdaInsightsMetricArray(localArray, metricName):
+                finalList = []
+                for x in range(len(localArray)):
+                    metricsArray=[
+                        "LambdaInsights", metricName, "function_name", splitArnString(localArray[x]),  { "label": splitArnString(localArray[x]) }
+                    ]
+                    
+                    finalList.append(metricsArray)
+                
+                return finalList
             def getBucketMetric(bucketName, metricName):
                 metricsArray=[
                     [ "AWS/S3", metricName, "BucketName", bucketName, "StorageType", "StandardStorage", { "label": bucketName } ]

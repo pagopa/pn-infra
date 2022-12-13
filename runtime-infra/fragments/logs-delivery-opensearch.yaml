@@ -117,6 +117,8 @@ Resources:
       Handler: index.handler
       MemorySize: 256
       Timeout: 900 # 15 minutes
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"      
       Environment:
         Variables:
           CLUSTER_ENDPOINT : !Ref OpenSearchClusterEndpoint
