@@ -242,15 +242,6 @@ Resources:
               Service: events.amazonaws.com
         Version: "2012-10-17"
       Policies:
-        - PolicyName: logMatchedEventToCloudwatch
-          PolicyDocument:
-            Statement:
-              - Sid: AllowEventBusToCreateLogs
-                Action:
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Effect: Allow
-                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
         - PolicyName: putEventIntoQueues
           PolicyDocument:
             Statement:
@@ -287,27 +278,11 @@ Resources:
                 ]
               },
               "Action": [
-                "logs:CreateLogStream"
-              ],
-              "Resource": [
-                "${CoreEventBusEventsLogGroup.Arn}",
-                "${CoreEventBusMatchedEventsLogGroup.Arn}"
-              ]
-            },
-            {
-              "Sid": "CoreEventBustoCWLogsPutLogEventsPolicy",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": [
-                  "events.amazonaws.com"
-                ]
-              },
-              "Action": [
+                "logs:CreateLogStream",
                 "logs:PutLogEvents"
               ],
               "Resource": [
-                "${CoreEventBusEventsLogGroup.Arn}",
-                "${CoreEventBusMatchedEventsLogGroup.Arn}"
+                "${CoreEventBusEventsLogGroup.Arn}"
               ]
             }
           ]
@@ -332,7 +307,8 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Effect: Allow
-                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+                Resource: 
+                  - !GetAtt CoreEventBusEventsLogGroup.Arn
 
   ExternalChannelsOutputsQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -364,10 +340,10 @@ Resources:
       LogGroupName: /aws/events/core-event-bus-input-events
       RetentionInDays: 14
 
-  CoreEventBusMatchedEventsLogGroup:
+  CoreEventBusMatchedEventsLoggerLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: /aws/events/core-event-bus-matched-events
+      LogGroupName: /aws/lambda/MatchedEventLogger
       RetentionInDays: 14
 
   CoreEventBusEventsLogGroupSubscriptionFilter:
@@ -388,7 +364,7 @@ Resources:
         Fn::GetAtt:
           - "SubscriptionFilterServiceRole"
           - "Arn"
-      LogGroupName: !Ref CoreEventBusMatchedEventsLogGroup
+      LogGroupName: !Ref CoreEventBusMatchedEventsLoggerLogGroup
       FilterPattern: ' '
       DestinationArn: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamArn
 
@@ -445,19 +421,19 @@ Resources:
         detail:
           documentType: [ 'PN_AAR', 'PN_NOTIFICATION_ATTACHMENTS', 'PN_LEGAL_FACTS' ]
       Targets: 
-        - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
-          Id: !Sub ${ProjectName}-LogGroup-SafeStore2DeliveryPush
+        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
+          Id: !Sub ${ProjectName}-Logger-SafeStore2DeliveryPush
           InputTransformer:
             InputPathsMap:
-              "detailType": "$.detail-type"
-              "eventId": "$.id"
-              "source": "$.source"
               "timestamp": "$.time"
             InputTemplate: |
               {
                   "timestamp": <timestamp>,
-                  "message": "{\"rule_arn\": \"<aws.events.rule-arn>\", \"detail_type\": \"<detailType>\", \"event_id\": \"<eventId>\", \"source\": \"<source>\"}"
-              }
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }       
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryPush'
           Arn: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
           InputPath: $.detail
@@ -476,19 +452,19 @@ Resources:
         detail:
           documentType: [ 'PN_DOWNTIME_LEGAL_FACTS' ]
       Targets: 
-        - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
-          Id: !Sub ${ProjectName}-LogGroup-DowntimeLogs2SafeStorage
+        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
+          Id: !Sub ${ProjectName}-Logger-DowntimeLogs2SafeStorage
           InputTransformer:
             InputPathsMap:
-              "detailType": "$.detail-type"
-              "eventId": "$.id"
-              "source": "$.source"
               "timestamp": "$.time"
             InputTemplate: |
               {
                   "timestamp": <timestamp>,
-                  "message": "{\"rule_arn\": \"<aws.events.rule-arn>\", \"detail_type\": \"<detailType>\", \"event_id\": \"<eventId>\", \"source\": \"<source>\"}"
-              }
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }       
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DowntimeLogs'
           Arn: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueARN
           InputPath: $.detail
@@ -507,19 +483,19 @@ Resources:
         detail:
           clientId: [ !Ref DeliveryPushExtChUser ]
       Targets: 
-        - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
-          Id: !Sub ${ProjectName}-LogGroup-ExtChToDeliveryPush
+        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
+          Id: !Sub ${ProjectName}-Logger-ExtChToDeliveryPush
           InputTransformer:
             InputPathsMap:
-              "detailType": "$.detail-type"
-              "eventId": "$.id"
-              "source": "$.source"
               "timestamp": "$.time"
             InputTemplate: |
               {
                   "timestamp": <timestamp>,
-                  "message": "{\"rule_arn\": \"<aws.events.rule-arn>\", \"detail_type\": \"<detailType>\", \"event_id\": \"<eventId>\", \"source\": \"<source>\"}"
-              }      
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }       
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2DeliveryPush'
           Arn: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
           InputPath: $.detail
@@ -538,24 +514,73 @@ Resources:
         detail:
           clientId: [ !Ref UserAttributesExtChUser ]
       Targets: 
-        - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
-          Id: !Sub ${ProjectName}-LogGroup-UserAttributes2ExtCh  
+        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
+          Id: !Sub ${ProjectName}-Logger-UserAttributes2ExtCh  
           InputTransformer:
             InputPathsMap:
-              "detailType": "$.detail-type"
-              "eventId": "$.id"
-              "source": "$.source"
               "timestamp": "$.time"
             InputTemplate: |
               {
                   "timestamp": <timestamp>,
-                  "message": "{\"rule_arn\": \"<aws.events.rule-arn>\", \"detail_type\": \"<detailType>\", \"event_id\": \"<eventId>\", \"source\": \"<source>\"}"
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2UserAttributes'
           Arn: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
           InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
+  EventBridgeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt MatchedEventsLoggerFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/pn-CoreEventBus/*"
+
+  MatchedEventsLoggerFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: MatchedEventsLoggerPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/MatchedEventLogger'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
+  
+  MatchedEventsLoggerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: MatchedEventLogger
+      Code:
+        ZipFile: |
+          def handler(event, context):
+            print(event)
+
+      Handler: index.handler
+      Runtime: python3.9
+      Role: !GetAtt MatchedEventsLoggerFunctionExecutionRole.Arn
 
   # Standard Queue for events Dead Letter Queue
   EventBusDeadLetterQueue:
@@ -785,7 +810,7 @@ Outputs:
     Description: Core event bus matched events log group
 
   CoreEventBusMatchedEventsLogGroupArn:
-    Value: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
+    Value: !GetAtt CoreEventBusMatchedEventsLoggerLogGroup.Arn
     Description: Core event bus matched events log group
 
   # pass-thought parameters
