@@ -340,10 +340,10 @@ Resources:
       LogGroupName: /aws/events/core-event-bus-input-events
       RetentionInDays: 14
 
-  CoreEventBusMatchedEventsLoggerLogGroup:
+  CoreEventBusMatchedEventsLoggerFnLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: /aws/lambda/MatchedEventLogger
+      LogGroupName: /aws/lambda/PnCoreEventBusMatchedEventLogger
       RetentionInDays: 14
 
   CoreEventBusEventsLogGroupSubscriptionFilter:
@@ -364,7 +364,7 @@ Resources:
         Fn::GetAtt:
           - "SubscriptionFilterServiceRole"
           - "Arn"
-      LogGroupName: !Ref CoreEventBusMatchedEventsLoggerLogGroup
+      LogGroupName: !Ref CoreEventBusMatchedEventsLoggerFnLogGroup
       FilterPattern: ' '
       DestinationArn: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamArn
 
@@ -561,7 +561,7 @@ Resources:
                 Action:
                   - logs:CreateLogGroup
                 Resource:
-                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/MatchedEventLogger'
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/PnCoreEventBusMatchedEventLogger'
               - Effect: Allow
                 Action:
                   - logs:CreateLogStream
@@ -572,7 +572,7 @@ Resources:
   MatchedEventsLoggerFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: MatchedEventLogger
+      FunctionName: PnCoreEventBusMatchedEventLogger
       Code:
         ZipFile: |
           import json
@@ -656,7 +656,6 @@ Resources:
         StreamName: !Sub '${ProjectName}-logs-stream'
         StreamRetentionPeriodHours: !Ref LogsStreamRetentionHours
   
-
 Outputs:
   # Web API for browsers and B2B
   ApiDnsName:
@@ -817,7 +816,7 @@ Outputs:
     Description: Core event bus matched events log group
 
   CoreEventBusMatchedEventsLogGroupArn:
-    Value: !GetAtt CoreEventBusMatchedEventsLoggerLogGroup.Arn
+    Value: !GetAtt CoreEventBusMatchedEventsLoggerFnLogGroup.Arn
     Description: Core event bus matched events log group
 
   # pass-thought parameters
