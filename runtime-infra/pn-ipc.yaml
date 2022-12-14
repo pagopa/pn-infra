@@ -447,6 +447,13 @@ Resources:
       Targets: 
         - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
           Id: !Sub ${ProjectName}-LogGroup-SafeStore2DeliveryPush
+          InputTransformer:
+            InputTemplate: |
+              {
+                "ruleArn" : <aws.events.rule-arn>,
+                "ruleName" : <aws.events.rule-name>,
+                "originalEvent" : <aws.events.event.json>
+              }
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryPush'
           Arn: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
           InputPath: $.detail
@@ -467,6 +474,13 @@ Resources:
       Targets: 
         - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
           Id: !Sub ${ProjectName}-LogGroup-DowntimeLogs2SafeStorage
+          InputTransformer:
+            InputTemplate: |
+              {
+                "ruleArn" : <aws.events.rule-arn>,
+                "ruleName" : <aws.events.rule-name>,
+                "originalEvent" : <aws.events.event.json>
+              }
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DowntimeLogs'
           Arn: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueARN
           InputPath: $.detail
@@ -486,7 +500,14 @@ Resources:
           clientId: [ !Ref DeliveryPushExtChUser ]
       Targets: 
         - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
-          Id: !Sub ${ProjectName}-LogGroup-ExtChToDeliveryPush  
+          Id: !Sub ${ProjectName}-LogGroup-ExtChToDeliveryPush
+          InputTransformer:
+            InputTemplate: |
+              {
+                "ruleArn" : <aws.events.rule-arn>,
+                "ruleName" : <aws.events.rule-name>,
+                "originalEvent" : <aws.events.event.json>
+              }            
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2DeliveryPush'
           Arn: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
           InputPath: $.detail
@@ -507,6 +528,13 @@ Resources:
       Targets: 
         - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
           Id: !Sub ${ProjectName}-LogGroup-UserAttributes2ExtCh  
+          InputTransformer:
+            InputTemplate: |
+              {
+                "ruleArn" : <aws.events.rule-arn>,
+                "ruleName" : <aws.events.rule-name>,
+                "originalEvent" : <aws.events.event.json>
+              }          
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2UserAttributes'
           Arn: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
           InputPath: $.detail
