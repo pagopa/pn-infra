@@ -575,8 +575,15 @@ Resources:
       FunctionName: MatchedEventLogger
       Code:
         ZipFile: |
+          import json
           def handler(event, context):
-            print(event)
+            json_data = json.dumps(event)
+            print(json_data)
+            res = {
+                "status": 'success'
+            }
+            return res
+
 
       Handler: index.handler
       Runtime: python3.9
