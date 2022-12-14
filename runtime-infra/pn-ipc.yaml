@@ -448,11 +448,15 @@ Resources:
         - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
           Id: !Sub ${ProjectName}-LogGroup-SafeStore2DeliveryPush
           InputTransformer:
+            InputPathsMap:
+              "detailType": "$.detail-type"
+              "eventId": "$.id"
+              "source": "$.source"
+              "timestamp": "$.time"
             InputTemplate: |
               {
-                "ruleArn" : <aws.events.rule-arn>,
-                "ruleName" : <aws.events.rule-name>,
-                "originalEvent" : <aws.events.event.json>
+                  "timestamp": <timestamp>,
+                  "message": "{\"rule_arn\": \"<aws.events.rule-arn>\", \"detail_type\": \"<detailType>\", \"event_id\": \"<eventId>\", \"source\": \"<source>\"}"
               }
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryPush'
           Arn: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
@@ -475,11 +479,15 @@ Resources:
         - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
           Id: !Sub ${ProjectName}-LogGroup-DowntimeLogs2SafeStorage
           InputTransformer:
+            InputPathsMap:
+              "detailType": "$.detail-type"
+              "eventId": "$.id"
+              "source": "$.source"
+              "timestamp": "$.time"
             InputTemplate: |
               {
-                "ruleArn" : <aws.events.rule-arn>,
-                "ruleName" : <aws.events.rule-name>,
-                "originalEvent" : <aws.events.event.json>
+                  "timestamp": <timestamp>,
+                  "message": "{\"rule_arn\": \"<aws.events.rule-arn>\", \"detail_type\": \"<detailType>\", \"event_id\": \"<eventId>\", \"source\": \"<source>\"}"
               }
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DowntimeLogs'
           Arn: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueARN
@@ -502,12 +510,16 @@ Resources:
         - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
           Id: !Sub ${ProjectName}-LogGroup-ExtChToDeliveryPush
           InputTransformer:
+            InputPathsMap:
+              "detailType": "$.detail-type"
+              "eventId": "$.id"
+              "source": "$.source"
+              "timestamp": "$.time"
             InputTemplate: |
               {
-                "ruleArn" : <aws.events.rule-arn>,
-                "ruleName" : <aws.events.rule-name>,
-                "originalEvent" : <aws.events.event.json>
-              }            
+                  "timestamp": <timestamp>,
+                  "message": "{\"rule_arn\": \"<aws.events.rule-arn>\", \"detail_type\": \"<detailType>\", \"event_id\": \"<eventId>\", \"source\": \"<source>\"}"
+              }      
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2DeliveryPush'
           Arn: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
           InputPath: $.detail
@@ -529,12 +541,16 @@ Resources:
         - Arn: !GetAtt CoreEventBusMatchedEventsLogGroup.Arn
           Id: !Sub ${ProjectName}-LogGroup-UserAttributes2ExtCh  
           InputTransformer:
+            InputPathsMap:
+              "detailType": "$.detail-type"
+              "eventId": "$.id"
+              "source": "$.source"
+              "timestamp": "$.time"
             InputTemplate: |
               {
-                "ruleArn" : <aws.events.rule-arn>,
-                "ruleName" : <aws.events.rule-name>,
-                "originalEvent" : <aws.events.event.json>
-              }          
+                  "timestamp": <timestamp>,
+                  "message": "{\"rule_arn\": \"<aws.events.rule-arn>\", \"detail_type\": \"<detailType>\", \"event_id\": \"<eventId>\", \"source\": \"<source>\"}"
+              }       
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2UserAttributes'
           Arn: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
           InputPath: $.detail
