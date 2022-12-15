@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys the OER dashboard'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  Version:
+    Type: String
+    Description: 'keep track of used projects commitIds'
+
+Resources:
+
+  MicroservicesDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub ${ProjectName}-OER-Dashboard
+      DashboardBody: 
+        'Fn::Transform':
+          Name: 'OerDashboardBodyTransform'
+          Parameters:
+            Region: !Sub ${AWS::Region}
+            
+Outputs:
+  Version:
+    Value: !Ref Version
