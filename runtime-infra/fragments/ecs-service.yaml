@@ -177,6 +177,11 @@ Parameters:
         Managed policy containing specific policy that allow access to resources needed by the specific 
         microservice. For example queues and dynamo tables.
 
+  AlbSecurityGroup:
+    Type: String
+    Default: ''
+    Description: Application load balancer seecurity group
+
   # Technical parameters
   VpcId:
     Type: AWS::EC2::VPC::Id
@@ -386,6 +391,7 @@ Mappings:
 Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
   HasDefaultSecurityGroup: !Not [ !Equals [ !Ref EcsDefaultSecurityGroup, '' ] ]
+  HasAlbSecurityGroup: !Not [ !Equals [ !Ref AlbSecurityGroup, '' ] ]
 
   AutoscalingByRestApi: !Equals [ !Ref AutoscalingStrategy, REST-API]
   AutoscalingBySQS: !Equals [ !Ref AutoscalingStrategy, SQS]
@@ -490,10 +496,17 @@ Resources:
       GroupDescription: !Sub '${MicroServiceUniqueName}-EcsSvcSecGrp'
       VpcId: !Ref VpcId
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: 0.0.0.0/0
+        - 'Fn::If':
+          - HasAlbSecurityGroup
+          - IpProtocol: tcp
+            FromPort: 8080
+            ToPort: 8080
+            SourceSecurityGroupId: !Ref AlbSecurityGroup
+          - IpProtocol: tcp
+            FromPort: 8080
+            ToPort: 8080
+            CidrIp: 0.0.0.0/0
+
 
   # ECS Task
   TaskDefinition:
