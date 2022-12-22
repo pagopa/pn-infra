@@ -22,7 +22,33 @@ Resources:
           Name: 'OerDashboardBodyTransform'
           Parameters:
             Region: !Sub ${AWS::Region}
-            
+            MicroservicesAlarmArns:
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-external-registries-CompositeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-mandate-CompositeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-delivery-CompositeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-auth-fleet-v2-CompositeAlarm              
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-downtime-logs-CompositeAlarm                            
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:pn-user-attributes-CompositeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:pn-paper-channel-CompositeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:pn-radd-fsu-CompositeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:pn-infra-CompositeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:pn-frontend-CompositeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:pn-delivery-push-CompositeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:pn-logsaver-be-CompositeAlarm
+            MicroservicesDashboardLinks:
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-external-registries       
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-mandate
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-delivery
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-auth-fleet-v2            
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-downtime-logs                         
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-user-attributes
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-paper-channel
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-radd-fsu
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-infra
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-frontend
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-delivery-push
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-logsaver-be
+
 Outputs:
   Version:
     Value: !Ref Version
