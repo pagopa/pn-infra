@@ -446,12 +446,12 @@ Resources:
       Cluster: !Ref ECSClusterName
       TaskDefinition: !Ref TaskDefinition
       EnableExecuteCommand: true
-      DeploymentConfiguration:
-        DeploymentCircuitBreaker:
-          Enable: true
-          Rollback: true
-        MinimumHealthyPercent: 100
-        MaximumPercent: 200
+      #DeploymentConfiguration:
+      #  DeploymentCircuitBreaker:
+      #    Enable: true
+      #    Rollback: true
+      #  MinimumHealthyPercent: 100
+      #  MaximumPercent: 200
       DesiredCount: !Ref MinTasksNumber
       # This may need to be adjusted if the container takes a while to start up
       HealthCheckGracePeriodSeconds: !Ref AutoscalingCheckPeriod
