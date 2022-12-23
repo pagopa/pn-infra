@@ -371,6 +371,18 @@ Tutte le operazioni vanno eseguite nell'account _PN-CORE_ nella regione _eu-sout
   - il file _desired-commit-ids-env.sh_ preparato in precedenza nella cartella _config_
 - Eseguire la pipeline _pn-env-update-pipeline_
 
+## Cross account observability
+Gli account __CONFIDENTIAL-INFORMATION__, __SPIDHUB__ e __HELPDESK__ devono essere configurati per condividere i dati di Cloudwatch all'account PN-CORE che fungerà da aggregatore.
+
+Per ogni profilo AWS tra quelli di __CONFIDENTIAL-INFORMATION__, __SPIDHUB__ e __HELPDESK__ eseguire questo comando dalla cartella `scripts/cross-account-observability`:
+
+`./setup-cloudwatch-shared-account.sh [-p <aws-profile>] -r <aws-region> -e <env-type> -a <monitoring-aws-accounts>`
+
+Valorizzando `monitoring-aws-accounts` con l'ID dell'account _Core_.
+
+### Account di monitoraggio (PN-CORE)
+Sull'account PN-CORE deve essere eseguita una configurazione manuale dalla console AWS, descritta a questo link [this link](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Cross-Account-Cross-Region.html#enable-cross-account-cross-Region) nella sezione _Set up a monitoring account_.
+
 ## Test
 
 Testare il nuovo ambiente di PN
