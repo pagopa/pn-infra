@@ -61,7 +61,7 @@ Resources:
     Type: AWS::CloudWatch::CompositeAlarm
     Properties:
       AlarmName: !Sub '${ProjectName}-CompositeAlarm-NotificationProgress'
-      AlarmRule: !Sub 'ALARM(pn-mandate-CompositeAlarm) OR ALARM(pn-delivery-push-CompositeAlarm) OR ALARM(pn-user-attributes-CompositeAlarm) OR ALARM(pn-user-attributes-CompositeAlarm) OR ALARM(arn:aws:cloudwatch:${AWS::Region}:${ConfidentialInfoAccountId}:alarm:pn-data-vault-CompositeAlarm)'
+      AlarmRule: ALARM(pn-mandate-CompositeAlarm) OR ALARM(pn-delivery-push-CompositeAlarm) OR ALARM(pn-user-attributes-CompositeAlarm) OR ALARM(pn-user-attributes-CompositeAlarm)
       #AlarmActions:
       #  - !Ref CompositeAlarmSNSTopic
       #OKActions:
