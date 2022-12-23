@@ -1226,9 +1226,33 @@ Resources:
                     print("Region param is missing")
                 else:
                     localRegion = event["params"]["Region"]
+                    microservicesAlarmArns = event["params"]["MicroservicesAlarmArns"]
+                    microservicesDashboardLinks = event["params"]["MicroservicesDashboardLinks"]
                     titleWidget = textSeparator('OER Dashboard', y_value)
+                    y_value=y_value+5
                     dashboardList.append(titleWidget)
-                
+                    
+                    x_width = 24/6
+                    
+                    titleWidget = textSeparator('Microservices Alarms', y_value)
+                    dashboardList.append(titleWidget)
+                    
+                    y_value=y_value+5
+                    x_value = 0
+                    for i in range(len(microservicesAlarmArns)):
+                        if i>0 and i%6==0:
+                            y_value+=2
+                            x_value=0
+                        
+                        alarmArn = microservicesAlarmArns[i]
+                        dashboardLink = microservicesDashboardLinks[i]
+                        serviceName = getServiceFromLink(dashboardLink)
+                        alarmWidget = microserviceAlarmWidget(alarmArn, serviceName, x_width, x_value, y_value)
+                        linkWidget = microserviceLinkWidget(dashboardLink, serviceName, x_width, x_value, y_value+2)
+                        x_value=x_value+x_width
+                        dashboardList.append(alarmWidget)
+                        dashboardList.append(linkWidget)
+                            
                 data["widgets"] = dashboardList
                 print(data)
                 
@@ -1239,6 +1263,42 @@ Resources:
                 }
                 return response
 
+            def microserviceLinkWidget(link, serviceName, width, x_value, y_value):
+                alarmJson={
+                    "height": 1,
+                    "width": width,
+                    "y": y_value,
+                    "x": x_value,
+                    "type": "text",
+                    "properties": {
+                        "markdown": "[Dashboard "+serviceName+"]("+link+")"
+                    }
+                }
+                
+                return alarmJson
+
+            def getServiceFromLink(link):
+                tokens = link.split("#dashboards:name=", 1)
+                if len(tokens)>1:
+                    return tokens[1]
+                else:
+                    return link
+                
+            def microserviceAlarmWidget(alarmArn, title, width, x_value, y_value):
+                alarmJson={
+                    "height": 2,
+                    "width": width,
+                    "y": y_value,
+                    "x": x_value,
+                    "type": "alarm",
+                    "properties": {
+                        "alarms": [alarmArn],
+                        "title": title+" Alarms"
+                    }
+                }
+                
+                return alarmJson
+                
             def textSeparator(message, textYValue):
                 textJson={
                     "height": 1,
@@ -1252,7 +1312,6 @@ Resources:
                 }
                 
                 return textJson
-
       Handler: index.lambda_handler
       Runtime: python3.9
       Role: !GetAtt OerTransformExecutionRole.Arn

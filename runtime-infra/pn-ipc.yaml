@@ -223,7 +223,16 @@ Resources:
         QueueName: !Sub '${ProjectName}-safestore_to_downtime_logs'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName     
-        
+  
+  ### Communications FROM the Gateway Service of NATIONAL-REGISTRY ###
+  NationalRegistryGatewayOutputsQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-national_registry_gateway_outputs'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
   ###                          PN-CORE EVENT BUS                          ###
   ###########################################################################
@@ -853,6 +862,23 @@ Outputs:
   DowntimeLogsSafeStorageEventsQueueAgeAlarmARN:
     Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.SqsAgeAlarmArn
     Description: Events form safe-storage to pn-downtime-logs queue age alarm ARN
+
+  # Gateway service of NationalRegistry events
+  NationalRegistryGatewayOutputsQueueName:
+    Value: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.QueueName
+    Description: Events from the gateway service of NationalRegistry queue name
+  NationalRegistryGatewayOutputsQueueURL:
+    Value: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.QueueURL
+    Description: Events from the gateway service of NationalRegistry queue URL
+  NationalRegistryGatewayOutputsQueueARN:
+    Value: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.QueueARN
+    Description: Events from the gateway service of NationalRegistry queue ARN
+  NationalRegistryGatewayOutputsQueueAlarmARN:
+    Value: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.SqsDLQAlarmArn
+    Description: Events from the gateway service of NationalRegistry alarm ARN
+  NationalRegistryGatewayOutputsQueueAgeAlarmARN:
+    Value: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.SqsAgeAlarmArn
+    Description: Events from the gateway service of NationalRegistry age alarm ARN
 
   # Kinesis Source Stream containing the DynamoDB Change Data Capture events
   CdcKinesisSourceStreamName:
