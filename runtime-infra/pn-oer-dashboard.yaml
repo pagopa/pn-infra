@@ -13,6 +13,7 @@ Parameters:
 
   ConfidentialInfoAccountId:
     Type: String
+    Default: ''
     Description: 'Confidential Info AWS Account ID'
 
 Resources:
@@ -54,7 +55,14 @@ Resources:
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-delivery-push
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-logsaver-be
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-data-vault;accountId=${ConfidentialInfoAccountId}
-              
+            FunctionalAlarmsArns:
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-CompositeAlarm-NotificationInput
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-CompositeAlarm-NotificationOutput
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-CompositeAlarm-NotificationProgress
+            FunctionalAlarmsNames:
+              - Nuove Notifiche
+              - Lettura Notifiche
+              - Workflow
 Outputs:
   Version:
     Value: !Ref Version
