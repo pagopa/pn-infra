@@ -11,6 +11,10 @@ Parameters:
     Type: String
     Description: 'keep track of used projects commitIds'
 
+  ConfidentialInfoAccountId:
+    Type: String
+    Description: 'Confidential Info AWS Account ID'
+
 Resources:
 
   MicroservicesDashboard:
@@ -35,6 +39,7 @@ Resources:
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-frontend-CompositeAlarm
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-delivery-push-CompositeAlarm
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-logsaver-be-CompositeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${ConfidentialInfoAccountId}:alarm:pn-data-vault-CompositeAlarm
             MicroservicesDashboardLinks:
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-external-registries       
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-mandate
@@ -48,7 +53,8 @@ Resources:
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-frontend
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-delivery-push
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-logsaver-be
-
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-data-vault;accountId=${ConfidentialInfoAccountId}
+              
 Outputs:
   Version:
     Value: !Ref Version
