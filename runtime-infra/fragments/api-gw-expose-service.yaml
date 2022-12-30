@@ -328,14 +328,14 @@ Resources:
         - !Ref AlarmSNSTopicArn
       OKActions:
         - !Ref AlarmSNSTopicArn
-      DatapointsToAlarm: 1
+      DatapointsToAlarm: 2
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 5
       Threshold: !Ref ApiGwLatencyLimit
       TreatMissingData: notBreaching
       Namespace: "AWS/ApiGateway"
       MetricName: "Latency"
-      Period: 300
+      Period: 60
       Dimensions:
         - Name: ApiName
           Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
