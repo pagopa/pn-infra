@@ -182,134 +182,136 @@ Resources:
               return success
               
           def publish_message(event):
-              data = {}
-              statusCode = 0  
-              body = ''
-              
-              if event is not None:
-                  try:
-                      body = json.loads(event['Records'][0]['body'])
-                      region = event['Records'][0]['awsRegion']
-                      sqs_message = json.loads(body['Message'])
-                      SlackSNSTopic = os.environ['SlackSNSTopic']
-                      sns = boto3.client('sns')
-                      print('########### INPUT MESSAGE #############')
-                      print(sqs_message)
-                                
-                      
-                      if 'AlarmName' in sqs_message:
-                          #Message type is an Alarm message
-                          
-                          metric_name = sqs_message['Trigger']['MetricName']
-                          metric_namespace = sqs_message['Trigger']['Namespace']
-                          log_group_response_name = get_log_group_name(metric_name, metric_namespace)
-                          print("==> LogGroups", log_group_response_name)
-                          
-                          if log_group_response_name == "NotFound":
-                              #No log groups found - Send message with no enrichment
-                              _message=sqs_message
-                          else:
-                              #Log group found - Create enriched message
+            data = {}
+            statusCode = 0  
+            body = ''
+            
+            if event is not None:
+                try:
+                    body = json.loads(event['Records'][0]['body'])
+                    region = event['Records'][0]['awsRegion']
+                    sqs_message = json.loads(body['Message'])
+                    SlackSNSTopic = os.environ['SlackSNSTopic']
+                    sns = boto3.client('sns')
+                    print('########### INPUT MESSAGE #############')
+                    print(sqs_message)
                               
-                              log_stream_response_id = get_log_stream_id(log_group_response_name)
-                              log_name = does_log_start_with_hash(log_group_response_name)
-                              cloud_watch_location = "https://"+region+".console.aws.amazon.com/cloudwatch/home?region="+region+"#logsV2:log-groups/log-group/"+log_name+"/log-events/"+encode_string(log_stream_response_id)
-                              print(cloud_watch_location)
-                              _message = {
-                                  "AlarmName": sqs_message['AlarmName'],
-                                  "AlarmDescription": sqs_message['AlarmDescription'],
-                                  "AWSAccountId": sqs_message['AWSAccountId'],
-                                  "AlarmConfigurationUpdatedTimestamp": sqs_message['AlarmConfigurationUpdatedTimestamp'],
-                                  "NewStateValue": sqs_message['NewStateValue'],
-                                  "NewStateReason": sqs_message['NewStateReason'],
-                                  "StateChangeTime": sqs_message['StateChangeTime'],
-                                  "Region": sqs_message['Region'],
-                                  "AlarmArn": sqs_message['AlarmArn'],
-                                  "OldStateValue": sqs_message['OldStateValue'],
-                                  "Trigger": {
-                                      "MetricName": sqs_message['Trigger']['MetricName'],
-                                      "Namespace": cloud_watch_location,
-                                      "Statistic": sqs_message['Trigger']['Statistic'],
-                                      "Dimensions": sqs_message['Trigger']['Dimensions'],
-                                      "Period": sqs_message['Trigger']['Period'],
-                                      "EvaluationPeriods": sqs_message['Trigger']['EvaluationPeriods'],
-                                      "DatapointsToAlarm": sqs_message['Trigger']['DatapointsToAlarm'],
-                                      "ComparisonOperator": sqs_message['Trigger']['ComparisonOperator'],
-                                      "Threshold": sqs_message['Trigger']['Threshold'],
-                                      "TreatMissingData": sqs_message['Trigger']['TreatMissingData'],
-                                      "EvaluateLowSampleCountPercentile": sqs_message['Trigger']['EvaluateLowSampleCountPercentile']
-                                  }
-                              }
-                      else:
-                          #Message not Alarm type - Handle CodeBuild/CodePipeline
-                          resource_source = sqs_message['source']
-                          account_id = sqs_message['account']
-                          time = sqs_message['time']
-                          region = sqs_message['region']
-                          caller_id = sqs_message['id']
-                          caller_version = sqs_message['version']
-                  
-                          if resource_source == "aws.codebuild":
-                              project_name = sqs_message['detail']['project-name']
-                              if project_name == "pn-RunE2eTestsCodeBuildProject":
-                                  project_link = "https://"+region+".console.aws.amazon.com/codesuite/codebuild/"+account_id+"/projects/"+project_name
-                                  cloudwatch_logs = sqs_message['detail']['additional-information']['logs']['deep-link']
-                                  resource_message = "TEST E2E FALLITI" 
-                                  resource_data = {}
-                              else:
-                                  resource_data = None
-                              
-                          elif resource_source == "aws.codepipeline":
-                              pipeline = sqs_message['detail']['pipeline']
-                              pipeline_link = "https://"+region+".console.aws.amazon.com/codesuite/codepipeline/pipelines/"+pipeline+"/view?region="+region
-                              resource_message = "PIPELINE " + pipeline + " FALLITA" 
-                              resource_data = {}
-                              
-                          
-                          _message = {
-                              "version":caller_version,
-                              "id":caller_id,
-                              "detail-type":resource_message,
-                              "source":"aws.ecr",
-                              "account":account_id,
-                              "time":time,
-                              "region": region,
-                              "resources": resource_data,
-                              "detail":{
-                                  "result":"SUCCESS",
-                                  "image-digest":"sha256:7f5b2640fe6fb4f46592dfd3410c4a79dac4f89e4782432e0378abcd1234",
-                                  "action-type":"PUSH",
-                                  "image-tag":"latest"
-                              }
-                          }
-                      
-                      print('########### OUTPUT MESSAGE #############')
-                      print(_message)
-                      if resource_data is not None:
-                          response = sns.publish(
-                              TopicArn=SlackSNSTopic,
-                              Message=json.dumps(_message),
-                              MessageStructure='string',
-                          )
-                      
-                      statusCode = 200
-                      body = "Success"
+                    
+                    if 'AlarmName' in sqs_message:
+                        #Message type is an Alarm message
+                        
+                        metric_name = sqs_message['Trigger']['MetricName']
+                        metric_namespace = sqs_message['Trigger']['Namespace']
+                        log_group_response_name = get_log_group_name(metric_name, metric_namespace)
+                        print("==> LogGroups", log_group_response_name)
+                        
+                        if log_group_response_name == "NotFound":
+                            #No log groups found - Send message with no enrichment
+                            _message=sqs_message
+                        else:
+                            #Log group found - Create enriched message
+                            log_stream_response_id = get_log_stream_id(log_group_response_name)
+                            log_name = does_log_start_with_hash(log_group_response_name)
+                            cloud_watch_location = "https://"+region+".console.aws.amazon.com/cloudwatch/home?region="+region+"#logsV2:log-groups/log-group/"+log_name+"/log-events/"+encode_string(log_stream_response_id)
+                            print("Cloudwatch error log", cloud_watch_location)
+                            
+                            resource_data = [ "arn:" + cloud_watch_location ]
+                            account_id = sqs_message['AWSAccountId']
+                            time = sqs_message['StateChangeTime']
+                            resource_message = "Cloudwatch log " + sqs_message['NewStateValue'] + " in " + log_name
+                            
+                            _message = {
+                                "version":"0",
+                                "id":origMessageId,
+                                "detail-type":resource_message,
+                                "source":"aws.ecr",
+                                "account":account_id,
+                                "time":time,
+                                "region": region,
+                                "resources": resource_data,
+                                "detail":{
+                                    "result":"SUCCESS",
+                                    "image-digest":"sha256:7f5b2640fe6fb4f46592dfd3410c4a79dac4f89e4782432e0378abcd1234",
+                                    "action-type":"PUSH",
+                                    "image-tag":"latest"
+                                }
+                            }
+                    else:
+                        #Message not Alarm type - Handle CodeBuild/CodePipeline
+                        resource_source = sqs_message['source']
+                        account_id = sqs_message['account']
+                        time = sqs_message['time']
+                        region = sqs_message['region']
+                        caller_id = sqs_message['id']
+                        caller_version = sqs_message['version']
+                
+                        if resource_source == "aws.codebuild":
+                            project_name = sqs_message['detail']['project-name']
+                            if project_name == "pn-RunE2eTestsCodeBuildProject":
+                                project_link = "https://"+region+".console.aws.amazon.com/codesuite/codebuild/"+account_id+"/projects/"+project_name
+                                cloudwatch_logs = sqs_message['detail']['additional-information']['logs']['deep-link']
+                                resource_message = "TEST E2E FALLITI" 
+                                resource_data = [
+                                        "arn:" + cloudwatch_logs
+                                    ]
+                            else:
+                                resource_data = []
+                            
+                        elif resource_source == "aws.codepipeline":
+                            pipeline = sqs_message['detail']['pipeline']
+                            pipeline_link = "https://"+region+".console.aws.amazon.com/codesuite/codepipeline/pipelines/"+pipeline+"/view?region="+region
+                            resource_message = "PIPELINE " + pipeline + " FALLITA" 
+                            resource_data = []
+                        else:
+                            resource_message = json.dumps( sqs_message )
+                            resource_data = []
+                            
+                        
+                        _message = {
+                            "version":caller_version,
+                            "id":caller_id,
+                            "detail-type":resource_message,
+                            "source":"aws.ecr",
+                            "account":account_id,
+                            "time":time,
+                            "region": region,
+                            "resources": resource_data,
+                            "detail":{
+                                "result":"SUCCESS",
+                                "image-digest":"sha256:7f5b2640fe6fb4f46592dfd3410c4a79dac4f89e4782432e0378abcd1234",
+                                "action-type":"PUSH",
+                                "image-tag":"latest"
+                            }
+                        }
+                    
+                    print('########### OUTPUT MESSAGE #############')
+                    print(_message)
+                    if _message is not None:
+                        response = sns.publish(
+                            TopicArn=SlackSNSTopic,
+                            Message=json.dumps(_message),
+                            MessageStructure='string',
+                        )
+                    
+                    statusCode = 200
+                    body = "Success"
 
-                  except Exception as e:
-                      print("Exception in publishing message: ", e)
-                      statusCode = 400
-                      body = "Client_Error"
-              else:
-                  print("Event is empty")
-                  statusCode = 500
-                  body = "Server_Error"
-                  
-              data = {
-                  'statusCode': statusCode,
-                  'body': json.dumps(body)
-              }
-              
-              return data
+                except Exception as e:
+                    traceback.print_exc()
+                    print("Exception in publishing message: ", e)
+                    statusCode = 400
+                    body = "Client_Error"
+            else:
+                print("Event is empty")
+                statusCode = 500
+                body = "Server_Error"
+                
+            data = {
+                'statusCode': statusCode,
+                'body': json.dumps(body)
+            }
+            
+            return data
 
 
           # This function will return the CloudWatch Log group name
