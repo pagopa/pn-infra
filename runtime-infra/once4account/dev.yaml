@@ -29,6 +29,25 @@ Resources:
     Properties:
       DisplayName: 'dev account alarms topic: send to SQS and slack'
   
+  CanPublishAlarmTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowServices
+            Effect: Allow
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+                - "cloudwatch.amazonaws.com"
+            Action:
+              - 'sns:Publish'
+            Resource:
+              - !Ref AlarmSNSTopic
+      Topics:
+        - !Ref AlarmSNSTopic
+  
   # - Alarm message queue
   AlarmHistoryBufferQueue:
     Type: AWS::SQS::Queue  
@@ -136,4 +155,8 @@ Outputs:
   AlarmSNSTopicName:
     Value: !GetAtt  AlarmSNSTopic.TopicName
     Description: Name of the Alarm SNS Topic
+  
+  Version:
+    Value: !Ref Version
+    Description: Give the version string as output to avoid warnings
 
