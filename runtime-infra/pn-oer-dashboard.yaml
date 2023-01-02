@@ -11,6 +11,14 @@ Parameters:
     Type: String
     Description: 'keep track of used projects commitIds'
 
+  ConfidentialInfoAccountId:
+    Type: String
+    Default: ''
+    Description: 'Confidential Info AWS Account ID'
+
+Conditions:
+  HasConfidentialInfoAccount: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, "" ] ]
+
 Resources:
 
   MicroservicesDashboard:
@@ -35,6 +43,10 @@ Resources:
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-frontend-CompositeAlarm
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-delivery-push-CompositeAlarm
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-logsaver-be-CompositeAlarm
+              - Fn::If:
+                - HasConfidentialInfoAccount
+                - !Sub arn:aws:cloudwatch:${AWS::Region}:${ConfidentialInfoAccountId}:alarm:pn-data-vault-CompositeAlarm
+                - ''
             MicroservicesDashboardLinks:
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-external-registries       
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-mandate
@@ -48,6 +60,10 @@ Resources:
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-frontend
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-delivery-push
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-logsaver-be
+              - Fn::If:
+                - HasConfidentialInfoAccount
+                - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-data-vault;accountId=${ConfidentialInfoAccountId}
+                - ''
             FunctionalAlarmsArns:
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-CompositeAlarm-NotificationInput
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-CompositeAlarm-NotificationOutput
