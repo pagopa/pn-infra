@@ -13,17 +13,17 @@ Parameters:
 
   ConfidentialInfoAccountId:
     Type: String
-    Default: 'MISSING'
+    Default: ''
     Description: 'Confidential Info AWS Account ID'
 
   AlbArn:
     Type: String
-    Default: 'MISSING'
+    Default: ''
     Description: 'ALB ARN'
 
   RaddTargetGroup:
     Type: String
-    Default: 'MISSING'
+    Default: ''
     Description: 'RADD Target Group'
 
 Resources:
@@ -37,6 +37,7 @@ Resources:
           Name: 'OerDashboardBodyTransform'
           Parameters:
             Region: !Sub ${AWS::Region}
+            ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
             MicroservicesAlarmArns:
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-external-registries-CompositeAlarm
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-mandate-CompositeAlarm
@@ -50,7 +51,7 @@ Resources:
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-frontend-CompositeAlarm
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-delivery-push-CompositeAlarm
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-logsaver-be-CompositeAlarm
-              - !Sub arn:aws:cloudwatch:${AWS::Region}:${ConfidentialInfoAccountId}:alarm:pn-data-vault-CompositeAlarm
+#              - !Sub arn:aws:cloudwatch:${AWS::Region}:$CONFIDENTIAL_INFO_ACCOUNT_ID:alarm:pn-data-vault-CompositeAlarm
             MicroservicesDashboardLinks:
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-external-registries       
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-mandate
@@ -64,7 +65,7 @@ Resources:
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-frontend
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-delivery-push
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-logsaver-be
-              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-data-vault;accountId=${ConfidentialInfoAccountId}
+#              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-data-vault;accountId=$CONFIDENTIAL_INFO_ACCOUNT_ID
             FunctionalAlarmsArns:
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-CompositeAlarm-NotificationInput
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-CompositeAlarm-NotificationOutput
@@ -81,7 +82,7 @@ Resources:
               - "API:pn-delivery-push-public-api-B2B"
               - "API:pn-delivery-push-public-api-IO"
               - "API:pn-delivery-push-public-api-WEB"
-              - !Sub "ALB:${AlbArn}:${RaddTargetGroup}"
+#              - !Sub "ALB:${AlbArn}:${RaddTargetGroup}"
 Outputs:
   Version:
     Value: !Ref Version
