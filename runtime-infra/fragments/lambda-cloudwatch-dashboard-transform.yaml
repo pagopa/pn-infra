@@ -1338,40 +1338,39 @@ Resources:
                 
                 width = 24
 
-                apiIndex = 0
+                metrics = []
+                multiplyFactors = []
+
                 for i in range(len(resources)):
                     resourceParts = resources[i].split(':')
                     resourceType = resourceParts[0]
-                    metrics = []
                 
-                    multiplyFactors = []
                     if resourceType=='API':
                         apiName = resourceParts[1]
                         error4xxMetric = [
-                            "AWS/ApiGateway", "4XXError", "ApiName", apiName, "Stage", "unique", { "id": "4xx"+str(apiIndex), "visible": False, "region": region }
+                            "AWS/ApiGateway", "4XXError", "ApiName", apiName, "Stage", "unique", { "id": "four"+str(i+1), "visible": False, "region": region }
                         ]
                         error5xxMetric = [
-                            "AWS/ApiGateway", "5XXError", "ApiName", apiName, "Stage", "unique", { "id": "5xx"+str(apiIndex), "visible": False, "region": region }
+                            "AWS/ApiGateway", "5XXError", "ApiName", apiName, "Stage", "unique", { "id": "five"+str(i+1), "visible": False, "region": region }
                         ]
                         countMetric = [
-                            "AWS/ApiGateway", "Count", "ApiName", apiName, "Stage", "unique", { "id": "cnt"+str(apiIndex), "visible": False, "region": region }
+                            "AWS/ApiGateway", "Count", "ApiName", apiName, "Stage", "unique", { "id": "cnt"+str(i+1), "visible": False, "region": region }
                         ]
                         latencyMetric = [
-                            "AWS/ApiGateway", "Latency", "ApiName", apiName, "Stage", "unique", { "id": "lat"+str(apiIndex), "visible": False, "stat": "p95", "region": region }
+                            "AWS/ApiGateway", "Latency", "ApiName", apiName, "Stage", "unique", { "id": "lat"+str(i+1), "visible": False, "stat": "p95", "region": region }
                         ]
 
                         instantAvailabilityMetric = [ 
-                            { "expression": "IF(5xx"+str(apiIndex)+"/cnt"+str(apiIndex)+"<"+str(rate5xx)+" AND 4xx"+str(apiIndex)+"/cnt"+str(apiIndex)+"<"+str(rate4xx)+" AND lat"+str(apiIndex)+"<"+str(latency)+", 1, 0)", "label": "Instant Availability "+apiName, "id": "apiIA"+str(apiIndex), "stat": "Average", "period": 300, "region": region } 
+                            { "expression": "IF(five"+str(i+1)+"/cnt"+str(i+1)+"<"+str(i+1)+" AND four"+str(i+1)+"/cnt"+str(i+1)+"<"+str(i+1)+" AND lat"+str(i+1)+"<"+str(latency)+", 1, 0)", "label": "Instant Availability "+apiName, "id": "apiIA"+str(i+1), "stat": "Average", "period": 300, "region": region } 
                         ]
                         
-                        multiplyFactors.append("apiIA"+str(apiIndex))
+                        multiplyFactors.append("apiIA"+str(i+1))
                         metrics.append(error4xxMetric)
                         metrics.append(error5xxMetric)            
                         metrics.append(countMetric)            
                         metrics.append(latencyMetric)            
                         metrics.append(instantAvailabilityMetric)            
-                        apiIndex = apiIndex+1
-                
+
                 # total instant availability
                 totalInstantAvailabilityMetric = [ 
                     { "expression": "*".join(multiplyFactors), "label": "Total Instant Availability", "id": "e1", "stat": "Average", "period": 300, "region": region } 
@@ -1381,7 +1380,7 @@ Resources:
                 
                 runningDataPointMetric = [ { "expression": "RUNNING_SUM((e1+1)/(e1+1))", "label": "Expression4", "id": "e4", "visible": False, "region": region } ]
                 
-                availabilityMetric = [ { "expression": "e3/e4", "label": "Availability", "id": "e2", "region": "eu-south-1" } ]
+                availabilityMetric = [ { "expression": "(e3/e4)*100", "label": "Availability", "id": "e2", "region": "eu-south-1" } ]
                 
                 metrics.append(totalInstantAvailabilityMetric)
                 metrics.append(runningSumMetric)
