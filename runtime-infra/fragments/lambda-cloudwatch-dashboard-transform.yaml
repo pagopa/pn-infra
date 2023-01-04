@@ -1268,6 +1268,19 @@ Resources:
                         dashboardList.append(alarmWidget)
                         dashboardList.append(linkWidget)
                             
+                    y_value=y_value+5
+                    
+                    if 'ReadNotificationAvailability' in event["params"]:
+                        resources = event["params"]["ReadNotificationAvailability"]
+                        resources = list(filter(None, resources))
+                        
+                        titleWidget = textSeparator('Lettura notifiche Availability', y_value)
+                        dashboardList.append(titleWidget)
+                        y_value = y_value+5
+                        theAvailabilityWidget = availabilityWidget(resources, y_value, "Lettura Notifica", localRegion)
+                        dashboardList.append(theAvailabilityWidget)    
+
+                    
                 data["widgets"] = dashboardList
                 print(data)
                 
@@ -1318,6 +1331,82 @@ Resources:
                 
                 return alarmJson
 
+            def availabilityWidget(resources, widgetYvalue, title, region):
+                rate5xx = 0.01
+                rate4xx = 0.1
+                latency = 1000
+                
+                width = 24
+
+                apiIndex = 0
+                for i in range(len(resources)):
+                    resourceParts = resources[i].split(':')
+                    resourceType = resourceParts[0]
+                    metrics = []
+                
+                    multiplyFactors = []
+                    if resourceType=='API':
+                        apiName = resourceParts[1]
+                        error4xxMetric = [
+                            "AWS/ApiGateway", "4XXError", "ApiName", apiName, "Stage", "unique", { "id": "4xx"+str(apiIndex), "visible": False, "region": region }
+                        ]
+                        error5xxMetric = [
+                            "AWS/ApiGateway", "5XXError", "ApiName", apiName, "Stage", "unique", { "id": "5xx"+str(apiIndex), "visible": False, "region": region }
+                        ]
+                        countMetric = [
+                            "AWS/ApiGateway", "Count", "ApiName", apiName, "Stage", "unique", { "id": "cnt"+str(apiIndex), "visible": False, "region": region }
+                        ]
+                        latencyMetric = [
+                            "AWS/ApiGateway", "Latency", "ApiName", apiName, "Stage", "unique", { "id": "lat"+str(apiIndex), "visible": False, "stat": "p95", "region": region }
+                        ]
+
+                        instantAvailabilityMetric = [ 
+                            { "expression": "IF(5xx"+str(apiIndex)+"/cnt"+str(apiIndex)+"<"+str(rate5xx)+" AND 4xx"+str(apiIndex)+"/cnt"+str(apiIndex)+"<"+str(rate4xx)+" AND lat"+str(apiIndex)+"<"+str(latency)+", 1, 0)", "label": "Instant Availability "+apiName, "id": "apiIA"+str(apiIndex), "stat": "Average", "period": 300, "region": region } 
+                        ]
+                        
+                        multiplyFactors.append("apiIA"+str(apiIndex))
+                        metrics.append(error4xxMetric)
+                        metrics.append(error5xxMetric)            
+                        metrics.append(countMetric)            
+                        metrics.append(latencyMetric)            
+                        metrics.append(instantAvailabilityMetric)            
+                        apiIndex = apiIndex+1
+                
+                # total instant availability
+                totalInstantAvailabilityMetric = [ 
+                    { "expression": "*".join(multiplyFactors), "label": "Total Instant Availability", "id": "e1", "stat": "Average", "period": 300, "region": region } 
+                ]
+                
+                runningSumMetric = [ { "expression": "RUNNING_SUM(e1)", "label": "Expression3", "id": "e3", "visible": False, "region": region } ]
+                
+                runningDataPointMetric = [ { "expression": "RUNNING_SUM((e1+1)/(e1+1))", "label": "Expression4", "id": "e4", "visible": False, "region": region } ]
+                
+                availabilityMetric = [ { "expression": "e3/e4", "label": "Availability", "id": "e2", "region": "eu-south-1" } ]
+                
+                metrics.append(totalInstantAvailabilityMetric)
+                metrics.append(runningSumMetric)
+                metrics.append(runningDataPointMetric)
+                metrics.append(availabilityMetric)
+            
+                widgetJson = {
+                    "type":"metric",
+                    "x":0,
+                    "y":widgetYvalue,
+                    "width":width,
+                    "height":5,
+                    "properties": {
+                        "sparkline": True,
+                        "view": "singleValue",
+                        "region": region,
+                        "stat": "Sum",
+                        "period": 300,
+                        "stacked": False,
+                        "singleValueFullPrecision": True,
+                        "metrics": metrics
+                    }
+                }   
+                return widgetJson
+                
             def getServiceFromLink(link):
                 tokens = link.split("#dashboards:name=", 1)
                 if len(tokens)>1:
