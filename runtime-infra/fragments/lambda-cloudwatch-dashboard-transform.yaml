@@ -1301,7 +1301,7 @@ Resources:
                         theAvailabilityWidget = availabilityWidget(resources, y_value, "Lettura Notifica", localRegion)
                         dashboardList.append(theAvailabilityWidget)    
 
-                    
+                data["start"] = "-P1D"
                 data["widgets"] = dashboardList
                 print(data)
                 
@@ -1394,7 +1394,7 @@ Resources:
                         ]
                         
                         instantAvailabilityMetric = [ 
-                            { "expression": "IF(fourFilled"+str(i+1)+"<"+str(rate5xx)+" AND fourFilled"+str(i+1)+"<"+str(rate4xx)+" AND latFilled"+str(i+1)+"<"+str(latency)+", 1, 0)", "label": "Instant Availability "+apiName, "id": "apiIA"+str(i+1), "stat": "Average", "period": 300, "region": region } 
+                            { "expression": "IF(fourFilled"+str(i+1)+"<"+str(rate5xx)+" AND fourFilled"+str(i+1)+"<"+str(rate4xx)+" AND latFilled"+str(i+1)+"<"+str(latency)+", 1, 0)", "label": "Instant Availability "+apiName, "id": "apiIA"+str(i+1), "stat": "Average", "period": 300, "region": region, "visible": False } 
                         ]
                         
                         multiplyFactors.append("apiIA"+str(i+1))
@@ -1409,7 +1409,7 @@ Resources:
 
                 # total instant availability
                 totalInstantAvailabilityMetric = [ 
-                    { "expression": "*".join(multiplyFactors), "label": "Total Instant Availability", "id": "e1", "stat": "Average", "period": 300, "region": region } 
+                    { "expression": "*".join(multiplyFactors), "label": "Instant Availability", "id": "e1", "stat": "Average", "period": 300, "region": region } 
                 ]
                 
                 runningSumMetric = [ { "expression": "RUNNING_SUM(e1)", "label": "Expression3", "id": "e3", "visible": False, "region": region } ]
@@ -1484,7 +1484,6 @@ Resources:
                     currentArray.append(x)
                 
                 return currentArray
-
       Handler: index.lambda_handler
       Runtime: python3.9
       Role: !GetAtt OerTransformExecutionRole.Arn
