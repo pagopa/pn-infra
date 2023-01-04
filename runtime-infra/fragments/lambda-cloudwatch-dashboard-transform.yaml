@@ -1217,6 +1217,18 @@ Resources:
         ZipFile: |
             import json
 
+            def not_confidential_info(value):
+                if value is None:
+                    return False
+                
+                if "$CONFIDENTIAL_INFO_ACCOUNT_ID" in value:
+                    return False
+                    
+                return True
+                
+            def replace_variable(value, variable_name, variable_value):
+                return value.replace(variable_name, variable_value)
+                
             def lambda_handler(event, context):
                 dashboardList = []
                 data = {}
@@ -1225,6 +1237,10 @@ Resources:
                 if (event["params"]["Region"] == ""):
                     print("Region param is missing")
                 else:
+                    confidentialInfoAccountId = ""
+                    if "ConfidentialInfoAccountId" in event["params"]:
+                        confidentialInfoAccountId = event["params"]["ConfidentialInfoAccountId"]
+                    
                     localRegion = event["params"]["Region"]
                     microservicesAlarmArns = event["params"]["MicroservicesAlarmArns"]
                     microservicesDashboardLinks = event["params"]["MicroservicesDashboardLinks"]
@@ -1251,7 +1267,11 @@ Resources:
                     
                     titleWidget = textSeparator('Microservices Alarms', y_value)
                     dashboardList.append(titleWidget)
-                    
+
+                    if confidentialInfoAccountId is None or confidentialInfoAccountId == '':
+                        microservicesAlarmArns = list(filter(not_confidential_info, microservicesAlarmArns))
+                        microservicesDashboardLinks = list(filter(not_confidential_info, microservicesDashboardLinks))
+                        
                     y_value=y_value+5
                     x_value = 0
                     for i in range(len(microservicesAlarmArns)):
@@ -1259,8 +1279,9 @@ Resources:
                             y_value+=2
                             x_value=0
                         
-                        alarmArn = microservicesAlarmArns[i]
-                        dashboardLink = microservicesDashboardLinks[i]
+                        alarmArn = replace_variable(microservicesAlarmArns[i], '$CONFIDENTIAL_INFO_ACCOUNT_ID', confidentialInfoAccountId)
+                        dashboardLink = replace_variable(microservicesDashboardLinks[i], '$CONFIDENTIAL_INFO_ACCOUNT_ID', confidentialInfoAccountId)
+                        
                         serviceName = getServiceFromLink(dashboardLink)
                         alarmWidget = microserviceAlarmWidget(alarmArn, serviceName, x_width, x_value, y_value)
                         linkWidget = microserviceLinkWidget(dashboardLink, serviceName, x_width, x_value, y_value+2)
@@ -1360,8 +1381,20 @@ Resources:
                             "AWS/ApiGateway", "Latency", "ApiName", apiName, "Stage", "unique", { "id": "lat"+str(i+1), "visible": False, "stat": "p95", "region": region }
                         ]
 
+                        filledError4xxMetric = [
+                            { "expression": "FILL(four"+str(i+1)+", 0)/FILL(cnt"+str(i+1)+", 1)", "label": "error4xxRate", "id": "fourFilled"+str(i+1), "stat": "Average", "period": 300, "region": region, "visible": False } 
+                        ]
+                        
+                        filledError5xxMetric = [
+                            { "expression": "FILL(five"+str(i+1)+", 0)/FILL(cnt"+str(i+1)+", 1)", "label": "error5xxRate", "id": "fiveFilled"+str(i+1), "stat": "Average", "period": 300, "region": region, "visible": False } 
+                        ]
+                        
+                        filledLatencyMetric = [
+                            { "expression": "FILL(lat"+str(i+1)+", 0)", "label": "latency", "id": "latFilled"+str(i+1), "stat": "p95", "period": 300, "region": region, "visible": False } 
+                        ]
+                        
                         instantAvailabilityMetric = [ 
-                            { "expression": "IF(five"+str(i+1)+"/cnt"+str(i+1)+"<"+str(i+1)+" AND four"+str(i+1)+"/cnt"+str(i+1)+"<"+str(i+1)+" AND lat"+str(i+1)+"<"+str(latency)+", 1, 0)", "label": "Instant Availability "+apiName, "id": "apiIA"+str(i+1), "stat": "Average", "period": 300, "region": region } 
+                            { "expression": "IF(fourFilled"+str(i+1)+"<"+str(rate5xx)+" AND fourFilled"+str(i+1)+"<"+str(rate4xx)+" AND latFilled"+str(i+1)+"<"+str(latency)+", 1, 0)", "label": "Instant Availability "+apiName, "id": "apiIA"+str(i+1), "stat": "Average", "period": 300, "region": region } 
                         ]
                         
                         multiplyFactors.append("apiIA"+str(i+1))
@@ -1369,6 +1402,9 @@ Resources:
                         metrics.append(error5xxMetric)            
                         metrics.append(countMetric)            
                         metrics.append(latencyMetric)            
+                        metrics.append(filledError4xxMetric)
+                        metrics.append(filledError5xxMetric)            
+                        metrics.append(filledLatencyMetric)            
                         metrics.append(instantAvailabilityMetric)            
 
                 # total instant availability
@@ -1392,7 +1428,7 @@ Resources:
                     "x":0,
                     "y":widgetYvalue,
                     "width":width,
-                    "height":5,
+                    "height": 6,
                     "properties": {
                         "sparkline": True,
                         "view": "singleValue",
@@ -1400,7 +1436,7 @@ Resources:
                         "stat": "Sum",
                         "period": 300,
                         "stacked": False,
-                        "singleValueFullPrecision": True,
+                        "singleValueFullPrecision": False,
                         "metrics": metrics
                     }
                 }   
@@ -1448,6 +1484,7 @@ Resources:
                     currentArray.append(x)
                 
                 return currentArray
+
       Handler: index.lambda_handler
       Runtime: python3.9
       Role: !GetAtt OerTransformExecutionRole.Arn
