@@ -164,16 +164,16 @@ Resources:
           TargetGroupArn: !Ref NetworkToApplicationLoadBalancerIpTargetGroup
           Order: 1
 
-  NetworkLoadBalancerDNSRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      AliasTarget:
-        DNSName: !GetAtt NetworkLoadBalancer.DNSName
-        EvaluateTargetHealth: false
-        HostedZoneId: !GetAtt NetworkLoadBalancer.CanonicalHostedZoneID
-      HostedZoneId: !Ref HostedZoneId
-      Name: !Ref RaddApiDnsName
-      Type: A
+  #NetworkLoadBalancerDNSRecord:
+  #  Type: AWS::Route53::RecordSet
+  #  Properties:
+  #    AliasTarget:
+  #      DNSName: !GetAtt NetworkLoadBalancer.DNSName
+  #      EvaluateTargetHealth: false
+  #      HostedZoneId: !GetAtt NetworkLoadBalancer.CanonicalHostedZoneID
+  #    HostedZoneId: !Ref HostedZoneId
+  #    Name: !Ref RaddApiDnsName
+  #    Type: A
 
   # Network load balancer forward to application load balancer
   NetworkToApplicationLoadBalancerTargetGroup:
