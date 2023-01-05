@@ -16,10 +16,10 @@ Parameters:
     Default: ''
     Description: 'Confidential Info AWS Account ID'
 
-  AlbArn:
+  Alb:
     Type: String
     Default: ''
-    Description: 'ALB ARN'
+    Description: 'ALB'
 
   RaddTargetGroup:
     Type: String
@@ -74,6 +74,8 @@ Resources:
               - Nuove Notifiche
               - Lettura Notifiche
               - Workflow
+            LoginAvailability:
+              - "API:pn-token-exchange-api"
             ReadNotificationAvailability:
               - "API:pn-delivery-progress-public-api-B2B"
               - "API:pn-delivery-public-api-B2B"
@@ -82,7 +84,24 @@ Resources:
               - "API:pn-delivery-push-public-api-B2B"
               - "API:pn-delivery-push-public-api-IO"
               - "API:pn-delivery-push-public-api-WEB"
-#              - !Sub "ALB:${AlbArn}:${RaddTargetGroup}"
+#              - !Sub "ALB:${Alb}:${RaddTargetGroup}"
+            WriteNotificationAvailability:
+              - "API:pn-delivery-public-api-B2B"
+              - "API:pn-delivery-public-api-IO"
+              - "API:pn-delivery-public-api-WEB"
+              - "API:pn-delivery-public-api-WEB"
+              - "API:pn-ExternalRegistry-public-api-B2B"
+              - "API:pn-ExternalRegistry-public-api-WEB"
+            MandateAvailability:
+              - "API:pn-mandate-public-api-WEB"
+              - "API:pn-token-exchange-api"
+              - "API:API:pn-ExternalRegistry-public-api-WEB"
+            DigitalAddressAvailability:
+              - "API:pn-UserAttributes-public-api-WEB"
+              - "API:pn-ExternalRegistry-public-api-WEB"
+            ApiKeyAvailability:
+              - "API:pn-ApikeyManager-public-api-WEB"
+              - "API:pn-ApikeyManager-bo-public-api-WEB"
 Outputs:
   Version:
     Value: !Ref Version
