@@ -1436,7 +1436,49 @@ Resources:
                         metrics.append(filledError5xxMetric)            
                         metrics.append(filledLatencyMetric)            
                         metrics.append(instantAvailabilityMetric)            
+                    elif resourceType=='ALB' and resourceParts[1] is not None and resourceParts[1] != '':
+                        albName = resourceParts[1]
+                        targetGroup = resourceParts[2]
+                        
+                        error4xxMetric = [
+                            "AWS/ApplicationELB", "HTTPCode_Target_4XX_Count", "TargetGroup", targetGroup, "LoadBalancer", albName, { "id": "four"+str(i+1), "visible": False, "region": region }
+                        ]
+                        error5xxMetric = [
+                            "AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "TargetGroup", targetGroup, "LoadBalancer", albName, { "id": "five"+str(i+1), "visible": False, "region": region }
+                        ]
+                        countMetric = [
+                            "AWS/ApplicationELB", "RequestCountPerTarget", "TargetGroup", targetGroup, "LoadBalancer", albName, { "id": "cnt"+str(i+1), "visible": False, "region": region }
+                        ]
+                        latencyMetric = [
+                            "AWS/ApplicationELB", "TargetResponseTime", "TargetGroup", targetGroup, "LoadBalancer", albName, { "id": "lat"+str(i+1), "visible": False, "stat": "p95", "region": region }
+                        ]
 
+                        filledError4xxMetric = [
+                            { "expression": "FILL(four"+str(i+1)+", 0)/FILL(cnt"+str(i+1)+", 1)", "label": "error4xxRate", "id": "fourFilled"+str(i+1), "stat": "Average", "period": 300, "region": region, "visible": False } 
+                        ]
+                        
+                        filledError5xxMetric = [
+                            { "expression": "FILL(five"+str(i+1)+", 0)/FILL(cnt"+str(i+1)+", 1)", "label": "error5xxRate", "id": "fiveFilled"+str(i+1), "stat": "Average", "period": 300, "region": region, "visible": False } 
+                        ]
+                        
+                        filledLatencyMetric = [
+                            { "expression": "FILL(lat"+str(i+1)+", 0)", "label": "latency", "id": "latFilled"+str(i+1), "stat": "p95", "period": 300, "region": region, "visible": False } 
+                        ]
+                        
+                        instantAvailabilityMetric = [ 
+                            { "expression": "IF(fourFilled"+str(i+1)+"<"+str(rate5xx)+" AND fourFilled"+str(i+1)+"<"+str(rate4xx)+" AND latFilled"+str(i+1)+"<"+str(latency)+", 1, 0)", "label": "Instant Availability "+apiName, "id": "apiIA"+str(i+1), "stat": "Average", "period": 300, "region": region, "visible": False } 
+                        ]
+                        
+                        multiplyFactors.append("apiIA"+str(i+1))
+                        metrics.append(error4xxMetric)
+                        metrics.append(error5xxMetric)            
+                        metrics.append(countMetric)            
+                        metrics.append(latencyMetric)            
+                        metrics.append(filledError4xxMetric)
+                        metrics.append(filledError5xxMetric)            
+                        metrics.append(filledLatencyMetric)            
+                        metrics.append(instantAvailabilityMetric) 
+                        
                 # total instant availability
                 totalInstantAvailabilityMetric = [ 
                     { "expression": "*".join(multiplyFactors), "label": "Instant Availability", "id": "e1", "stat": "Average", "period": 300, "region": region } 
@@ -1452,7 +1494,7 @@ Resources:
                 metrics.append(runningSumMetric)
                 metrics.append(runningDataPointMetric)
                 metrics.append(availabilityMetric)
-            
+
                 widgetJson = {
                     "type":"metric",
                     "x":0,
@@ -1514,7 +1556,6 @@ Resources:
                     currentArray.append(x)
                 
                 return currentArray
-
       Handler: index.lambda_handler
       Runtime: python3.9
       Role: !GetAtt OerTransformExecutionRole.Arn
