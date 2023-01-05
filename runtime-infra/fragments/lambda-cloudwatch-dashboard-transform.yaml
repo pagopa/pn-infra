@@ -156,7 +156,7 @@ Resources:
                         localAlarmArns = list(filter(None, localAlarmArns))
                         alarmList = alarmWidgetBuilder(localAlarmArns, y_value ,localRegion)
                         dashboardList = appendList(dashboardList, alarmList)
-                        y_value = y_value+9
+                        y_value = y_value+20
                         
                     if event["params"]["QueueArns"] == [''] or len(event["params"]["QueueArns"]) == 0:
                         print("QueueArns param is missing or empty")
@@ -254,14 +254,14 @@ Resources:
                     "x": 0,
                     "y": widgetYvalue+1,
                     "width": 24,
-                    "height": 2,
+                    "height": 6,
                     "properties": {
                         "alarms": localArray
                     }
                 }
                 myList.append(alarmStatusJson)
                 
-                message = textSeparator("Alarm History Widgets", widgetYvalue+3)
+                message = textSeparator("Alarm History Widgets", widgetYvalue+7)
                 myList.append(message)
 
                 width = int(24/len(localArray))
@@ -270,7 +270,7 @@ Resources:
                     myJson={ 
                         "type": "metric", 
                         "x": x_value, 
-                        "y": widgetYvalue+4, 
+                        "y": widgetYvalue+9, 
                         "width": width, 
                         "height": 5, 
                         "properties": {
@@ -1294,23 +1294,23 @@ Resources:
                     availabiliyConfigurations = [
                         {
                             "key": "LoginAvailability",
-                            "title": "Login"
+                            "title": "Login (Token Exchange only)"
                         },
                         {
                             "key": "ReadNotificationAvailability",
-                            "title": "Lettura notifiche"
+                            "title": "Notification access"
                         },
                         {
                             "key": "WriteNotificationAvailability",
-                            "title": "Creazione notifiche"
+                            "title": "Notification creation"
                         },
                         {
                             "key": "MandateAvailability",
-                            "title": "Gestione deleghe"
+                            "title": "Mandate"
                         },
                         {
                             "key": "DigitalAddressAvailability",
-                            "title": "Domicili e recapiti digitali"
+                            "title": "Address book"
                         },
                         {
                             "key": "ApiKeyAvailability",
