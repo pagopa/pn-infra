@@ -1323,7 +1323,12 @@ Resources:
                             resources = event["params"][availabilityConfiguration['key']]
                             resources = list(filter(None, resources))
                             
-                            titleWidget = textSeparator(availabilityConfiguration['title']+' Availability', y_value)
+                            formattedResArray = []
+                            for res in resources:
+                                formattedResArray.append('"'+res+'"')
+                            resourcesAsString = ", ".join(formattedResArray)
+
+                            titleWidget = textAndSubtextSeparator(availabilityConfiguration['title']+' Availability', resourcesAsString, y_value)
                             dashboardList.append(titleWidget)
                             y_value = y_value+5
                             theAvailabilityWidget = availabilityWidget(resources, y_value, availabilityConfiguration['title'], localRegion)
@@ -1558,6 +1563,20 @@ Resources:
                     "type": "text",
                     "properties": {
                         "markdown": "# "+message
+                    }
+                }
+                
+                return textJson
+
+            def textAndSubtextSeparator(message, paragraph, textYValue):
+                textJson={
+                    "height": 3,
+                    "width": 24,
+                    "y": textYValue,
+                    "x": 0,
+                    "type": "text",
+                    "properties": {
+                        "markdown": "# "+message + "\r\n" + paragraph
                     }
                 }
                 
