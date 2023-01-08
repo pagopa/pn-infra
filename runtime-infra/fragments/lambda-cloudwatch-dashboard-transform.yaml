@@ -1346,7 +1346,7 @@ Resources:
             def alarmWidgetBuilder(alarmArray, functionalityNameArray, widgetYvalue, localRegion):
                 myList = []
                 
-                width = 24/len(alarmArray)
+                width = 12/len(alarmArray)
                 message = textSeparator("Allarmi macrofunzionalità", widgetYvalue)
                 myList.append(message)
                 
@@ -1366,6 +1366,18 @@ Resources:
                     }
                     myList.append(alarmStatusJson)
                 
+                message = textJson={
+                    "height": 2,
+                    "width": 12,
+                    "y": widgetYvalue+1,
+                    "x": 12,
+                    "type": "text",
+                    "properties": {
+                        "markdown": "Se il workflow si ferma ma non si presentano violazioni delle SLA delle notifiche allora l'incidente non genera effettivi disservizi."
+                    }
+                }
+                myList.append(message)
+
                 return myList
                             
             def microserviceLinkWidget(link, serviceName, width, x_value, y_value):
