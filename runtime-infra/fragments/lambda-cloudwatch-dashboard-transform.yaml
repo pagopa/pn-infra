@@ -156,7 +156,7 @@ Resources:
                         localAlarmArns = list(filter(None, localAlarmArns))
                         alarmList = alarmWidgetBuilder(localAlarmArns, y_value ,localRegion)
                         dashboardList = appendList(dashboardList, alarmList)
-                        y_value = y_value+9
+                        y_value = y_value+20
                         
                     if event["params"]["QueueArns"] == [''] or len(event["params"]["QueueArns"]) == 0:
                         print("QueueArns param is missing or empty")
@@ -254,14 +254,14 @@ Resources:
                     "x": 0,
                     "y": widgetYvalue+1,
                     "width": 24,
-                    "height": 2,
+                    "height": 6,
                     "properties": {
                         "alarms": localArray
                     }
                 }
                 myList.append(alarmStatusJson)
                 
-                message = textSeparator("Alarm History Widgets", widgetYvalue+3)
+                message = textSeparator("Alarm History Widgets", widgetYvalue+7)
                 myList.append(message)
 
                 width = int(24/len(localArray))
@@ -270,7 +270,7 @@ Resources:
                     myJson={ 
                         "type": "metric", 
                         "x": x_value, 
-                        "y": widgetYvalue+4, 
+                        "y": widgetYvalue+9, 
                         "width": width, 
                         "height": 5, 
                         "properties": {
@@ -1217,6 +1217,18 @@ Resources:
         ZipFile: |
             import json
 
+            def not_confidential_info(value):
+                if value is None:
+                    return False
+                
+                if "$CONFIDENTIAL_INFO_ACCOUNT_ID" in value:
+                    return False
+                    
+                return True
+                
+            def replace_variable(value, variable_name, variable_value):
+                return value.replace(variable_name, variable_value)
+                
             def lambda_handler(event, context):
                 dashboardList = []
                 data = {}
@@ -1225,6 +1237,10 @@ Resources:
                 if (event["params"]["Region"] == ""):
                     print("Region param is missing")
                 else:
+                    confidentialInfoAccountId = ""
+                    if "ConfidentialInfoAccountId" in event["params"]:
+                        confidentialInfoAccountId = event["params"]["ConfidentialInfoAccountId"]
+                    
                     localRegion = event["params"]["Region"]
                     microservicesAlarmArns = event["params"]["MicroservicesAlarmArns"]
                     microservicesDashboardLinks = event["params"]["MicroservicesDashboardLinks"]
@@ -1251,7 +1267,11 @@ Resources:
                     
                     titleWidget = textSeparator('Microservices Alarms', y_value)
                     dashboardList.append(titleWidget)
-                    
+
+                    if confidentialInfoAccountId is None or confidentialInfoAccountId == '':
+                        microservicesAlarmArns = list(filter(not_confidential_info, microservicesAlarmArns))
+                        microservicesDashboardLinks = list(filter(not_confidential_info, microservicesDashboardLinks))
+                        
                     y_value=y_value+5
                     x_value = 0
                     for i in range(len(microservicesAlarmArns)):
@@ -1259,8 +1279,9 @@ Resources:
                             y_value+=2
                             x_value=0
                         
-                        alarmArn = microservicesAlarmArns[i]
-                        dashboardLink = microservicesDashboardLinks[i]
+                        alarmArn = replace_variable(microservicesAlarmArns[i], '$CONFIDENTIAL_INFO_ACCOUNT_ID', confidentialInfoAccountId)
+                        dashboardLink = replace_variable(microservicesDashboardLinks[i], '$CONFIDENTIAL_INFO_ACCOUNT_ID', confidentialInfoAccountId)
+                        
                         serviceName = getServiceFromLink(dashboardLink)
                         alarmWidget = microserviceAlarmWidget(alarmArn, serviceName, x_width, x_value, y_value)
                         linkWidget = microserviceLinkWidget(dashboardLink, serviceName, x_width, x_value, y_value+2)
@@ -1268,6 +1289,54 @@ Resources:
                         dashboardList.append(alarmWidget)
                         dashboardList.append(linkWidget)
                             
+                    y_value=y_value+5
+                    
+                    availabiliyConfigurations = [
+                        {
+                            "key": "LoginAvailability",
+                            "title": "Login (Token Exchange only)"
+                        },
+                        {
+                            "key": "ReadNotificationAvailability",
+                            "title": "Notification access"
+                        },
+                        {
+                            "key": "WriteNotificationAvailability",
+                            "title": "Notification creation"
+                        },
+                        {
+                            "key": "MandateAvailability",
+                            "title": "Mandate"
+                        },
+                        {
+                            "key": "DigitalAddressAvailability",
+                            "title": "Address book"
+                        },
+                        {
+                            "key": "ApiKeyAvailability",
+                            "title": "API-Key management"
+                        }
+                    ]
+                    
+                    for availabilityConfiguration in availabiliyConfigurations:
+                        if availabilityConfiguration['key'] in event["params"]:
+                            resources = event["params"][availabilityConfiguration['key']]
+                            resources = list(filter(None, resources))
+                            
+                            formattedResArray = []
+                            for res in resources:
+                                formattedResArray.append('"'+res+'"')
+                            resourcesAsString = ", ".join(formattedResArray)
+
+                            titleWidget = textAndSubtextSeparator(availabilityConfiguration['title']+' Availability', resourcesAsString, y_value)
+                            dashboardList.append(titleWidget)
+                            y_value = y_value+5
+                            theAvailabilityWidget = availabilityWidget(resources, y_value, availabilityConfiguration['title'], localRegion)
+                            dashboardList.append(theAvailabilityWidget)   
+                            y_value = y_value+10
+                        
+
+                data["start"] = "-P1D"
                 data["widgets"] = dashboardList
                 print(data)
                 
@@ -1282,7 +1351,7 @@ Resources:
             def alarmWidgetBuilder(alarmArray, functionalityNameArray, widgetYvalue, localRegion):
                 myList = []
                 
-                width = 24/len(alarmArray)
+                width = 12/len(alarmArray)
                 message = textSeparator("Allarmi macrofunzionalità", widgetYvalue)
                 myList.append(message)
                 
@@ -1302,6 +1371,18 @@ Resources:
                     }
                     myList.append(alarmStatusJson)
                 
+                message = textJson={
+                    "height": 2,
+                    "width": 12,
+                    "y": widgetYvalue+1,
+                    "x": 12,
+                    "type": "text",
+                    "properties": {
+                        "markdown": "Se il workflow si ferma ma non si presentano violazioni delle SLA delle notifiche allora l'incidente non genera effettivi disservizi."
+                    }
+                }
+                myList.append(message)
+
                 return myList
                             
             def microserviceLinkWidget(link, serviceName, width, x_value, y_value):
@@ -1318,6 +1399,138 @@ Resources:
                 
                 return alarmJson
 
+            def availabilityWidget(resources, widgetYvalue, title, region):
+                rate5xx = 0.01
+                rate4xx = 0.1
+                latency = 1000
+                
+                width = 24
+
+                metrics = []
+                multiplyFactors = []
+
+                for i in range(len(resources)):
+                    resourceParts = resources[i].split(':')
+                    resourceType = resourceParts[0]
+                
+                    if resourceType=='API':
+                        apiName = resourceParts[1]
+                        error4xxMetric = [
+                            "AWS/ApiGateway", "4XXError", "ApiName", apiName, "Stage", "unique", { "id": "four"+str(i+1), "visible": False, "region": region }
+                        ]
+                        error5xxMetric = [
+                            "AWS/ApiGateway", "5XXError", "ApiName", apiName, "Stage", "unique", { "id": "five"+str(i+1), "visible": False, "region": region }
+                        ]
+                        countMetric = [
+                            "AWS/ApiGateway", "Count", "ApiName", apiName, "Stage", "unique", { "id": "cnt"+str(i+1), "visible": False, "region": region }
+                        ]
+                        latencyMetric = [
+                            "AWS/ApiGateway", "Latency", "ApiName", apiName, "Stage", "unique", { "id": "lat"+str(i+1), "visible": False, "stat": "p95", "region": region }
+                        ]
+
+                        filledError4xxMetric = [
+                            { "expression": "FILL(four"+str(i+1)+", 0)/FILL(cnt"+str(i+1)+", 1)", "label": "error4xxRate", "id": "fourFilled"+str(i+1), "stat": "Average", "period": 300, "region": region, "visible": False } 
+                        ]
+                        
+                        filledError5xxMetric = [
+                            { "expression": "FILL(five"+str(i+1)+", 0)/FILL(cnt"+str(i+1)+", 1)", "label": "error5xxRate", "id": "fiveFilled"+str(i+1), "stat": "Average", "period": 300, "region": region, "visible": False } 
+                        ]
+                        
+                        filledLatencyMetric = [
+                            { "expression": "FILL(lat"+str(i+1)+", 0)", "label": "latency", "id": "latFilled"+str(i+1), "stat": "p95", "period": 300, "region": region, "visible": False } 
+                        ]
+                        
+                        instantAvailabilityMetric = [ 
+                            { "expression": "IF(fiveFilled"+str(i+1)+"<"+str(rate5xx)+" AND fourFilled"+str(i+1)+"<"+str(rate4xx)+" AND latFilled"+str(i+1)+"<"+str(latency)+", 1, 0)", "label": "Instant Availability "+apiName, "id": "apiIA"+str(i+1), "stat": "Average", "period": 300, "region": region, "visible": False } 
+                        ]
+                        
+                        multiplyFactors.append("apiIA"+str(i+1))
+                        metrics.append(error4xxMetric)
+                        metrics.append(error5xxMetric)            
+                        metrics.append(countMetric)            
+                        metrics.append(latencyMetric)            
+                        metrics.append(filledError4xxMetric)
+                        metrics.append(filledError5xxMetric)            
+                        metrics.append(filledLatencyMetric)            
+                        metrics.append(instantAvailabilityMetric)            
+                    elif resourceType=='ALB' and resourceParts[1] is not None and resourceParts[1] != '':
+                        albName = resourceParts[1]
+                        targetGroup = resourceParts[2]
+                        
+                        error4xxMetric = [
+                            "AWS/ApplicationELB", "HTTPCode_Target_4XX_Count", "TargetGroup", targetGroup, "LoadBalancer", albName, { "id": "four"+str(i+1), "visible": False, "region": region }
+                        ]
+                        error5xxMetric = [
+                            "AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "TargetGroup", targetGroup, "LoadBalancer", albName, { "id": "five"+str(i+1), "visible": False, "region": region }
+                        ]
+                        countMetric = [
+                            "AWS/ApplicationELB", "RequestCountPerTarget", "TargetGroup", targetGroup, "LoadBalancer", albName, { "id": "cnt"+str(i+1), "visible": False, "region": region }
+                        ]
+                        latencyMetric = [
+                            "AWS/ApplicationELB", "TargetResponseTime", "TargetGroup", targetGroup, "LoadBalancer", albName, { "id": "lat"+str(i+1), "visible": False, "stat": "p95", "region": region }
+                        ]
+
+                        filledError4xxMetric = [
+                            { "expression": "FILL(four"+str(i+1)+", 0)/FILL(cnt"+str(i+1)+", 1)", "label": "error4xxRate", "id": "fourFilled"+str(i+1), "stat": "Average", "period": 300, "region": region, "visible": False } 
+                        ]
+                        
+                        filledError5xxMetric = [
+                            { "expression": "FILL(five"+str(i+1)+", 0)/FILL(cnt"+str(i+1)+", 1)", "label": "error5xxRate", "id": "fiveFilled"+str(i+1), "stat": "Average", "period": 300, "region": region, "visible": False } 
+                        ]
+                        
+                        filledLatencyMetric = [
+                            { "expression": "FILL(lat"+str(i+1)+", 0)", "label": "latency", "id": "latFilled"+str(i+1), "stat": "p95", "period": 300, "region": region, "visible": False } 
+                        ]
+                        
+                        instantAvailabilityMetric = [ 
+                            { "expression": "IF(fiveFilled"+str(i+1)+"<"+str(rate5xx)+" AND fourFilled"+str(i+1)+"<"+str(rate4xx)+" AND latFilled"+str(i+1)+"<"+str(latency)+", 1, 0)", "label": "Instant Availability "+apiName, "id": "apiIA"+str(i+1), "stat": "Average", "period": 300, "region": region, "visible": False } 
+                        ]
+                        
+                        multiplyFactors.append("apiIA"+str(i+1))
+                        metrics.append(error4xxMetric)
+                        metrics.append(error5xxMetric)            
+                        metrics.append(countMetric)            
+                        metrics.append(latencyMetric)            
+                        metrics.append(filledError4xxMetric)
+                        metrics.append(filledError5xxMetric)            
+                        metrics.append(filledLatencyMetric)            
+                        metrics.append(instantAvailabilityMetric) 
+                        
+                # total instant availability
+                totalInstantAvailabilityMetric = [ 
+                    { "expression": "*".join(multiplyFactors), "label": "Instant Availability", "id": "e1", "stat": "Average", "period": 300, "region": region } 
+                ]
+                
+                runningSumMetric = [ { "expression": "RUNNING_SUM(e1)", "label": "Expression3", "id": "e3", "visible": False, "region": region } ]
+                
+                runningDataPointMetric = [ { "expression": "RUNNING_SUM((e1+1)/(e1+1))", "label": "Expression4", "id": "e4", "visible": False, "region": region } ]
+                
+                availabilityMetric = [ { "expression": "(e3/e4)*100", "label": "Availability", "id": "e2", "region": "eu-south-1" } ]
+                
+                metrics.append(totalInstantAvailabilityMetric)
+                metrics.append(runningSumMetric)
+                metrics.append(runningDataPointMetric)
+                metrics.append(availabilityMetric)
+
+                widgetJson = {
+                    "type":"metric",
+                    "x":0,
+                    "y":widgetYvalue,
+                    "width":width,
+                    "height": 6,
+                    "properties": {
+                        "sparkline": True,
+                        "view": "singleValue",
+                        "region": region,
+                        "stat": "Sum",
+                        "period": 300,
+                        "stacked": False,
+                        "singleValueFullPrecision": False,
+                        "metrics": metrics
+                    }
+                }   
+                return widgetJson
+                
             def getServiceFromLink(link):
                 tokens = link.split("#dashboards:name=", 1)
                 if len(tokens)>1:
@@ -1350,6 +1563,20 @@ Resources:
                     "type": "text",
                     "properties": {
                         "markdown": "# "+message
+                    }
+                }
+                
+                return textJson
+
+            def textAndSubtextSeparator(message, paragraph, textYValue):
+                textJson={
+                    "height": 3,
+                    "width": 24,
+                    "y": textYValue,
+                    "x": 0,
+                    "type": "text",
+                    "properties": {
+                        "markdown": "# "+message + "\r\n" + paragraph
                     }
                 }
                 

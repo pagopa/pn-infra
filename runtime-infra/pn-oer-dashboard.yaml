@@ -16,8 +16,15 @@ Parameters:
     Default: ''
     Description: 'Confidential Info AWS Account ID'
 
-Conditions:
-  HasConfidentialInfoAccount: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, "" ] ]
+  Alb:
+    Type: String
+    Default: ''
+    Description: 'ALB'
+
+  RaddTargetGroup:
+    Type: String
+    Default: ''
+    Description: 'RADD Target Group'
 
 Resources:
 
@@ -30,6 +37,8 @@ Resources:
           Name: 'OerDashboardBodyTransform'
           Parameters:
             Region: !Sub ${AWS::Region}
+            # Cloudformation doesn't allow to use IF conditions as Marco parameters so the optionality is managed at Lambda level
+            ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
             MicroservicesAlarmArns:
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-external-registries-CompositeAlarm
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-mandate-CompositeAlarm
@@ -43,10 +52,7 @@ Resources:
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-frontend-CompositeAlarm
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-delivery-push-CompositeAlarm
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-logsaver-be-CompositeAlarm
-              - Fn::If:
-                - HasConfidentialInfoAccount
-                - !Sub arn:aws:cloudwatch:${AWS::Region}:${ConfidentialInfoAccountId}:alarm:pn-data-vault-CompositeAlarm
-                - ''
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:$CONFIDENTIAL_INFO_ACCOUNT_ID:alarm:pn-data-vault-CompositeAlarm
             MicroservicesDashboardLinks:
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-external-registries       
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-mandate
@@ -60,10 +66,7 @@ Resources:
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-frontend
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-delivery-push
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-logsaver-be
-              - Fn::If:
-                - HasConfidentialInfoAccount
-                - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-data-vault;accountId=${ConfidentialInfoAccountId}
-                - ''
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-data-vault;accountId=$CONFIDENTIAL_INFO_ACCOUNT_ID
             FunctionalAlarmsArns:
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-CompositeAlarm-NotificationInput
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-CompositeAlarm-NotificationOutput
@@ -72,6 +75,37 @@ Resources:
               - Nuove Notifiche
               - Lettura Notifiche
               - Workflow
+            LoginAvailability:
+              - "API:pn-token-exchange-api"
+            ReadNotificationAvailability:
+              - "API:pn-token-exchange-api"
+              - "API:pn-delivery-progress-public-api-B2B"
+              - "API:pn-delivery-public-api-B2B"
+              - "API:pn-delivery-public-api-IO"
+              - "API:pn-delivery-public-api-WEB"
+              - "API:pn-delivery-push-public-api-B2B"
+              - "API:pn-delivery-push-public-api-IO"
+              - "API:pn-delivery-push-public-api-WEB"
+              - !Sub "ALB:${Alb}:${RaddTargetGroup}"
+            WriteNotificationAvailability:
+              - "API:pn-delivery-public-api-B2B"
+              - "API:pn-delivery-public-api-IO"
+              - "API:pn-delivery-public-api-WEB"
+              - "API:pn-delivery-public-api-WEB"
+              - "API:pn-ExternalRegistry-public-api-B2B"
+              - "API:pn-ExternalRegistry-public-api-WEB"
+            MandateAvailability:
+              - "API:pn-mandate-public-api-WEB"
+              - "API:pn-token-exchange-api"
+              - "API:API:pn-ExternalRegistry-public-api-WEB"
+            DigitalAddressAvailability:
+              - "API:pn-token-exchange-api"
+              - "API:pn-UserAttributes-public-api-WEB"
+              - "API:pn-ExternalRegistry-public-api-WEB"
+            ApiKeyAvailability:
+              - "API:pn-token-exchange-api"
+              - "API:pn-ApikeyManager-public-api-WEB"
+              - "API:pn-ApikeyManager-bo-public-api-WEB"
 Outputs:
   Version:
     Value: !Ref Version
