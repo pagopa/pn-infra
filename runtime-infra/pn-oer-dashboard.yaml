@@ -26,6 +26,11 @@ Parameters:
     Default: ''
     Description: 'RADD Target Group'
 
+  LogsBucketName:
+    Type: String
+    Default: ''
+    Description: 'Logs Bucket Name'
+
 Resources:
 
   StorageFunction:
@@ -36,6 +41,9 @@ Resources:
           'use strict';
           const AWS = require('aws-sdk');
           const cloudwatch = new AWS.CloudWatch({apiVersion: '2010-08-01'});
+          const dynamoDB = new AWS.DynamoDB();
+
+          const DOCS = `PN Storage Widget`
 
           function getBucketSize(bucketName, startTime, endTime) {
               var params = {
@@ -52,30 +60,104 @@ Resources:
                   },
                 ],
                 Period: 86400,
-                Statistics: ['Sum'],
+                Statistics: ['Average'],
                 MetricName: 'BucketSizeBytes',
                 Namespace: 'AWS/S3'
               };
               
+              console.log('params', params);
               return cloudwatch.getMetricStatistics(params).promise();
           }
 
-          exports.handler = async (event) => {
-            const bucketName = 'pn-logs-bucket-eu-south-1-558518206506-001'
-            const endTime =  new Date();
-            const startTime = new Date();
-            startTime.setDate(startTime.getDate()-1);
-            
-            const res = await getBucketSize(bucketName, startTime, endTime);
-            return {
-              status: 200,
-              message: 'OK',
-              res: res
+          function listDynamoTables() {
+              var params = {
+                
+              };
+              return dynamoDB.listTables(params).promise();
+          }
+
+          function getDynamoTableSize(tableName){
+            var params = {
+              TableName: tableName
             }
+            
+            return dynamoDB.describeTable(params).promise();
+          }
+
+          async function getDynamoTablesSize(){
+            const listTablesResult = await listDynamoTables()
+            const ret = []
+            for(let i=0; i<listTablesResult.TableNames.length; i++){
+              const tableName = listTablesResult.TableNames[i]
+              const describeTableResult = await getDynamoTableSize(tableName)
+              const tableSize = describeTableResult.Table.TableSizeBytes
+              ret.push({
+                type: 'DynamoDB',
+                name: tableName,
+                size: tableSize
+              })
+            }
+            
+            return ret;
+          }
+
+          const CSS = ``
+
+          exports.handler = async (event) => {
+            
+            if (event.describe) {
+              return DOCS;   
+            }
+            const widgetContext = event.widgetContext;
+            const timeRange = widgetContext.timeRange.zoom || widgetContext.timeRange;
+            const startTime = new Date(timeRange.start);
+            const endTime = new Date(timeRange.end);
+            const region = event.region;
+              
+            const tables = []
+
+            const bucketName = process.env.LOGS_BUCKET_NAME
+            if(bucketName){
+              const res = await getBucketSize(bucketName, startTime, endTime);
+              tables.push({
+                type: 'S3',
+                name: bucketName,
+                size: res.Datapoints.length>0?res.Datapoints[0].Average:'n/a'
+              })
+            }
+
+            const dynamoTables = await getDynamoTablesSize()
+            for(let i=0; i<dynamoTables.length; i++){
+              tables.push(dynamoTables[i]);
+            }
+            
+            const initialValue = 0;
+            const totalDynamoSize = tables.reduce(
+              (accumulator, currentValue) => accumulator + currentValue.size,
+              initialValue
+            );
+            
+            tables.push({
+              type: 'DynamoDB',
+              name: 'Total DynamoDB Size',
+              size: totalDynamoSize
+            })
+
+            const metricRows = tables.map((resource, i) => {
+              let html = `<tr><td>${resource.type}</td><td><b>${resource.name}</b></td>`;
+              html += `<td>${resource.value}</td></tr>`;
+              return html;
+            });
+              
+            const tableStart = `<h3>Storage widget</h3><table class="cwdb-no-default-styles"><thead><tr><th>Resource Type</th><th>Resource Name</th><th>Size (in bytes)</th></tr></thead>`
+            return CSS + tableStart + `<tbody>${metricRows.join('')}</tbody></table>`;    
           };
       Description: "Storage function custom widget"
       FunctionName: pn-storage-function
       Handler: index.handler
+      Environment: 
+        Variables:
+          LOGS_BUCKET_NAME: !Ref LogsBucketName
       MemorySize: 128
       Role: !GetAtt StorageFunctionIAMRole.Arn
       Runtime: nodejs16.x
