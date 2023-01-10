@@ -33,14 +33,46 @@ Resources:
     Properties:
       Code:
         ZipFile: |
-          const handler = async (event) => {
+          'use strict';
+          const AWS = require('aws-sdk');
+          const cloudwatch = new AWS.CloudWatch({apiVersion: '2010-08-01'});
+
+          function getBucketSize(bucketName, startTime, endTime) {
+              var params = {
+                StartTime: startTime.toISOString(),
+                EndTime: endTime.toISOString(),
+                Dimensions: [
+                  {
+                    Name: 'BucketName',
+                    Value: bucketName
+                  },
+                  {
+                    Name: 'StorageType',
+                    Value: 'StandardStorage'
+                  },
+                ],
+                Period: 86400,
+                Statistics: ['Sum'],
+                MetricName: 'BucketSizeBytes',
+                Namespace: 'AWS/S3'
+              };
+              
+              return cloudwatch.getMetricStatistics(params).promise();
+          }
+
+          exports.handler = async (event) => {
+            const bucketName = 'pn-logs-bucket-eu-south-1-558518206506-001'
+            const endTime =  new Date();
+            const startTime = new Date();
+            startTime.setDate(startTime.getDate()-1);
+            
+            const res = await getBucketSize(bucketName, startTime, endTime);
             return {
               status: 200,
-              message: 'OK'
+              message: 'OK',
+              res: res
             }
           };
-
-          export { handler };
       Description: "Storage function custom widget"
       FunctionName: pn-storage-function
       Handler: index.handler
@@ -73,7 +105,7 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/pn-storage-function:*
               - Action:
-                  - cloudwatch:GetMetricData
+                  - cloudwatch:GetMetricStatistics
                   - cloudwatch:ListMetrics
                   - dynamodb:List*
                   - dynamodb:DescribeTable
