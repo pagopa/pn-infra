@@ -28,6 +28,66 @@ Parameters:
 
 Resources:
 
+  StorageFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          const handler = async (event) => {
+            return {
+              status: 200,
+              message: 'OK'
+            }
+          };
+
+          export { handler };
+      Description: "Storage function custom widget"
+      FunctionName: pn-storage-function
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt StorageFunctionIAMRole.Arn
+      Runtime: nodejs16.x
+      Timeout: 60
+
+  StorageFunctionIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      Policies:
+        - PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Effect: Allow
+                Resource:
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/pn-storage-function:*
+              - Action:
+                  - cloudwatch:GetMetricData
+                  - cloudwatch:ListMetrics
+                  - dynamodb:List*
+                  - dynamodb:DescribeTable
+                Effect: Allow
+                Resource: '*'
+          PolicyName: pn-storage-function-policy
+
+  StorageFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${StorageFunction}
+      RetentionInDays: 14
+
+
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard
     Properties:
@@ -106,6 +166,7 @@ Resources:
               - "API:pn-token-exchange-api"
               - "API:pn-ApikeyManager-public-api-WEB"
               - "API:pn-ApikeyManager-bo-public-api-WEB"
+            StorageWidgetFunction: !Ref StorageFunction
 Outputs:
   Version:
     Value: !Ref Version
