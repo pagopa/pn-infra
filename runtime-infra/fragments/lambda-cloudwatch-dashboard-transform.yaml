@@ -156,8 +156,10 @@ Resources:
                         localAlarmArns = list(filter(None, localAlarmArns))
                         alarmList = alarmWidgetBuilder(localAlarmArns, y_value ,localRegion, 4)
                         dashboardList = appendList(dashboardList, alarmList)
-                        y_value = y_value+9+9*int((len(localAlarmArns)/4))
-                        
+                        if(len(localAlarmArns)%4==0):
+                            y_value = y_value+9+6*int((len(localAlarmArns)/4))
+                        else:
+                            y_value = y_value+9+6*int((len(localAlarmArns)/4))+6
                     if event["params"]["QueueArns"] == [''] or len(event["params"]["QueueArns"]) == 0:
                         print("QueueArns param is missing or empty")
                     else:
@@ -263,14 +265,19 @@ Resources:
                 
                 message = textSeparator("Alarm History Widgets", widgetYvalue+7)
                 myList.append(message)
-
-                width = int(24/len(localArray))
+                
+                widgetYvalue = widgetYvalue+9
+                
+                width = int(24/maxAlarmWidgetsPerRow)
                 for x in range(len(localArray)):
                     x_value=(x%maxAlarmWidgetsPerRow)*width
+                    if x>0 and x%maxAlarmWidgetsPerRow==0:
+                        widgetYvalue = widgetYvalue+6
+                        
                     myJson={ 
                         "type": "metric", 
                         "x": x_value, 
-                        "y": widgetYvalue+9, 
+                        "y": widgetYvalue, 
                         "width": width, 
                         "height": 5, 
                         "properties": {
@@ -286,8 +293,6 @@ Resources:
                     }
                     myList.append(myJson)
 
-                    if x>0 and x%maxAlarmWidgetsPerRow==0:
-                        widgetYvalue = widgetYvalue+9
 
                     
                 return myList
@@ -705,7 +710,7 @@ Resources:
                 queueList.append(putRecordsJson)
 
                 return queueList
- 
+
             def restApiWidgetBuilder(localArray, widgetYvalue, localRegion, localRestAPINames):
                 restList = []
                 message = textSeparator("REST API Widgets", widgetYvalue)
@@ -1207,9 +1212,6 @@ Resources:
                 }
                 
                 return textJson
-
-
-
       Handler: index.lambda_handler
       Runtime: python3.9
       Role: !GetAtt TransformExecutionRole.Arn
