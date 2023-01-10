@@ -90,6 +90,8 @@ Resources:
 
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard
+    DependsOn:
+      - StorageFunction
     Properties:
       DashboardName: !Sub ${ProjectName}-OER-Dashboard
       DashboardBody: 
@@ -166,7 +168,7 @@ Resources:
               - "API:pn-token-exchange-api"
               - "API:pn-ApikeyManager-public-api-WEB"
               - "API:pn-ApikeyManager-bo-public-api-WEB"
-            StorageWidgetFunction: !Ref StorageFunction
+            StorageWidgetFunction: !Sub ${StorageFunction.Arn}
 Outputs:
   Version:
     Value: !Ref Version
