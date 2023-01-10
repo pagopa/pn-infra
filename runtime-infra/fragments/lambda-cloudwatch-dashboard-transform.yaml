@@ -1335,6 +1335,9 @@ Resources:
                             dashboardList.append(theAvailabilityWidget)   
                             y_value = y_value+10
                         
+                    if 'StorageWidgetFunction' in event["params"]:
+                        customStorageWidget = customWidget(event["params"]["StorageWidgetFunction"], "Storage", 16, 24, 0, y_value)
+                        dashboardList.append(customStorageWidget)
 
                 data["start"] = "-P1D"
                 data["widgets"] = dashboardList
@@ -1539,6 +1542,25 @@ Resources:
                 else:
                     return link
                 
+            def customWidget(lambdaArn, title, height, width, x_value, y_value):
+                customWidgetJson = {
+                    "height": height,
+                    "width": width,
+                    "y": y_value,
+                    "x": x_value,
+                    "type": "custom",
+                    "properties": {
+                        "endpoint": lambdaArn,
+                        "title": title,
+                        "params": {},
+                        "updateOn": {
+                            "refresh": True
+                        },
+                    }
+                }
+                
+                return customWidgetJson
+
             def microserviceAlarmWidget(alarmArn, title, width, x_value, y_value):
                 alarmJson={
                     "height": 2,

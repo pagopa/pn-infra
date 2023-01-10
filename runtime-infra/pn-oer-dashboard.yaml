@@ -94,7 +94,7 @@ Resources:
               ret.push({
                 type: 'DynamoDB',
                 name: tableName,
-                size: tableSize
+                size: tableSize/(1024*1024)
               })
             }
             
@@ -122,7 +122,7 @@ Resources:
               tables.push({
                 type: 'S3',
                 name: bucketName,
-                size: res.Datapoints.length>0?res.Datapoints[0].Average:'n/a'
+                size: res.Datapoints.length>0?res.Datapoints[0].Average/(1024*1024):'n/a'
               })
             }
 
@@ -145,11 +145,11 @@ Resources:
 
             const metricRows = tables.map((resource, i) => {
               let html = `<tr><td>${resource.type}</td><td><b>${resource.name}</b></td>`;
-              html += `<td>${resource.value}</td></tr>`;
+              html += `<td>${resource.size}</td></tr>`;
               return html;
             });
               
-            const tableStart = `<h3>Storage widget</h3><table class="cwdb-no-default-styles"><thead><tr><th>Resource Type</th><th>Resource Name</th><th>Size (in bytes)</th></tr></thead>`
+            const tableStart = `<table class="cwdb-no-default-styles"><thead><tr><th>Resource Type</th><th>Resource Name</th><th>Size (in MB)</th></tr></thead>`
             return CSS + tableStart + `<tbody>${metricRows.join('')}</tbody></table>`;    
           };
       Description: "Storage function custom widget"
