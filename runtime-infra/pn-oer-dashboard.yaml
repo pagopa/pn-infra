@@ -99,14 +99,14 @@ Resources:
               ret.push({
                 type: 'DynamoDB',
                 name: tableName,
-                size: tableSize
+                size: tableSize/(1024*1024*1024)
               })
             }
             
             return ret;
           }
 
-          const CSS = ``
+          const CSS = `<style>td,th{font-family:Arial,sans-serif;font-size:14px;white-space:nowrap;text-align:left;padding:3px;border-bottom:1px solid #f2f2f2}td:first-child{text-align:left}tr:hover{background:#fbf8e9!important;transition:all .1s ease-in-out}tbody tr:nth-child(even){background:#f5f5f5;box-shadow:0 1px 0 rgba(255,255,255,.8) inset}th{text-align:left;text-shadow:0 1px 0 rgba(255,255,255,.5);border-bottom:1px solid #ccc;background-color:#dce9f9;background-image:linear-gradient(top,#ebf3fc,#dce9f9)}th:first-child{border-radius:6px 0 0 0}th:last-child{border-radius:0 6px 0 0}th:only-child{border-radius:6px 6px 0 0}</style>`
 
           exports.handler = async (event) => {
             
@@ -127,7 +127,7 @@ Resources:
               tables.push({
                 type: 'S3',
                 name: bucketName,
-                size: res.Datapoints.length>0?res.Datapoints[0].Average:'n/a'
+                size: res.Datapoints.length>0?res.Datapoints[0].Average/(1024*1024*1024):'n/a'
               })
             }
 
@@ -150,11 +150,11 @@ Resources:
 
             const metricRows = tables.map((resource, i) => {
               let html = `<tr><td>${resource.type}</td><td><b>${resource.name}</b></td>`;
-              html += `<td>${resource.size}</td></tr>`;
+              html += `<td>${resource.size} GB</td></tr>`;
               return html;
             });
               
-            const tableStart = `<h3>Storage widget</h3><table class="cwdb-no-default-styles"><thead><tr><th>Resource Type</th><th>Resource Name</th><th>Size (in bytes)</th></tr></thead>`
+            const tableStart = `<table class="cwdb-no-default-styles"><thead><tr><th>Resource Type</th><th>Resource Name</th><th>Used Storage</th></tr></thead>`
             return CSS + tableStart + `<tbody>${metricRows.join('')}</tbody></table>`;    
           };
 
@@ -290,6 +290,7 @@ Resources:
               - "API:pn-ApikeyManager-bo-public-api-WEB"
             StorageWidgetFunction: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:pn-storage-function
             OpenSearchArn: !Ref OpenSearchArn
+            LogsBucketName: !Ref LogsBucketName
 Outputs:
   Version:
     Value: !Ref Version
