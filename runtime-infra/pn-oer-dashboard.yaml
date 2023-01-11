@@ -50,30 +50,6 @@ Resources:
 
           const DOCS = `PN Storage Widget`
 
-          function getBucketSize(bucketName, startTime, endTime) {
-              var params = {
-                StartTime: startTime.toISOString(),
-                EndTime: endTime.toISOString(),
-                Dimensions: [
-                  {
-                    Name: 'BucketName',
-                    Value: bucketName
-                  },
-                  {
-                    Name: 'StorageType',
-                    Value: 'StandardStorage'
-                  },
-                ],
-                Period: 86400,
-                Statistics: ['Average'],
-                MetricName: 'BucketSizeBytes',
-                Namespace: 'AWS/S3'
-              };
-              
-              console.log('params', params);
-              return cloudwatch.getMetricStatistics(params).promise();
-          }
-
           function listDynamoTables() {
               var params = {
                 
@@ -97,9 +73,8 @@ Resources:
               const describeTableResult = await getDynamoTableSize(tableName)
               const tableSize = describeTableResult.Table.TableSizeBytes
               ret.push({
-                type: 'DynamoDB',
                 name: tableName,
-                size: tableSize/(1024*1024*1024)
+                size: tableSize
               })
             }
             
@@ -113,23 +88,8 @@ Resources:
             if (event.describe) {
               return DOCS;   
             }
-            const widgetContext = event.widgetContext;
-            const timeRange = widgetContext.timeRange.zoom || widgetContext.timeRange;
-            const startTime = new Date(timeRange.start);
-            const endTime = new Date(timeRange.end);
-            const region = event.region;
-              
-            const tables = []
 
-            const bucketName = process.env.LOGS_BUCKET_NAME
-            if(bucketName){
-              const res = await getBucketSize(bucketName, startTime, endTime);
-              tables.push({
-                type: 'S3',
-                name: bucketName,
-                size: res.Datapoints.length>0?res.Datapoints[0].Average/(1024*1024*1024):'n/a'
-              })
-            }
+            const tables = []
 
             const dynamoTables = await getDynamoTablesSize()
             for(let i=0; i<dynamoTables.length; i++){
@@ -143,27 +103,22 @@ Resources:
             );
             
             tables.push({
-              type: 'DynamoDB',
               name: 'Total DynamoDB Size',
               size: totalDynamoSize
             })
 
             const metricRows = tables.map((resource, i) => {
-              let html = `<tr><td>${resource.type}</td><td><b>${resource.name}</b></td>`;
-              html += `<td>${resource.size} GB</td></tr>`;
+              let html = `<tr><td><b>${resource.name}</b></td>`;
+              html += `<td>${Number(resource.size/(1024*1024*1024)).toFixed(6)} GB</td></tr>`;
               return html;
             });
               
-            const tableStart = `<table class="cwdb-no-default-styles"><thead><tr><th>Resource Type</th><th>Resource Name</th><th>Used Storage</th></tr></thead>`
+            const tableStart = `<table class="cwdb-no-default-styles"><thead><tr><th>Table Name</th><th>Used Storage</th></tr></thead>`
             return CSS + tableStart + `<tbody>${metricRows.join('')}</tbody></table>`;    
           };
-
       Description: "Storage function custom widget"
       FunctionName: pn-storage-function
       Handler: index.handler
-      Environment: 
-        Variables:
-          LOGS_BUCKET_NAME: !Ref LogsBucketName
       MemorySize: 128
       Role: !GetAtt StorageFunctionIAMRole.Arn
       Runtime: nodejs16.x

@@ -1336,26 +1336,29 @@ Resources:
                             y_value = y_value+10
                         
 
-                    storage_x_value = 0
-                    if 'LogsBucketName' in event["params"]:
-                        theS3StorageWidget = s3StorageWidget(event["params"]["LogsBucketName"], "S3 Logs Bucket", 10, 8, storage_x_value, y_value, localRegion)
-                        dashboardList.append(theOpenSearchStorageWidget)
-                        storage_x_value = storage_x_value+8
+                    if 'LogsBucketName' in event["params"] or 'OpenSearchArn' in event["params"] or 'StorageWidgetFunction' in event["params"]:
+                        titleWidget = textSeparator('Storage', y_value)
+                        dashboardList.append(titleWidget)
+                        y_value = y_value+2
+                        storage_x_value = 0
+                        if 'LogsBucketName' in event["params"]:
+                            theS3StorageWidget = s3StorageWidget(event["params"]["LogsBucketName"], "S3 Logs Bucket", 10, 6, storage_x_value, y_value, localRegion)
+                            dashboardList.append(theS3StorageWidget)
+                            storage_x_value = storage_x_value+6
 
-                    if 'OpenSearchArn' in event["params"]:
-                        theOpenSearchStorageWidget = openSearchStorageWidget(event["params"]["OpenSearchArn"], "OpenSearch Free/Used Space", 10, 8, storage_x_value, y_value, localRegion)
-                        dashboardList.append(theOpenSearchStorageWidget)
-                        storage_x_value = storage_x_value+8
+                        if 'OpenSearchArn' in event["params"]:
+                            theOpenSearchStorageWidget = openSearchStorageWidget(event["params"]["OpenSearchArn"], "OpenSearch Free/Used Space", 10, 8, storage_x_value, y_value, localRegion)
+                            dashboardList.append(theOpenSearchStorageWidget)
+                            storage_x_value = storage_x_value+8
 
-                    if 'StorageWidgetFunction' in event["params"]:
-                        customStorageWidget = customWidget(event["params"]["StorageWidgetFunction"], "DynamoDB Storage", 10, 8, storage_x_value, y_value)
-                        dashboardList.append(customStorageWidget)
-                        
-                    y_value = y_value+11
+                        if 'StorageWidgetFunction' in event["params"]:
+                            customStorageWidget = customWidget(event["params"]["StorageWidgetFunction"], "DynamoDB Storage", 10, 10, storage_x_value, y_value)
+                            dashboardList.append(customStorageWidget)
+                            
+                        y_value = y_value+11
 
                 data["start"] = "-P1D"
                 data["widgets"] = dashboardList
-                print(data)
                 
                 response = {
                     "requestId": event["requestId"],
