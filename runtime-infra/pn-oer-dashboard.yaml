@@ -48,23 +48,7 @@ Resources:
           const cloudwatch = new AWS.CloudWatch({apiVersion: '2010-08-01'});
           const dynamoDB = new AWS.DynamoDB();
 
-          const sts = new AWS.STS({apiVersion: '2011-06-15'});
-
           const DOCS = `PN Storage Widget`
-
-          var helpdeskCloudwatch = null;
-
-          function assumeRole(role){
-            var roleToAssume = {
-              RoleArn: role,
-              RoleSessionName: 'session1',
-              DurationSeconds: 900
-            };
-            //Assume Role
-            const data = sts.assumeRole(roleToAssume).promise(); 
-            
-            return data;  
-          }
 
           function getBucketSize(bucketName, startTime, endTime) {
               var params = {
@@ -89,43 +73,6 @@ Resources:
               console.log('params', params);
               return cloudwatch.getMetricStatistics(params).promise();
           }
-
-          function getOpenSearchSpace(clientId, domainName, startTime, endTime, metricName){
-            var params = {
-                StartTime: startTime.toISOString(),
-                EndTime: endTime.toISOString(),
-                Dimensions: [
-                  {
-                    Name: 'ClientId',
-                    Value: clientId
-                  },
-                  {
-                    Name: 'DomainName',
-                    Value: domainName
-                  },
-                ],
-                Period: 60,
-                Statistics: ['Maximum'],
-                MetricName: metricName,
-                Namespace: 'AWS/ES'
-              };
-              
-              return helpdeskCloudwatch.getMetricStatistics(params).promise();
-          }
-
-          async function getOpenSearchSize(openSearchArn, startTime, endTime){
-            const roleArn = 'arn:aws:iam::558518206506:role/aws-service-role/cloudwatch-crossaccount.amazonaws.com/AWSServiceRoleForCloudWatchCrossAccount';
-            const assumeRoleCredentials = await assumeRole(roleArn);
-            helpdeskCloudwatch = new AWS.CloudWatch({
-              apiVersion: '2011-06-15',
-              accessKeyId: assumeRoleCredentials.Credentials.AccessKeyId,
-              secretAccessKey: assumeRoleCredentials.Credentials.SecretAccessKey,
-              sessionToken: assumeRoleCredentials.Credentials.SessionToken
-            })
-            
-            return assumeRoleCredentials;
-          }
-
 
           function listDynamoTables() {
               var params = {
@@ -184,16 +131,6 @@ Resources:
               })
             }
 
-            const openSearchArn = process.env.OPENSEARCH_ARN
-            if(openSearchArn){
-              const { domainName, size } = await getOpenSearchSize(openSearchArn, startTime, endTime);
-              tables.push({
-                type: 'OpenSearch',
-                name: domainName,
-                size: size
-              })
-            }
-
             const dynamoTables = await getDynamoTablesSize()
             for(let i=0; i<dynamoTables.length; i++){
               tables.push(dynamoTables[i]);
@@ -227,9 +164,6 @@ Resources:
       Environment: 
         Variables:
           LOGS_BUCKET_NAME: !Ref LogsBucketName
-          OPENSEARCH_ARN: !Ref OpenSearchArn
-          ACCOUNT_ID: !Sub ${AWS::AccountId}
-          REGION: !Sub ${AWS::Region}
       MemorySize: 128
       Role: !GetAtt StorageFunctionIAMRole.Arn
       Runtime: nodejs16.x
@@ -263,7 +197,6 @@ Resources:
                   - cloudwatch:ListMetrics
                   - dynamodb:List*
                   - dynamodb:DescribeTable
-                  - sts:AssumeRole
                 Effect: Allow
                 Resource: '*'
           PolicyName: pn-storage-function-policy
@@ -356,6 +289,7 @@ Resources:
               - "API:pn-ApikeyManager-public-api-WEB"
               - "API:pn-ApikeyManager-bo-public-api-WEB"
             StorageWidgetFunction: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:pn-storage-function
+            OpenSearchArn: !Ref OpenSearchArn
 Outputs:
   Version:
     Value: !Ref Version
