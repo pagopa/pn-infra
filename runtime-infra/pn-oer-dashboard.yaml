@@ -26,10 +26,147 @@ Parameters:
     Default: ''
     Description: 'RADD Target Group'
 
+  OpenSearchArn:
+    Type: String
+    Default: ''
+    Description: 'OpenSearch ARN'
+
+  LogsBucketName:
+    Type: String
+    Default: ''
+    Description: 'Logs Bucket Name'
+
 Resources:
+
+  StorageFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          'use strict';
+          const AWS = require('aws-sdk');
+          const cloudwatch = new AWS.CloudWatch({apiVersion: '2010-08-01'});
+          const dynamoDB = new AWS.DynamoDB();
+
+          const DOCS = `PN Storage Widget`
+
+          function listDynamoTables() {
+              var params = {
+                
+              };
+              return dynamoDB.listTables(params).promise();
+          }
+
+          function getDynamoTableSize(tableName){
+            var params = {
+              TableName: tableName
+            }
+            
+            return dynamoDB.describeTable(params).promise();
+          }
+
+          async function getDynamoTablesSize(){
+            const listTablesResult = await listDynamoTables()
+            const ret = []
+            for(let i=0; i<listTablesResult.TableNames.length; i++){
+              const tableName = listTablesResult.TableNames[i]
+              const describeTableResult = await getDynamoTableSize(tableName)
+              const tableSize = describeTableResult.Table.TableSizeBytes
+              ret.push({
+                name: tableName,
+                size: tableSize
+              })
+            }
+            
+            return ret;
+          }
+
+          const CSS = `<style>td,th{font-family:Arial,sans-serif;font-size:14px;white-space:nowrap;text-align:left;padding:3px;border-bottom:1px solid #f2f2f2}td:first-child{text-align:left}tr:hover{background:#fbf8e9!important;transition:all .1s ease-in-out}tbody tr:nth-child(even){background:#f5f5f5;box-shadow:0 1px 0 rgba(255,255,255,.8) inset}th{text-align:left;text-shadow:0 1px 0 rgba(255,255,255,.5);border-bottom:1px solid #ccc;background-color:#dce9f9;background-image:linear-gradient(top,#ebf3fc,#dce9f9)}th:first-child{border-radius:6px 0 0 0}th:last-child{border-radius:0 6px 0 0}th:only-child{border-radius:6px 6px 0 0}</style>`
+
+          exports.handler = async (event) => {
+            
+            if (event.describe) {
+              return DOCS;   
+            }
+
+            const tables = []
+
+            const dynamoTables = await getDynamoTablesSize()
+            for(let i=0; i<dynamoTables.length; i++){
+              tables.push(dynamoTables[i]);
+            }
+            
+            const initialValue = 0;
+            const totalDynamoSize = tables.reduce(
+              (accumulator, currentValue) => accumulator + currentValue.size,
+              initialValue
+            );
+            
+            tables.push({
+              name: 'Total DynamoDB Size',
+              size: totalDynamoSize
+            })
+
+            const metricRows = tables.map((resource, i) => {
+              let html = `<tr><td><b>${resource.name}</b></td>`;
+              html += `<td>${Number(resource.size/(1024*1024*1024)).toFixed(6)} GB</td></tr>`;
+              return html;
+            });
+              
+            const tableStart = `<table class="cwdb-no-default-styles"><thead><tr><th>Table Name</th><th>Used Storage</th></tr></thead>`
+            return CSS + tableStart + `<tbody>${metricRows.join('')}</tbody></table>`;    
+          };
+      Description: "Storage function custom widget"
+      FunctionName: pn-storage-function
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt StorageFunctionIAMRole.Arn
+      Runtime: nodejs16.x
+      Timeout: 60
+
+  StorageFunctionIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      Policies:
+        - PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Effect: Allow
+                Resource:
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/pn-storage-function:*
+              - Action:
+                  - cloudwatch:GetMetricStatistics
+                  - cloudwatch:ListMetrics
+                  - dynamodb:List*
+                  - dynamodb:DescribeTable
+                Effect: Allow
+                Resource: '*'
+          PolicyName: pn-storage-function-policy
+
+  StorageFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${StorageFunction}
+      RetentionInDays: 14
+
 
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard
+    DependsOn:
+      - StorageFunction
     Properties:
       DashboardName: !Sub ${ProjectName}-OER-Dashboard
       DashboardBody: 
@@ -106,6 +243,9 @@ Resources:
               - "API:pn-token-exchange-api"
               - "API:pn-ApikeyManager-public-api-WEB"
               - "API:pn-ApikeyManager-bo-public-api-WEB"
+            StorageWidgetFunction: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:pn-storage-function
+            OpenSearchArn: !Ref OpenSearchArn
+            LogsBucketName: !Ref LogsBucketName
 Outputs:
   Version:
     Value: !Ref Version

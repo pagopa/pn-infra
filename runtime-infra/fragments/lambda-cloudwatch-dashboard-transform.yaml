@@ -1342,9 +1342,29 @@ Resources:
                             y_value = y_value+10
                         
 
+                    if 'LogsBucketName' in event["params"] or 'OpenSearchArn' in event["params"] or 'StorageWidgetFunction' in event["params"]:
+                        titleWidget = textSeparator('Storage', y_value)
+                        dashboardList.append(titleWidget)
+                        y_value = y_value+2
+                        storage_x_value = 0
+                        if 'LogsBucketName' in event["params"]:
+                            theS3StorageWidget = s3StorageWidget(event["params"]["LogsBucketName"], "S3 Logs Bucket", 10, 6, storage_x_value, y_value, localRegion)
+                            dashboardList.append(theS3StorageWidget)
+                            storage_x_value = storage_x_value+6
+
+                        if 'OpenSearchArn' in event["params"]:
+                            theOpenSearchStorageWidget = openSearchStorageWidget(event["params"]["OpenSearchArn"], "OpenSearch Free/Used Space", 10, 8, storage_x_value, y_value, localRegion)
+                            dashboardList.append(theOpenSearchStorageWidget)
+                            storage_x_value = storage_x_value+8
+
+                        if 'StorageWidgetFunction' in event["params"]:
+                            customStorageWidget = customWidget(event["params"]["StorageWidgetFunction"], "DynamoDB Storage", 10, 10, storage_x_value, y_value)
+                            dashboardList.append(customStorageWidget)
+                            
+                        y_value = y_value+11
+
                 data["start"] = "-P1D"
                 data["widgets"] = dashboardList
-                print(data)
                 
                 response = {
                     "requestId": event["requestId"],
@@ -1545,6 +1565,25 @@ Resources:
                 else:
                     return link
                 
+            def customWidget(lambdaArn, title, height, width, x_value, y_value):
+                customWidgetJson = {
+                    "height": height,
+                    "width": width,
+                    "y": y_value,
+                    "x": x_value,
+                    "type": "custom",
+                    "properties": {
+                        "endpoint": lambdaArn,
+                        "title": title,
+                        "params": {},
+                        "updateOn": {
+                            "refresh": True
+                        },
+                    }
+                }
+                
+                return customWidgetJson
+                
             def microserviceAlarmWidget(alarmArn, title, width, x_value, y_value):
                 alarmJson={
                     "height": 2,
@@ -1559,6 +1598,58 @@ Resources:
                 }
                 
                 return alarmJson
+                
+            def s3StorageWidget(bucketName, title, height, width, x_value, y_value, region):
+                widgetJson = {
+                    "type":"metric",
+                    "x":x_value,
+                    "y":y_value,
+                    "width":width,
+                    "height": height,
+                    "properties": {
+                        "sparkline": False,
+                        "view": "singleValue",
+                        "region": region,
+                        "stat": "Maximum",
+                        "period": 604800,
+                        "title": title,
+                        "stacked": False,
+                        "setPeriodToTimeRange": True,
+                        "metrics": [
+                            ["AWS/S3", "BucketSizeBytes", "StorageType", "StandardStorage", "BucketName", bucketName ]
+                        ]
+                    }
+                }   
+                
+                return widgetJson
+
+            def openSearchStorageWidget(openSearchArn, title, height, width, x_value, y_value, region):
+                clientId = openSearchArn.split(':')[4]
+                domainName = openSearchArn.split(':')[5].replace("domain/", "")
+                widgetJson = {
+                    "type":"metric",
+                    "x":x_value,
+                    "y":y_value,
+                    "width":width,
+                    "height": height,
+                    "properties": {
+                        "sparkline": True,
+                        "view": "singleValue",
+                        "region": region,
+                        "stat": "Maximum",
+                        "period": 60,
+                        "title": title,
+                        "stacked": False,
+                        "accountId": clientId,
+                        "singleValueFullPrecision": False,
+                        "metrics": [
+                            ["AWS/ES", "FreeStorageSpace", "ClientId", clientId, "DomainName", domainName ],
+                            ["AWS/ES", "ClusterUsedSpace", "ClientId", clientId, "DomainName", domainName ]    
+                        ]
+                    }
+                }   
+                
+                return widgetJson
                 
             def textSeparator(message, textYValue):
                 textJson={
@@ -1593,6 +1684,7 @@ Resources:
                     currentArray.append(x)
                 
                 return currentArray
+
       Handler: index.lambda_handler
       Runtime: python3.9
       Role: !GetAtt OerTransformExecutionRole.Arn
