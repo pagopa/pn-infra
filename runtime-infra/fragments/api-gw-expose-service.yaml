@@ -25,7 +25,8 @@ Parameters:
       - B2B
       - WEB
       - IO
-    Description: B2B, WEB or IO usage. Used from other back-end system or used from a browser
+      - HELPDESK
+    Description: B2B, WEB, HELPDESK or IO usage. Used from other back-end system or used from a browser
 
   ServiceApiPath:
     Type: String
@@ -59,13 +60,27 @@ Parameters:
     Type: Number
     Description: Latency limit before raising alarm (milliseconds)
 
+  OpenApiBucketName:
+    Type: String
+    Default: ''
+    Description: Bucket name where the OpenAPI files are located
+
+  OpenApiBucketKey:
+    Type: String
+    Default: ''
+    Description: Bucket key of the OpenAPI file in the s3 bucket
+
 Conditions:
   IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
   IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
   IsIO: !Equals [ !Ref IntendedUsage, 'IO' ]
+  IsHelpdesk: !Equals [ !Ref IntendedUsage, 'HELPDESK' ]
   UseApiKey: !Or [ !Equals [ !Ref IntendedUsage, 'B2B' ], !Equals [ !Ref IntendedUsage, 'IO' ] ]
   SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
-
+  HasOpenApiBucketName: !Not [ !Equals [ !Ref OpenApiBucketName, '' ] ]
+  HasOpenApiBucketKey: !Not [ !Equals [ !Ref OpenApiBucketKey, '' ] ]
+  HasOpenApiSpecs: !And [ !Condition HasOpenApiBucketName, !Condition HasOpenApiBucketKey ]
+  IsWebOrHelpdesk: !Or [ !Condition IsWeb, !Condition IsHelpdesk ]
 Resources:
 
   # API definition
@@ -75,6 +90,16 @@ Resources:
       Tags:
         - Key: "PN_APIGW_TYPE"
           Value: !Ref IntendedUsage
+        - Fn::If:
+          - HasOpenApiSpecs
+          - Key: "PN_OPENAPI_BUCKET_NAME"
+            Value: !Ref OpenApiBucketName
+          - !Ref AWS::NoValue
+        - Fn::If:
+          - HasOpenApiSpecs
+          - Key: "PN_OPENAPI_BUCKET_KEY"
+            Value: !Ref OpenApiBucketKey   
+          - !Ref AWS::NoValue
       Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
       FailOnWarnings: true
       DisableExecuteApiEndpoint: true      
@@ -159,19 +184,22 @@ Resources:
       AuthorizationType: CUSTOM
       AuthorizerId:
         Fn::If:
-          - IsB2B
-          - !Ref ApiKeyAuthorizerV2
+          - IsHelpdesk
+          - !Ref HelpdeskAuthorizer
           - Fn::If:
-            - IsIO
-            - !Ref IoAuthorizer
-            - !Ref JwtAuthorizer
+            - IsB2B
+            - !Ref ApiKeyAuthorizerV2
+            - Fn::If:
+              - IsIO
+              - !Ref IoAuthorizer
+              - !Ref JwtAuthorizer
       RequestParameters:
         Fn::If:
           - IsIO
           - method.request.path.proxy: true
             method.request.header.x-pagopa-cx-taxid: true
           - Fn::If:
-              - IsWeb
+              - IsWebOrHelpdesk
               - method.request.path.proxy: true
                 method.request.header.Authorization: true
               - method.request.path.proxy: true
@@ -307,6 +335,28 @@ Resources:
       IdentitySource: method.request.header.x-api-key, method.request.header.x-pagopa-cx-taxid
       RestApiId: !Ref PublicRestApi
 
+  # Helpdesk Authorizer
+  HelpdeskLambdaPermission:
+    Condition: IsHelpdesk
+    Type: AWS::Lambda::Permission
+    DependsOn: HelpdeskAuthorizer
+    Properties:
+      FunctionName: !Sub '${ProjectName}-helpdeskAuthorizerLambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${HelpdeskAuthorizer}"
+
+  HelpdeskAuthorizer:
+    Condition: IsHelpdesk
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: pn-auth-fleet_helpdeskAuthorizer
+      Type: TOKEN
+      AuthorizerResultTtlInSeconds: '300'
+      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-helpdeskAuthorizerLambda/invocations'
+      IdentitySource: method.request.header.Authorization
+      RestApiId: !Ref PublicRestApi
+      
   # Expose API to custom domain
   APIMapping:
     Type: AWS::ApiGateway::BasePathMapping
