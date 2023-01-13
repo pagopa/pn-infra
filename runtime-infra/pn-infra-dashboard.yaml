@@ -50,6 +50,10 @@ Parameters:
     Type: String
     Default: ''
 
+  OpenSearchDeliveryLambdaErrorLogsAlarmArn:
+    Type: String
+    Default: ''
+
   OpenSearchDeliveryLambdaArn:
     Type: String
     Default: ''
@@ -117,6 +121,7 @@ Resources:
             - !Ref CdcToS3KinesisDeliveryStreamAlarmArn
             - !Ref LogsToS3KinesisDeliveryStreamAlarmArn
             - !Ref OpenSearchDeliveryLambdaAlarmArn
+            - !Ref OpenSearchDeliveryLambdaErrorLogsAlarmArn
             - !GetAtt LogsBucketAlarm.Arn
             - !Ref OOMAlarmArn
         LambdaArns: !Join
