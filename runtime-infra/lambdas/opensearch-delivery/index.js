@@ -18,10 +18,17 @@ const handler = async (event) => {
       const bulkResponse = await openSearch.bulk({ body: bulkBody });
       const batchSeqNumbers = failedSeqNumbers(bulkResponse, bulkBody);
       console.log(`Bulk done with ${batchSeqNumbers.length} errors`);
+      if(batchSeqNumbers.length>0){
+        console.log(JSON.stringify(bulkResponse))
+      }
       seqNumbers.push(...batchSeqNumbers);
     }
 
-    console.log(`Failed documents: ${seqNumbers.length}`);
+    if(seqNumbers.length>0){
+      console.error(`Bulk import has ${seqNumbers.length} failures`);
+    } else {
+      console.log(`Bulk imported completed`);
+    }
 
     return {
       batchItemFailures:  [...new Set(seqNumbers)]
