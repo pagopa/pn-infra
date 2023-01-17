@@ -313,8 +313,8 @@ Modificare i seguenti parametri:
   - __DataLakeAccountId1__: per certificazione va bene il numero dell'account AWS di PN-CORE per prod serve l'account id 
       dell'ambiente di produzione di DataLake che dovrà essere comunicato da PagoPA,
   - __DataLakeAccountId2__: serve solo in ambiente dev, in tutti gli altri ambienti deve essere valorizzato con '-'
-  - __RaddApiCertificateArn__: ARN del certificato per api-radd.\<NOME_AMBIENTE\>.pn.pagopa.it
-  - __RaddApiDnsName__: Nome del DNS per la RADD API, api-radd.\<NOME_AMBIENTE\>.pn.pagopa.it
+  - __RaddApiCertificateArn__: ARN del certificato per api.radd.\<NOME_AMBIENTE\>.pn.pagopa.it
+  - __RaddApiDnsName__: Nome del DNS per la RADD API, api.radd.\<NOME_AMBIENTE\>.pn.pagopa.it
   - __HostedZoneId__: ID della hosted zone dove registrare il DNS della RADD API
   - __InternalNlbIps__: Lista degli IP degli internal NLB; bisogna scegliere IP della private subnet nella VPC interna, non ancora utilizzati (prendere uno degli ultimi disponibili)
 
