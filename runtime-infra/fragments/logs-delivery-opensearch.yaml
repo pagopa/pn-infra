@@ -168,9 +168,48 @@ Resources:
       Period: 3600 # 1 hour
       TreatMissingData: notBreaching
 
+  # CloudWatch metric to filer ERROR in log group
+  DeliveryLambdaErrorLogsMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    DependsOn: DeliveryLambda
+    Properties: 
+      LogGroupName: !Sub /aws/lambda/${DeliveryLambda}
+      FilterPattern: '?ERROR'
+      MetricTransformations: 
+        - MetricValue: 1
+          MetricNamespace: "ErrorFatalLogs"
+          MetricName: !Sub "${DeliveryLambda}-ErrorMetric"
+
+  # Create alarm
+  DeliveryLambdaErrorLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn: DeliveryLambdaErrorLogsMetricFilter
+    Properties:
+      AlarmName: !Sub "${DeliveryLambda}-ErrorLogs-Alarm"
+      AlarmDescription: "CloudWatch alarm for when DeliveryLambda has ERROR line."
+      TreatMissingData: notBreaching
+      AlarmActions: 
+        - !Ref AlarmSNSTopicArn
+      #InsufficientDataActions:
+      #  - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      MetricName: !Sub "${DeliveryLambda}-ErrorMetric"
+      Namespace: "ErrorFatalLogs"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Statistic: Sum
+      Threshold: 1
+
 Outputs:
   DeliveryLambdaAlarmArn:
     Description: 'Delivery lambda alarm ARN'
+    Value: !GetAtt DeliveryLambdaErrorsAlarm.Arn
+
+  DeliveryLambdaErrorLogsAlarmArn:
+    Description: 'Delivery lambda error log alarm ARN'
     Value: !GetAtt DeliveryLambdaErrorsAlarm.Arn
 
   DeliveryLambdaArn:

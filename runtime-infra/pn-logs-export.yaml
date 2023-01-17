@@ -167,6 +167,14 @@ Outputs:
       - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaAlarmArn
       - ''
 
+  OpenSearchDeliveryLambdaErrorLogsAlarmArn:
+    Description: 'Lambda to OpenSearch error logs alarm ARN'
+    Value:
+      !If 
+      - HasOpenSearchExport
+      - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaErrorLogsAlarmArn
+      - ''
+
   OpenSearchDeliveryLambdaArn:
     Description: 'Lambda Logs to OpenSearch ARN'
     Value:

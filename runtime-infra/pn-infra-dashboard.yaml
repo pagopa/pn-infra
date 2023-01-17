@@ -50,6 +50,10 @@ Parameters:
     Type: String
     Default: ''
 
+  OpenSearchDeliveryLambdaErrorLogsAlarmArn:
+    Type: String
+    Default: ''
+
   OpenSearchDeliveryLambdaArn:
     Type: String
     Default: ''
@@ -80,6 +84,15 @@ Parameters:
     Default: ''
     Description: 'Out of memory ECS alarm'
 
+  # Preparing account to create a Helpdesk dedicated dashboard
+  HelpdeskAccountId:
+    Type: String
+    Default: ''
+    Description: 'Helpdesk Account Id'
+
+Conditions:
+  HasHelpdeskAccountId: !Not [ !Equals [ !Ref HelpdeskAccountId, '' ] ]
+  
 Resources:
 
   LogsBucketAlarm:
@@ -117,6 +130,7 @@ Resources:
             - !Ref CdcToS3KinesisDeliveryStreamAlarmArn
             - !Ref LogsToS3KinesisDeliveryStreamAlarmArn
             - !Ref OpenSearchDeliveryLambdaAlarmArn
+            - !Ref OpenSearchDeliveryLambdaErrorLogsAlarmArn
             - !GetAtt LogsBucketAlarm.Arn
             - !Ref OOMAlarmArn
         LambdaArns: !Join
