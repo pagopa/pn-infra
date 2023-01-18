@@ -213,6 +213,16 @@ Resources:
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
+  ### Communication FROM KAFKA-BRIDGE
+  KafkaBridgeOnboardingQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-kafka_bridge_onboarding'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
   ### Queue that receive composite alarm information for DOWNTIME LOGS ###
   CompositeAlarmQueue:
     Type: AWS::CloudFormation::Stack
@@ -369,6 +379,23 @@ Resources:
               - !GetAtt "ExternalChannels2PaperChannelQueue.Outputs.QueueARN"
               - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueARN"
               - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueARN"
+
+    KafkaBridgeOutputsQueuePolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - !GetAtt "KafkaBridgeOnboardingQueue.Outputs.QueueURL"
+        PolicyDocument:
+          Statement:
+            - Sid: "SendEventsToDLQ"
+              Effect: "Allow"
+              Principal:
+                Service:
+                  - "events.amazonaws.com"
+              Action:
+                - "SQS:SendMessage"
+              Resource:
+                - !GetAtt "KafkaBridgeOnboardingQueue.Outputs.QueueARN"
 
   # Log all events
   CoreEventBusEventsLogGroup:
@@ -837,6 +864,23 @@ Outputs:
   ExternalChannels2PaperChannelQueueAgeAlarmARN:
     Value: !GetAtt ExternalChannels2PaperChannelQueue.Outputs.SqsAgeAlarmArn
     Description: pn-external-channels output to pn-paper-channel queue age alarm ARN
+
+  # Kafka bridge onboarding
+  KafkaBridgeOnboardingQueueName:
+    Value: !GetAtt KafkaBridgeOnboardingQueue.Outputs.QueueName
+    Description: pn-kafka-bridge onboarding institutes output queue name
+  KafkaBridgeOnboardingQueueURL:
+    Value: !GetAtt KafkaBridgeOnboardingQueue.Outputs.QueueURL
+    Description: pn-kafka-bridge onboarding institutes output queue URL
+  KafkaBridgeOnboardingQueueARN:
+    Value: !GetAtt KafkaBridgeOnboardingQueue.Outputs.QueueARN
+    Description: pn-kafka-bridge onboarding institutes output queue ARN
+  KafkaBridgeOnboardingQueueAlarmARN:
+    Value: !GetAtt KafkaBridgeOnboardingQueue.Outputs.SqsDLQAlarmArn
+    Description: pn-kafka-bridge onboarding institutes output queue alarm ARN
+  KafkaBridgeOnboardingQueueAgeAlarmARN:
+    Value: !GetAtt KafkaBridgeOnboardingQueue.Outputs.SqsAgeAlarmArn
+    Description: pn-kafka-bridge onboarding institutes output queue age alarm ARN
 
   # Downtime Logs composite alarm queue
   DowntimeLogsAggregateAlarmQueueName:
