@@ -493,12 +493,15 @@ Outputs:
   AuthorizerARN:
     Value: 
       Fn::If:
-        - IsB2B
-        - !Ref ApiKeyAuthorizerV2
+        - IsHelpdesk
+        - !Ref HelpdeskAuthorizer
         - Fn::If:
-          - IsIO
-          - !Ref IoAuthorizer
-          - !Ref JwtAuthorizer
+          - IsB2B
+          - !Ref ApiKeyAuthorizerV2
+          - Fn::If:
+            - IsIO
+            - !Ref IoAuthorizer
+            - !Ref JwtAuthorizer
     Description: "Authorizer ARN"
 
   # Rest API definition
