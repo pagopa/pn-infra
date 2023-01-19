@@ -383,23 +383,6 @@ Resources:
               - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueARN"
               - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueARN"
 
-  KafkaBridgeOutputsQueuePolicy:
-    Type: AWS::SQS::QueuePolicy
-    Properties:
-      Queues:
-        - !GetAtt "KafkaBridgeOnboardingQueue.Outputs.QueueURL"
-      PolicyDocument:
-        Statement:
-          - Sid: "SendEventsToDLQ"
-            Effect: "Allow"
-            Principal:
-              Service:
-                - "events.amazonaws.com"
-            Action:
-              - "SQS:SendMessage"
-            Resource:
-              - !GetAtt "KafkaBridgeOnboardingQueue.Outputs.QueueARN"
-
   # Log all events
   CoreEventBusEventsLogGroup:
     Type: AWS::Logs::LogGroup
