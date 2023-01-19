@@ -245,6 +245,16 @@ Resources:
         QueueName: !Sub '${ProjectName}-national_registry_gateway_outputs'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+  
+  ### Communication FROM pn-mandate TO pn-delivery ###
+  Mandate2DeliveryQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-mandate_to_delivery'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
   ###                          PN-CORE EVENT BUS                          ###
   ###########################################################################
@@ -891,6 +901,23 @@ Outputs:
   NationalRegistryGatewayOutputsQueueAgeAlarmARN:
     Value: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.SqsAgeAlarmArn
     Description: Events from the gateway service of NationalRegistry age alarm ARN
+
+  # Mandate to Delivery events
+  Mandate2DeliveryQueueName:
+    Value: !GetAtt Mandate2DeliveryQueue.Outputs.QueueName
+    Description: Events from Mandate to Delivery queue name
+  Mandate2DeliveryQueueURL:
+    Value: !GetAtt Mandate2DeliveryQueue.Outputs.QueueURL
+    Description: Events from Mandate to Delivery queue URL
+  Mandate2DeliveryQueueARN:
+    Value: !GetAtt Mandate2DeliveryQueue.Outputs.QueueARN
+    Description: Events from Mandate to Delivery queue ARN
+  Mandate2DeliveryQueueAlarmARN:
+    Value: !GetAtt Mandate2DeliveryQueue.Outputs.SqsDLQAlarmArn
+    Description: Events from Mandate to Delivery alarm ARN
+  Mandate2DeliveryQueueAgeAlarmARN:
+    Value: !GetAtt Mandate2DeliveryQueue.Outputs.SqsAgeAlarmArn
+    Description: Events from Mandate to Delivery age alarm ARN
 
   # Kinesis Source Stream containing the DynamoDB Change Data Capture events
   CdcKinesisSourceStreamName:
