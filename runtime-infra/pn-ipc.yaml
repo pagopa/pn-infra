@@ -179,16 +179,7 @@ Resources:
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
         FifoQueue: true
 
-  ### Communication TO and FROM EXTERNAL-CHANNELS ###
-  ExternalChannelsInputsQueue:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
-      Parameters:
-        QueueName: !Sub '${ProjectName}-external_channel_inputs'
-        DelaySeconds: 1
-        AlarmSNSTopicName: !Ref AlarmSNSTopicName
-
+  ### Communication FROM EXTERNAL-CHANNELS ###
   ExternalChannelsOutputsQueue:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -253,6 +244,16 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub '${ProjectName}-national_registry_gateway_outputs'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+  
+  ### Communication FROM pn-mandate TO pn-delivery ###
+  Mandate2DeliveryQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-mandate_to_delivery'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
@@ -783,22 +784,6 @@ Outputs:
     Value: !GetAtt DeliveryPushInputsQueue.Outputs.SqsAgeAlarmArn
     Description: pn-delivery-push input queue age alarm ARN
 
-  # External channels inputs
-  ExternalChannelsInputsQueueName:
-    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueName
-    Description: pn-external-channels input queue name
-  ExternalChannelsInputsQueueURL:
-    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueURL
-    Description: pn-external-channels input queue URL
-  ExternalChannelsInputsQueueARN:
-    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueARN
-    Description: pn-external-channels input queue ARN
-  ExternalChannelsInputsQueueAlarmARN:
-    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.SqsDLQAlarmArn
-    Description: pn-external-channels input queue alarm ARN
-  ExternalChannelsInputsQueueAgeAlarmARN:
-    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.SqsAgeAlarmArn
-    Description: pn-external-channels input queue age alarm ARN
 
   # External channels outputs
   ExternalChannelsOutputsQueueName:
@@ -918,6 +903,23 @@ Outputs:
   NationalRegistryGatewayOutputsQueueAgeAlarmARN:
     Value: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.SqsAgeAlarmArn
     Description: Events from the gateway service of NationalRegistry age alarm ARN
+
+  # Mandate to Delivery events
+  Mandate2DeliveryQueueName:
+    Value: !GetAtt Mandate2DeliveryQueue.Outputs.QueueName
+    Description: Events from Mandate to Delivery queue name
+  Mandate2DeliveryQueueURL:
+    Value: !GetAtt Mandate2DeliveryQueue.Outputs.QueueURL
+    Description: Events from Mandate to Delivery queue URL
+  Mandate2DeliveryQueueARN:
+    Value: !GetAtt Mandate2DeliveryQueue.Outputs.QueueARN
+    Description: Events from Mandate to Delivery queue ARN
+  Mandate2DeliveryQueueAlarmARN:
+    Value: !GetAtt Mandate2DeliveryQueue.Outputs.SqsDLQAlarmArn
+    Description: Events from Mandate to Delivery alarm ARN
+  Mandate2DeliveryQueueAgeAlarmARN:
+    Value: !GetAtt Mandate2DeliveryQueue.Outputs.SqsAgeAlarmArn
+    Description: Events from Mandate to Delivery age alarm ARN
 
   # Kinesis Source Stream containing the DynamoDB Change Data Capture events
   CdcKinesisSourceStreamName:
