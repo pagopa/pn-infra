@@ -179,16 +179,7 @@ Resources:
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
         FifoQueue: true
 
-  ### Communication TO and FROM EXTERNAL-CHANNELS ###
-  ExternalChannelsInputsQueue:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
-      Parameters:
-        QueueName: !Sub '${ProjectName}-external_channel_inputs'
-        DelaySeconds: 1
-        AlarmSNSTopicName: !Ref AlarmSNSTopicName
-
+  ### Communication FROM EXTERNAL-CHANNELS ###
   ExternalChannelsOutputsQueue:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -783,22 +774,6 @@ Outputs:
     Value: !GetAtt DeliveryPushInputsQueue.Outputs.SqsAgeAlarmArn
     Description: pn-delivery-push input queue age alarm ARN
 
-  # External channels inputs
-  ExternalChannelsInputsQueueName:
-    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueName
-    Description: pn-external-channels input queue name
-  ExternalChannelsInputsQueueURL:
-    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueURL
-    Description: pn-external-channels input queue URL
-  ExternalChannelsInputsQueueARN:
-    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueARN
-    Description: pn-external-channels input queue ARN
-  ExternalChannelsInputsQueueAlarmARN:
-    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.SqsDLQAlarmArn
-    Description: pn-external-channels input queue alarm ARN
-  ExternalChannelsInputsQueueAgeAlarmARN:
-    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.SqsAgeAlarmArn
-    Description: pn-external-channels input queue age alarm ARN
 
   # External channels outputs
   ExternalChannelsOutputsQueueName:
