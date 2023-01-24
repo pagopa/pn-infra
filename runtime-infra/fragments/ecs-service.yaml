@@ -933,18 +933,18 @@ Resources:
         - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
         - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
       Policies:
-        Fn::If:
+        - Fn::If:
           - HasSecrets
-          - - PolicyName: !Sub '${MicroServiceUniqueName}-ExecutionPolicy'
-              PolicyDocument:
-                Statement:
-                  - Effect: Allow
-                    Action:
-                      - secretsmanager:GetSecretValue
-                      - kms:Decrypt
-                    Resource:
-                      - Fn::Sub: "arn:${AWS::Partition}:secretsmanager:*:${AWS::AccountId}:secret:*"
-          - - AWS::NoValue
+          - PolicyName: !Sub '${MicroServiceUniqueName}-ExecutionPolicy'
+            PolicyDocument:
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - secretsmanager:GetSecretValue
+                    - kms:Decrypt
+                  Resource:
+                    - Fn::Sub: "arn:${AWS::Partition}:secretsmanager:*:${AWS::AccountId}:secret:*"
+          - AWS::NoValue
 
   # A role for the containers
   TaskRole:
