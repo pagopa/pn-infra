@@ -369,6 +369,37 @@ Parameters:
     Type: String
     Default: ''
 
+  # Secrets
+  ContainerSecret1:
+    Description: 1st container secret in the form key=secret arn
+    Type: String
+    Default: ''
+  ContainerSecret2:
+    Description: 2nd container secret in the form key=secret arn
+    Type: String
+    Default: ''
+  ContainerSecret3:
+    Description: 3rd container secret in the form key=secret arn
+    Type: String
+    Default: ''
+  ContainerSecret4:
+    Description: 4th container secret in the form key=secret arn
+    Type: String
+    Default: ''  
+  ContainerSecret5:
+    Description: 5th container secret in the form key=secret arn
+    Type: String
+    Default: ''   
+  ContainerSecret6:
+    Description: 6th container secret in the form key=secret arn
+    Type: String
+    Default: ''        
+
+  MicroServiceSecretPrefix:
+    Description: Microservice secret name prefix
+    Type: String
+    Default: ''
+    
 Mappings:
   ContainerMemory:
     2GB:
@@ -451,7 +482,14 @@ Conditions:
   Env41Exist: !Not [ !Equals [ !Ref ContainerEnvEntry41, '' ] ]
   Env42Exist: !Not [ !Equals [ !Ref ContainerEnvEntry42, '' ] ]
 
+  Secret1Exist: !Not [ !Equals [ !Ref ContainerSecret1, '' ] ]
+  Secret2Exist: !Not [ !Equals [ !Ref ContainerSecret2, '' ] ]
+  Secret3Exist: !Not [ !Equals [ !Ref ContainerSecret3, '' ] ]
+  Secret4Exist: !Not [ !Equals [ !Ref ContainerSecret4, '' ] ]
+  Secret5Exist: !Not [ !Equals [ !Ref ContainerSecret5, '' ] ]
+  Secret6Exist: !Not [ !Equals [ !Ref ContainerSecret6, '' ] ]
 
+  HasSecrets: !Or [ !Condition Secret1Exist, !Condition Secret2Exist, !Condition Secret3Exist, !Condition Secret4Exist, !Condition Secret5Exist, !Condition Secret6Exist ]
 Resources:
 
   # ECS Service
@@ -543,6 +581,43 @@ Resources:
               Condition: COMPLETE
             - ContainerName: aws-collector
               Condition: START
+          Secrets:
+            - 'Fn::If':
+              - Secret1Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret1 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret1 ] ]
+              - !Ref "AWS::NoValue"
+            - 'Fn::If':
+              - Secret2Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret2 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret2 ] ]
+              - !Ref "AWS::NoValue"
+            - 'Fn::If':
+              - Secret3Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret3 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret3 ] ]
+              - !Ref "AWS::NoValue"              
+            - 'Fn::If':
+              - Secret4Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret4 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret4 ] ]
+              - !Ref "AWS::NoValue"              
+            - 'Fn::If':
+              - Secret5Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret5 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret5 ] ]
+              - !Ref "AWS::NoValue"              
+            - 'Fn::If':
+              - Secret6Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret6 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret6 ] ]
+              - !Ref "AWS::NoValue"              
           Environment:
             - Name: 'OTEL_RESOURCE_ATTRIBUTES'
               Value: !Sub 'service.name=${MicroServiceUniqueName}'
@@ -884,6 +959,18 @@ Resources:
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
         - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
+      Policies:
+        Fn::If:
+          - HasSecrets
+          - - PolicyName: !Sub '${MicroServiceUniqueName}-ExecutionPolicy'
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - secretsmanager:GetSecretValue
+                    Resource:
+                      - Fn::Sub: "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${MicroServiceSecretPrefix}*"
+          - !Ref AWS::NoValue
 
   # A role for the containers
   TaskRole:
