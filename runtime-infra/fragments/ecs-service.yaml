@@ -385,7 +385,15 @@ Parameters:
   ContainerSecret4:
     Description: 4th container secret in the form key=secret arn
     Type: String
-    Default: ''     
+    Default: ''  
+  ContainerSecret5:
+    Description: 5th container secret in the form key=secret arn
+    Type: String
+    Default: ''   
+  ContainerSecret6:
+    Description: 6th container secret in the form key=secret arn
+    Type: String
+    Default: ''        
 
   MicroServiceSecretPrefix:
     Description: Microservice secret name prefix
@@ -478,8 +486,10 @@ Conditions:
   Secret2Exist: !Not [ !Equals [ !Ref ContainerSecret2, '' ] ]
   Secret3Exist: !Not [ !Equals [ !Ref ContainerSecret3, '' ] ]
   Secret4Exist: !Not [ !Equals [ !Ref ContainerSecret4, '' ] ]
+  Secret5Exist: !Not [ !Equals [ !Ref ContainerSecret5, '' ] ]
+  Secret6Exist: !Not [ !Equals [ !Ref ContainerSecret6, '' ] ]
 
-  HasSecrets: !Or [ !Condition Secret1Exist, !Condition Secret2Exist, !Condition Secret3Exist, !Condition Secret4Exist ]
+  HasSecrets: !Or [ !Condition Secret1Exist, !Condition Secret2Exist, !Condition Secret3Exist, !Condition Secret4Exist, !Condition Secret5Exist, !Condition Secret6Exist ]
 Resources:
 
   # ECS Service
@@ -595,6 +605,18 @@ Resources:
               - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret4 ] ]
                 ValueFrom:
                   !Select [ 1, !Split [ "=", !Ref ContainerSecret4 ] ]
+              - !Ref "AWS::NoValue"              
+            - 'Fn::If':
+              - Secret5Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret5 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret5 ] ]
+              - !Ref "AWS::NoValue"              
+            - 'Fn::If':
+              - Secret6Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret6 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret6 ] ]
               - !Ref "AWS::NoValue"              
           Environment:
             - Name: 'OTEL_RESOURCE_ATTRIBUTES'
