@@ -387,6 +387,11 @@ Parameters:
     Type: String
     Default: ''     
 
+  MicroServiceSecretPrefix:
+    Description: Microservice secret name prefix
+    Type: String
+    Default: ''
+    
 Mappings:
   ContainerMemory:
     2GB:
@@ -942,7 +947,7 @@ Resources:
                     Action:
                       - secretsmanager:GetSecretValue
                     Resource:
-                      - Fn::Sub: "arn:${AWS::Partition}:secretsmanager:*:${AWS::AccountId}:secret:*"
+                      - Fn::Sub: "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${MicroServiceSecretPrefix}*"
           - !Ref AWS::NoValue
 
   # A role for the containers
