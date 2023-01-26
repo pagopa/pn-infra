@@ -511,12 +511,36 @@ Resources:
       Description: Web Application Firewall for Rest API Gateway 
       Name: !Ref WAFName
       Rules: 
+        - Name: AWSManagedRulesAmazonIpReputationList
+          OverrideAction: 
+            None: {}
+          Priority: 1
+          Statement: 
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesAmazonIpReputationList
+          VisibilityConfig: 
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSManagedRulesAmazonIpReputationList
+            SampledRequestsEnabled: true
+        - Name: AWSManagedRulesAnonymousIpList
+          OverrideAction: 
+            None: {}
+          Priority: 2
+          Statement: 
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesAnonymousIpList
+          VisibilityConfig: 
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSManagedRulesAnonymousIpList
+            SampledRequestsEnabled: true
         - !If 
           - WAFRule0Exists
           - Name: !Join ["-", [!Select [0, !Ref WAFRuleVendors], !Select [0, !Ref WAFRuleNames]]]
             OverrideAction: 
               None: {}
-            Priority: 0
+            Priority: 3
             Statement: 
               ManagedRuleGroupStatement:
                 VendorName: !Select [0, !Ref WAFRuleVendors]
@@ -552,7 +576,7 @@ Resources:
           - Name: !Join ["-", [!Select [1, !Ref WAFRuleVendors], !Select [1, !Ref WAFRuleNames]]]
             OverrideAction:
               None: {}
-            Priority: 1
+            Priority: 4
             Statement:
               ManagedRuleGroupStatement:
                 VendorName: !Select [1, !Ref WAFRuleVendors]
@@ -588,7 +612,7 @@ Resources:
           - Name: !Join ["-", [!Select [2, !Ref WAFRuleVendors], !Select [2, !Ref WAFRuleNames]]]
             OverrideAction:
               None: {}
-            Priority: 2
+            Priority: 5
             Statement:
               ManagedRuleGroupStatement:
                 VendorName: !Select [2, !Ref WAFRuleVendors]
@@ -624,7 +648,7 @@ Resources:
           - Name: !Join ["-", [!Select [3, !Ref WAFRuleVendors], !Select [3, !Ref WAFRuleNames]]]
             OverrideAction:
               None: {}
-            Priority: 3
+            Priority: 6
             Statement:
               ManagedRuleGroupStatement:
                 VendorName: !Select [3, !Ref WAFRuleVendors]
@@ -660,7 +684,7 @@ Resources:
           - Name: !Join ["-", [!Select [4, !Ref WAFRuleVendors], !Select [4, !Ref WAFRuleNames]]]
             OverrideAction:
               None: {}
-            Priority: 4
+            Priority: 7
             Statement:
               ManagedRuleGroupStatement:
                 VendorName: !Select [4, !Ref WAFRuleVendors]
@@ -694,7 +718,7 @@ Resources:
         - !If 
           - AddRateRuleCondition
           - Name: "Rate-based_Rule"
-            Priority: 5
+            Priority: 8
             Action: 
               Block: {}
             Statement: 
