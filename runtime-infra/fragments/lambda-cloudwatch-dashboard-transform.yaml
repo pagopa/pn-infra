@@ -1363,6 +1363,14 @@ Resources:
                             
                         y_value = y_value+11
 
+                    if 'SearchSLAViolationWidgetFunction' in event["params"]:
+                        titleWidget = textSeparator('SLA Violations', y_value)
+                        dashboardList.append(titleWidget)
+                        y_value = y_value+2
+                        customSlaWidget = customWidget(event["params"]["SearchSLAViolationWidgetFunction"], "Search SLA Violations", 10, 24, 0, y_value)
+                        dashboardList.append(customSlaWidget)
+                        y_value = y_value+11
+
                 data["start"] = "-P1D"
                 data["widgets"] = dashboardList
                 

@@ -168,20 +168,66 @@ Resources:
       Code:
         ZipFile: |
           'use strict';
-          const AWS = require('aws-sdk');
+          const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
+          const { Buffer } = require('node:buffer')
 
           const DOCS = `PM SLA Violation History` 
+          const CSS = `<style>td,th{font-family:Arial,sans-serif;font-size:14px;white-space:nowrap;text-align:left;padding:3px;border-bottom:1px solid #f2f2f2}td:first-child{text-align:left}tr:hover{background:#fbf8e9!important;transition:all .1s ease-in-out}tbody tr:nth-child(even){background:#f5f5f5;box-shadow:0 1px 0 rgba(255,255,255,.8) inset}th{text-align:left;text-shadow:0 1px 0 rgba(255,255,255,.5);border-bottom:1px solid #ccc;background-color:#dce9f9;background-image:linear-gradient(top,#ebf3fc,#dce9f9)}th:first-child{border-radius:6px 0 0 0}th:last-child{border-radius:0 6px 0 0}th:only-child{border-radius:6px 6px 0 0}</style>`
+
+          async function searchSLAViolations(type, active = true, olderThan, lastScannedKey = null){
+              const client = new LambdaClient();
+              const payload = {
+                type,
+                active,
+                olderThan
+              }
+              
+              if(lastScannedKey){
+                payload.lastScannedKey = lastScannedKey
+              }
+              
+              const input = {
+                  FunctionName: process.env.SEARCH_SLA_LAMBDA_ARN,
+                  Payload: Buffer.from(JSON.stringify(payload))
+              };
+              const command = new InvokeCommand(input);
+              try {
+                const response = await client.send(command);
+                return JSON.parse(Buffer.from(response.Payload))
+              } catch(e){
+                console.error(e)
+              }
+          }
+
           exports.handler = async (event) => {
             
             if (event.describe) {
               return DOCS;   
             }
 
-            const tables = []
-            const metricRows = []
-            const tableStart = `<table class="cwdb-no-default-styles"><thead><tr><th>Type</th><th>IUN</th><th>SLA Expiration</th></tr></thead>`
-            return CSS + tableStart + `<tbody>${metricRows.join('')}</tbody></table>`;    
+            const olderThan = new Date().toISOString();
+            const res = await searchSLAViolations('VALIDATION', true, olderThan)
+            let slaRows = []
+
+            const parsedRes = JSON.parse(res);
+            
+            if(parsedRes){
+              console.log(parsedRes.results);
+              
+              slaRows = parsedRes.results.map((resource, i) => {
+                let html = `<tr><td><b>${resource.relatedEntityId}</b></td>`;
+                html += `<td><b>${resource.type}</b></td>`;
+                html += `<td><b>${resource.active_sla_entityName_type?'Active':'Archived'}</b></td>`;
+                html += `<td><b>${resource.startTimestamp}</b></td>`;
+                html += `<td><b>${resource.slaExpiration}</b></td></tr>`;
+                return html;
+              });
+            }
+            
+            const tableStart = `<table class="cwdb-no-default-styles"><thead><tr><th>Entity ID</th><th>Type</th><th>Status</th><th>Start timestamp</th><th>SLA Expiration</th></tr></thead>`
+            return CSS + tableStart + `<tbody>${slaRows.join('')}</tbody></table>`;    
           };
+
       Description: "SLA Violation History function custom widget"
       FunctionName: pn-sla-violation-history-function
       Environment:
@@ -311,6 +357,7 @@ Resources:
               - "API:pn-ApikeyManager-public-api-WEB"
               - "API:pn-ApikeyManager-bo-public-api-WEB"
             StorageWidgetFunction: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:pn-storage-function
+            SearchSLAViolationWidgetFunction: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:pn-sla-violation-history-function          
             OpenSearchArn: !Ref OpenSearchArn
             LogsBucketName: !Ref LogsBucketName
 Outputs:
