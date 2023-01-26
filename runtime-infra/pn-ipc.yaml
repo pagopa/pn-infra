@@ -20,6 +20,16 @@ Parameters:
     Type: String
     Description: 'The certificate used for B2B rest API.'
 
+  SelcpgApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The DNS name used for B2B Selfcare PG API.'
+
+  SelcpgApiCertificateArn:
+    Type: String
+    Default: ''
+    Description: 'The certificate used for B2B Selfcare PG API.'
+
   WebApiDnsName:
     Type: String
     Description: 'The DNS name used for browser rest API.'
@@ -120,6 +130,11 @@ Parameters:
     Default: ''
     Type: String
 
+Conditions:
+  HasSelcpgApiDns: !Not [ !Equals [ !Ref SelcpgApiDnsName, '' ] ]
+  HasSelcpgApiCertificate: !Not [ !Equals [ !Ref SelcpgApiCertificateArn, '' ] ]  
+  HasSelcpgApi: !And [ !Condition HasSelcpgApiDns, !Condition HasSelcpgApiCertificate ]
+
 Resources:
 
   ###            COMMON RESOURCES FOR WEB API AND DISTRIBUTIONS            ###
@@ -133,6 +148,17 @@ Resources:
       Parameters:
         DnsName: !Ref ApiDnsName
         CertificateArn: !Ref ApiCertificateArn
+        HostedZoneId: !Ref HostedZoneId
+
+  # Custom domain for B2B api selcpg
+  SelcpgApiCustomDomain:
+    Type: AWS::CloudFormation::Stack
+    Condition: HasSelcpgApi
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
+      Parameters:
+        DnsName: !Ref SelcpgApiDnsName
+        CertificateArn: !Ref SelcpgApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
 
   # Custom domain for B2B api
@@ -749,6 +775,9 @@ Outputs:
   IoApiDnsName:
     Value: !Ref IoApiDnsName
     Description: 'The DNS name used for browser rest API.'
+  SelcpgApiDnsName:
+    Value: !Ref SelcpgApiDnsName
+    Description: 'The DNS name used for B2B Selfecare PG rest API.'
 
   # SafeStorage to DeliveryPush
   SafeStorageToDeliveryPushQueueName:
