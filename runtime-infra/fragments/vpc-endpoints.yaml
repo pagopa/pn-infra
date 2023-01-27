@@ -5,14 +5,19 @@ Parameters:
   VpcName:
     Type: String
     Description: 'VPC name: pn-dev, pn-uat, extreg-dev, ...'
+  
   VpcCidr:
     Type: String
     Description: Address range for security group
 
   VpcId:
     Type: AWS::EC2::VPC::Id
+    Description: The ID of the VPC for the endpoint.
+  
   Subnets:
     Type: List<AWS::EC2::Subnet::Id>
+    Description: The IDs of the subnets in which to create endpoint network interfaces.
+ 
   RouteTableIds:
     Type: List<String>
 
@@ -67,6 +72,114 @@ Resources:
       SubnetIds: !Ref Subnets
       VpcId: !Ref VpcId
 
+  ### to CloudWatch service ###
+  CloudWatchInferanceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.logs'
+      SubnetIds: !Ref Subnets
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  ### to SNS service ###
+  SNSInferanceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.sns'
+      SubnetIds: !Ref Subnets
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  ### to KMS service ###
+  KMSInferanceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.kms'
+      SubnetIds: !Ref Subnets
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  ### to Kinesis Stream service ###
+  KinesisStreamInferanceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.kinesis-streams'
+      SubnetIds: !Ref Subnets
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  ### to API service ###
+  ApiInferanceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.execute-api'
+      SubnetIds: !Ref Subnets
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  ### to ELB service ###
+  ElbInferanceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.elasticloadbalancing'
+      SubnetIds: !Ref Subnets
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  ### to EventBridge service ###
+  EventBridgeInferanceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.events'
+      SubnetIds: !Ref Subnets
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  ### to ECR API service ###
+  ECRApiInferanceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecr.api'
+      SubnetIds: !Ref Subnets
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+  ### to ECR DKR service ###
+  ECRDkrInferanceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecr.dkr'
+      SubnetIds: !Ref Subnets
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
 
   ###         ALLOW ACCESS TO SERVICES ELASTIC NETWORK INTERFACES         ###
   ###########################################################################
@@ -83,4 +196,5 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${VpcName}-Interface-Endpoint-SecGrp'
+
 
