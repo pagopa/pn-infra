@@ -173,12 +173,16 @@ Resources:
 
           const DOCS = `PM SLA Violation History` 
           const CSS = `<style>td,th{font-family:Arial,sans-serif;font-size:14px;white-space:nowrap;text-align:left;padding:3px;border-bottom:1px solid #f2f2f2}td:first-child{text-align:left}tr:hover{background:#fbf8e9!important;transition:all .1s ease-in-out}tbody tr:nth-child(even){background:#f5f5f5;box-shadow:0 1px 0 rgba(255,255,255,.8) inset}th{text-align:left;text-shadow:0 1px 0 rgba(255,255,255,.5);border-bottom:1px solid #ccc;background-color:#dce9f9;background-image:linear-gradient(top,#ebf3fc,#dce9f9)}th:first-child{border-radius:6px 0 0 0}th:last-child{border-radius:0 6px 0 0}th:only-child{border-radius:6px 6px 0 0}</style>`
+          const ExtCSS = `<style>.search-form { margin-bottom: 10px; } select,input { padding: 5px; } .buttons { margin-top: 10px; } .btn { padding: 5px; } .btn-primary { background-color: #00a1b0; color: #FFF; } .btn-secondary { background-color: #FFF; color: #00a1b0; } </style>`
 
-          async function searchSLAViolations(type, active = true, olderThan, lastScannedKey = null){
+          async function searchSLAViolations(type, active = 'YES', olderThan, lastScannedKey = null){
               const client = new LambdaClient();
+              
+              const activeBool = active=='YES'?true:false
+              
               const payload = {
                 type,
-                active,
+                active: activeBool,
                 olderThan
               }
               
@@ -199,14 +203,53 @@ Resources:
               }
           }
 
-          exports.handler = async (event) => {
+          function renderTypeOptions(type){
+            const types = ['VALIDATION', 'REFINEMENT', 'SEND_PEC', 'SEND_PAPER_AR_890', 'SEND_AMR']
+            return types.map(t => {
+              const selectedStr = t==type?'selected="selected"':''
+              return `<option value="${t}" ${selectedStr}>${t}</option>`
+            })
+          }
+
+          function renderActiveOptions(active){
+            const types = ['YES', 'NO']
+            return types.map(t => {
+              const selectedStr = t==active?'selected="selected"':''
+              return `<option value="${t}" ${selectedStr}>${t}</option>`
+            })
+          }
+
+          exports.handler = async (event, context) => {
             
             if (event.describe) {
               return DOCS;   
             }
+            
+            console.log(JSON.stringify(event.widgetContext));
 
-            const olderThan = new Date().toISOString();
-            const res = await searchSLAViolations('VALIDATION', true, olderThan)
+            const params = {
+              olderThan: new Date().toISOString(),
+              type: 'VALIDATION',
+              active: 'YES'
+            }
+            
+            let olderThanStr = new Date().toISOString().split('T')[0];
+
+            const formParams = event.widgetContext.forms.all;
+            if(!event.resetQuery && formParams.olderThan && formParams.type && formParams.active){
+              params.olderThan = new Date(formParams.olderThan+'T23:59:59.999Z')    
+              params.type = formParams.type
+              params.active = formParams.active
+              
+              olderThanStr = formParams.olderThan
+            }
+            
+            if(event.nextPage){
+              params.lastScannedKey = event.nextPage
+            }
+
+            console.log('Search sla params', params)
+            const res = await searchSLAViolations(params.type, params.active, params.olderThan, params.lastScannedKey)
             let slaRows = []
 
             const parsedRes = JSON.parse(res);
@@ -224,8 +267,23 @@ Resources:
               });
             }
             
+            const formStart = `<div class="search-form">`
+            
+            const form = `Date from: <input type="date" name="olderThan" value="${olderThanStr}" />Type: <select name="type">${renderTypeOptions(params.type)}</select>Active: <select name="active">${renderActiveOptions(params.active)}</select>`
+            const buttonsStart = `<div class="buttons">`
+            const actionButton = `<a class="btn btn-primary">Run query</a><cwdb-action action="call" endpoint="${context.invokedFunctionArn}"></cwdb-action>`
+            let paginateButton = ''
+            
+            if(res.lastScannedKey) {
+              paginateButton = `<a class="btn btn-secondary">Next page</a><cwdb-action action="call" endpoint="${context.invokedFunctionArn}">{ "nextPage": "${res.lastScannedKey}" }</cwdb-action>`
+            }
+            
+            const buttonsEnd = `</div>`
+            const formEnd = `</div>`
+            
+            
             const tableStart = `<table class="cwdb-no-default-styles"><thead><tr><th>Entity ID</th><th>Type</th><th>Status</th><th>Start timestamp</th><th>SLA Expiration</th></tr></thead>`
-            return CSS + tableStart + `<tbody>${slaRows.join('')}</tbody></table>`;    
+            return CSS + ExtCSS + formStart + form + buttonsStart + actionButton + paginateButton + buttonsEnd + formEnd + tableStart + `<tbody>${slaRows.join('')}</tbody></table>`;    
           };
 
       Description: "SLA Violation History function custom widget"
