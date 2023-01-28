@@ -19,9 +19,9 @@ Resources:
       Name:
         # Fn::If:
         #   - CreateParentZone
-        #   - 'spid.pn.pagopa.it'
+        #   - 'bo.pn.pagopa.it'
         #   -  
-          !Sub 'spid.${EnvName}.pn.pagopa.it'
+          !Sub 'bo.${EnvName}.pn.pagopa.it'
       HostedZoneConfig:
         Comment: !Sub Public zone for 'Piattaforma notifiche' ambiente ${EnvName}
 
@@ -33,12 +33,12 @@ Resources:
       Name:
         # Fn::If:
         #   - CreateParentZone
-        #   - 'testdns.spid.pn.pagopa.it'
+        #   - 'testdns.bo.pn.pagopa.it'
         #   - 
-        !Sub 'testdns.spid.${EnvName}.pn.pagopa.it'
-      Comment: !Sub "Entry DNS di prova per SPID PN ${EnvName}"
+        !Sub 'testdns.bo.${EnvName}.pn.pagopa.it'
+      Comment: !Sub "Entry DNS di prova per BackOffice PN ${EnvName}"
       ResourceRecords:
-        - !Sub '"Test DNS entry for PN SPID ${EnvName}"'
+        - !Sub '"Test DNS entry for PN BackOffice ${EnvName}"'
       TTL: 120
       Type: TXT
       Weight: 1
@@ -51,9 +51,9 @@ Resources:
       Name: 
       #   !If
       #     - CreateParentZone
-      #     - 'spid.pn.pagopa.it'
+      #     - 'bo.pn.pagopa.it'
       #     - 
-        !Sub 'spid.${EnvName}.pn.pagopa.it'
+        !Sub 'bo.${EnvName}.pn.pagopa.it'
       Comment: !Sub "CAA DNS record for PN ${EnvName}"
       ResourceRecords: 
         - '0 issue "amazonaws.com"'
