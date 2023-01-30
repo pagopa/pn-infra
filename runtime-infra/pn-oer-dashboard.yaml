@@ -230,9 +230,11 @@ Resources:
             const params = {
               olderThan: new Date().toISOString(),
               type: 'VALIDATION',
-              active: 'YES'
+              active: 'YES',
+              lastScannedKey: null
             }
             
+            let prevScannedKey = ''
             let olderThanStr = new Date().toISOString().split('T')[0];
 
             const formParams = event.widgetContext.forms.all;
@@ -246,6 +248,11 @@ Resources:
             
             if(event.nextPage){
               params.lastScannedKey = event.nextPage
+            } else if(event.resetQuery){
+              params.olderThan = new Date().toISOString()
+              params.type = 'VALIDATION'
+              params.active = 'YES'
+              params.lastScannedKey = null
             }
 
             console.log('Search sla params', params)
@@ -255,10 +262,9 @@ Resources:
             const parsedRes = JSON.parse(res);
             
             if(parsedRes){
-              console.log(parsedRes.results);
-              
+              console.log(parsedRes);
               slaRows = parsedRes.results.map((resource, i) => {
-                let html = `<tr><td><b>${resource.relatedEntityId}</b></td>`;
+                let html = `<tr><td><b>${resource.sla_relatedEntityId}</b></td>`;
                 html += `<td><b>${resource.type}</b></td>`;
                 html += `<td><b>${resource.active_sla_entityName_type?'Active':'Archived'}</b></td>`;
                 html += `<td><b>${resource.startTimestamp}</b></td>`;
@@ -275,16 +281,19 @@ Resources:
             let paginateButton = ''
             
             if(res.lastScannedKey) {
-              paginateButton = `<a class="btn btn-secondary">Next page</a><cwdb-action action="call" endpoint="${context.invokedFunctionArn}">{ "nextPage": "${res.lastScannedKey}" }</cwdb-action>`
+              paginateButton += `<a class="btn btn-secondary">Next page</a><cwdb-action action="call" endpoint="${context.invokedFunctionArn}">{ "nextPage": "${res.lastScannedKey}" }</cwdb-action>`
             }
             
+            const resetQueryButton = `<a class="btn btn-secondary">Reset Query</a><cwdb-action action="call" endpoint="${context.invokedFunctionArn}">{ "resetQuery": "true" }</cwdb-action>`
+
             const buttonsEnd = `</div>`
             const formEnd = `</div>`
             
             
             const tableStart = `<table class="cwdb-no-default-styles"><thead><tr><th>Entity ID</th><th>Type</th><th>Status</th><th>Start timestamp</th><th>SLA Expiration</th></tr></thead>`
-            return CSS + ExtCSS + formStart + form + buttonsStart + actionButton + paginateButton + buttonsEnd + formEnd + tableStart + `<tbody>${slaRows.join('')}</tbody></table>`;    
+            return CSS + ExtCSS + formStart + form + buttonsStart + actionButton + paginateButton + resetQueryButton + buttonsEnd + formEnd + tableStart + `<tbody>${slaRows.join('')}</tbody></table>`;    
           };
+
 
       Description: "SLA Violation History function custom widget"
       FunctionName: pn-sla-violation-history-function
