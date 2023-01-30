@@ -272,6 +272,36 @@ Resources:
         QueueName: !Sub '${ProjectName}-national_registry_gateway_outputs'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  ### Communication FROM pn-national-registries TO pn-delivery-push ###
+  NationalRegistries2DeliveryPushQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-nationalregistries_to_deliverypush'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+  
+  ### Communication FROM pn-national-registries TO pn-paper-channel ###
+  NationalRegistries2PaperChannelQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-nationalregistries_to_paperchannel'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+  
+  ### Communication FROM pn-national-registries TO Self Care PG ###
+  NationalRegistries2SelcPGQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-nationalregistries_to_selcpg'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
   
   ### Communication FROM pn-mandate TO pn-delivery ###
   Mandate2DeliveryQueue:
@@ -932,6 +962,57 @@ Outputs:
   NationalRegistryGatewayOutputsQueueAgeAlarmARN:
     Value: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.SqsAgeAlarmArn
     Description: Events from the gateway service of NationalRegistry age alarm ARN
+
+  # pn-national-registries TO pn-delivery-push events
+  NationalRegistries2DeliveryPushQueueName:
+    Value: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.QueueName
+    Description: Events from pn-national-registries TO pn-delivery-push queue name
+  NationalRegistries2DeliveryPushQueueURL:
+    Value: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.QueueURL
+    Description: Events from pn-national-registries TO pn-delivery-push queue URL
+  NationalRegistries2DeliveryPushQueueARN:
+    Value: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.QueueARN
+    Description: Events from pn-national-registries TO pn-delivery-push queue ARN
+  NationalRegistries2DeliveryPushQueueAlarmARN:
+    Value: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.SqsDLQAlarmArn
+    Description: Events from pn-national-registries TO pn-delivery-push alarm ARN
+  NationalRegistries2DeliveryPushQueueAgeAlarmARN:
+    Value: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.SqsAgeAlarmArn
+    Description: Events from pn-national-registries TO pn-delivery-push age alarm ARN
+  
+  # pn-national-registries TO pn-paper-channel events
+  NationalRegistries2PaperChannelQueueName:
+    Value: !GetAtt NationalRegistries2PaperChannelQueue.Outputs.QueueName
+    Description: Events from pn-national-registries TO pn-paper-channel queue name
+  NationalRegistries2PaperChannelQueueURL:
+    Value: !GetAtt NationalRegistries2PaperChannelQueue.Outputs.QueueURL
+    Description: Events from pn-national-registries TO pn-paper-channel queue URL
+  NationalRegistries2PaperChannelQueueARN:
+    Value: !GetAtt NationalRegistries2PaperChannelQueue.Outputs.QueueARN
+    Description: Events from pn-national-registries TO pn-paper-channel queue ARN
+  NationalRegistries2PaperChannelQueueAlarmARN:
+    Value: !GetAtt NationalRegistries2PaperChannelQueue.Outputs.SqsDLQAlarmArn
+    Description: Events from pn-national-registries TO pn-paper-channel alarm ARN
+  NationalRegistries2PaperChannelQueueAgeAlarmARN:
+    Value: !GetAtt NationalRegistries2PaperChannelQueue.Outputs.SqsAgeAlarmArn
+    Description: Events from pn-national-registries TO pn-paper-channel age alarm ARN
+  
+  # pn-national-registries TO Self Care PG events
+  NationalRegistries2SelcPGQueueName:
+    Value: !GetAtt NationalRegistries2SelcPGQueue.Outputs.QueueName
+    Description: Events from pn-national-registries TO Self Care PG queue name
+  NationalRegistries2SelcPGQueueURL:
+    Value: !GetAtt NationalRegistries2SelcPGQueue.Outputs.QueueURL
+    Description: Events from pn-national-registries TO Self Care PG queue URL
+  NationalRegistries2SelcPGQueueARN:
+    Value: !GetAtt NationalRegistries2SelcPGQueue.Outputs.QueueARN
+    Description: Events from pn-national-registries TO Self Care PG queue ARN
+  NationalRegistries2SelcPGQueueAlarmARN:
+    Value: !GetAtt NationalRegistries2SelcPGQueue.Outputs.SqsDLQAlarmArn
+    Description: Events from pn-national-registries TO Self Care PG alarm ARN
+  NationalRegistries2SelcPGQueueAgeAlarmARN:
+    Value: !GetAtt NationalRegistries2SelcPGQueue.Outputs.SqsAgeAlarmArn
+    Description: Events from pn-national-registries TO Self Care PG age alarm ARN
 
   # Mandate to Delivery events
   Mandate2DeliveryQueueName:
