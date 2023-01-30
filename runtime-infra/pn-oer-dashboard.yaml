@@ -232,6 +232,8 @@ Resources:
             
             console.log(JSON.stringify(event.widgetContext));
 
+            let paginationKeys = []
+            
             const params = {
               olderThan: new Date().toISOString(),
               type: 'VALIDATION',
@@ -239,7 +241,6 @@ Resources:
               lastScannedKey: null
             }
             
-            let prevScannedKey = ''
             let olderThanStr = new Date().toISOString().split('T')[0];
 
             const formParams = event.widgetContext.forms.all;
@@ -247,17 +248,27 @@ Resources:
               params.olderThan = new Date(formParams.olderThan+'T23:59:59.999Z')    
               params.type = formParams.type
               params.active = formParams.active
+              paginationKeys = formParams.paginationKeys.split(",")
               
               olderThanStr = formParams.olderThan
             }
             
             if(event.nextPage){
               params.lastScannedKey = event.nextPage
+              paginationKeys.push(event.nextPage)
+            } else if(event.prevPage) {
+              let prevKey = null
+              if(paginationKeys.length>1){
+                paginationKeys.pop() // remove last element
+                prevKey = paginationKeys[paginationKeys.length-1] // get last element
+              }
+              params.lastScannedKey = prevKey
             } else if(event.resetQuery){
               params.olderThan = new Date().toISOString()
               params.type = 'VALIDATION'
               params.active = 'YES'
               params.lastScannedKey = null
+              paginationKeys = []
             }
 
             console.log('Search sla params', params)
@@ -280,13 +291,17 @@ Resources:
             
             const formStart = `<div class="search-form">`
             
-            const form = `Date from: <input type="date" name="olderThan" value="${olderThanStr}" />Type: <select name="type">${renderTypeOptions(params.type)}</select>Active: <select name="active">${renderActiveOptions(params.active)}</select>`
+            const form = `Date from: <input type="date" name="olderThan" value="${olderThanStr}" />Type: <select name="type">${renderTypeOptions(params.type)}</select>Active: <select name="active">${renderActiveOptions(params.active)}</select><input type="hidden" name="paginationKeys" value="${paginationKeys.join(',')}" />`
             const buttonsStart = `<div class="buttons">`
             const actionButton = `<a class="btn btn-primary">Run query</a><cwdb-action action="call" endpoint="${context.invokedFunctionArn}"></cwdb-action>`
             let paginateButton = ''
             
             if(res.lastScannedKey) {
               paginateButton += `<a class="btn btn-secondary">Next page</a><cwdb-action action="call" endpoint="${context.invokedFunctionArn}">{ "nextPage": "${res.lastScannedKey}" }</cwdb-action>`
+            }
+
+            if(paginationKeys.length>0) {
+              paginateButton += `<a class="btn btn-secondary">Prev page</a><cwdb-action action="call" endpoint="${context.invokedFunctionArn}">{ "prevPage": "true" }</cwdb-action>`
             }
             
             const resetQueryButton = `<a class="btn btn-secondary">Reset Query</a><cwdb-action action="call" endpoint="${context.invokedFunctionArn}">{ "resetQuery": "true" }</cwdb-action>`
