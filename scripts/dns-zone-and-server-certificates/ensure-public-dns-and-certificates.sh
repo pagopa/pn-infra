@@ -13,7 +13,7 @@ scriptDir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 usage() {
       cat <<EOF
-    Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] -r <aws-region> -e <env-type> -p <aws-profile> -P <parent-zone-aws-profile> -l <login-zone-profile>
+    Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] -r <aws-region> -e <env-type> -p <aws-profile> -P <parent-zone-aws-profile> -l <login-zone-profile> -b <bo-zone-profile>
 
     [-h]                      : this help message
     [-v]                      : verbose mode
@@ -23,6 +23,7 @@ usage() {
     -p <aws-profile>                profilo AWS per accedere all'account pn-core
     -P <parent-zone-aws-profile>    profilo aws per accedere all'account che contiene la zona pn.pagopa.it (pn_uat)
     -l <login-zone-profile>         profilo AWS per l'account di spidhub login
+    -b <bo-zone-profile>            profilo AWS per l'account di backoffice
 
     This script require following executable configured in the PATH variable:
      - aws cli 2.0 
@@ -63,6 +64,10 @@ parse_params() {
       loginZoneProfile="${2-}"
       shift
       ;;
+    -b | --bo-zone-profile )
+      boZoneProfile="${2-}"
+      shift
+      ;;
     -?*) usage ;;
     *) break ;;
     esac
@@ -73,6 +78,7 @@ parse_params() {
   [[ -z "${zoneProfile-}" ]] && usage 
   [[ -z "${parentZoneProfile-}" ]] && usage
   [[ -z "${loginZoneProfile-}" ]] && usage
+  [[ -z "${boZoneProfile-}" ]] && usage
   [[ -z "${envName-}" ]] && usage
 
   args=("$@")
@@ -197,3 +203,6 @@ aws --profile $zoneProfile --region $zoneRegion cloudformation deploy \
       "NameServers=${nameserverParamValue}"
 
 
+### CREATE CERTIFICATE IN BACKOFFICE ACCOUNT
+boSubDomainName="devops"
+source "${scriptDir}/create-or-renew-one-certificate.sh" $boSubDomainName "bo.${envName}.pn.pagopa.it" $boZoneProfile $cloudFrontRegion $zoneRegion
