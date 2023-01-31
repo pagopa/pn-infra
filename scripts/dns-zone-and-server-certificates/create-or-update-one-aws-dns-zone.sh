@@ -63,24 +63,5 @@ nameserverParamValue=$( echo $nameservers | sed -e 's/,/|/g' )
 echo $nameserverParamValue
 
 echo "CONFIGURE DELEGATION"
-if ( [ ! "$envName" = "prod" ] ) then
-  createOrUpdateStack $parentZoneProfile $parentZoneRegion $parentZoneStackName zone-delegation-recordset.yaml "EnvName=${envName}" "NameServers=${nameserverParamValue}"
-else
-  echo " ### delegation of PRODUCTION DNS ZONE needs pull request, see engineering space on confluence"
-  echo $outputs > /tmp/dns-pagopa-it-path-proposal.txt
-
-  echo "# Subscripion PROD-PiattaformaNotifiche, pn.pagopa.it \n "\
-       'resource "azurerm_dns_ns_record" "pn_pagopa_it_ns" { \n'\
-       '  name                = "pn"\n'\
-       '  zone_name           = azurerm_dns_zone.pagopa-it.name\n'\
-       '  resource_group_name = azurerm_resource_group.rg-prod.name\n'\
-       '  records = [' > /tmp/dns-pagopa-it-path-proposal.txt
-  echo "$nameserverParamValue" | tr "|" "\n" | sed -e 's/^/    "/' | sed -e 's/$/.",/'\
-       >> /tmp/dns-pagopa-it-path-proposal.txt
-
-  echo '  ]\n'\
-       '  ttl  = var.DEFAULT_TTL_SEC\n'\
-       '  tags = var.tags\n'\
-       '}' >> /tmp/dns-pagopa-it-path-proposal.txt
-fi
+createOrUpdateStack $parentZoneProfile $parentZoneRegion $parentZoneStackName zone-delegation-recordset.yaml "EnvName=${envName}" "NameServers=${nameserverParamValue}"
 
