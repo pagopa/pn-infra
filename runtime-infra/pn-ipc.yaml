@@ -795,6 +795,166 @@ Resources:
         StreamName: !Sub '${ProjectName}-logs-stream'
         StreamRetentionPeriodHours: !Ref LogsStreamRetentionHours
   
+  ###            LAMBDAS                                                   ###
+  ############################################################################
+
+  # NationalRegistriesRouterLambda to redirect National Registries Gateway responses to the right SQS
+  NationalRegistriesRouterLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs16.x
+      Description: 'The function implements a simple router to redirect National Registries Gateway responses to the right SQS'
+      MemorySize: 128
+      Timeout: 10
+      Role: !GetAtt NationalRegistriesRouterLambdaRole.Arn
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"          
+      Environment:
+        Variables:
+          SQS_DELIVERYPUSH_URI: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.QueueURL
+          SQS_PAPERCHANNEL_URI: !GetAtt NationalRegistries2PaperChannelQueue.Outputs.QueueURL
+      Code:
+        ZipFile: |
+              const AWS = require('aws-sdk')
+              const sqs = new AWS.SQS();
+              const SQS_DELIVERYPUSH_URI  = process.env.SQS_DELIVERYPUSH_URI
+              const SQS_PAPERCHANNEL_URI = process.env.SQS_PAPERCHANNEL_URI
+
+              async function send(params) {
+                let response;
+                console.log("Sending Event: %s", JSON.stringify(params,null,2))
+                try {
+                    const data = await sqs.sendMessage(params).promise();
+                    if (data) {
+                        console.log("Success, message sent. MessageID:", data.MessageId);
+                        const bodyMessage = 'Message Sent to SQS with MessageId: ' +data.MessageId;
+                        response = {
+                            statusCode: 200,
+                            body: JSON.stringify(bodyMessage),
+                        };
+                    }else{
+                        throw new Error("Error: sqs.sendMessage, no data");
+                    }
+                    return response;
+                }
+                catch (err) {
+                    console.log("Fatal error during Send", err);
+                    throw err;
+                }
+              }
+
+              function chooseDestinations(bodyMessage){
+                let destinations = []; 
+                if(bodyMessage.includes("digitalAddress")) {
+                    destinations.push(SQS_DELIVERYPUSH_URI);
+                } 
+                if(bodyMessage.includes("physicalAddress")) {
+                    destinations.push(SQS_PAPERCHANNEL_URI);
+                }
+                if(!destinations.length){
+                    destinations.push(SQS_DELIVERYPUSH_URI, SQS_PAPERCHANNEL_URI); 
+                }
+                return destinations;
+              }
+
+              function deepCopyMessageAttributes(messageAttributes){
+                let newMessageAttributes = {};
+                let messageAttributesKeys = Object.keys(messageAttributes);
+                messageAttributesKeys.forEach((key) => {
+                  let messageAttribute = messageAttributes[key];
+                  if(messageAttribute.hasOwnProperty("dataType")){
+                    let newMessageAttribute = {
+                      DataType: messageAttribute.dataType
+                    }
+                    if (messageAttribute.hasOwnProperty("binaryValue")){
+                      newMessageAttribute.BinaryValue=messageAttribute.binaryValue
+                    } else if (messageAttribute.hasOwnProperty("stringValue")){
+                      newMessageAttribute.StringValue=messageAttribute.stringValue
+                    } else {
+                      console.log("Skipped messageAttributes with key [%s], with unexpected dataType [%s]", key, newMessageAttribute.DataType)
+                    }
+                    newMessageAttributes[key]=newMessageAttribute;
+                  }else{
+                    console.log("Skipped messageAttributes with key [%s], missing dataType", key)
+                  }
+                });
+                return newMessageAttributes;
+              }
+
+              exports.handler = async (event) => {
+                let response;
+                await Promise.all(event.Records.map(async (record) => {
+                    console.log("Processing Event: %s", JSON.stringify(record,null,2))
+                    const bodyMessage = record.body;
+                    const messageAttributes = deepCopyMessageAttributes(record.messageAttributes)
+                    const destinations = chooseDestinations(bodyMessage);
+                    await Promise.all(destinations.map(async (destination) => {
+                        const params = {
+                            DelaySeconds: 0,
+                            MessageAttributes: messageAttributes,
+                            MessageBody: bodyMessage,
+                            QueueUrl: destination
+                        };
+                        response = await send(params);            
+                        return response;
+                    }));
+                }));
+              };
+
+  NationalRegistriesRouterLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-NationalRegistriesRouterLambdaRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: !Sub ${ProjectName}-NationalRegistriesRouterLambdaRolePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: AllowLambdaToCreateLogs
+                Action:
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+                Effect: Allow
+                Resource: "*"
+              - Sid: AllowLambdaToCreateLogGroup
+                Action:
+                - logs:CreateLogGroup
+                Effect: Allow
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+              - Sid: SendMessage
+                Action:
+                - sqs:SendMessage
+                Effect: Allow
+                Resource: 
+                - !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.QueueARN
+                - !GetAtt NationalRegistries2PaperChannelQueue.Outputs.QueueARN
+              - Sid: ReveiveMessage
+                Action:
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+                Effect: Allow
+                Resource: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.QueueARN
+
+  NationalRegistriesRouterEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      Enabled: true
+      BatchSize: 10
+      EventSourceArn: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.QueueARN
+      FunctionName: !GetAtt NationalRegistriesRouterLambda.Arn
+  
 Outputs:
   # Web API for browsers and B2B
   ApiDnsName:
