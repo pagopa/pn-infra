@@ -180,6 +180,77 @@ Resources:
       VpcEndpointType: Interface
       VpcId: !Ref VpcId
 
+### SSM Messages - EC2 connection ###
+  SSMMessagesInferanceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ssmmessages'
+      SubnetIds: !Ref Subnets
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+### SSM - EC2 connection ###
+  SSMInferanceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ssm'
+      SubnetIds: !Ref Subnets
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+### EC2 Message - EC2 Connection ###
+  EC2InferanceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ec2messages'
+      SubnetIds: !Ref Subnets
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+### ECS Agent - ECS Connection ###
+  ECSAgentInferanceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecs-agent'
+      SubnetIds: !Ref Subnets
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+### ECS Telemetry - ECS Connection ###
+  ECSTelemetryInferanceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecs-telemetry'
+      SubnetIds: !Ref Subnets
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+
+### ECS - ECS Connection ###
+  ECSInferanceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: true
+      SecurityGroupIds: 
+        - !Ref InterfaceSecurityGroup
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecs'
+      SubnetIds: !Ref Subnets
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
 
   ###         ALLOW ACCESS TO SERVICES ELASTIC NETWORK INTERFACES         ###
   ###########################################################################
