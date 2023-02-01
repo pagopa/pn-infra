@@ -13,7 +13,7 @@ scriptDir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 usage() {
       cat <<EOF
-    Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] -r <aws-region> -e <env-type> -p <aws-profile> -P <parent-zone-aws-profile> -l <login-zone-profile>
+    Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] -r <aws-region> -e <env-type> -p <aws-profile> -P <parent-zone-aws-profile> -l <login-zone-profile> -b <bo-zone-profile>
 
     [-h]                      : this help message
     [-v]                      : verbose mode
@@ -23,6 +23,7 @@ usage() {
     -p <aws-profile>                profilo AWS per accedere all'account pn-core
     -P <parent-zone-aws-profile>    profilo aws per accedere all'account che contiene la zona pn.pagopa.it (pn_uat)
     -l <login-zone-profile>         profilo AWS per l'account di spidhub login
+    -b <bo-zone-profile>            profilo AWS per l'account di backoffice
 
     This script require following executable configured in the PATH variable:
      - aws cli 2.0 
@@ -63,6 +64,10 @@ parse_params() {
       loginZoneProfile="${2-}"
       shift
       ;;
+    -b | --bo-zone-profile )
+      boZoneProfile="${2-}"
+      shift
+      ;;
     -?*) usage ;;
     *) break ;;
     esac
@@ -73,6 +78,7 @@ parse_params() {
   [[ -z "${zoneProfile-}" ]] && usage 
   [[ -z "${parentZoneProfile-}" ]] && usage
   [[ -z "${loginZoneProfile-}" ]] && usage
+  [[ -z "${boZoneProfile-}" ]] && usage
   [[ -z "${envName-}" ]] && usage
 
   args=("$@")
@@ -123,10 +129,15 @@ do
 done
 echo "#####################################"
 echo ""
-
+echo ""
+echo ""
+echo ""
+echo ""
+echo ""
 
 
 echo "### CREATE CHILD ZONE FOR SPIDHUB"
+echo "#####################################"
 aws --profile $loginZoneProfile --region $zoneRegion cloudformation deploy \
       --stack-name "${envName}-dnszone-spid" \
       --template-file ${scriptDir}/cnf-templates/spid-dns-zone.yaml \
@@ -143,6 +154,8 @@ echo $nameservers | tr "," "\n"
 
 nameserverParamValue=$( echo $nameservers | sed -e 's/,/|/g' )
 
+echo ""
+echo ""
 echo "### DELEGATE CHILD ZONE FOR SPIDHUB"
 aws --profile $zoneProfile --region $zoneRegion cloudformation deploy \
     --stack-name "${envName}-dnszone-spid-delegation" \
@@ -153,5 +166,46 @@ aws --profile $zoneProfile --region $zoneRegion cloudformation deploy \
       "NameServers=${nameserverParamValue}"
 
 
+echo ""
+echo ""
+echo ""
+echo ""
+echo ""
 
 
+echo "### CREATE CHILD ZONE FOR BACKOFFICE"
+echo "#####################################"
+aws --profile $boZoneProfile --region $zoneRegion cloudformation deploy \
+      --stack-name "${envName}-dnszone-backoffice" \
+      --template-file ${scriptDir}/cnf-templates/backoffice-dns-zone.yaml \
+      --parameter-override "EnvName=${envName}"
+
+echo "List stack outputs"
+outputs=$( aws --profile $boZoneProfile --region $zoneRegion cloudformation describe-stacks \
+    --stack-name "${envName}-dnszone-backoffice" )
+echo $outputs
+
+echo "Extract NameServers DNSs"
+nameservers=$( echo $outputs | jq '.Stacks[0].Outputs[] | select(.OutputKey=="NameServers") | .OutputValue' | sed -e 's/"//g')
+echo $nameservers | tr "," "\n"
+
+nameserverParamValue=$( echo $nameservers | sed -e 's/,/|/g' )
+
+echo ""
+echo ""
+echo "### DELEGATE CHILD ZONE FOR BACKOFFICE"
+aws --profile $zoneProfile --region $zoneRegion cloudformation deploy \
+    --stack-name "${envName}-dnszone-backoffice-delegation" \
+    --template-file ${scriptDir}/cnf-templates/zone-delegation-recordset.yaml \
+    --parameter-override \
+      "EnvName=bo" \
+      "BaseDnsDomain=${envName}.pn.pagopa.it" \
+      "NameServers=${nameserverParamValue}"
+
+
+### CREATE CERTIFICATE IN BACKOFFICE ACCOUNT
+boSubDomainName="helpdesk"
+source "${scriptDir}/create-or-renew-one-certificate.sh" $boSubDomainName "bo.${envName}.pn.pagopa.it" $boZoneProfile $cloudFrontRegion $zoneRegion
+
+boApiSubDomainName="api"
+source "${scriptDir}/create-or-renew-one-certificate.sh" $boApiSubDomainName "bo.${envName}.pn.pagopa.it" $boZoneProfile $zoneRegion $zoneRegion
