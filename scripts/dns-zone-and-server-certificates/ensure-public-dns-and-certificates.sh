@@ -204,5 +204,8 @@ aws --profile $zoneProfile --region $zoneRegion cloudformation deploy \
 
 
 ### CREATE CERTIFICATE IN BACKOFFICE ACCOUNT
-boSubDomainName="devops"
+boSubDomainName="helpdesk"
 source "${scriptDir}/create-or-renew-one-certificate.sh" $boSubDomainName "bo.${envName}.pn.pagopa.it" $boZoneProfile $cloudFrontRegion $zoneRegion
+
+boApiSubDomainName="api"
+source "${scriptDir}/create-or-renew-one-certificate.sh" $boApiSubDomainName "bo.${envName}.pn.pagopa.it" $boZoneProfile $zoneRegion $zoneRegion
