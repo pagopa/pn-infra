@@ -3,7 +3,7 @@
 ./create_and_share_private_hosted_zones.sh \
     -p-1 cicd_hotfix_core \
     -d-1 core.pn.internal \
-    -v-1 vpc-045626930db3f0845 \
+    -v-1 vpc-059fa461ed0c53203 \
     \
     -p-2 cicd_hotfix_helpdesk \
     -d-2 helpdesk.pn.internal \
