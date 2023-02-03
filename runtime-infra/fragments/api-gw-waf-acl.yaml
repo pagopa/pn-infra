@@ -735,6 +735,11 @@ Resources:
         CloudWatchMetricsEnabled: true
         MetricName: !Join ["-", [MetricFor, !Ref WAFName]]
         SampledRequestsEnabled: true
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "exposeServiceWaf"
+        - Key: "pnMicroservice"
+          Value: !Ref WAFName
 
   # Associate Web ACLs with Rest API
   ApiWafWebAclAssociation0:

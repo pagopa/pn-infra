@@ -322,6 +322,9 @@ Resources:
     Type: AWS::Events::EventBus
     Properties: 
       Name: !Sub '${ProjectName}-CoreEventBus'
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
   
   # Allow access from partner system
   PnCoreEventBusSafeStoreAccessPolicy: 
@@ -365,6 +368,9 @@ Resources:
                   - !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
                   - !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
                   - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueARN"
+      Tags: 
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
   
   # Resource based policy to allow EventBridge to publish to CloudWatch Logs
   LogGroupCoreEventBusPolicy:
@@ -415,6 +421,9 @@ Resources:
                 Effect: Allow
                 Resource: 
                   - !GetAtt CoreEventBusEventsLogGroup.Arn
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   ExternalChannelsOutputsQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -447,12 +456,18 @@ Resources:
     Properties:
       LogGroupName: /aws/events/core-event-bus-input-events
       RetentionInDays: 14
+      Tags: 
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   CoreEventBusMatchedEventsLoggerFnLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: /aws/lambda/PnCoreEventBusMatchedEventLogger
       RetentionInDays: 14
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   CoreEventBusEventsLogGroupSubscriptionFilter:
     Type: AWS::Logs::SubscriptionFilter
@@ -503,6 +518,9 @@ Resources:
                 - "kms:Decrypt"
                 Effect: Allow
                 Resource: "*"
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   PnCoreEventBusToLogGroup:
     Type: AWS::Events::Rule
@@ -707,6 +725,9 @@ Resources:
                   - logs:PutLogEvents
                 Resource:
                   - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
   
   MatchedEventsLoggerFunction:
     Type: AWS::Lambda::Function
@@ -727,6 +748,9 @@ Resources:
       Handler: index.handler
       Runtime: python3.9
       Role: !GetAtt MatchedEventsLoggerFunctionExecutionRole.Arn
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   # Standard Queue for events Dead Letter Queue
   EventBusDeadLetterQueue:
@@ -734,6 +758,9 @@ Resources:
     Properties:
       MessageRetentionPeriod: !Ref EventBusDeadLetterQueueMaximumRetentionPeriod
       QueueName: !Sub '${ProjectName}-CoreEventBus-DLQ'
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   # Dead Letter Queue policy 
   EventBusDeadLetterQueuePolicy:
@@ -814,6 +841,9 @@ Resources:
         Variables:
           SQS_DELIVERYPUSH_URI: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.QueueURL
           SQS_PAPERCHANNEL_URI: !GetAtt NationalRegistries2PaperChannelQueue.Outputs.QueueURL
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
       Code:
         ZipFile: |
               const AWS = require('aws-sdk')
@@ -946,6 +976,9 @@ Resources:
                 - sqs:GetQueueAttributes
                 Effect: Allow
                 Resource: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.QueueARN
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   NationalRegistriesRouterEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping

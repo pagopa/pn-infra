@@ -102,6 +102,10 @@ Resources:
           - !Ref AWS::NoValue
         - Key: "PN_SERVICE_PATH"
           Value: !Ref ServiceApiPath
+        - Key: "pnInfraFeature"
+          Value: "exposeService"
+        - Key: "pnMicroservice"
+          Value: !Ref MicroServiceUniqueName
       Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
       FailOnWarnings: true
       DisableExecuteApiEndpoint: true      
@@ -264,12 +268,22 @@ Resources:
           HttpMethod: '*'
           MetricsEnabled: 'true'
           DataTraceEnabled: 'false'
+      Tags:
+        - Key: pnInfraFeature
+          Value: exposeService
+        - Key: pnMicroservice
+          Value: !Ref MicroServiceUniqueName
 
   # Log Group
   PublicApiLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: 14
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "exposeService"
+        - Key: "pnMicroservice"
+          Value: !Ref MicroServiceUniqueName
 
   # B2B Authorizer
   ApiKeyLambdaPermission:
@@ -478,6 +492,11 @@ Resources:
                 - "kms:Decrypt"
                 Effect: Allow
                 Resource: "*"
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "exposeService"
+        - Key: "pnMicroservice"
+          Value: !Ref MicroServiceUniqueName
 
 Outputs:
 

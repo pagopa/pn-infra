@@ -55,6 +55,10 @@ Resources:
             Principal:
               Service: firehose.amazonaws.com
         Version: "2012-10-17"
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "logToBucket"
+
 
   ## IAM Policy  
   DeliveryStreamSourceServiceRoleDefaultPolicy:
@@ -88,6 +92,9 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: 120
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "logToBucket"
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
 
@@ -131,6 +138,9 @@ Resources:
         Prefix: !Sub '${StreamNamePrefix}/'
         ErrorOutputPrefix: !Sub 'errors/${StreamNamePrefix}/'
         RoleARN: !Ref LogsExporterRoleArn
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "logToBucket"
       # DeliveryStreamEncryptionConfigurationInput: 
       #   KeyARN: !GetAtt LogsKinesisDeliveryStreamKmsKey.Arn
       #   KeyType: CUSTOMER_MANAGED_CMK

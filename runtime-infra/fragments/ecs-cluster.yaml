@@ -11,6 +11,9 @@ Resources:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Sub ${MacroServiceName}-ecs-cluster
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
 Outputs:
   ClusterName:

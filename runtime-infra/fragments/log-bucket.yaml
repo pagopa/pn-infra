@@ -66,6 +66,9 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "logToBucket"
 
   # - Log storage cryptography key alias
   LogsBucketKmsAlias:
@@ -122,6 +125,9 @@ Resources:
               - kms:GenerateDataKey*
               - kms:DescribeKey
             Resource: "*"
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "logToBucket"
 
   # - Bucket access policy
   LogsBucketPolicy:
@@ -212,6 +218,10 @@ Resources:
               Resource: 
                 - !Sub "${LogsBucketKmsKey.Arn}"
                 - !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/${ProjectName}-logs-bucket-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}-key-alias'
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "logToBucket"
+
 Outputs:
   LogsBucketKmsKeyArn:
     Value: 

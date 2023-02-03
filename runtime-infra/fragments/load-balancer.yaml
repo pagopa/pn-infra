@@ -44,6 +44,10 @@ Resources:
       Subnets: !Ref Subnets
       SecurityGroups:
         - !Ref WebappSecurityGroup
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
+      
 
   # Application load balancer listener
   ApplicationLoadBalancerListener:
@@ -95,6 +99,9 @@ Resources:
 #          ToPort: 8443
 #          CidrIp: "0.0.0.0/0"
       VpcId: !Ref VpcId
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
 
   ###                         NETWORK LOAD BALANCER                         ###
@@ -108,6 +115,9 @@ Resources:
       Scheme: internal
       IpAddressType: ipv4
       Subnets: !Ref Subnets
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
       
   NetworkLoadBalancerStatic:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -122,6 +132,9 @@ Resources:
           PrivateIPv4Address: !Select [ 1, !Ref InternalNlbIps ]
         - SubnetId: !Select [ 2, !Ref Subnets] 
           PrivateIPv4Address: !Select [ 2, !Ref InternalNlbIps ]
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   # Network load balancer listener
   NetworkLoadBalancerListener:
@@ -186,6 +199,9 @@ Resources:
       Targets:
         - Id: !Ref ApplicationLoadBalancer
       VpcId: !Ref VpcId
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   # Network load balancer forward to application load balancer
   NetworkToApplicationLoadBalancerStaticTargetGroup:
@@ -198,6 +214,9 @@ Resources:
       Targets:
         - Id: !Ref ApplicationLoadBalancer
       VpcId: !Ref VpcId
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   NetworkToApplicationLoadBalancerIpTargetGroup:
     DependsOn:
@@ -217,6 +236,9 @@ Resources:
           AvailabilityZone: !Select [ 1, !GetAZs '' ]
         - Id: !Select [ 2, !Ref InternalNlbIps ]
           AvailabilityZone: !Select [ 2, !GetAZs '' ]
+      Tags: 
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   ###                        API GATEWAY INTEGRATION                        ###
   #############################################################################
@@ -229,6 +251,9 @@ Resources:
       Description: "API-GW link to Network load balancer"
       TargetArns:
         - !Ref NetworkLoadBalancer
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
  
 Outputs:
