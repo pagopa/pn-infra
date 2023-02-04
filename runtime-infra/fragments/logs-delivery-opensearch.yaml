@@ -54,9 +54,6 @@ Parameters:
     Type: String
     Description: ARN of the SNS topic for alarms
 
-Conditions:
-  IsSNSTopicPresent: !Not [!Equals [!Ref AlarmSNSTopicArn, '']]
-
 Resources:
   DeliveryLambdaRole:
     Type: AWS::IAM::Role
@@ -145,29 +142,6 @@ Resources:
       MaximumBatchingWindowInSeconds: 300 # 5 minutes
       StartingPosition: LATEST
 
-  DeliveryLambdaErrorsAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub '${ProjectName}-${StreamNamePrefix}-opensearch-delivery-errors'
-      AlarmActions:
-        !If
-          - IsSNSTopicPresent
-          - 
-            - !Ref AlarmSNSTopicArn
-          - !Ref AWS::NoValue
-      Namespace: AWS/Lambda
-      MetricName: Errors
-      Dimensions:
-      - Name: FunctionName
-        Value: !Ref DeliveryLambda
-      Statistic: Sum
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      Threshold: 1
-      DatapointsToAlarm: 1
-      EvaluationPeriods: 1
-      Period: 3600 # 1 hour
-      TreatMissingData: notBreaching
-
   # CloudWatch metric to filer ERROR in log group
   DeliveryLambdaErrorLogsMetricFilter: 
     Type: AWS::Logs::MetricFilter
@@ -181,12 +155,12 @@ Resources:
           MetricName: !Sub "${DeliveryLambda}-ErrorMetric"
 
   # Create alarm
-  DeliveryLambdaErrorLogsMetricAlarm:
+  DeliveryLambdaInvocationErrorLogsMetricAlarm:
     Type: AWS::CloudWatch::Alarm
     DependsOn: DeliveryLambdaErrorLogsMetricFilter
     Properties:
-      AlarmName: !Sub "${DeliveryLambda}-ErrorLogs-Alarm"
-      AlarmDescription: "CloudWatch alarm for when DeliveryLambda has ERROR line."
+      AlarmName: !Sub "${DeliveryLambda}-LogInvocationErrors-Alarm"
+      AlarmDescription: "CloudWatch alarm for when DeliveryLambda has ERROR line or an invocation error happens."
       TreatMissingData: notBreaching
       AlarmActions: 
         - !Ref AlarmSNSTopicArn
@@ -195,22 +169,36 @@ Resources:
       OKActions:
         - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: 1
-      MetricName: !Sub "${DeliveryLambda}-ErrorMetric"
-      Namespace: "ErrorFatalLogs"
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 60
-      Period: 60
-      Statistic: Sum
       Threshold: 1
-
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              MetricName: !Sub ${DeliveryLambda}-ErrorMetric
+              Namespace: ErrorFatalLogs
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m2
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: FunctionName
+                  Value: !Ref DeliveryLambda
+              Namespace: AWS/Lambda
+              MetricName: Errors
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: e1
+          Expression: SUM([m1,m2])
+          Label: !Sub "${DeliveryLambda}-LogInvocationErrorsAlarm"
 Outputs:
-  DeliveryLambdaAlarmArn:
+  DeliveryLambdaInvocationErrorLogsMetricAlarm:
     Description: 'Delivery lambda alarm ARN'
-    Value: !GetAtt DeliveryLambdaErrorsAlarm.Arn
-
-  DeliveryLambdaErrorLogsAlarmArn:
-    Description: 'Delivery lambda error log alarm ARN'
-    Value: !GetAtt DeliveryLambdaErrorsAlarm.Arn
+    Value: !GetAtt DeliveryLambdaInvocationErrorLogsMetricAlarm.Arn
 
   DeliveryLambdaArn:
     Description: 'Delivery lambda ARN'
