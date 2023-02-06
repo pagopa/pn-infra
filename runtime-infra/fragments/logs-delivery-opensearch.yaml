@@ -8,6 +8,10 @@ Parameters:
     Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
       experimental environments without crash official development environment'
 
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
   StreamNamePrefix:
     Type: String
     Description: to distinguish different log groups streams
@@ -142,63 +146,18 @@ Resources:
       MaximumBatchingWindowInSeconds: 300 # 5 minutes
       StartingPosition: LATEST
 
-  # CloudWatch metric to filer ERROR in log group
-  DeliveryLambdaErrorLogsMetricFilter: 
-    Type: AWS::Logs::MetricFilter
-    DependsOn: DeliveryLambda
-    Properties: 
-      LogGroupName: !Sub /aws/lambda/${DeliveryLambda}
-      FilterPattern: '?ERROR'
-      MetricTransformations: 
-        - MetricValue: 1
-          MetricNamespace: "ErrorFatalLogs"
-          MetricName: !Sub "${DeliveryLambda}-ErrorMetric"
-
-  # Create alarm
-  DeliveryLambdaInvocationErrorLogsMetricAlarm:
-    Type: AWS::CloudWatch::Alarm
-    DependsOn: DeliveryLambdaErrorLogsMetricFilter
+  DeliveryLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
     Properties:
-      AlarmName: !Sub "${DeliveryLambda}-LogInvocationErrors-Alarm"
-      AlarmDescription: "CloudWatch alarm for when DeliveryLambda has ERROR line or an invocation error happens."
-      TreatMissingData: notBreaching
-      AlarmActions: 
-        - !Ref AlarmSNSTopicArn
-      #InsufficientDataActions:
-      #  - !Ref AlarmSNSTopicArn
-      OKActions:
-        - !Ref AlarmSNSTopicArn
-      DatapointsToAlarm: 1
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
-      Threshold: 1
-      Metrics:
-        - Id: m1
-          MetricStat:
-            Metric:
-              MetricName: !Sub ${DeliveryLambda}-ErrorMetric
-              Namespace: ErrorFatalLogs
-            Period: 60
-            Stat: Sum
-          ReturnData: False
-        - Id: m2
-          MetricStat:
-            Metric:
-              Dimensions:
-                - Name: FunctionName
-                  Value: !Ref DeliveryLambda
-              Namespace: AWS/Lambda
-              MetricName: Errors
-            Period: 60
-            Stat: Sum
-          ReturnData: False
-        - Id: e1
-          Expression: SUM([m1,m2])
-          Label: !Sub "${DeliveryLambda}-LogInvocationErrorsAlarm"
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Sub '${ProjectName}-safestore_to_deliverypush'
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
 Outputs:
   DeliveryLambdaInvocationErrorLogsMetricAlarm:
     Description: 'Delivery lambda alarm ARN'
-    Value: !GetAtt DeliveryLambdaInvocationErrorLogsMetricAlarm.Arn
+    Value: !GetAtt DeliveryLambdaAlarms.Outputs.LambdaInvocationErrorLogsMetricAlarm
 
   DeliveryLambdaArn:
     Description: 'Delivery lambda ARN'
