@@ -8,6 +8,10 @@ Parameters:
     Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
       experimental environments without crash official development environment'
 
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
   StreamNamePrefix:
     Type: String
     Description: to distinguish different log groups streams
@@ -53,9 +57,6 @@ Parameters:
   AlarmSNSTopicArn:
     Type: String
     Description: ARN of the SNS topic for alarms
-
-Conditions:
-  IsSNSTopicPresent: !Not [!Equals [!Ref AlarmSNSTopicArn, '']]
 
 Resources:
   DeliveryLambdaRole:
@@ -145,72 +146,18 @@ Resources:
       MaximumBatchingWindowInSeconds: 300 # 5 minutes
       StartingPosition: LATEST
 
-  DeliveryLambdaErrorsAlarm:
-    Type: AWS::CloudWatch::Alarm
+  DeliveryLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
     Properties:
-      AlarmName: !Sub '${ProjectName}-${StreamNamePrefix}-opensearch-delivery-errors'
-      AlarmActions:
-        !If
-          - IsSNSTopicPresent
-          - 
-            - !Ref AlarmSNSTopicArn
-          - !Ref AWS::NoValue
-      Namespace: AWS/Lambda
-      MetricName: Errors
-      Dimensions:
-      - Name: FunctionName
-        Value: !Ref DeliveryLambda
-      Statistic: Sum
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      Threshold: 1
-      DatapointsToAlarm: 1
-      EvaluationPeriods: 1
-      Period: 3600 # 1 hour
-      TreatMissingData: notBreaching
-
-  # CloudWatch metric to filer ERROR in log group
-  DeliveryLambdaErrorLogsMetricFilter: 
-    Type: AWS::Logs::MetricFilter
-    DependsOn: DeliveryLambda
-    Properties: 
-      LogGroupName: !Sub /aws/lambda/${DeliveryLambda}
-      FilterPattern: '?ERROR'
-      MetricTransformations: 
-        - MetricValue: 1
-          MetricNamespace: "ErrorFatalLogs"
-          MetricName: !Sub "${DeliveryLambda}-ErrorMetric"
-
-  # Create alarm
-  DeliveryLambdaErrorLogsMetricAlarm:
-    Type: AWS::CloudWatch::Alarm
-    DependsOn: DeliveryLambdaErrorLogsMetricFilter
-    Properties:
-      AlarmName: !Sub "${DeliveryLambda}-ErrorLogs-Alarm"
-      AlarmDescription: "CloudWatch alarm for when DeliveryLambda has ERROR line."
-      TreatMissingData: notBreaching
-      AlarmActions: 
-        - !Ref AlarmSNSTopicArn
-      #InsufficientDataActions:
-      #  - !Ref AlarmSNSTopicArn
-      OKActions:
-        - !Ref AlarmSNSTopicArn
-      DatapointsToAlarm: 1
-      MetricName: !Sub "${DeliveryLambda}-ErrorMetric"
-      Namespace: "ErrorFatalLogs"
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
-      Period: 60
-      Statistic: Sum
-      Threshold: 1
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref DeliveryLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 Outputs:
-  DeliveryLambdaAlarmArn:
+  DeliveryLambdaInvocationErrorLogsMetricAlarm:
     Description: 'Delivery lambda alarm ARN'
-    Value: !GetAtt DeliveryLambdaErrorsAlarm.Arn
-
-  DeliveryLambdaErrorLogsAlarmArn:
-    Description: 'Delivery lambda error log alarm ARN'
-    Value: !GetAtt DeliveryLambdaErrorsAlarm.Arn
+    Value: !GetAtt DeliveryLambdaAlarms.Outputs.LambdaInvocationErrorLogsMetricAlarm
 
   DeliveryLambdaArn:
     Description: 'Delivery lambda ARN'

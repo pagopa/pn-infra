@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic for alarms
+
+  FunctionName:
+    Type: String
+    Description: Lambda function name
+
+Resources:
+  # CloudWatch metric to filer ERROR in log group
+  LambdaErrorLogsMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: !Sub /aws/lambda/${FunctionName}
+      FilterPattern: '?ERROR'
+      MetricTransformations: 
+        - MetricValue: 1
+          MetricNamespace: "ErrorFatalLogs"
+          MetricName: !Sub "${FunctionName}-ErrorMetric"
+
+  # Create alarm
+  LambdaInvocationErrorLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn: LambdaErrorLogsMetricFilter
+    Properties:
+      AlarmName: !Sub "${FunctionName}-LogInvocationErrors-Alarm"
+      AlarmDescription: "CloudWatch alarm for when lambda has ERROR line or an invocation error happens."
+      TreatMissingData: notBreaching
+      AlarmActions: 
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Threshold: 1
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              MetricName: !Sub ${FunctionName}-ErrorMetric
+              Namespace: ErrorFatalLogs
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m2
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: FunctionName
+                  Value: !Ref FunctionName
+              Namespace: AWS/Lambda
+              MetricName: Errors
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: e1
+          Expression: SUM([m1,m2])
+          Label: !Sub "${FunctionName}-LogInvocationErrorsAlarm"
+Outputs:
+  LambdaInvocationErrorLogsMetricAlarm:
+    Description: 'Lambda alarm ARN'
+    Value: !GetAtt LambdaInvocationErrorLogsMetricAlarm.Arn
