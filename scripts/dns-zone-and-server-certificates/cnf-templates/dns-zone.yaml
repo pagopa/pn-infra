@@ -7,21 +7,11 @@ Parameters:
     Default: 'prod'
     Description: The name of the installation devel, beta, uat, preprod, ...
 
-Conditions:
-  CreateParentZone:
-    Fn::Equals:
-      - !Ref EnvName
-      - "prod"
-
 Resources:
   HostedZone:
     Type: AWS::Route53::HostedZone
     Properties:
-      Name:
-        Fn::If:
-          - CreateParentZone
-          - 'pn.pagopa.it'
-          - !Sub '${EnvName}.pn.pagopa.it'
+      Name: !Sub '${EnvName}.pn.pagopa.it'
       HostedZoneConfig:
         Comment: !Sub Public zone for 'Piattaforma notifiche' ambiente ${EnvName}
 
@@ -30,11 +20,7 @@ Resources:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId: !Ref HostedZone
-      Name:
-        Fn::If:
-          - CreateParentZone
-          - 'testdns.pn.pagopa.it'
-          - !Sub 'testdns.${EnvName}.pn.pagopa.it'
+      Name: !Sub 'testdns.${EnvName}.pn.pagopa.it'
       Comment: !Sub "Entry DNS di prova per PN ${EnvName}"
       ResourceRecords:
         - !Sub '"Test DNS entry for PN ${EnvName}"'
@@ -47,11 +33,7 @@ Resources:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId: !Ref HostedZone
-      Name: 
-        !If
-          - CreateParentZone
-          - 'pn.pagopa.it'
-          - !Sub '${EnvName}.pn.pagopa.it'
+      Name: !Sub '${EnvName}.pn.pagopa.it'
       Comment: !Sub "CAA DNS record for PN ${EnvName}"
       ResourceRecords: 
         - '0 issue "amazonaws.com"'
