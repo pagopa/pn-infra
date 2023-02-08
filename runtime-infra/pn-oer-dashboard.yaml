@@ -176,31 +176,31 @@ Resources:
           const ExtCSS = `<style>table{ width: 100%; } td { padding: 3px; } .search-form { margin-bottom: 10px; } select,input { padding: 5px; } .buttons { margin-top: 10px; } .btn { padding: 5px; } .btn-primary { background-color: #00a1b0; color: #FFF; } .btn-secondary { background-color: #FFF; color: #00a1b0; } </style>`
 
           async function searchSLAViolations(type, active = 'YES', olderThan, lastScannedKey = null){
-              const client = new LambdaClient();
-              
-              const activeBool = active=='YES'?true:false
-              
-              const payload = {
-                type,
-                active: activeBool,
-                olderThan
-              }
-              
-              if(lastScannedKey){
-                payload.lastScannedKey = lastScannedKey
-              }
-              
-              const input = {
-                  FunctionName: process.env.SEARCH_SLA_LAMBDA_ARN,
-                  Payload: Buffer.from(JSON.stringify(payload))
-              };
-              const command = new InvokeCommand(input);
-              try {
-                const response = await client.send(command);
-                return JSON.parse(Buffer.from(response.Payload))
-              } catch(e){
-                console.error(e)
-              }
+            const client = new LambdaClient();
+            
+            const activeBool = active=='YES'?true:false
+            
+            const payload = {
+              type,
+              active: activeBool,
+              olderThan
+            }
+            
+            if(lastScannedKey){
+              payload.lastScannedKey = lastScannedKey
+            }
+            
+            const input = {
+                FunctionName: process.env.SEARCH_SLA_LAMBDA_ARN,
+                Payload: Buffer.from(JSON.stringify(payload))
+            };
+            const command = new InvokeCommand(input);
+            try {
+              const response = await client.send(command);
+              return JSON.parse(Buffer.from(response.Payload))
+            } catch(e){
+              console.error(e)
+            }
           }
 
           function renderTypeOptions(type){
@@ -276,11 +276,9 @@ Resources:
             }
 
             console.log('Search sla params', params)
-            const res = await searchSLAViolations(params.type, params.active, params.olderThan, params.lastScannedKey)
+            const parsedRes = await searchSLAViolations(params.type, params.active, params.olderThan, params.lastScannedKey)
             let slaRows = []
 
-            const parsedRes = JSON.parse(res);
-            
             if(parsedRes){
               console.log(parsedRes);
               slaRows = parsedRes.results.map((resource, i) => {
