@@ -298,8 +298,8 @@ Resources:
             const actionButton = `<a class="btn btn-primary">Run query</a><cwdb-action action="call" endpoint="${context.invokedFunctionArn}"></cwdb-action>`
             let paginateButton = ''
             
-            if(res.lastScannedKey) {
-              paginateButton += `<a class="btn btn-secondary">Next page</a><cwdb-action action="call" endpoint="${context.invokedFunctionArn}">{ "nextPage": "${res.lastScannedKey}" }</cwdb-action>`
+            if(parsedRes.lastScannedKey) {
+              paginateButton += `<a class="btn btn-secondary">Next page</a><cwdb-action action="call" endpoint="${context.invokedFunctionArn}">{ "nextPage": "${parsedRes.lastScannedKey}" }</cwdb-action>`
             }
 
             if(paginationKeys.length>0) {
