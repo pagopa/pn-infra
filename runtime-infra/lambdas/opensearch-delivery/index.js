@@ -30,9 +30,11 @@ const handler = async (event) => {
       console.log(`Bulk imported completed`);
     }
 
-    return {
-      batchItemFailures:  [...new Set(seqNumbers)]
-    }
+    const uniqueSeqNumbers = [...new Set(seqNumbers)]
+    const ret = uniqueSeqNumbers.map((s) => {
+      return { itemIdentifier: s };
+    })
+    return ret
 
   } else {
     return {
