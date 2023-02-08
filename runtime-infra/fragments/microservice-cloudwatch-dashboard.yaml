@@ -56,23 +56,36 @@ Parameters:
     Type: CommaDelimitedList
     Default: ''
 
+  EvaluationPeriod: 
+    Type: Number
+    Default: '10'
+    Description: Evaluation periods (in seconds); allowed values are 10, 30, 60 and multiple of 60
+
 Resources:
 
-  MicroserviceCompositeAlarm:
-    Type: AWS::CloudWatch::CompositeAlarm
+  # Create alarm
+  MicroserviceGlobalMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub '${DashboardName}-CompositeAlarm'
-      AlarmRule: 
-        Fn::Join:
-          - ''
-          - - 'ALARM('
-            - Fn::Join:
-              - ') OR ALARM('
-              - 'Fn::Transform':
-                  Name: 'TrimListTransform'
-                  Parameters:
-                    Arns: !Ref AlarmArns
-            - ')'
+      AlarmName: !Sub '${DashboardName}-GlobalAlarm'
+      AlarmDescription: "CloudWatch alarm for when microservice has at least 1 alarm active in 10 seconds"
+      TreatMissingData: notBreaching
+      DatapointsToAlarm: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref EvaluationPeriod
+      Threshold: 1
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              MetricName: !Sub ${DashboardName}-ActiveAlarms
+              Namespace: PnStatus
+            Period: !Ref EvaluationPeriod
+            Stat: Sum
+          ReturnData: False
+        - Id: e1
+          Expression: FILL(m1, REPEAT)
+          Label: !Sub "${DashboardName}-ActiveAlarmsMetric"
 
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard
@@ -93,8 +106,3 @@ Resources:
             KinesisFirehoseArns: !Ref KinesisFirehoseArns
             EventRuleArns: !Ref EventRuleArns
             BucketNames: !Ref BucketNames
-
-Outputs:
-  MicroserviceCompositeAlarmArn:
-    Value: !GetAtt MicroserviceCompositeAlarm.Arn
-    Description: 'Arn of microservice composite alarm'

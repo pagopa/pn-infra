@@ -867,7 +867,7 @@ Resources:
         Action: "events:PutEvents"
         Resource: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
   
-  ###                           CI to CD BRIDGE                           ###
+  ###                           Alarm State ChangeRule                    ###
   ###########################################################################
   # EVENT BRIDGE RULE: invoke lambda on alarm state change
   SendAlarmChangeEventsToLambda:
@@ -927,7 +927,7 @@ Resources:
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
-      Timeout : 120
+      Timeout : 180
 
   # Lambda function role
   CompositeMetricGeneratorRole:
@@ -968,6 +968,16 @@ Resources:
     Properties:
       LogGroupName: !Sub "/aws/lambda/${CompositeMetricGenerator}"
       RetentionInDays: 14
+
+  CompositeMetricGeneratorAlarm:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - CompositeMetricGeneratorLogGroup
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref CompositeMetricGenerator
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   ###            LAMBDAS                                                   ###
   ############################################################################
