@@ -126,6 +126,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
         StreamNamePrefix: logsToOpenSearch
         KinesisStreamArn: !Ref LogsKinesisSourceStreamArn
         KinesisStreamKMSKeyArn: !Ref LogsKinesisSourceStreamKeyArn
@@ -160,15 +161,7 @@ Outputs:
     Value:
       !If
       - HasOpenSearchExport
-      - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaAlarmArn
-      - ''
-
-  OpenSearchDeliveryLambdaErrorLogsAlarmArn:
-    Description: 'Lambda to OpenSearch error logs alarm ARN'
-    Value:
-      !If 
-      - HasOpenSearchExport
-      - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaErrorLogsAlarmArn
+      - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaInvocationErrorLogsMetricAlarm
       - ''
 
   OpenSearchDeliveryLambdaArn:

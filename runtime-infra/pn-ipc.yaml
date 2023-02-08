@@ -16,6 +16,11 @@ Parameters:
     Type: String
     Description: 'The DNS name used for B2B rest API.'
 
+  AlternateApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The alternate DNS name used for B2B rest API.'
+
   ApiCertificateArn:
     Type: String
     Description: 'The certificate used for B2B rest API.'
@@ -24,6 +29,11 @@ Parameters:
     Type: String
     Default: ''
     Description: 'The DNS name used for B2B Selfcare PG API.'
+
+  AlternateSelcpgApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The alternate DNS name used for B2B Selfcare PG API.'
 
   SelcpgApiCertificateArn:
     Type: String
@@ -34,6 +44,11 @@ Parameters:
     Type: String
     Description: 'The DNS name used for browser rest API.'
 
+  AlternateWebApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The alternate DNS name used for browser rest API. '
+
   WebApiCertificateArn:
     Type: String
     Description: 'The certificate used for browser rest API.'
@@ -41,6 +56,11 @@ Parameters:
   IoApiDnsName:
     Type: String
     Description: 'The DNS name used for IO API rest'
+
+  AlternateIoApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The alternate DNS name used for IO API rest.'
 
   IoApiCertificateArn:
     Type: String
@@ -139,6 +159,25 @@ Conditions:
   HasSelcpgApiCertificate: !Not [ !Equals [ !Ref SelcpgApiCertificateArn, '' ] ]  
   HasSelcpgApi: !And [ !Condition HasSelcpgApiDns, !Condition HasSelcpgApiCertificate ]
 
+  HasAlternateApiDnsName: !Not 
+    - !Equals
+      - !Ref AlternateApiDnsName
+      - ""
+  HasAlternateWebApiDnsName: !Not 
+    - !Equals
+      - !Ref AlternateWebApiDnsName
+      - ""
+
+  HasAlternateSelcpgApiDnsName: !Not 
+    - !Equals
+      - !Ref AlternateSelcpgApiDnsName
+      - ""
+
+  HasAlternateIoApiDnsName: !Not 
+    - !Equals
+      - !Ref AlternateIoApiDnsName
+      - ""
+
 Resources:
 
   ###            COMMON RESOURCES FOR WEB API AND DISTRIBUTIONS            ###
@@ -151,6 +190,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
       Parameters:
         DnsName: !Ref ApiDnsName
+        AlternateDnsName: !Ref AlternateApiDnsName
         CertificateArn: !Ref ApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
 
@@ -162,6 +202,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
       Parameters:
         DnsName: !Ref SelcpgApiDnsName
+        AlternateDnsName: !Ref AlternateSelcpgApiDnsName
         CertificateArn: !Ref SelcpgApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
 
@@ -172,6 +213,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
       Parameters:
         DnsName: !Ref WebApiDnsName
+        AlternateDnsName: !Ref AlternateWebApiDnsName
         CertificateArn: !Ref WebApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
 
@@ -182,6 +224,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
       Parameters:
         DnsName: !Ref IoApiDnsName
+        AlternateDnsName: !Ref AlternateIoApiDnsName
         CertificateArn: !Ref IoApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
 
@@ -1089,16 +1132,16 @@ Resources:
 Outputs:
   # Web API for browsers and B2B
   ApiDnsName:
-    Value: !Ref ApiDnsName
+    Value: !If [ HasAlternateApiDnsName, !Ref AlternateApiDnsName, !Ref ApiDnsName ]
     Description: 'The DNS name used for B2B rest API.'
   WebApiDnsName:
-    Value: !Ref WebApiDnsName
+    Value: !If [ HasAlternateWebApiDnsName, !Ref AlternateWebApiDnsName, !Ref WebApiDnsName ]
     Description: 'The DNS name used for browser rest API.'
   IoApiDnsName:
-    Value: !Ref IoApiDnsName
+    Value: !If [ HasAlternateIoApiDnsName, !Ref AlternateIoApiDnsName, !Ref IoApiDnsName ]
     Description: 'The DNS name used for browser rest API.'
   SelcpgApiDnsName:
-    Value: !Ref SelcpgApiDnsName
+    Value: !If [ HasAlternateSelcpgApiDnsName, !Ref AlternateSelcpgApiDnsName, !Ref SelcpgApiDnsName ]
     Description: 'The DNS name used for B2B Selfecare PG rest API.'
 
   # SafeStorage to DeliveryPush
