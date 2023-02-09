@@ -111,15 +111,53 @@ const mapping = {
     ]
 }
 
-function findMicroserviceByAlarm(alarm){
-
+function replaceVariables(alarm, replacements = {}){
+    let ret = alarm
+    for (const [replacementKey, replacementValue] of Object.entries(replacements)) {
+        ret = ret.replace('${'+replacementKey+'}', replacementValue)
+    }
+    return ret;
 }
 
-function findAllAlarmsByMicroservice(microservice){
+function findMicroserviceByAlarm(alarm, envType){
+    for (const [microservice, alarms] of Object.entries(mapping)) {
+        let replacedAlarm = alarms.find((a) => {
+            const replacedAlarm = replaceVariables(a, {
+                env: envType
+            })
 
+            return replacedAlarm==alarm
+        })
+        if(replacedAlarm){
+            return microservice
+        }
+    }
+
+    return null
+}
+
+function findAllAlarmsByMicroservice(microservice, envType){
+    const alarms = mapping[microservice]
+    if(!alarms){
+        console.warn('Invalid microservice key: '+microservice)
+        return  []
+    } else {
+        const replacedAlarms = alarms.map((a) => {
+            return replaceVariables(a, {
+                env: envType
+            });
+        })
+
+        return replacedAlarms
+    }
+}
+
+function findAllMicroservices(){
+    return Object.keys(mapping);
 }
 
 module.exports = {
     findMicroserviceByAlarm,
-    findAllAlarmsByMicroservice
+    findAllAlarmsByMicroservice,
+    findAllMicroservices
 }
