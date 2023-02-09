@@ -46,9 +46,6 @@ Parameters:
   OpenSearchDeliveryLambdaS3Key:
     Type: String
     Description: s3 object key of the lambda used to delivery events to opensearch
-  OpenSearchDeliveryLambdaS3ObjectVersion:
-    Type: String
-    Description: s3 object version of the lambda used to delivery events to opensearch
   
   OpenSearchSecretArn:
     Type: String
@@ -132,7 +129,6 @@ Resources:
       Code:
         S3Bucket: !Ref OpenSearchDeliveryLambdaS3Bucket
         S3Key: !Ref OpenSearchDeliveryLambdaS3Key
-        S3ObjectVersion: !Ref OpenSearchDeliveryLambdaS3ObjectVersion
 
   DeliveryLambdaKinesisSource:
     Type: AWS::Lambda::EventSourceMapping

@@ -8,6 +8,11 @@ Parameters:
     Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
       experimental environments without crash official development environment'
 
+  EnvironmentType:
+    Type: String
+    Default: ''
+    Description: Environment type
+
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
@@ -104,6 +109,10 @@ Parameters:
     Description: 'keep track of used projects commitIds'
 
   # pass-though parameters
+  LambdasBucketName:
+    Type: String
+  LambdasBasePath:
+    Type: String
   NetworkLoadBalancerLink:
     Type: String
   ApplicationLoadBalancerListenerArn:
@@ -838,6 +847,31 @@ Resources:
         StreamName: !Sub '${ProjectName}-logs-stream'
         StreamRetentionPeriodHours: !Ref LogsStreamRetentionHours
   
+  ###          Allow  EVENTS FROM CONFIDENTIAL AND HELPDESK         ###
+  #####################################################################
+  ## Composite alarm event bus and rule
+  AllowEventsFromConfidentialPolicy: 
+    Type: AWS::Events::EventBusPolicy
+    Properties: 
+      StatementId: "allowEventsFromDataVault"
+      Statement: 
+        Effect: "Allow"
+        Principal: 
+            AWS: !Sub "arn:aws:iam::${ConfidentialInfoAccountId}:root"
+        Action: "events:PutEvents"
+        Resource: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+
+  AllowEventsFromHelpdeskPolicy: 
+    Type: AWS::Events::EventBusPolicy
+    Properties: 
+      StatementId: "allowEventsFromHelpdesk"
+      Statement: 
+        Effect: "Allow"
+        Principal: 
+            AWS: !Sub "arn:aws:iam::${HelpdeskAccountId}:root"
+        Action: "events:PutEvents"
+        Resource: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+
   ###            LAMBDAS                                                   ###
   ############################################################################
 
@@ -1329,3 +1363,9 @@ Outputs:
     Value: !Ref HelpdeskAccountId
   OpenSearchArn:
     Value: !Ref OpenSearchArn
+  LambdasBucketName:
+    Value: !Ref LambdasBucketName
+  LambdasBasePath:
+    Value: !Ref LambdasBasePath
+  EnvironmentType:
+    Value: !Ref EnvironmentType
