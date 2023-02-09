@@ -26,6 +26,10 @@ Parameters:
   LambdasBasePath:
     Type: String
 
+  EnvironmentType:
+    Type: String
+    Default: ''
+
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
 
@@ -245,6 +249,8 @@ Resources:
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
+          ENVIRONMENT_TYPE: !Ref EnvironmentType
+          ACCOUNT_ID: !Sub ${AWS::AccountId}
       Timeout : 180
 
   # Lambda function role
