@@ -1,0 +1,53 @@
+
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template creates an Amazon CloudWatch Microservices Dashboard.
+
+Parameters:
+  MicroserviceName:
+    Description: The name of the microservice
+    Type: String
+ 
+  EvaluationPeriod: 
+    Type: Number
+    Default: '10'
+    Description: Evaluation periods (in seconds); allowed values are 10, 30, 60 and multiple of 60
+
+  DatapointsToAlarm:
+    Type: Number
+    Default: '1'
+
+  Threshold:
+    Type: Number
+    Default: '1'
+
+Resources:
+  # Create alarm
+  MicroserviceGlobalMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${MicroserviceName}-CumulativeAlarm'
+      AlarmDescription: "CloudWatch alarm for when microservice has at least 1 alarm active in 10 seconds"
+      TreatMissingData: notBreaching
+      DatapointsToAlarm: !Ref DatapointsToAlarm
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref EvaluationPeriod
+      Threshold: !!Ref Threshold
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              MetricName: !Sub ${MicroserviceName}-ActiveAlarms
+              Namespace: PnStatus
+            Period: !Ref EvaluationPeriod
+            Stat: Sum
+          ReturnData: False
+        - Id: e1
+          Expression: FILL(m1, REPEAT)
+          Label: !Sub "${MicroserviceName}-ActiveAlarmsMetric"
+
+Outputs:
+  
+  MicroserviceAlarmArn:
+    Value: !GetAtt MicroserviceGlobalMetricAlarm.Arn
+    Description: Microservice global alarm
