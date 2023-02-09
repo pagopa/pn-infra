@@ -378,7 +378,7 @@ Resources:
   APIGatewayApiLatencyAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "${ProjectName}-${MicroServiceUniqueName}-${IntendedUsage}-ApiGwLatencyAlarm"
+      AlarmName: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-ApiGwLatencyAlarm"
       AlarmDescription: "CloudWatch alarm for when API Gateway latency exceeds the limit."
       AlarmActions: 
         - !Ref AlarmSNSTopicArn
@@ -402,7 +402,7 @@ Resources:
   APIGatewayApiErrorAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "${ProjectName}-${MicroServiceUniqueName}-${IntendedUsage}-ApiGwAlarm"
+      AlarmName: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-ApiGwAlarm"
       AlarmDescription: "CloudWatch alarm for when API Gateway has 4xx or 5xx error."
       AlarmActions: 
         - !Ref AlarmSNSTopicArn
