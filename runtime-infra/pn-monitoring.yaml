@@ -178,9 +178,18 @@ Resources:
       FilterPattern: ' '
       DestinationArn: !Ref LogsKinesisSourceStreamArn
 
-###                           Alarm State ChangeRule                    ###
+  ###                           Alarm State ChangeRule                    ###
   ###########################################################################
   # EVENT BRIDGE RULE: invoke lambda on alarm state change
+
+  DefaultEventBusMonitoringLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt CompositeMetricGenerator.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt SendAlarmChangeEventsToLambda.Arn
+
   SendAlarmChangeEventsToLambda:
     Type: AWS::Events::Rule
     Properties: 
@@ -189,9 +198,6 @@ Resources:
       EventPattern: 
         source: [ "aws.cloudwatch" ]
         detail-type: ["CloudWatch Alarm State Change"]
-        detail: 
-          state:
-            value: ["ALARM"]
       Targets: 
         - Arn: !GetAtt CompositeMetricGenerator.Arn
           Id: !Sub ${ProjectName}-AlarmStateChangeTarget
