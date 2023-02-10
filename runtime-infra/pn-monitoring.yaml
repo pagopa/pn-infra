@@ -30,6 +30,10 @@ Parameters:
     Type: String
     Default: ''
 
+  CompositeMetricGeneratorScheduleExpression:
+    Type: String
+    Default: 'rate(10 minutes)'
+
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
 
@@ -229,6 +233,16 @@ Resources:
                 Resource: 
                   - !GetAtt CompositeMetricGenerator.Arn
 
+  CompositeMetricGeneratorScheduleRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Name: !Sub "${ProjectName}-CompositeMetricGeneratorScheduleRule"
+      ScheduleExpression: !Ref CompositeMetricGeneratorScheduleExpression
+      State: ENABLED
+      Targets: 
+        - Arn: !GetAtt CompositeMetricGenerator.Arn
+          Id: !Ref CompositeMetricGenerator
+          
   ### Alarm state change lambda               ####
   ################################################
   # Lambda function
