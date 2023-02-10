@@ -104,3 +104,11 @@ aws ${aws_command_base_args} cloudformation deploy \
         --parameter-overrides \
             MonitoringAccountIds=${monitoring_account_ids} \
             Policy="View-Access-for-all-services"
+
+aws ${aws_command_base_args} cloudformation deploy \
+        --stack-name ${project_name}-cross-account-events-${env_type} \
+        --capabilities CAPABILITY_NAMED_IAM \
+        --template-file CloudWatch-CrossAccountEvents.yaml \
+        --parameter-overrides \
+            MonitoringAccountIds=${monitoring_account_ids}
+

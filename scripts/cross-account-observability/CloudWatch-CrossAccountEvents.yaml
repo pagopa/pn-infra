@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Template to send alarm state change events to central monitoring account.
+
+Parameters:
+  MonitoringAccountId:
+    Description: The AWS account Id of the monitoring account.
+    Type: String
+
+Resources:
+  EventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Send alarm state change events to central account.
+      EventBusName: default
+      EventPattern:
+        source:
+          - "aws.cloudwatch"
+        detail-type:
+          - "CloudWatch Alarm State Change"
+      Name: !Sub AlarmStateChange-${AWS::AccountId}
+      State: ENABLED
+      Targets: 
+        - Arn: !Sub "arn:aws:events:${AWS::Region}:${MonitoringAccountId}:event-bus/default"
+          Id: !Sub default-${AWS::AccountId}
+          RoleArn: !GetAtt EventBridgeIAMrole.Arn
+
+  EventBridgeIAMrole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: PutEventsDestinationBus
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'events:PutEvents'
+                Resource:
+                  - !Sub arn:aws:events:${AWS::Region}:${MonitoringAccountId}:event-bus/default
+      RoleName: !Sub CrossAccountEventsRole
