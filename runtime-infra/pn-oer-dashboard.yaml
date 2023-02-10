@@ -176,31 +176,31 @@ Resources:
           const ExtCSS = `<style>table{ width: 100%; } td { padding: 3px; } .search-form { margin-bottom: 10px; } select,input { padding: 5px; } .buttons { margin-top: 10px; } .btn { padding: 5px; } .btn-primary { background-color: #00a1b0; color: #FFF; } .btn-secondary { background-color: #FFF; color: #00a1b0; } </style>`
 
           async function searchSLAViolations(type, active = 'YES', olderThan, lastScannedKey = null){
-              const client = new LambdaClient();
-              
-              const activeBool = active=='YES'?true:false
-              
-              const payload = {
-                type,
-                active: activeBool,
-                olderThan
-              }
-              
-              if(lastScannedKey){
-                payload.lastScannedKey = lastScannedKey
-              }
-              
-              const input = {
-                  FunctionName: process.env.SEARCH_SLA_LAMBDA_ARN,
-                  Payload: Buffer.from(JSON.stringify(payload))
-              };
-              const command = new InvokeCommand(input);
-              try {
-                const response = await client.send(command);
-                return JSON.parse(Buffer.from(response.Payload))
-              } catch(e){
-                console.error(e)
-              }
+            const client = new LambdaClient();
+            
+            const activeBool = active=='YES'?true:false
+            
+            const payload = {
+              type,
+              active: activeBool,
+              olderThan
+            }
+            
+            if(lastScannedKey){
+              payload.lastScannedKey = lastScannedKey
+            }
+            
+            const input = {
+                FunctionName: process.env.SEARCH_SLA_LAMBDA_ARN,
+                Payload: Buffer.from(JSON.stringify(payload))
+            };
+            const command = new InvokeCommand(input);
+            try {
+              const response = await client.send(command);
+              return JSON.parse(Buffer.from(response.Payload))
+            } catch(e){
+              console.error(e)
+            }
           }
 
           function renderTypeOptions(type){
@@ -276,11 +276,9 @@ Resources:
             }
 
             console.log('Search sla params', params)
-            const res = await searchSLAViolations(params.type, params.active, params.olderThan, params.lastScannedKey)
+            const parsedRes = await searchSLAViolations(params.type, params.active, params.olderThan, params.lastScannedKey)
             let slaRows = []
 
-            const parsedRes = JSON.parse(res);
-            
             if(parsedRes){
               console.log(parsedRes);
               slaRows = parsedRes.results.map((resource, i) => {
@@ -300,8 +298,8 @@ Resources:
             const actionButton = `<a class="btn btn-primary">Run query</a><cwdb-action action="call" endpoint="${context.invokedFunctionArn}"></cwdb-action>`
             let paginateButton = ''
             
-            if(res.lastScannedKey) {
-              paginateButton += `<a class="btn btn-secondary">Next page</a><cwdb-action action="call" endpoint="${context.invokedFunctionArn}">{ "nextPage": "${res.lastScannedKey}" }</cwdb-action>`
+            if(parsedRes.lastScannedKey) {
+              paginateButton += `<a class="btn btn-secondary">Next page</a><cwdb-action action="call" endpoint="${context.invokedFunctionArn}">{ "nextPage": "${parsedRes.lastScannedKey}" }</cwdb-action>`
             }
 
             if(paginationKeys.length>0) {
@@ -380,19 +378,19 @@ Resources:
             # Cloudformation doesn't allow to use IF conditions as Marco parameters so the optionality is managed at Lambda level
             ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
             MicroservicesAlarmArns:
-              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-external-registries-CompositeAlarm
-              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-mandate-CompositeAlarm
-              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-delivery-CompositeAlarm
-              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-auth-fleet-v2-CompositeAlarm              
-              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-downtime-logs-CompositeAlarm                            
-              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-user-attributes-CompositeAlarm
-              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-paper-channel-CompositeAlarm
-              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-radd-fsu-CompositeAlarm
-              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-infra-CompositeAlarm
-              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-frontend-CompositeAlarm
-              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-delivery-push-CompositeAlarm
-              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-logsaver-be-CompositeAlarm
-              - !Sub arn:aws:cloudwatch:${AWS::Region}:$CONFIDENTIAL_INFO_ACCOUNT_ID:alarm:pn-data-vault-CompositeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-external-registries-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-mandate-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-delivery-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-auth-fleet-v2-CumulativeAlarm              
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-downtime-logs-CumulativeAlarm                            
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-user-attributes-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-paper-channel-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-radd-fsu-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-infra-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-frontend-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-delivery-push-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-logsaver-be-CumulativeAlarm
+#              - !Sub arn:aws:cloudwatch:${AWS::Region}:$CONFIDENTIAL_INFO_ACCOUNT_ID:alarm:pn-data-vault-CumulativeAlarm
             MicroservicesDashboardLinks:
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-external-registries       
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-mandate
@@ -406,7 +404,7 @@ Resources:
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-frontend
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-delivery-push
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-logsaver-be
-              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-data-vault;accountId=$CONFIDENTIAL_INFO_ACCOUNT_ID
+#              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-data-vault;accountId=$CONFIDENTIAL_INFO_ACCOUNT_ID
             FunctionalAlarmsArns:
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-CompositeAlarm-NotificationInput
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-CompositeAlarm-NotificationOutput
@@ -450,6 +448,7 @@ Resources:
             SearchSLAViolationWidgetFunction: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:pn-sla-violation-history-function          
             OpenSearchArn: !Ref OpenSearchArn
             LogsBucketName: !Ref LogsBucketName
+
 Outputs:
   Version:
     Value: !Ref Version
