@@ -198,6 +198,14 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt SendAlarmChangeEventsToLambda.Arn
 
+  DefaultEventBusScheduleMonitoringLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt CompositeMetricGenerator.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CompositeMetricGeneratorScheduleRule.Arn
+
   SendAlarmChangeEventsToLambda:
     Type: AWS::Events::Rule
     Properties: 
