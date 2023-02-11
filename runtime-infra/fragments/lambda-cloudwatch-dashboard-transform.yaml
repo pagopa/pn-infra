@@ -1363,8 +1363,15 @@ Resources:
                             
                         y_value = y_value+11
 
+                    titleWidget = textSeparator('SLA Violations', y_value)
+                    dashboardList.append(titleWidget)
+                    y_value = y_value+2
+                    customSlaWidget = activeSlaViolationsWidget("Active SLA Violations", 10, 24, 0, y_value, localRegion)
+                    dashboardList.append(customSlaWidget)
+                    y_value = y_value+11
+
                     if 'SearchSLAViolationWidgetFunction' in event["params"]:
-                        titleWidget = textSeparator('SLA Violations', y_value)
+                        titleWidget = textSeparator('SLA Violations History', y_value)
                         dashboardList.append(titleWidget)
                         y_value = y_value+2
                         customSlaWidget = customWidget(event["params"]["SearchSLAViolationWidgetFunction"], "Search SLA Violations", 10, 24, 0, y_value)
@@ -1659,6 +1666,34 @@ Resources:
                 
                 return widgetJson
                 
+            def activeSlaViolationsWidget(title, height, width, x_value, y_value, localRegion):
+                widgetJson = {
+                    "type":"metric",
+                    "x":x_value,
+                    "y":y_value,
+                    "width":width,
+                    "height": height,
+                    "properties": {
+                        "sparkline": True,
+                        "view": "timeSeries",
+                        "stat": "Sum",
+                        "period": 60,
+                        "title": title,
+                        "region": localRegion,
+                        "stacked": False,
+                        "singleValueFullPrecision": False,
+                        "metrics": [
+                            ["OER", "pn-activeSLAViolations", "type", "VALIDATION" ],
+                            ["OER", "pn-activeSLAViolations", "type", "REFINEMENT" ],
+                            ["OER", "pn-activeSLAViolations", "type", "SEND_PEC" ],
+                            ["OER", "pn-activeSLAViolations", "type", "SEND_PAPER_AR_890" ],
+                            ["OER", "pn-activeSLAViolations", "type", "SEND_AMR" ],
+                        ]
+                    }
+                }   
+                
+                return widgetJson
+
             def textSeparator(message, textYValue):
                 textJson={
                     "height": 1,
