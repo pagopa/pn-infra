@@ -1231,7 +1231,16 @@ Resources:
                     return False
                     
                 return True
+
+            def not_helpdesk(value):
+                if value is None:
+                    return False
                 
+                if "$HELPDESK_ACCOUNT_ID" in value:
+                    return False
+                    
+                return True
+
             def replace_variable(value, variable_name, variable_value):
                 return value.replace(variable_name, variable_value)
                 
@@ -1246,7 +1255,11 @@ Resources:
                     confidentialInfoAccountId = ""
                     if "ConfidentialInfoAccountId" in event["params"]:
                         confidentialInfoAccountId = event["params"]["ConfidentialInfoAccountId"]
-                    
+
+                    helpdeskAccountId = ""
+                    if "HelpdeskAccountId" in event["params"]:
+                        helpdeskAccountId = event["params"]["HelpdeskAccountId"]
+
                     localRegion = event["params"]["Region"]
                     microservicesAlarmArns = event["params"]["MicroservicesAlarmArns"]
                     microservicesDashboardLinks = event["params"]["MicroservicesDashboardLinks"]
@@ -1263,12 +1276,10 @@ Resources:
                         localAlarmNames = event["params"]["FunctionalAlarmsNames"]
                         localAlarmNames = list(filter(None, localAlarmNames))
 
-
                         alarmList = alarmWidgetBuilder(localAlarmArns, localAlarmNames, y_value ,localRegion)
                         dashboardList = appendList(dashboardList, alarmList)
                         y_value = y_value+9
-                                    
-                                    
+                                                                       
                     x_width = 24/6
                     
                     titleWidget = textSeparator('Microservices Alarms', y_value)
@@ -1277,7 +1288,11 @@ Resources:
                     if confidentialInfoAccountId is None or confidentialInfoAccountId == '':
                         microservicesAlarmArns = list(filter(not_confidential_info, microservicesAlarmArns))
                         microservicesDashboardLinks = list(filter(not_confidential_info, microservicesDashboardLinks))
-                        
+
+                    if helpdeskAccountId is None or helpdeskAccountId == '':
+                        microservicesAlarmArns = list(filter(not_helpdesk, microservicesAlarmArns))
+                        microservicesDashboardLinks = list(filter(not_helpdesk, microservicesDashboardLinks))
+
                     y_value=y_value+5
                     x_value = 0
                     for i in range(len(microservicesAlarmArns)):
@@ -1287,7 +1302,10 @@ Resources:
                         
                         alarmArn = replace_variable(microservicesAlarmArns[i], '$CONFIDENTIAL_INFO_ACCOUNT_ID', confidentialInfoAccountId)
                         dashboardLink = replace_variable(microservicesDashboardLinks[i], '$CONFIDENTIAL_INFO_ACCOUNT_ID', confidentialInfoAccountId)
-                        
+
+                        alarmArn = replace_variable(microservicesAlarmArns[i], '$HELPDESK_ACCOUNT_ID', helpdeskAccountId)
+                        dashboardLink = replace_variable(microservicesDashboardLinks[i], '$HELPDESK_ACCOUNT_ID', helpdeskAccountId)
+
                         serviceName = getServiceFromLink(dashboardLink)
                         alarmWidget = microserviceAlarmWidget(alarmArn, serviceName, x_width, x_value, y_value)
                         linkWidget = microserviceLinkWidget(dashboardLink, serviceName, x_width, x_value, y_value+2)

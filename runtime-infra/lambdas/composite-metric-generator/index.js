@@ -31,13 +31,15 @@ const handler = async (event) => {
         console.log('Periodic evaluation');
         const microserviceConfigs = findAllMicroservices()
         for(let i=0; i<microserviceConfigs.length; i++){
-            const microserviceName = microserviceConfigs[i].microservices
-            const msAlarms = findAllAlarmsByMicroservice(microserviceName, envType, microserviceConfigs[i].accountId)
-            const alarmsInAlarmState = await getActiveAlarms(msAlarms, region, microserviceConfigs[i].accountId)
-            console.log('Microservice '+microserviceName, alarmsInAlarmState)
-            if(alarmsInAlarmState){
-                await putMicroserviceMetric(microserviceName+'-ActiveAlarms', alarmsInAlarmState.length, region);
-            } 
+            for(let j=0; j<microserviceConfigs[i].microservices; j++){
+                const microserviceName = microserviceConfigs[i].microservices[j]
+                const msAlarms = findAllAlarmsByMicroservice(microserviceName, envType, microserviceConfigs[i].accountId)
+                const alarmsInAlarmState = await getActiveAlarms(msAlarms, region, microserviceConfigs[i].accountId)
+                console.log('Microservice '+microserviceName+' in account '+microserviceConfigs[i].accountId, alarmsInAlarmState)
+                if(alarmsInAlarmState){
+                    await putMicroserviceMetric(microserviceName+'-ActiveAlarms', alarmsInAlarmState.length, region);
+                } 
+            }
         }
     }
     return {

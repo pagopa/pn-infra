@@ -199,7 +199,7 @@ function findAllAlarmsByMicroservice(microservice, envType, accountId = null){
 }
 
 function findAllMicroservices(){
-    const coreKeys = Object.keys(mapping)
+    const coreKeys = Object.keys(coreMapping)
     const helpdeskKeys = Object.keys(helpdeskMapping)
     const confidentialInfoKeys = Object.keys(confidentialInfoMapping)
     return [
