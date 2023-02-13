@@ -121,7 +121,9 @@ const helpdeskMapping = {
         'pn-helpdesk-writes-blocked',
         'pn-helpdesk-cluster-yellow',
         'pn-helpdesk-jvm-pressure',
-        'pn-helpdesk-cpu-usage'        
+        'pn-helpdesk-cpu-usage',
+        'pn-helpdesk-jvm-pressure',
+        'pn-helpdesk-master-jvm-pressure'
     ]
 }
 

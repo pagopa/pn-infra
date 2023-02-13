@@ -31,7 +31,7 @@ const handler = async (event) => {
         console.log('Periodic evaluation');
         const microserviceConfigs = findAllMicroservices()
         for(let i=0; i<microserviceConfigs.length; i++){
-            for(let j=0; j<microserviceConfigs[i].microservices; j++){
+            for(let j=0; j<microserviceConfigs[i].microservices.length; j++){
                 const microserviceName = microserviceConfigs[i].microservices[j]
                 const msAlarms = findAllAlarmsByMicroservice(microserviceName, envType, microserviceConfigs[i].accountId)
                 const alarmsInAlarmState = await getActiveAlarms(msAlarms, region, microserviceConfigs[i].accountId)
