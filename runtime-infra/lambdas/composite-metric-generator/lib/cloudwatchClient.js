@@ -20,13 +20,26 @@ const getCrossAccountCredentials = async (accountId) => {
       return data;
     } catch (error) {
       // error handling.
-      console.log(error)
+      console.error(error)
       return null;
     }
 }
-async function getActiveAlarms(alarmNames, region){
+async function getActiveAlarms(alarmNames, region, accountId = null){
     // a client can be shared by different commands.
-    const client = new CloudWatchClient({ region: region });
+    const clientParams = {
+        region: region
+    }
+
+    if(accountId){
+        const crossAccountCredentials = await getCrossAccountCredentials(accountId)
+        clientParams.credentials = {
+            accessKeyId: crossAccountCredentials.Credentials.AccessKeyId,
+            expiration: crossAccountCredentials.Credentials.Expiration,
+            secretAccessKey: crossAccountCredentials.Credentials.SecretAccessKey,
+            sessionToken: crossAccountCredentials.Credentials.SessionToken
+        }
+    }
+    const client = new CloudWatchClient(clientParams);
 
     const params = {
         AlarmNames: alarmNames,

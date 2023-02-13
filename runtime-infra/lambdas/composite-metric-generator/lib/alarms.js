@@ -159,6 +159,8 @@ function getMappingByAccountId(accountId = null){
     if(accountId==process.env.CONFIDENTIAL_INFO_ACCOUNT_ID){
         return confidentialInfoMapping;
     }
+
+    return coreMapping
 }
 
 function findMicroserviceByAlarm(alarm, envType, accountId = null){
@@ -200,7 +202,20 @@ function findAllMicroservices(){
     const coreKeys = Object.keys(mapping)
     const helpdeskKeys = Object.keys(helpdeskMapping)
     const confidentialInfoKeys = Object.keys(confidentialInfoMapping)
-    return coreKeys.concat(helpdeskKeys).concat(confidentialInfoKeys)
+    return [
+        {
+            accountId: null,
+            microservices: coreKeys
+        },
+        {
+            accountId: process.env.HELPDESK_ACCOUNT_ID,
+            microservices: helpdeskKeys
+        },
+        {
+            accountId: process.env.CONFIDENTIAL_INFO_ACCOUNT_ID,
+            microservices: confidentialInfoKeys
+        }
+    ]
 }
 
 module.exports = {
