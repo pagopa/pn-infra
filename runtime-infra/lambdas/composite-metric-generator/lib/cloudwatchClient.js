@@ -30,7 +30,7 @@ async function getActiveAlarms(alarmNames, region, accountId = null){
         region: region
     }
 
-    if(accountId){
+    if(accountId && accountId!=process.env.ACCOUNT_ID){
         const crossAccountCredentials = await getCrossAccountCredentials(accountId)
         clientParams.credentials = {
             accessKeyId: crossAccountCredentials.Credentials.AccessKeyId,
