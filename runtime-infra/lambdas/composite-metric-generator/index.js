@@ -11,24 +11,18 @@ const handler = async (event) => {
     // find alarm
     if(event.source=='aws.cloudwatch'){
         if(event.account!=accountId){
-            console.warn('Account ID mismatch', {
-                source: event.account,
-                current: accountId
-            })
-
-            return {
-                success: true
-            }
+            accountId = event.account; // override account ID with accounts to read alarms from
         }
-        const microserviceName = findMicroserviceByAlarm(event.detail.alarmName, envType, event.account);
+        
+        const microserviceName = findMicroserviceByAlarm(event.detail.alarmName, envType, accountId);
         if(!microserviceName){
             console.warn('Alarm doesn\'t match any of microservice alarms list');
             return {
                 success: true
             }
         }
-        const msAlarms = findAllAlarmsByMicroservice(microserviceName, envType, event.account)
-        const alarmsInAlarmState = await getActiveAlarms(msAlarms, event.region, event.account)
+        const msAlarms = findAllAlarmsByMicroservice(microserviceName, envType, accountId)
+        const alarmsInAlarmState = await getActiveAlarms(msAlarms, event.region, accountId)
         if(alarmsInAlarmState){
             await putMicroserviceMetric(microserviceName+'-ActiveAlarms', alarmsInAlarmState.length, region);
         }
