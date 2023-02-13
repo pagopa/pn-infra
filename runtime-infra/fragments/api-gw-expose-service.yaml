@@ -509,7 +509,10 @@ Outputs:
           - Fn::If:
             - IsIO
             - !Ref IoAuthorizer
-            - !Ref JwtAuthorizer
+            - Fn::If:
+                - IsPNPG
+                - !Ref AWS::NoValue
+                - !Ref JwtAuthorizer
     Description: "Authorizer ARN"
 
   # Rest API definition
