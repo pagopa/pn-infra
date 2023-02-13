@@ -204,20 +204,29 @@ function findAllMicroservices(){
     const coreKeys = Object.keys(coreMapping)
     const helpdeskKeys = Object.keys(helpdeskMapping)
     const confidentialInfoKeys = Object.keys(confidentialInfoMapping)
-    return [
+
+    const ret = [
         {
             accountId: null,
             microservices: coreKeys
-        },
-        {
-            accountId: process.env.HELPDESK_ACCOUNT_ID,
-            microservices: helpdeskKeys
-        },
-        {
-            accountId: process.env.CONFIDENTIAL_INFO_ACCOUNT_ID,
-            microservices: confidentialInfoKeys
         }
     ]
+
+    if(process.env.HELPDESK_ACCOUNT_ID){
+        ret.push({
+            accountId: process.env.HELPDESK_ACCOUNT_ID,
+            microservices: helpdeskKeys
+        })
+    }
+
+    if(process.env.CONFIDENTIAL_INFO_ACCOUNT_ID){
+        ret.push({
+            accountId: process.env.CONFIDENTIAL_INFO_ACCOUNT_ID,
+            microservices: confidentialInfoKeys
+        })
+    }
+
+    return ret;
 }
 
 module.exports = {

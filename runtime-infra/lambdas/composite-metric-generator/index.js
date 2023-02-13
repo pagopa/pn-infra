@@ -12,6 +12,13 @@ const handler = async (event) => {
     if(event.source=='aws.cloudwatch'){
         if(event.account!=accountId){
             accountId = event.account; // override account ID with accounts to read alarms from
+
+            if(event.account!=process.env.HELPDESK_ACCOUNT_ID && event.account!=process.env.CONFIDENTIAL_INFO_ACCOUNT_ID){
+                console.warn('Invalid account ID '+event.account)
+                return {
+                    success: true
+                }
+            }
         }
         
         const microserviceName = findMicroserviceByAlarm(event.detail.alarmName, envType, accountId);

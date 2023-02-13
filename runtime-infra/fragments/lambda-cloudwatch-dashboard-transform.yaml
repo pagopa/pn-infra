@@ -1303,8 +1303,8 @@ Resources:
                         alarmArn = replace_variable(microservicesAlarmArns[i], '$CONFIDENTIAL_INFO_ACCOUNT_ID', confidentialInfoAccountId)
                         dashboardLink = replace_variable(microservicesDashboardLinks[i], '$CONFIDENTIAL_INFO_ACCOUNT_ID', confidentialInfoAccountId)
 
-                        alarmArn = replace_variable(microservicesAlarmArns[i], '$HELPDESK_ACCOUNT_ID', helpdeskAccountId)
-                        dashboardLink = replace_variable(microservicesDashboardLinks[i], '$HELPDESK_ACCOUNT_ID', helpdeskAccountId)
+                        alarmArn = replace_variable(alarmArn, '$HELPDESK_ACCOUNT_ID', helpdeskAccountId)
+                        dashboardLink = replace_variable(dashboardLink, '$HELPDESK_ACCOUNT_ID', helpdeskAccountId)
 
                         serviceName = getServiceFromLink(dashboardLink)
                         alarmWidget = microserviceAlarmWidget(alarmArn, serviceName, x_width, x_value, y_value)
@@ -1593,7 +1593,13 @@ Resources:
             def getServiceFromLink(link):
                 tokens = link.split("#dashboards:name=", 1)
                 if len(tokens)>1:
-                    subTokens = tokens[1].split(";", 1)        
+                    subTokens = tokens[1].split(";", 1)
+
+                    if(len(subTokens)>1):
+                        displayTokens = subTokens[1].split('display=', 1)
+                        if(len(displayTokens)>1):
+                            return displayTokens[1]
+                            
                     return subTokens[0]
                 else:
                     return link

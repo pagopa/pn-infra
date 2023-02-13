@@ -21,7 +21,7 @@ const getCrossAccountCredentials = async (accountId) => {
     } catch (error) {
       // error handling.
       console.error(error)
-      return null;
+      throw error;
     }
 }
 async function getActiveAlarms(alarmNames, region, accountId = null){

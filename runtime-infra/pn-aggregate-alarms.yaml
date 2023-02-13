@@ -142,13 +142,45 @@ Resources:
       Parameters:
         MicroserviceName: 'pn-frontend'
 
-  # Frontend
+  # Infra
   InfraCumulativeAlarm:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
       Parameters:
         MicroserviceName: 'pn-infra'
+
+  # DataVault
+  DataVaultCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-data-vault'
+
+  # Infra Confidential Info
+  InfraConfidentialCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-infra-confidential-info'
+
+  # Logsaver Confidential Info
+  LogsaverBeConfidentialCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-logsaver-be-confidential-info'
+
+  # Helpdesk Info
+  HelpdeskCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-helpdesk'
 
   # - Everything written to this topic is an alarm
   CompositeAlarmSNSTopic:
