@@ -1,5 +1,29 @@
 const { CloudWatchClient, DescribeAlarmsCommand, PutMetricDataCommand } = require("@aws-sdk/client-cloudwatch");
+const { STSClient, AssumeRoleCommand } = require("@aws-sdk/client-sts");
 
+const getCrossAccountCredentials = async (accountId) => {
+    
+    // a client can be shared by different commands.
+    const client = new STSClient({ region: process.env.REGION });
+    
+    const crossAccountRoleArn = `arn:aws:iam::${accountId}:role/CloudWatch-CrossAccountSharingRole`
+    const timestamp = (new Date()).getTime();
+    const params = {
+        RoleArn: crossAccountRoleArn,
+        RoleSessionName: `cross-account-credentials-${timestamp}`
+    };
+    const command = new AssumeRoleCommand(params);
+    // async/await.
+    try {
+        const data = await client.send(command);
+      // process data.
+      return data;
+    } catch (error) {
+      // error handling.
+      console.log(error)
+      return null;
+    }
+}
 async function getActiveAlarms(alarmNames, region){
     // a client can be shared by different commands.
     const client = new CloudWatchClient({ region: region });

@@ -34,6 +34,16 @@ Parameters:
     Type: String
     Default: 'rate(10 minutes)'
 
+  HelpdeskAccountId:
+    Type: String
+    Default: ''
+    Description: 'Helpdesk account ID'
+
+  ConfidentialInfoAccountId:
+    Type: String
+    Default: ''
+    Description: 'ConfidentialInfo account ID'
+
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
 
@@ -273,6 +283,8 @@ Resources:
           REGION: !Sub ${AWS::Region}
           ENVIRONMENT_TYPE: !Ref EnvironmentType
           ACCOUNT_ID: !Sub ${AWS::AccountId}
+          HELPDESK_ACCOUNT_ID: !Ref HelpdeskAccountId
+          CONFIDENTIAL_INFO_ACCOUNT_ID: !Ref ConfidentialInfoAccountId
       Timeout : 180
 
   # Lambda function role
@@ -307,6 +319,12 @@ Resources:
             Action:
               - "cloudwatch:*"
             Resource: '*' # cannot restrict because it needs to read metrics and alarms of multiple AWS accounts and regions
+          - Effect: Allow
+            Action:
+              - "sts:AssumeRole"
+            Resource: 
+              - !Sub "arn:aws:iam::${HelpdeskAccountId}:role/CloudWatch-CrossAccountSharingRole"
+              - !Sub "arn:aws:iam::${ConfidentialInfoAccountId}:role/CloudWatch-CrossAccountSharingRole"
 
   # lambda function Log Group
   CompositeMetricGeneratorLogGroup:
