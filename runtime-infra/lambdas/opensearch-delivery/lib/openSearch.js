@@ -62,6 +62,11 @@ function prepareBulkBody(logs){
                       }
                     }
 
+                    // fix to handle bunyan nodejs logger format
+                    if(jsonMessage.time && !jsonMessage['@timestamp']){
+                      jsonMessage['@timestamp'] = jsonMessage.time
+                    }
+                    
                     jsonMessage.message = truncateMessage(jsonMessage.message, 30000)
                     jsonMessage._id = log.id
                     jsonMessage.kinesisSeqNumber = doc.kinesisSeqNumber
