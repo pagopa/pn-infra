@@ -185,7 +185,7 @@ Resources:
       ResourceId: !Ref PublicApiProxyResource
       HttpMethod: ANY
       ApiKeyRequired: !If [ UseApiKey, true, false]
-      AuthorizationType: !If [ IsPNPG, !Ref AWS::NoValue, CUSTOM]
+      AuthorizationType: !If [ IsPNPG, NONE, CUSTOM]
       AuthorizerId:
         Fn::If:
           - IsBackoffice
@@ -511,7 +511,7 @@ Outputs:
             - !Ref IoAuthorizer
             - Fn::If:
                 - IsPNPG
-                - !Ref AWS::NoValue
+                - ""
                 - !Ref JwtAuthorizer
     Description: "Authorizer ARN"
 
