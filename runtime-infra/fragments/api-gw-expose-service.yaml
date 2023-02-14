@@ -185,7 +185,7 @@ Resources:
       ResourceId: !Ref PublicApiProxyResource
       HttpMethod: ANY
       ApiKeyRequired: !If [ UseApiKey, true, false]
-      AuthorizationType: !If [ IsPNPG, !Ref AWS::NoValue, CUSTOM]
+      AuthorizationType: !If [ IsPNPG, NONE, CUSTOM]
       AuthorizerId:
         Fn::If:
           - IsBackoffice
