@@ -1,4 +1,4 @@
-const mapping = {
+const coreMapping = {
     'pn-user-attributes': [
         'pn-UserAttributes-ErrorFatalLogs-Alarm',
         'pn-UserAttributes-WEB-ApiGwAlarm',
@@ -111,15 +111,126 @@ const mapping = {
     ]
 }
 
-function findMicroserviceByAlarm(alarm){
-
+const helpdeskMapping = {
+    'pn-helpdesk': [
+        'pn-helpdesk-low-storage',
+        'pn-helpdesk-ApiGwAlarm',
+        'pn-helpdesk-ApiGwLatencyAlarm',
+        'pn-helpdesk-Logextractor-ErrorFatalLogs-Alarm',
+        'pn-helpdesk-cluster-red',
+        'pn-helpdesk-writes-blocked',
+        'pn-helpdesk-cluster-yellow',
+        'pn-helpdesk-jvm-pressure',
+        'pn-helpdesk-cpu-usage',
+        'pn-helpdesk-jvm-pressure',
+        'pn-helpdesk-master-jvm-pressure'
+    ]
 }
 
-function findAllAlarmsByMicroservice(microservice){
+const confidentialInfoMapping = {
+    'pn-data-vault': [
+        'pn-data-vault-sep-ErrorFatalLogs-Alarm',
+    ],
+    'pn-logsaver-be-confidential-info': [
+        'pn-logsaver-be-ErrorFatalLogs-Alarm',
+        'pn-logsaver-be-FailedInvocation-Alarm'
+    ],
+    'pn-infra-confidential-info': [
+        'pn-cdcTos3-Kinesis-Alarm',
+        'pn-logsTos3-Kinesis-Alarm'
+    ]
+}
 
+function replaceVariables(alarm, replacements = {}){
+    let ret = alarm
+    for (const [replacementKey, replacementValue] of Object.entries(replacements)) {
+        ret = ret.replace('${'+replacementKey+'}', replacementValue)
+    }
+    return ret;
+}
+
+function getMappingByAccountId(accountId = null){
+    if(!accountId){
+        return coreMapping;
+    }
+
+    if(accountId==process.env.HELPDESK_ACCOUNT_ID){
+        return helpdeskMapping;
+    } 
+
+    if(accountId==process.env.CONFIDENTIAL_INFO_ACCOUNT_ID){
+        return confidentialInfoMapping;
+    }
+
+    return coreMapping
+}
+
+function findMicroserviceByAlarm(alarm, envType, accountId = null){
+    const mapping = getMappingByAccountId(accountId)
+    for (const [microservice, alarms] of Object.entries(mapping)) {
+        let replacedAlarm = alarms.find((a) => {
+            const replacedAlarm = replaceVariables(a, {
+                env: envType
+            })
+
+            return replacedAlarm==alarm
+        })
+        if(replacedAlarm){
+            return microservice
+        }
+    }
+
+    return null
+}
+
+function findAllAlarmsByMicroservice(microservice, envType, accountId = null){
+    const mapping = getMappingByAccountId(accountId)
+    const alarms = mapping[microservice]
+    if(!alarms){
+        console.warn('Invalid microservice key: '+microservice)
+        return  []
+    } else {
+        const replacedAlarms = alarms.map((a) => {
+            return replaceVariables(a, {
+                env: envType
+            });
+        })
+
+        return replacedAlarms
+    }
+}
+
+function findAllMicroservices(){
+    const coreKeys = Object.keys(coreMapping)
+    const helpdeskKeys = Object.keys(helpdeskMapping)
+    const confidentialInfoKeys = Object.keys(confidentialInfoMapping)
+
+    const ret = [
+        {
+            accountId: null,
+            microservices: coreKeys
+        }
+    ]
+
+    if(process.env.HELPDESK_ACCOUNT_ID){
+        ret.push({
+            accountId: process.env.HELPDESK_ACCOUNT_ID,
+            microservices: helpdeskKeys
+        })
+    }
+
+    if(process.env.CONFIDENTIAL_INFO_ACCOUNT_ID){
+        ret.push({
+            accountId: process.env.CONFIDENTIAL_INFO_ACCOUNT_ID,
+            microservices: confidentialInfoKeys
+        })
+    }
+
+    return ret;
 }
 
 module.exports = {
     findMicroserviceByAlarm,
-    findAllAlarmsByMicroservice
+    findAllAlarmsByMicroservice,
+    findAllMicroservices
 }

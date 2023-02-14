@@ -30,6 +30,20 @@ Parameters:
     Type: String
     Default: ''
 
+  CompositeMetricGeneratorScheduleExpression:
+    Type: String
+    Default: 'rate(10 minutes)'
+
+  HelpdeskAccountId:
+    Type: String
+    Default: ''
+    Description: 'Helpdesk account ID'
+
+  ConfidentialInfoAccountId:
+    Type: String
+    Default: ''
+    Description: 'ConfidentialInfo account ID'
+
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
 
@@ -194,6 +208,14 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt SendAlarmChangeEventsToLambda.Arn
 
+  DefaultEventBusScheduleMonitoringLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt CompositeMetricGenerator.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CompositeMetricGeneratorScheduleRule.Arn
+
   SendAlarmChangeEventsToLambda:
     Type: AWS::Events::Rule
     Properties: 
@@ -229,6 +251,16 @@ Resources:
                 Resource: 
                   - !GetAtt CompositeMetricGenerator.Arn
 
+  CompositeMetricGeneratorScheduleRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Name: !Sub "${ProjectName}-CompositeMetricGeneratorScheduleRule"
+      ScheduleExpression: !Ref CompositeMetricGeneratorScheduleExpression
+      State: ENABLED
+      Targets: 
+        - Arn: !GetAtt CompositeMetricGenerator.Arn
+          Id: !Ref CompositeMetricGenerator
+          
   ### Alarm state change lambda               ####
   ################################################
   # Lambda function
@@ -251,6 +283,8 @@ Resources:
           REGION: !Sub ${AWS::Region}
           ENVIRONMENT_TYPE: !Ref EnvironmentType
           ACCOUNT_ID: !Sub ${AWS::AccountId}
+          HELPDESK_ACCOUNT_ID: !Ref HelpdeskAccountId
+          CONFIDENTIAL_INFO_ACCOUNT_ID: !Ref ConfidentialInfoAccountId
       Timeout : 180
 
   # Lambda function role
@@ -285,6 +319,12 @@ Resources:
             Action:
               - "cloudwatch:*"
             Resource: '*' # cannot restrict because it needs to read metrics and alarms of multiple AWS accounts and regions
+          - Effect: Allow
+            Action:
+              - "sts:AssumeRole"
+            Resource: 
+              - !Sub "arn:aws:iam::${HelpdeskAccountId}:role/CloudWatch-CrossAccountSharingRole"
+              - !Sub "arn:aws:iam::${ConfidentialInfoAccountId}:role/CloudWatch-CrossAccountSharingRole"
 
   # lambda function Log Group
   CompositeMetricGeneratorLogGroup:

@@ -16,6 +16,11 @@ Parameters:
     Default: ''
     Description: 'Confidential Info AWS Account ID'
 
+  HelpdeskAccountId:
+    Type: String
+    Default: ''
+    Description: 'Helpdesk AWS Account ID'
+
   Alb:
     Type: String
     Default: ''
@@ -375,8 +380,9 @@ Resources:
           Name: 'OerDashboardBodyTransform'
           Parameters:
             Region: !Sub ${AWS::Region}
-            # Cloudformation doesn't allow to use IF conditions as Marco parameters so the optionality is managed at Lambda level
+            # Cloudformation doesn't allow to use IF conditions as macro parameters so the optionality is managed at Lambda level
             ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
+            HelpdeskAccountId: !Ref HelpdeskAccountId
             MicroservicesAlarmArns:
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-external-registries-CumulativeAlarm
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-mandate-CumulativeAlarm
@@ -390,7 +396,13 @@ Resources:
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-frontend-CumulativeAlarm
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-delivery-push-CumulativeAlarm
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-logsaver-be-CumulativeAlarm
-#              - !Sub arn:aws:cloudwatch:${AWS::Region}:$CONFIDENTIAL_INFO_ACCOUNT_ID:alarm:pn-data-vault-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-progression-sensor-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-national-registries-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-kafka-bridge-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-data-vault-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-logsaver-be-confidential-info-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-infra-confidential-info-CumulativeAlarm
+              - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-helpdesk-CumulativeAlarm
             MicroservicesDashboardLinks:
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-external-registries       
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-mandate
@@ -404,7 +416,13 @@ Resources:
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-frontend
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-delivery-push
               - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-logsaver-be
-#              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-data-vault;accountId=$CONFIDENTIAL_INFO_ACCOUNT_ID
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-progression-sensor
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-national-registries
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-kafka-bridge
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-data-vault;accountId=$CONFIDENTIAL_INFO_ACCOUNT_ID
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-infra;accountId=$CONFIDENTIAL_INFO_ACCOUNT_ID;display=pn-infra-confidential
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-logsaver-be;accountId=$CONFIDENTIAL_INFO_ACCOUNT_ID;display=pn-logsaver-be-confidential
+              - !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=pn-helpdesk-dashboard;accountId=$HELPDESK_ACCOUNT_ID;display=pn-helpdesk
             FunctionalAlarmsArns:
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-CompositeAlarm-NotificationInput
               - !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:pn-CompositeAlarm-NotificationOutput
