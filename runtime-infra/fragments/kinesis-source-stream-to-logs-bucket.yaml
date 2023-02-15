@@ -28,6 +28,11 @@ Parameters:
   StreamNamePrefix:
     Type: String 
     Description: to distinguish different log groups streams
+  
+  StreamContent:
+    Type: String 
+    Description: Stream's logical content type. DYNAMO_CDC or CLOUDWATCH_LOGS
+    Default: CLOUDWATCH_LOGS
 
   AlarmSNSTopicArn:
     Description: The ARN of the Alarm SNS Topic for notifications.
@@ -36,6 +41,7 @@ Parameters:
 Conditions:
   ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
 
+  IsCdcStream: !Equals [ !Ref StreamContent, 'DYNAMO_CDC' ]
 
 Resources:
 
@@ -128,9 +134,31 @@ Resources:
             Ref: DeliveryStreamLogGroup
           LogStreamName:
             Ref: DeliveryStreamLogGroupS3Destination
-        Prefix: !Sub '${StreamNamePrefix}/'
+        Prefix: 
+          Fn::If: 
+            - IsCdcStream
+            - !Sub '${StreamNamePrefix}/TABLE_NAME_!{partitionKeyFromQuery:TABLE_NAME}/'
+            - !Sub '${StreamNamePrefix}/'
         ErrorOutputPrefix: !Sub 'errors/${StreamNamePrefix}/'
         RoleARN: !Ref LogsExporterRoleArn
+        DynamicPartitioningConfiguration:
+          Enabled: true
+        ProcessingConfiguration:
+          Fn::If: 
+            - IsCdcStream
+            - Enabled: true
+              Processors:
+              - Type: AppendDelimiterToRecord
+                Parameters:
+                - ParameterName: Delimiter
+                  ParameterValue: "\\n"
+              - Type: MetadataExtraction
+                Parameters:
+                - ParameterName: MetadataExtractionQuery
+                  ParameterValue: '{ TABLE_NAME : .tableName }'
+                - ParameterName: JsonParsingEngine
+                  ParameterValue: JQ-1.6
+            - Enabled: false
       # DeliveryStreamEncryptionConfigurationInput: 
       #   KeyARN: !GetAtt LogsKinesisDeliveryStreamKmsKey.Arn
       #   KeyType: CUSTOMER_MANAGED_CMK
