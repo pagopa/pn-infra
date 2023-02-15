@@ -137,7 +137,7 @@ Resources:
         Prefix: 
           Fn::If: 
             - IsCdcStream
-            - !Sub '${StreamNamePrefix}/TABLE_NAME_!{partitionKeyFromQuery:TABLE_NAME}/'
+            - !Sub '${StreamNamePrefix}/TABLE_NAME_!{partitionKeyFromQuery:TABLE_NAME}/!{partitionKeyFromQuery:YEAR}/!{partitionKeyFromQuery:MONTH}/!{partitionKeyFromQuery:DAY}/!{partitionKeyFromQuery:HOUR}'
             - !Sub '${StreamNamePrefix}/'
         ErrorOutputPrefix: !Sub 'errors/${StreamNamePrefix}/'
         RoleARN: !Ref LogsExporterRoleArn
@@ -155,7 +155,7 @@ Resources:
               - Type: MetadataExtraction
                 Parameters:
                 - ParameterName: MetadataExtractionQuery
-                  ParameterValue: '{ TABLE_NAME : .tableName }'
+                  ParameterValue: '{ TABLE_NAME : .tableName, YEAR : .dynamodb.ApproximateCreationDateTime | strftime(\"%Y\"), MONTH: .dynamodb.ApproximateCreationDateTime | strftime(\"%m\"), DAY: .dynamodb.ApproximateCreationDateTime | strftime(\"%d\"), HOUR: .dynamodb.ApproximateCreationDateTime | strftime(\"%H\") }'
                 - ParameterName: JsonParsingEngine
                   ParameterValue: JQ-1.6
             - Enabled: false
