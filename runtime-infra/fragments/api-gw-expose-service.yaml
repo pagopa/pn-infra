@@ -264,7 +264,7 @@ Resources:
       DeploymentId: !Ref PublicRestApiDeploymentPnPlaceholderEpochSeconds
       AccessLogSetting:
         DestinationArn: !GetAtt "PublicApiLogGroup.Arn"
-        Format: '{"requestTime":"$context.requestTime","requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","routeKey":"$context.routeKey","status":$context.status,"responseLatency":$context.responseLatency, "sourceIp": $context.identity.sourceIp}'
+        Format: '{"requestTime":"$context.requestTime","requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","resourcePath":"$context.resourcePath","status":$context.status,"responseLatency":$context.responseLatency,"xrayTraceId":"$context.xrayTraceId","errorMessage":$context.error.messageString,"validationErrorString":$context.error.validationErrorString,"integrationRequestId":"$context.integration.requestId","functionResponseStatus":"$context.integration.status","integrationLatency":"$context.integration.latency","integrationServiceStatus":"$context.integration.integrationStatus","authorizeStatus":"$context.authorize.status","authorizerStatus":"$context.authorizer.status","authorizerLatency":"$context.authorizer.latency","authorizerRequestId":"$context.authorizer.requestId","ip":"$context.identity.sourceIp","userAgent":"$context.identity.userAgent","principalId":"$context.authorizer.principalId"}'
       MethodSettings:
         - ResourcePath: '/*'
           HttpMethod: '*'
