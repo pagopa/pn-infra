@@ -142,7 +142,7 @@ Resources:
         ErrorOutputPrefix: !Sub 'errors/${StreamNamePrefix}/'
         RoleARN: !Ref LogsExporterRoleArn
         DynamicPartitioningConfiguration:
-          Enabled: true
+          Enabled: !If [ IsCdcStream, true, false ]
         ProcessingConfiguration:
           Fn::If: 
             - IsCdcStream
