@@ -109,7 +109,7 @@ Resources:
     DeletionPolicy: Retain
   
 
-  LogsKinesisDeliveryStream:
+  LogsKinesisDeliveryStreamPartitioned:
     Condition: ExportLogs
     DependsOn:
       - DeliveryStreamSourceServiceRoleDefaultPolicy
@@ -206,7 +206,7 @@ Outputs:
 
   DeliveryStreamArn:
     Description: 'ARN of delivery stream'
-    Value: !GetAtt LogsKinesisDeliveryStream.Arn
+    Value: !GetAtt LogsKinesisDeliveryStreamPartitioned.Arn
 
   # LogsKinesisDeliveryStreamKmsKey:
   #   Condition: ExportLogs
