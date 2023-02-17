@@ -110,5 +110,5 @@ aws ${aws_command_base_args} cloudformation deploy \
         --capabilities CAPABILITY_NAMED_IAM \
         --template-file CloudWatch-CrossAccountEvents.yaml \
         --parameter-overrides \
-            MonitoringAccountIds=${monitoring_account_ids}
+            MonitoringAccountId=${monitoring_account_ids}
 
