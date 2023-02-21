@@ -27,6 +27,10 @@ Resources:
                   - logs:PutLogEvents
                 Resource:
                   - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
+        
   rTransformFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -72,6 +76,10 @@ Resources:
       Handler: index.handler
       Runtime: python3.9
       Role: !GetAtt rTransformExecutionRole.Arn
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
+
   rTransformFunctionPermissions:
     Type: AWS::Lambda::Permission
     Properties:

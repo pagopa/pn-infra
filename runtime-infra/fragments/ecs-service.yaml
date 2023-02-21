@@ -541,6 +541,11 @@ Resources:
         - ContainerName: !Sub '${MicroServiceUniqueName}'
           ContainerPort: 8080
           TargetGroupArn: !Ref TargetGroup
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "ecs"
+        - Key: "pnMicroservice"
+          Value: !Ref MicroServiceUniqueName
 
   # ECS Service security group
   EcsServiceSecurityGroup:
@@ -559,6 +564,11 @@ Resources:
             FromPort: 8080
             ToPort: 8080
             CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "ecs"
+        - Key: "pnMicroservice"
+          Value: !Ref MicroServiceUniqueName
 
 
   # ECS Task
@@ -926,6 +936,11 @@ Resources:
           - !Ref "AWS::NoValue"
       Volumes:
         - Name: "my-vol"
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "ecs"
+        - Key: "pnMicroservice"
+          Value: !Ref MicroServiceUniqueName
 
 
   # Microservice Log group
@@ -938,6 +953,11 @@ Resources:
         Fn::GetAtt:
           - LogGroupKmsKey
           - Arn
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "ecs"
+        - Key: "pnMicroservice"
+          Value: !Ref MicroServiceUniqueName
 
   # KMS Key for Encrypt log data in CloudWatch Logs
   LogGroupKmsKey:
@@ -971,8 +991,14 @@ Resources:
                 ArnLike:
                     'kms:EncryptionContext:aws:logs:arn': !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*' 
         Version: "2012-10-17"
+        Tags:
+        - Key: "pnInfraFeature"
+          Value: "ecs"
+        - Key: "pnMicroservice"
+          Value: !Ref MicroServiceUniqueName
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain    
+      
 
   # A role needed by ECS
   ExecutionRole:
@@ -1020,6 +1046,11 @@ Resources:
           - - !Ref TaskRoleManagedPolicyArn
             - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
           - - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "ecs"
+        - Key: "pnMicroservice"
+          Value: !Ref MicroServiceUniqueName
 
   # Role policy needed to access the ECR registry of the CiCd account
   EcrAccessTaskPolicy:
@@ -1083,6 +1114,12 @@ Resources:
         - Key: deregistration_delay.timeout_seconds
           Value: 60 # default is 300
       VpcId: !Ref VpcId
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "ecs"
+        - Key: "pnMicroservice"
+          Value: !Ref MicroServiceUniqueName
+        
 
   # Load balancer forward rule; forward only path pattern defined with MappedPaths
   LoadBalancerRoutingRule:
@@ -1158,6 +1195,11 @@ Resources:
                 Action: ["application-autoscaling:*", "cloudwatch:DescribeAlarms", "cloudwatch:PutMetricAlarm",
                          "ecs:DescribeServices", "ecs:UpdateService"]
                 Resource: "*"
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "ecs"
+        - Key: "pnMicroservice"
+          Value: !Ref MicroServiceUniqueName
 
   AutoScalingTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
@@ -1294,6 +1336,11 @@ Resources:
                 - "kms:Decrypt"
                 Effect: Allow
                 Resource: "*"
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "ecs"
+        - Key: "pnMicroservice"
+          Value: !Ref MicroServiceUniqueName
 
 Outputs:
   ServiceName:

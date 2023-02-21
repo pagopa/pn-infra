@@ -93,6 +93,11 @@ Resources:
           - !Ref AWS::NoValue
       DelaySeconds: !Ref DelaySeconds
       MessageRetentionPeriod: !Ref MessageRetentionPeriod
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "pnStorage"
+        - Key: "pnMicroservice"
+          Value: !Ref QueueName
 
   QueueFifo:
     Condition: IsFifo
@@ -111,6 +116,11 @@ Resources:
       FifoQueue: true
       ContentBasedDeduplication: !If [IsContentBasedDeduplication, true, false]
       DeduplicationScope: !Ref DeduplicationScope
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "pnStorage"
+        - Key: "pnMicroservice"
+          Value: !Ref QueueName
 
   DeadLetterQueue:
     Condition: IsNotFifoWithDLQ
@@ -122,6 +132,11 @@ Resources:
           - !Sub "${QueueName}-DLQ"
           - !Ref DeadLetterQueueName
       MessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "pnStorage"
+        - Key: "pnMicroservice"
+          Value: !Ref QueueName
 
   DeadLetterQueueFifo:
     Condition: IsFifoWithDLQ
@@ -134,6 +149,11 @@ Resources:
           - !Ref DeadLetterQueueName
       MessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
       FifoQueue: true
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "pnStorage"
+        - Key: "pnMicroservice"
+          Value: !Ref QueueName
 
   QueueHasMessagesAlarm:
     Condition: IsWithAlarm

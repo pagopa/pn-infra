@@ -61,6 +61,9 @@ Resources:
             Principal:
               Service: firehose.amazonaws.com
         Version: "2012-10-17"
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "logToBucket"
 
   ## IAM Policy  
   DeliveryStreamSourceServiceRoleDefaultPolicy:
@@ -94,6 +97,9 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: 120
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "logToBucket"
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
 
@@ -115,6 +121,9 @@ Resources:
       - DeliveryStreamSourceServiceRoleDefaultPolicy
     Type: AWS::KinesisFirehose::DeliveryStream
     Properties:
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "logToBucket"
       DeliveryStreamName: !Sub '${ProjectName}-${StreamNamePrefix}-delivery-stream-v1'
       DeliveryStreamType: KinesisStreamAsSource
       KinesisStreamSourceConfiguration:

@@ -80,6 +80,10 @@ Resources:
     Properties:
       LogGroupName: !Sub "/aws/events/${ProjectName}-ecs-oom-errors"
       RetentionInDays: 90
+      Tags: 
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
+
 
   # Resource based policy to allow EventBridge to publish to CloudWatch Logs
   LogGroupOOMEventsPolicy:
@@ -183,6 +187,9 @@ Resources:
                 - "kms:Decrypt"
                 Effect: Allow
                 Resource: "*"
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   OomSubscriptionFilter:
     Condition: SendLogToKinesis

@@ -50,7 +50,9 @@ Resources:
                   - logs:PutLogEvents
                 Resource:
                   - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/DashboardBodyTransform:*'
-
+            Tags:
+                - Key: "pnInfraFeature"
+                  Value: "baseInfra"
   OerTransformExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -78,7 +80,9 @@ Resources:
                   - logs:PutLogEvents
                 Resource:
                   - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/OerDashboardBodyTransform:*'
-
+            Tags:
+                - Key: "pnInfraFeature"
+                  Value: "baseInfra"
   TrimListExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -106,7 +110,9 @@ Resources:
                   - logs:PutLogEvents
                 Resource:
                   - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/TrimListTransform:*'
-
+            Tags:
+                - Key: "pnInfraFeature"
+                  Value: "baseInfra"
   TrimListFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -130,7 +136,9 @@ Resources:
         Handler: index.lambda_handler
         Runtime: python3.9
         Role: !GetAtt TrimListExecutionRole.Arn
-                
+            Tags:
+                - Key: "pnInfraFeature"
+                  Value: "baseInfra"                
 
   TransformFunction:
     Type: AWS::Lambda::Function
@@ -1215,7 +1223,9 @@ Resources:
       Handler: index.lambda_handler
       Runtime: python3.9
       Role: !GetAtt TransformExecutionRole.Arn
-
+            Tags:
+                - Key: "pnInfraFeature"
+                  Value: "baseInfra"
   OerTransformFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1755,7 +1765,9 @@ Resources:
       Handler: index.lambda_handler
       Runtime: python3.9
       Role: !GetAtt OerTransformExecutionRole.Arn
-
+            Tags:
+                - Key: "pnInfraFeature"
+                  Value: "baseInfra"
   TransformFunctionPermissions:
     Type: AWS::Lambda::Permission
     Properties:

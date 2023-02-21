@@ -128,6 +128,9 @@ Resources:
       Role: !GetAtt StorageFunctionIAMRole.Arn
       Runtime: nodejs16.x
       Timeout: 60
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   StorageFunctionIAMRole:
     Type: AWS::IAM::Role
@@ -160,12 +163,18 @@ Resources:
                 Effect: Allow
                 Resource: '*'
           PolicyName: pn-storage-function-policy
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   StorageFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /aws/lambda/${StorageFunction}
       RetentionInDays: 14
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   SLAViolationHistoryFunction:
     Type: AWS::Lambda::Function
@@ -331,6 +340,9 @@ Resources:
       Role: !GetAtt SlaViolationHistoryFunctionIAMRole.Arn
       Runtime: nodejs18.x
       Timeout: 60
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   SlaViolationHistoryFunctionIAMRole:
     Type: AWS::IAM::Role
@@ -362,12 +374,18 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:pn-searchSLAViolationsLambda
           PolicyName: pn-sla-violation-history-function-policy
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   SlaViolationHistoryFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /aws/lambda/${SLAViolationHistoryFunction}
       RetentionInDays: 14
+      Tags:
+        - Key: "pnInfraFeature"
+          Value: "baseInfra"
 
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard
