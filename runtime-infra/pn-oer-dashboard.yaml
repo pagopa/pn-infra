@@ -262,7 +262,11 @@ Resources:
               params.olderThan = new Date(formParams.olderThan+'T23:59:59.999Z')    
               params.type = formParams.type
               params.active = formParams.active
-              paginationKeys = formParams.paginationKeys.split(",")
+              if(formParams.paginationKeys){
+                paginationKeys = formParams.paginationKeys.split(",")
+              } else {
+                paginationKeys = []
+              }
               
               olderThanStr = formParams.olderThan
             }
