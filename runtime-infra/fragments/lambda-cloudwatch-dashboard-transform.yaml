@@ -160,6 +160,7 @@ Resources:
                             y_value = y_value+9+6*int((len(localAlarmArns)/4))
                         else:
                             y_value = y_value+9+6*int((len(localAlarmArns)/4))+6
+
                     if event["params"]["QueueArns"] == [''] or len(event["params"]["QueueArns"]) == 0:
                         print("QueueArns param is missing or empty")
                     else:
@@ -229,6 +230,15 @@ Resources:
                         localDynamoDBTableNames = event["params"]["DynamoDBTableNames"]
                         dynamoList = dynamoDBWidgetBuilder(localDynamoDBTableNames, y_value, localRegion)
                         dashboardList = appendList(dashboardList, dynamoList)
+                        y_value = y_value+6
+
+                    # logs for the microservice
+                    if event["params"]["LogGroupsNames"] == [''] or len(event["params"]["LogGroupsNames"]) == 0:
+                        print("LogGroupsNames param is missing or empty")
+                    else:
+                        localLogNames = event["params"]["LogGroupsNames"]
+                        logNamesList = LogsArnsListWidgetBuilder(localLogNames, y_value, localRegion)
+                        dashboardList = appendList(dashboardList, logNamesList)
 
                 data["widgets"] = dashboardList
                 print(data)
@@ -918,6 +928,44 @@ Resources:
                     dynamoList.append(systemErrorsJson)
                     
                 return dynamoList
+
+            # the builder for logs
+            def LogsArnsListWidgetBuilder(localArray, widgetYvalue, localRegion):
+                limit = 20 # HOW TO make it configurable?
+                #source = "/ecs/pn-ApikeyManager" # how to get the correct one?
+                
+                LogsArns = []
+                
+                message = textSeparator("Latest Logs Widget", widgetYvalue)
+                LogsArns.append(message)
+
+                widgetYvalue = widgetYvalue + 5
+
+                for x in range(len(localArray)):
+                    source = x
+                    message = textSeparator2("Logs for " + source, widgetYvalue)
+                    LogsArns.append(message)
+
+                    widgetYvalue = widgetYvalue + 5
+
+                    LogsArnsJson = {
+                        "type": "log",
+                        "x": 0,
+                        "y": widgetYvalue,
+                        "width": 24,
+                        "height": 6,
+                        "properties": {
+                            "query": "SOURCE '" + source + "' | fields @timestamp, @message, @logStream, @log\n| sort @timestamp desc\n| limit " + limit,
+                            "region": localRegion,
+                            "stacked": false,
+                            "view": "table"
+                        }
+                    }
+                    LogsArns.append(LogsArnsJson)
+
+                    widgetYvalue = widgetYvalue + 6
+
+                return LogsArns
 
             def lambdaNewWidgetBuilder(localArray, widgetYvalue, localRegion):
                 lambdaList = []
