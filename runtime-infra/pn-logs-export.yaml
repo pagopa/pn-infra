@@ -45,15 +45,12 @@ Parameters:
     Type: String
     Description: The ARN of the secret containing OpenSearch credentials
   
-  OpenSearchDeliveryLambdaS3Bucket:
+  LambdasBucketName:
     Type: String
     Description: s3 bucket name of the lambda used to delivery events to opensearch
-  OpenSearchDeliveryLambdaS3Key:
+  LambdasBasePath:
     Type: String
     Description: s3 object key of the lambda used to delivery events to opensearch
-  OpenSearchDeliveryLambdaS3ObjectVersion:
-    Type: String
-    Description: s3 object version of the lambda used to delivery events to opensearch
   
   TemplateBucketBaseUrl:
     Type: String
@@ -81,6 +78,7 @@ Resources:
         LogsExporterRoleArn: !Ref LogsExporterRoleArn
         StreamNamePrefix: 'cdcTos3'
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        StreamContent: DYNAMO_CDC
 
   ###             Export CloudWatch Logs to Log saving bucket             ###
   ###########################################################################
@@ -96,6 +94,7 @@ Resources:
         LogsExporterRoleArn: !Ref LogsExporterRoleArn
         StreamNamePrefix: 'logsTos3'
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        StreamContent: CLOUDWATCH_LOGS
 
   ###                   Export dynamo CDC to OpenSearch                   ###
   ###########################################################################
@@ -129,6 +128,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
         StreamNamePrefix: logsToOpenSearch
         KinesisStreamArn: !Ref LogsKinesisSourceStreamArn
         KinesisStreamKMSKeyArn: !Ref LogsKinesisSourceStreamKeyArn
@@ -137,9 +137,8 @@ Resources:
         OpenSearchDeliveryVpcId: !Ref VpcId
         OpenSearchDeliverySubnetIds: !Join [",", !Ref SubnetsIds]
         OpenSearchSecretArn: !Ref OpenSearchSecretArn
-        OpenSearchDeliveryLambdaS3Bucket: !Ref OpenSearchDeliveryLambdaS3Bucket
-        OpenSearchDeliveryLambdaS3Key: !Ref OpenSearchDeliveryLambdaS3Key
-        OpenSearchDeliveryLambdaS3ObjectVersion: !Ref OpenSearchDeliveryLambdaS3ObjectVersion
+        OpenSearchDeliveryLambdaS3Bucket: !Ref LambdasBucketName
+        OpenSearchDeliveryLambdaS3Key: !Sub "${LambdasBasePath}/opensearch-delivery.zip"
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 Outputs:
@@ -164,15 +163,7 @@ Outputs:
     Value:
       !If
       - HasOpenSearchExport
-      - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaAlarmArn
-      - ''
-
-  OpenSearchDeliveryLambdaErrorLogsAlarmArn:
-    Description: 'Lambda to OpenSearch error logs alarm ARN'
-    Value:
-      !If 
-      - HasOpenSearchExport
-      - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaErrorLogsAlarmArn
+      - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaInvocationErrorLogsMetricAlarm
       - ''
 
   OpenSearchDeliveryLambdaArn:

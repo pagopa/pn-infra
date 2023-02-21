@@ -16,6 +16,34 @@ Parameters:
     Type: String
     Description: where to send logs
 
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
+  LambdasBucketName:
+    Type: String
+
+  LambdasBasePath:
+    Type: String
+
+  EnvironmentType:
+    Type: String
+    Default: ''
+
+  CompositeMetricGeneratorScheduleExpression:
+    Type: String
+    Default: 'rate(10 minutes)'
+
+  HelpdeskAccountId:
+    Type: String
+    Default: ''
+    Description: 'Helpdesk account ID'
+
+  ConfidentialInfoAccountId:
+    Type: String
+    Default: ''
+    Description: 'ConfidentialInfo account ID'
+
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
 
@@ -51,10 +79,11 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/events/${ProjectName}-ecs-oom-errors"
-      RetentionInDays: 14
+      RetentionInDays: 90
       Tags: 
         - Key: "pnInfraFeature"
           Value: "baseInfra"
+
 
   # Resource based policy to allow EventBridge to publish to CloudWatch Logs
   LogGroupOOMEventsPolicy:
@@ -174,7 +203,158 @@ Resources:
       FilterPattern: ' '
       DestinationArn: !Ref LogsKinesisSourceStreamArn
 
+  ###                           Alarm State ChangeRule                    ###
+  ###########################################################################
+  # EVENT BRIDGE RULE: invoke lambda on alarm state change
+
+  DefaultEventBusMonitoringLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt CompositeMetricGenerator.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt SendAlarmChangeEventsToLambda.Arn
+
+  DefaultEventBusScheduleMonitoringLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt CompositeMetricGenerator.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CompositeMetricGeneratorScheduleRule.Arn
+
+  SendAlarmChangeEventsToLambda:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Save build events
+      RoleArn: !GetAtt "MonitoringBusExecuteLambdaRole.Arn"
+      EventPattern: 
+        source: [ "aws.cloudwatch" ]
+        detail-type: ["CloudWatch Alarm State Change"]
+      Targets: 
+        - Arn: !GetAtt CompositeMetricGenerator.Arn
+          Id: !Sub ${ProjectName}-AlarmStateChangeTarget
+
+  # - Role and policy used to execute lambda from EventBridge rule
+  MonitoringBusExecuteLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: !Sub ${ProjectName}-monitoring-bus-policy
+          PolicyDocument:
+            Statement:
+              - Sid: executeLambda
+                Action:
+                  - lambda:InvokeFunction
+                  - lambda:InvokeAsync
+                Effect: Allow
+                Resource: 
+                  - !GetAtt CompositeMetricGenerator.Arn
+
+  CompositeMetricGeneratorScheduleRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Name: !Sub "${ProjectName}-CompositeMetricGeneratorScheduleRule"
+      ScheduleExpression: !Ref CompositeMetricGeneratorScheduleExpression
+      State: ENABLED
+      Targets: 
+        - Arn: !GetAtt CompositeMetricGenerator.Arn
+          Id: !Ref CompositeMetricGenerator
+          
+  ### Alarm state change lambda               ####
+  ################################################
+  # Lambda function
+  CompositeMetricGenerator:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-compositeMetricGenerator"
+      Runtime: nodejs18.x
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub "${LambdasBasePath}/composite-metric-generator.zip"
+      Role: !GetAtt CompositeMetricGeneratorRole.Arn
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          ENVIRONMENT_TYPE: !Ref EnvironmentType
+          ACCOUNT_ID: !Sub ${AWS::AccountId}
+          HELPDESK_ACCOUNT_ID: !Ref HelpdeskAccountId
+          CONFIDENTIAL_INFO_ACCOUNT_ID: !Ref ConfidentialInfoAccountId
+      Timeout : 180
+
+  # Lambda function role
+  CompositeMetricGeneratorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-compositeMetricGeneratorRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Path: /
+
+  # Lambda function IAM policy
+  CompositeMetricGeneratorRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-compositeMetricGeneratorRolePolicy
+      Roles:
+        - !Ref CompositeMetricGeneratorRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - "cloudwatch:*"
+            Resource: '*' # cannot restrict because it needs to read metrics and alarms of multiple AWS accounts and regions
+          - Effect: Allow
+            Action:
+              - "sts:AssumeRole"
+            Resource: 
+              - !Sub "arn:aws:iam::${HelpdeskAccountId}:role/CloudWatch-CrossAccountSharingRole"
+              - !Sub "arn:aws:iam::${ConfidentialInfoAccountId}:role/CloudWatch-CrossAccountSharingRole"
+
+  # lambda function Log Group
+  CompositeMetricGeneratorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${CompositeMetricGenerator}"
+      RetentionInDays: 14
+
+  CompositeMetricGeneratorAlarm:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - CompositeMetricGeneratorLogGroup
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref CompositeMetricGenerator
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
 Outputs:
   OOMAlarmArn:
     Value: !GetAtt CloudWatchAlarmOOM.Arn
     Description: 'ARN of cloudwatch out of memory alarm'
+
+  CompositeMetricGeneratorAlarmArn: 
+    Value: !GetAtt CompositeMetricGeneratorAlarm.Outputs.LambdaInvocationErrorLogsMetricAlarm
+    Description: 'ARN of composite metric generator alarm'

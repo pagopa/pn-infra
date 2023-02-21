@@ -26,7 +26,8 @@ Parameters:
       - WEB
       - IO
       - BACKOFFICE
-    Description: B2B, WEB, BACKOFFICE or IO usage. Used from other back-end system or used from a browser
+      - PNPG
+    Description: B2B, WEB, BACKOFFICE, PNPG or IO usage. Used from other back-end system or used from a browser
 
   ServiceApiPath:
     Type: String
@@ -74,8 +75,9 @@ Conditions:
   IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
   IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
   IsIO: !Equals [ !Ref IntendedUsage, 'IO' ]
+  IsPNPG: !Equals [ !Ref IntendedUsage, 'PNPG' ]
   IsBackoffice: !Equals [ !Ref IntendedUsage, 'BACKOFFICE' ]
-  UseApiKey: !Or [ !Equals [ !Ref IntendedUsage, 'B2B' ], !Equals [ !Ref IntendedUsage, 'IO' ] ]
+  UseApiKey: !Or [ !Equals [ !Ref IntendedUsage, 'B2B' ], !Equals [ !Ref IntendedUsage, 'IO' ], !Equals [ !Ref IntendedUsage, 'PNPG' ] ]
   SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
   HasOpenApiBucketName: !Not [ !Equals [ !Ref OpenApiBucketName, '' ] ]
   HasOpenApiBucketKey: !Not [ !Equals [ !Ref OpenApiBucketKey, '' ] ]
@@ -187,7 +189,7 @@ Resources:
       ResourceId: !Ref PublicApiProxyResource
       HttpMethod: ANY
       ApiKeyRequired: !If [ UseApiKey, true, false]
-      AuthorizationType: CUSTOM
+      AuthorizationType: !If [ IsPNPG, NONE, CUSTOM]
       AuthorizerId:
         Fn::If:
           - IsBackoffice
@@ -198,7 +200,10 @@ Resources:
             - Fn::If:
               - IsIO
               - !Ref IoAuthorizer
-              - !Ref JwtAuthorizer
+              - Fn::If:
+                - IsPNPG
+                - !Ref AWS::NoValue
+                - !Ref JwtAuthorizer
       RequestParameters:
         Fn::If:
           - IsIO
@@ -223,6 +228,7 @@ Resources:
           integration.request.header.x-pagopa-pn-cx-groups: context.authorizer.cx_groups
           integration.request.header.x-pagopa-pn-cx-role: context.authorizer.cx_role
           integration.request.header.x-pagopa-pn-jti: context.authorizer.cx_jti
+          integration.request.header.x-pagopa-pn-src-ch: !Sub "'${IntendedUsage}'"
         PassthroughBehavior: "WHEN_NO_MATCH"
         TimeoutInMillis: 29000
 
@@ -262,7 +268,7 @@ Resources:
       DeploymentId: !Ref PublicRestApiDeploymentPnPlaceholderEpochSeconds
       AccessLogSetting:
         DestinationArn: !GetAtt "PublicApiLogGroup.Arn"
-        Format: '{"requestTime":"$context.requestTime","requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","routeKey":"$context.routeKey","status":$context.status,"responseLatency":$context.responseLatency, "sourceIp": $context.identity.sourceIp}'
+        Format: '{"requestTime":"$context.requestTime","requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","resourcePath":"$context.resourcePath","status":$context.status,"responseLatency":$context.responseLatency,"xrayTraceId":"$context.xrayTraceId","errorMessage":"$context.error.message","validationError":"$context.error.validationErrorString","integrationRequestId":"$context.integration.requestId","functionResponseStatus":"$context.integration.status","integrationLatency":"$context.integration.latency","integrationServiceStatus":"$context.integration.integrationStatus","authorizeStatus":"$context.authorize.status","authorizerStatus":"$context.authorizer.status","authorizerLatency":"$context.authorizer.latency","authorizerRequestId":"$context.authorizer.requestId","ip":"$context.identity.sourceIp","userAgent":"$context.identity.userAgent","principalId":"$context.authorizer.principalId"}'
       MethodSettings:
         - ResourcePath: '/*'
           HttpMethod: '*'
@@ -386,7 +392,7 @@ Resources:
   APIGatewayApiLatencyAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "${ProjectName}-${MicroServiceUniqueName}-${IntendedUsage}-ApiGwLatencyAlarm"
+      AlarmName: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-ApiGwLatencyAlarm"
       AlarmDescription: "CloudWatch alarm for when API Gateway latency exceeds the limit."
       AlarmActions: 
         - !Ref AlarmSNSTopicArn
@@ -410,7 +416,7 @@ Resources:
   APIGatewayApiErrorAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "${ProjectName}-${MicroServiceUniqueName}-${IntendedUsage}-ApiGwAlarm"
+      AlarmName: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-ApiGwAlarm"
       AlarmDescription: "CloudWatch alarm for when API Gateway has 4xx or 5xx error."
       AlarmActions: 
         - !Ref AlarmSNSTopicArn
@@ -522,7 +528,10 @@ Outputs:
           - Fn::If:
             - IsIO
             - !Ref IoAuthorizer
-            - !Ref JwtAuthorizer
+            - Fn::If:
+                - IsPNPG
+                - ""
+                - !Ref JwtAuthorizer
     Description: "Authorizer ARN"
 
   # Rest API definition

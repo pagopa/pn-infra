@@ -305,6 +305,297 @@ Resources:
                             myList.append(myJson)
 
 
+<<<<<<< HEAD
+=======
+            #Helper function to split the ARN received to get the last parameter of ARN
+            def splitArnString(arn):
+                stringList = arn.split(":")
+                return stringList[len(stringList)-1]
+                
+            def getRestAPIStageName(arn):
+                newArn = splitArnString(arn)
+                stringList = newArn.split('/')
+                return stringList[len(stringList)-1]
+
+            def getStreamNameName(arn):
+                newArn = splitArnString(arn)
+                stringList = newArn.split('/')
+                return stringList[len(stringList)-1]
+
+            def getEventRuleName(arn):
+                newArn = splitArnString(arn)
+                stringList = newArn.split('/')
+                return stringList[len(stringList)-1]
+
+            def getRestAllMetricArray(localArray, localRestAPINames):
+                # [ "AWS/ApiGateway", "", "ApiName", "final-public-api-WEB", "Stage", "unique" ],
+                # [ "...", "PetStore", ".", "dev" ],
+                # [ "...", "TestAPI", ".", "Prod" ]
+                finalList = []
+                for x in range(len(localArray)):
+                    data = [
+                        "AWS/ApiGateway", "Latency", "ApiName", localRestAPINames[x], "Stage", getRestAPIStageName(localArray[x]) 
+                    ]
+                    finalList.append(data)
+                return finalList
+                
+            def getSQSSumMetricArray(localArray, localRegion):
+                finalList = []
+                for x in range(len(localArray)):
+                    notVisibleArray = [
+                        "AWS/SQS", "ApproximateNumberOfMessagesNotVisible", "QueueName", splitArnString(localArray[x]), { "id": "m"+str(2*x+1), "visible": False }
+                        ]
+                    visibleArray = [
+                        "AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", splitArnString(localArray[x]), { "id": "m"+str(2*x+2), "visible": False }
+                        ]
+                        
+                    finalList.append(notVisibleArray)
+                    finalList.append(visibleArray)
+                
+                for y in range(len(localArray)):
+                    metric1 = 2*y+1
+                    metric2 = 2*y+2
+                    
+                    metric1String = "m"+str(metric1)
+                    metric2String = "m"+str(metric2)
+                    sumString = "SUM(["+metric1String+","+metric2String+"])"
+                    metricJson=[
+                        {"expression": sumString, "label": splitArnString(localArray[y]), "id": "e"+str(y+1), "region": localRegion} 
+                    ]
+
+                    finalList.append(metricJson)
+                return finalList
+                
+            def getRestPercentageArray(localArray, localRegion, localRestAPINames):
+                finalList = []
+                
+                for x in range(len(localArray)):
+                    dataList = []
+                    metric1 = 2*x+1
+                    metric2 = 2*x+2
+                    
+                    metric1String = "m"+str(metric1)
+                    metric2String = "m"+str(metric2)
+                    
+                    countRestJson=[
+                        "AWS/ApiGateway", "Count", "ApiName", localRestAPINames[x], "Stage", getRestAPIStageName(localArray[x]), { "id": metric1String, "visible": False }
+                        ]
+                        
+                    errorRestJson=[
+                        "AWS/ApiGateway", "4XXError", "ApiName", localRestAPINames[x], "Stage", getRestAPIStageName(localArray[x]), { "id": metric2String, "visible": False }
+                        ]
+
+                    sumString = "SUM("+str(100)+"/["+metric1String+"]*"+metric2String+")"
+                    metricJson=[
+                        { "expression": sumString, "label": localRestAPINames[x], "id": "e"+str(x+1) }
+                    ]
+                    dataList.append(countRestJson)
+                    dataList.append(errorRestJson)
+                    dataList.append(metricJson)
+                    finalList.append(dataList)
+
+                return finalList
+                
+            def getOldestSQSMessageArray(localArray):
+                finalList = []
+                for x in range(len(localArray)):
+                    metricsArray=[
+                        "AWS/SQS", "ApproximateAgeOfOldestMessage", "QueueName", splitArnString(localArray[x])    
+                    ]
+                    
+                    finalList.append(metricsArray)
+                
+                return finalList
+                    
+            def getEventRuleMetricArray(localArray, metricName):
+                finalList = []
+                for x in range(len(localArray)):
+                    metricsArray=[
+                        "AWS/Events", metricName, "RuleName", getEventRuleName(localArray[x])    
+                    ]
+                    
+                    finalList.append(metricsArray)
+                
+                return finalList
+
+            def getKinesisDataMetricArray(localArray, metricName):
+                finalList = []
+                for x in range(len(localArray)):
+                    metricsArray=[
+                        "AWS/Kinesis", metricName, "StreamName", getStreamNameName(localArray[x])    
+                    ]
+                    
+                    finalList.append(metricsArray)
+                
+                return finalList
+
+            def getKinesisFirehoseMetricArray(localArray, metricName):
+                finalList = []
+                for x in range(len(localArray)):
+                    metricsArray=[
+                        "AWS/Firehose", metricName, "DeliveryStreamName", getStreamNameName(localArray[x])    
+                    ]
+                    
+                    finalList.append(metricsArray)
+                
+                return finalList
+
+            def getLambdaMetricArray(localArray, metricName):
+                finalList = []
+                for x in range(len(localArray)):
+                    metricsArray=[
+                        "AWS/Lambda", metricName, "FunctionName", splitArnString(localArray[x]),  { "label": splitArnString(localArray[x]) }
+                    ]
+                    
+                    finalList.append(metricsArray)
+                
+                return finalList
+
+            def getLambdaInsightsMetricArray(localArray, metricName):
+                finalList = []
+                for x in range(len(localArray)):
+                    metricsArray=[
+                        "LambdaInsights", metricName, "function_name", splitArnString(localArray[x]),  { "label": splitArnString(localArray[x]) }
+                    ]
+                    
+                    finalList.append(metricsArray)
+                
+                return finalList
+            def getBucketMetric(bucketName, metricName):
+                metricsArray=[
+                    [ "AWS/S3", metricName, "BucketName", bucketName, "StorageType", "StandardStorage", { "label": bucketName } ]
+                ]
+
+                return metricsArray
+
+            def textSeparator(message, textYValue):
+                textJson={
+                    "height": 1,
+                    "width": 24,
+                    "y": textYValue,
+                    "x": 0,
+                    "type": "text",
+                    "properties": {
+                        "markdown": "# "+message
+                    }
+                }
+                
+                return textJson
+                
+            def textSeparator2(message, textYValue, width, x_value):
+                textJson={
+                    "height": 1,
+                    "width": width,
+                    "y": textYValue,
+                    "x": x_value,
+                    "type": "text",
+                    "properties": {
+                        "markdown": "## "+message
+                    }
+                }
+                
+                return textJson
+      Handler: index.lambda_handler
+      Runtime: python3.9
+      Role: !GetAtt TransformExecutionRole.Arn
+
+  OerTransformFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+            import json
+
+            def not_confidential_info(value):
+                if value is None:
+                    return False
+                
+                if "$CONFIDENTIAL_INFO_ACCOUNT_ID" in value:
+                    return False
+                    
+                return True
+
+            def not_helpdesk(value):
+                if value is None:
+                    return False
+                
+                if "$HELPDESK_ACCOUNT_ID" in value:
+                    return False
+                    
+                return True
+
+            def replace_variable(value, variable_name, variable_value):
+                return value.replace(variable_name, variable_value)
+                
+            def lambda_handler(event, context):
+                dashboardList = []
+                data = {}
+                y_value=0
+                
+                if (event["params"]["Region"] == ""):
+                    print("Region param is missing")
+                else:
+                    confidentialInfoAccountId = ""
+                    if "ConfidentialInfoAccountId" in event["params"]:
+                        confidentialInfoAccountId = event["params"]["ConfidentialInfoAccountId"]
+
+                    helpdeskAccountId = ""
+                    if "HelpdeskAccountId" in event["params"]:
+                        helpdeskAccountId = event["params"]["HelpdeskAccountId"]
+
+                    localRegion = event["params"]["Region"]
+                    microservicesAlarmArns = event["params"]["MicroservicesAlarmArns"]
+                    microservicesDashboardLinks = event["params"]["MicroservicesDashboardLinks"]
+                    titleWidget = textSeparator('OER Dashboard', y_value)
+                    y_value=y_value+5
+                    dashboardList.append(titleWidget)
+                    
+                    if event["params"]["FunctionalAlarmsArns"] == [''] or len(event["params"]["FunctionalAlarmsArns"]) == 0:
+                        print("FunctionalAlarmsArns param is missing or empty")
+                    else:
+                        localAlarmArns = event["params"]["FunctionalAlarmsArns"]
+                        localAlarmArns = list(filter(None, localAlarmArns))
+
+                        localAlarmNames = event["params"]["FunctionalAlarmsNames"]
+                        localAlarmNames = list(filter(None, localAlarmNames))
+
+                        alarmList = alarmWidgetBuilder(localAlarmArns, localAlarmNames, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, alarmList)
+                        y_value = y_value+9
+                                                                       
+                    x_width = 24/6
+                    
+                    titleWidget = textSeparator('Microservices Alarms', y_value)
+                    dashboardList.append(titleWidget)
+
+                    if confidentialInfoAccountId is None or confidentialInfoAccountId == '':
+                        microservicesAlarmArns = list(filter(not_confidential_info, microservicesAlarmArns))
+                        microservicesDashboardLinks = list(filter(not_confidential_info, microservicesDashboardLinks))
+
+                    if helpdeskAccountId is None or helpdeskAccountId == '':
+                        microservicesAlarmArns = list(filter(not_helpdesk, microservicesAlarmArns))
+                        microservicesDashboardLinks = list(filter(not_helpdesk, microservicesDashboardLinks))
+
+                    y_value=y_value+5
+                    x_value = 0
+                    for i in range(len(microservicesAlarmArns)):
+                        if i>0 and i%6==0:
+                            y_value+=2
+                            x_value=0
+                        
+                        alarmArn = replace_variable(microservicesAlarmArns[i], '$CONFIDENTIAL_INFO_ACCOUNT_ID', confidentialInfoAccountId)
+                        dashboardLink = replace_variable(microservicesDashboardLinks[i], '$CONFIDENTIAL_INFO_ACCOUNT_ID', confidentialInfoAccountId)
+
+                        alarmArn = replace_variable(alarmArn, '$HELPDESK_ACCOUNT_ID', helpdeskAccountId)
+                        dashboardLink = replace_variable(dashboardLink, '$HELPDESK_ACCOUNT_ID', helpdeskAccountId)
+
+                        serviceName = getServiceFromLink(dashboardLink)
+                        alarmWidget = microserviceAlarmWidget(alarmArn, serviceName, x_width, x_value, y_value)
+                        linkWidget = microserviceLinkWidget(dashboardLink, serviceName, x_width, x_value, y_value+2)
+                        x_value=x_value+x_width
+                        dashboardList.append(alarmWidget)
+                        dashboardList.append(linkWidget)
+>>>>>>> 6810a9f9fd3336ee3a4dc78be4e98e79011d5bf7
                             
                         return myList
                         
@@ -1274,8 +1565,35 @@ Resources:
                                 localAlarmArns = event["params"]["FunctionalAlarmsArns"]
                                 localAlarmArns = list(filter(None, localAlarmArns))
 
+<<<<<<< HEAD
                                 localAlarmNames = event["params"]["FunctionalAlarmsNames"]
                                 localAlarmNames = list(filter(None, localAlarmNames))
+=======
+                    titleWidget = textSeparator('SLA Violations', y_value)
+                    dashboardList.append(titleWidget)
+                    y_value = y_value+2
+                    customSlaWidget = activeSlaViolationsWidget("Active SLA Violations", 10, 24, 0, y_value, localRegion)
+                    dashboardList.append(customSlaWidget)
+                    y_value = y_value+11
+
+                    if 'SearchSLAViolationWidgetFunction' in event["params"]:
+                        titleWidget = textSeparator('SLA Violations History', y_value)
+                        dashboardList.append(titleWidget)
+                        y_value = y_value+2
+                        customSlaWidget = customWidget(event["params"]["SearchSLAViolationWidgetFunction"], "Search SLA Violations", 10, 24, 0, y_value)
+                        dashboardList.append(customSlaWidget)
+                        y_value = y_value+11
+
+                data["start"] = "-P1D"
+                data["widgets"] = dashboardList
+                
+                response = {
+                    "requestId": event["requestId"],
+                    "status": "success",
+                    "fragment": json.dumps(data)
+                }
+                return response
+>>>>>>> 6810a9f9fd3336ee3a4dc78be4e98e79011d5bf7
 
 
                                 alarmList = alarmWidgetBuilder(localAlarmArns, localAlarmNames, y_value ,localRegion)
@@ -1645,6 +1963,7 @@ Resources:
                         
                         return widgetJson
 
+<<<<<<< HEAD
                     def openSearchStorageWidget(openSearchArn, title, height, width, x_value, y_value, region):
                         clientId = openSearchArn.split(':')[4]
                         domainName = openSearchArn.split(':')[5].replace("domain/", "")
@@ -1700,6 +2019,168 @@ Resources:
                         }
                         
                         return textJson
+=======
+                widgetJson = {
+                    "type":"metric",
+                    "x":0,
+                    "y":widgetYvalue,
+                    "width":width,
+                    "height": 6,
+                    "properties": {
+                        "sparkline": True,
+                        "view": "singleValue",
+                        "region": region,
+                        "stat": "Sum",
+                        "period": 300,
+                        "stacked": False,
+                        "singleValueFullPrecision": False,
+                        "metrics": metrics
+                    }
+                }   
+                return widgetJson
+                
+            def getServiceFromLink(link):
+                tokens = link.split("#dashboards:name=", 1)
+                if len(tokens)>1:
+                    subTokens = tokens[1].split(";", 1)
+
+                    if(len(subTokens)>1):
+                        displayTokens = subTokens[1].split('display=', 1)
+                        if(len(displayTokens)>1):
+                            return displayTokens[1]
+                            
+                    return subTokens[0]
+                else:
+                    return link
+                
+            def customWidget(lambdaArn, title, height, width, x_value, y_value):
+                customWidgetJson = {
+                    "height": height,
+                    "width": width,
+                    "y": y_value,
+                    "x": x_value,
+                    "type": "custom",
+                    "properties": {
+                        "endpoint": lambdaArn,
+                        "title": title,
+                        "params": {},
+                        "updateOn": {
+                            "refresh": True
+                        },
+                    }
+                }
+                
+                return customWidgetJson
+                
+            def microserviceAlarmWidget(alarmArn, title, width, x_value, y_value):
+                alarmJson={
+                    "height": 2,
+                    "width": width,
+                    "y": y_value,
+                    "x": x_value,
+                    "type": "alarm",
+                    "properties": {
+                        "alarms": [alarmArn],
+                        "title": title+" Alarms"
+                    }
+                }
+                
+                return alarmJson
+                
+            def s3StorageWidget(bucketName, title, height, width, x_value, y_value, region):
+                widgetJson = {
+                    "type":"metric",
+                    "x":x_value,
+                    "y":y_value,
+                    "width":width,
+                    "height": height,
+                    "properties": {
+                        "sparkline": False,
+                        "view": "singleValue",
+                        "region": region,
+                        "stat": "Maximum",
+                        "period": 604800,
+                        "title": title,
+                        "stacked": False,
+                        "setPeriodToTimeRange": True,
+                        "metrics": [
+                            ["AWS/S3", "BucketSizeBytes", "StorageType", "StandardStorage", "BucketName", bucketName ]
+                        ]
+                    }
+                }   
+                
+                return widgetJson
+
+            def openSearchStorageWidget(openSearchArn, title, height, width, x_value, y_value, region):
+                clientId = openSearchArn.split(':')[4]
+                domainName = openSearchArn.split(':')[5].replace("domain/", "")
+                widgetJson = {
+                    "type":"metric",
+                    "x":x_value,
+                    "y":y_value,
+                    "width":width,
+                    "height": height,
+                    "properties": {
+                        "sparkline": True,
+                        "view": "singleValue",
+                        "region": region,
+                        "stat": "Maximum",
+                        "period": 60,
+                        "title": title,
+                        "stacked": False,
+                        "accountId": clientId,
+                        "singleValueFullPrecision": False,
+                        "metrics": [
+                            ["AWS/ES", "FreeStorageSpace", "ClientId", clientId, "DomainName", domainName ],
+                            ["AWS/ES", "ClusterUsedSpace", "ClientId", clientId, "DomainName", domainName ]    
+                        ]
+                    }
+                }   
+                
+                return widgetJson
+                
+            def activeSlaViolationsWidget(title, height, width, x_value, y_value, localRegion):
+                widgetJson = {
+                    "type":"metric",
+                    "x":x_value,
+                    "y":y_value,
+                    "width":width,
+                    "height": height,
+                    "properties": {
+                        "sparkline": True,
+                        "view": "timeSeries",
+                        "stat": "Sum",
+                        "period": 60,
+                        "title": title,
+                        "region": localRegion,
+                        "stacked": False,
+                        "singleValueFullPrecision": False,
+                        "metrics": [
+                            ["OER", "pn-activeSLAViolations", "type", "VALIDATION" ],
+                            ["OER", "pn-activeSLAViolations", "type", "REFINEMENT" ],
+                            ["OER", "pn-activeSLAViolations", "type", "SEND_PEC" ],
+                            ["OER", "pn-activeSLAViolations", "type", "SEND_PAPER_AR_890" ],
+                            ["OER", "pn-activeSLAViolations", "type", "SEND_AMR" ],
+                        ]
+                    }
+                }   
+                
+                return widgetJson
+
+            def textSeparator(message, textYValue):
+                textJson={
+                    "height": 1,
+                    "width": 24,
+                    "y": textYValue,
+                    "x": 0,
+                    "type": "text",
+                    "properties": {
+                        "markdown": "# "+message
+                    }
+                }
+                
+                return textJson
+>>>>>>> 6810a9f9fd3336ee3a4dc78be4e98e79011d5bf7
 
                     def appendList(currentArray, appendArray):
                         for x in appendArray:

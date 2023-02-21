@@ -58,22 +58,6 @@ Parameters:
 
 Resources:
 
-  MicroserviceCompositeAlarm:
-    Type: AWS::CloudWatch::CompositeAlarm
-    Properties:
-      AlarmName: !Sub '${DashboardName}-CompositeAlarm'
-      AlarmRule: 
-        Fn::Join:
-          - ''
-          - - 'ALARM('
-            - Fn::Join:
-              - ') OR ALARM('
-              - 'Fn::Transform':
-                  Name: 'TrimListTransform'
-                  Parameters:
-                    Arns: !Ref AlarmArns
-            - ')'
-
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard
     Properties:
@@ -93,8 +77,3 @@ Resources:
             KinesisFirehoseArns: !Ref KinesisFirehoseArns
             EventRuleArns: !Ref EventRuleArns
             BucketNames: !Ref BucketNames
-
-Outputs:
-  MicroserviceCompositeAlarmArn:
-    Value: !GetAtt MicroserviceCompositeAlarm.Arn
-    Description: 'Arn of microservice composite alarm'
