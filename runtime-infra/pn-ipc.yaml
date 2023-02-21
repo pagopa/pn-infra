@@ -591,7 +591,8 @@ Resources:
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "NationalRegistriesOutcomeEvent" ]
-        detail-source: [ "pn-delivery-push" ]
+        detail:
+          source: [ "pn-delivery-push" ]
       Targets: 
         - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
           Id: !Sub ${ProjectName}-Logger-NationalRegistries2DeliveryPush
@@ -608,7 +609,7 @@ Resources:
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-NationalRegistries2DeliveryPush'
           Arn: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.QueueARN
-          InputPath: $.detail
+          InputPath: $.detail.body
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
@@ -994,11 +995,12 @@ Resources:
           MaximumBatchingWindowInSeconds: !Ref NationalRegistriesPipeWindowSize
       Target: !GetAtt PnCoreEventBus.Arn
       TargetParameters:
+        EventBridgeEventBusParameters:
+          DetailType: "NationalRegistriesOutcomeEvent"
         InputTemplate: |
               {
-                "detail-type": "NationalRegistriesOutcomeEvent",
-                "detail": <$.body>,
-                "detail-source": <$.messageAttributes.clientId.stringValue>
+                "body": <$.body>,
+                "source": <$.messageAttributes.clientId.stringValue>
               }
 
 Outputs:
