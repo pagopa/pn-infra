@@ -108,6 +108,16 @@ Parameters:
     Type: String
     Description: 'keep track of used projects commitIds'
 
+  NationalRegistriesPipeWindowSize:
+    Type: Number
+    Default: 30
+    Description: window size of national registries pipe (sqs to sqs)
+  
+  NationalRegistriesPipeBatchSize:
+    Type: Number
+    Default: 2
+    Description: events batch size of national registries pipe (sqs to sqs)
+
   # pass-though parameters
   LambdasBucketName:
     Type: String
@@ -913,7 +923,7 @@ Resources:
     Type: AWS::Pipes::Pipe
     Properties:
       Name: National-registries-to-delivery-push-pipe
-      Description: 'Pipe from SQS to EventBridge'
+      Description: 'Pipe from National Registries Queue to Delivery Push queue'
       RoleArn: !GetAtt NationalRegistriesPipeRole.Arn
       Source: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.QueueARN
       SourceParameters:
@@ -922,20 +932,21 @@ Resources:
             - Pattern: | 
                 {
                   "messageAttributes": {
-                  "clientId": {
-                    "stringValue": ["pn-delivery-push"]
+                    "clientId": {
+                      "stringValue": ["pn-delivery-push"]
+                    }
                   }
                 }
         SqsQueueParameters:
-          BatchSize: 2
-          MaximumBatchingWindowInSeconds: 30
+          BatchSize: !Ref NationalRegistriesPipeBatchSize
+          MaximumBatchingWindowInSeconds: !Ref NationalRegistriesPipeWindowSize
       Target: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.QueueARN
 
   NationalRegistriesToPaperChannelPipe:
     Type: AWS::Pipes::Pipe
     Properties:
       Name: National-registries-to-paper-channel-pipe
-      Description: 'Pipe from SQS to EventBridge'
+      Description: 'Pipe from National Registries Queue to Paper Channel queue'
       RoleArn: !GetAtt NationalRegistriesPipeRole.Arn
       Source: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.QueueARN
       SourceParameters:
@@ -944,13 +955,14 @@ Resources:
             - Pattern: | 
                 {
                   "messageAttributes": {
-                  "clientId": {
-                    "stringValue": ["pn-delivery-push"]
+                    "clientId": {
+                      "stringValue": ["pn-paper-channel"]
+                    }
                   }
                 }
         SqsQueueParameters:
-          BatchSize: 2
-          MaximumBatchingWindowInSeconds: 30
+          BatchSize: !Ref NationalRegistriesPipeBatchSize
+          MaximumBatchingWindowInSeconds: !Ref NationalRegistriesPipeWindowSize
       Target: !GetAtt NationalRegistries2PaperChannelQueue.Outputs.QueueARN
 
 Outputs:
