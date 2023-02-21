@@ -490,6 +490,9 @@ Resources:
         - !GetAtt "ExternalChannels2PaperChannelQueue.Outputs.QueueURL"
         - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueURL"
         - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueURL"
+        - !GetAtt "NationalRegistries2DeliveryPushQueue.Outputs.QueueURL"
+        - !GetAtt "NationalRegistries2PaperChannelQueue.Outputs.QueueURL"
+        - !GetAtt "NationalRegistries2SelcPGQueue.Outputs.QueueURL"        
       PolicyDocument:
         Statement:
           - Sid: "SendEventsToDLQ"
@@ -505,6 +508,9 @@ Resources:
               - !GetAtt "ExternalChannels2PaperChannelQueue.Outputs.QueueARN"
               - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueARN"
               - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueARN"
+              - !GetAtt "NationalRegistries2DeliveryPushQueue.Outputs.QueueURL"
+              - !GetAtt "NationalRegistries2PaperChannelQueue.Outputs.QueueURL"
+              - !GetAtt "NationalRegistries2SelcPGQueue.Outputs.QueueURL"        
 
   # Log all events
   CoreEventBusEventsLogGroup:
