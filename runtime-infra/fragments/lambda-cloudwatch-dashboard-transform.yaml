@@ -931,8 +931,7 @@ Resources:
 
             # the builder for logs
             def logsArnsListWidgetBuilder(localArray, widgetYvalue, localRegion):
-                limit = 20 # HOW TO make it configurable?
-                #source = "/ecs/pn-ApikeyManager" # how to get the correct one?
+                limit = 20 # HOW TO make this configurable?
                 
                 LogsArns = []
                 
@@ -942,7 +941,7 @@ Resources:
                 widgetYvalue = widgetYvalue + 5
 
                 for x in range(len(localArray)):
-                    source = x
+                    source = localArray[x] # example
                     message = textSeparator2("Logs for " + source, widgetYvalue, 24, 0)
                     LogsArns.append(message)
 
