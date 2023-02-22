@@ -935,7 +935,7 @@ Resources:
                 
                 LogsArns = []
                 
-                message = textSeparator("Latest Logs Widgets", widgetYvalue)
+                message = textSeparator("Latest Error Logs Widgets", widgetYvalue)
                 LogsArns.append(message)
 
                 widgetYvalue = widgetYvalue + 5
@@ -955,7 +955,7 @@ Resources:
                         "width": 24,
                         "height": 6,
                         "properties": {
-                            "query": "SOURCE '" + source + "' | fields @timestamp, @message, @logStream, @log, level\n| filter level = \"ERROR\" or strcontains(@message, \"ERROR\")\n| sort @timestamp desc\n| limit " + str(limit),
+                            "query": "SOURCE '" + source + "' | fields @timestamp, @message, @logStream, @log, level\n| filter level = \"ERROR\" or strcontains(@message, \"ERROR\") or strcontains(@message, \"FATAL\")\n| sort @timestamp desc\n| limit " + str(limit),
                             "region": localRegion,
                             "stacked": False,
                             "view": "table"
