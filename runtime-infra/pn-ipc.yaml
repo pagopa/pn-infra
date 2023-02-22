@@ -615,7 +615,7 @@ Resources:
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-NationalRegistries2DeliveryPush'
           Arn: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.QueueARN
-          InputPath: $.detail.body
+          InputPath: $.detail.sqsMessage
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
@@ -645,7 +645,7 @@ Resources:
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-NationalRegistries2PaperChannel'
           Arn: !GetAtt NationalRegistries2PaperChannelQueue.Outputs.QueueARN
-          InputPath: $.detail
+          InputPath: $.detail.sqsMessage
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
@@ -1005,8 +1005,11 @@ Resources:
           DetailType: "NationalRegistriesOutcomeEvent"
         InputTemplate: |
               {
-                "body": <$.body>,
-                "source": <$.messageAttributes.clientId.stringValue>
+                "sqsMessage": {
+                  "body": <$.body>,
+                  "messageAttributes": <$.messageAttributes>
+                },
+                "source": <$.messageAttributes.clientId.stringValue>,
               }
 
 Outputs:
