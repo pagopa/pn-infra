@@ -230,7 +230,7 @@ Resources:
                         localDynamoDBTableNames = event["params"]["DynamoDBTableNames"]
                         dynamoList = dynamoDBWidgetBuilder(localDynamoDBTableNames, y_value, localRegion)
                         dashboardList = appendList(dashboardList, dynamoList)
-                        y_value = y_value+6
+                        y_value = y_value+25
 
                     # logs for the microservice
                     if event["params"]["LogGroupsNames"] == [''] or len(event["params"]["LogGroupsNames"]) == 0:
@@ -935,17 +935,18 @@ Resources:
                 
                 LogsArns = []
                 
-                message = textSeparator("Latest Logs Widget", widgetYvalue)
+                message = textSeparator("Latest Logs Widgets", widgetYvalue)
                 LogsArns.append(message)
 
                 widgetYvalue = widgetYvalue + 5
 
                 for x in range(len(localArray)):
                     source = localArray[x] # example
-                    message = textSeparator2("Logs for " + source, widgetYvalue, 24, 0)
-                    LogsArns.append(message)
 
-                    widgetYvalue = widgetYvalue + 5
+                    # not needed: log name already showed inside the widget
+                    #message = textSeparator2("Logs for " + source, widgetYvalue, 24, 0)
+                    #LogsArns.append(message)
+                    #widgetYvalue = widgetYvalue + 5
 
                     LogsArnsJson = {
                         "type": "log",
@@ -954,7 +955,7 @@ Resources:
                         "width": 24,
                         "height": 6,
                         "properties": {
-                            "query": "SOURCE '" + source + "' | fields @timestamp, @message, @logStream, @log, level\n| filter level = \"ERROR\"\n| sort @timestamp desc\n| limit " + str(limit),
+                            "query": "SOURCE '" + source + "' | fields @timestamp, @message, @logStream, @log, level\n| filter level = \"ERROR\" or strcontains(@message, \"ERROR\")\n| sort @timestamp desc\n| limit " + str(limit),
                             "region": localRegion,
                             "stacked": False,
                             "view": "table"
