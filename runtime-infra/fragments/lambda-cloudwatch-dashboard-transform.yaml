@@ -237,7 +237,7 @@ Resources:
                         print("LogGroupsNames param is missing or empty")
                     else:
                         localLogNames = event["params"]["LogGroupsNames"]
-                        logNamesList = LogsArnsListWidgetBuilder(localLogNames, y_value, localRegion)
+                        logNamesList = logsArnsListWidgetBuilder(localLogNames, y_value, localRegion)
                         dashboardList = appendList(dashboardList, logNamesList)
 
                 data["widgets"] = dashboardList
@@ -930,7 +930,7 @@ Resources:
                 return dynamoList
 
             # the builder for logs
-            def LogsArnsListWidgetBuilder(localArray, widgetYvalue, localRegion):
+            def logsArnsListWidgetBuilder(localArray, widgetYvalue, localRegion):
                 limit = 20 # HOW TO make it configurable?
                 #source = "/ecs/pn-ApikeyManager" # how to get the correct one?
                 
@@ -943,7 +943,7 @@ Resources:
 
                 for x in range(len(localArray)):
                     source = x
-                    message = textSeparator2("Logs for " + source, widgetYvalue)
+                    message = textSeparator2("Logs for " + source, widgetYvalue, 24, 0)
                     LogsArns.append(message)
 
                     widgetYvalue = widgetYvalue + 5
@@ -955,9 +955,9 @@ Resources:
                         "width": 24,
                         "height": 6,
                         "properties": {
-                            "query": "SOURCE '" + source + "' | fields @timestamp, @message, @logStream, @log\n| sort @timestamp desc\n| limit " + limit,
+                            "query": "SOURCE '" + source + "' | fields @timestamp, @message, @logStream, @log, level\n| filter level = \"ERROR\"\n| sort @timestamp desc\n| limit " + str(limit),
                             "region": localRegion,
-                            "stacked": false,
+                            "stacked": False,
                             "view": "table"
                         }
                     }
