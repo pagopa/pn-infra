@@ -380,6 +380,10 @@ Parameters:
     Description: 45th container environment entry in the form key=value
     Type: String
     Default: ''
+  ContainerEnvEntry46:
+    Description: 46th container environment entry in the form key=value
+    Type: String
+    Default: ''
 
   # Secrets
   ContainerSecret1:
@@ -496,6 +500,7 @@ Conditions:
   Env43Exist: !Not [ !Equals [ !Ref ContainerEnvEntry43, '' ] ]
   Env44Exist: !Not [ !Equals [ !Ref ContainerEnvEntry44, '' ] ]
   Env45Exist: !Not [ !Equals [ !Ref ContainerEnvEntry45, '' ] ]
+  Env46Exist: !Not [ !Equals [ !Ref ContainerEnvEntry46, '' ] ]
 
   Secret1Exist: !Not [ !Equals [ !Ref ContainerSecret1, '' ] ]
   Secret2Exist: !Not [ !Equals [ !Ref ContainerSecret2, '' ] ]
@@ -877,6 +882,11 @@ Resources:
                 - Env45Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry45 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry45 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env46Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry46 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry46 ] ]
                 - !Ref "AWS::NoValue"
           PortMappings:
             - ContainerPort: 8080
