@@ -615,7 +615,7 @@ Resources:
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-NationalRegistries2DeliveryPush'
           Arn: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.QueueARN
-          InputPath: $.detail.sqsMessage
+          InputPath: $.detail.body
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
@@ -645,7 +645,7 @@ Resources:
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-NationalRegistries2PaperChannel'
           Arn: !GetAtt NationalRegistries2PaperChannelQueue.Outputs.QueueARN
-          InputPath: $.detail.sqsMessage
+          InputPath: $.detail.body
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
@@ -968,7 +968,7 @@ Resources:
             Action:
               - sts:AssumeRole
       Policies:
-        - PolicyName: SourcePolicy
+        - PolicyName: !Sub ${ProjectName}--National-registries-source-policy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -978,7 +978,7 @@ Resources:
                   - 'sqs:DeleteMessage'
                   - 'sqs:GetQueueAttributes'
                 Resource: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.QueueARN
-        - PolicyName: National-registries-target-policy
+        - PolicyName: !Sub ${ProjectName}-National-registries-target-policy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -991,7 +991,7 @@ Resources:
   NationalRegistriesToEventBridgePipe:
     Type: AWS::Pipes::Pipe
     Properties:
-      Name: National-registries-to-paper-channel-pipe
+      Name: !Sub ${ProjectName}-National-registries-to-paper-channel-pipe
       Description: 'Pipe from National Registries Queue to Paper Channel queue'
       RoleArn: !GetAtt NationalRegistriesPipeRole.Arn
       Source: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.QueueARN
@@ -1005,10 +1005,7 @@ Resources:
           DetailType: "NationalRegistriesOutcomeEvent"
         InputTemplate: |
               {
-                "sqsMessage": {
-                  "body": <$.body>,
-                  "messageAttributes": <$.messageAttributes>
-                },
+                "body": <$.body>,
                 "source": <$.messageAttributes.clientId.stringValue>
               }
 
