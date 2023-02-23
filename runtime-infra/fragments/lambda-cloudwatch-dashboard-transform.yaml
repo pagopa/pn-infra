@@ -237,8 +237,17 @@ Resources:
                         print("LogGroupsNames param is missing or empty")
                     else:
                         localLogNames = event["params"]["LogGroupsNames"]
-                        logNamesList = logsArnsListWidgetBuilder(localLogNames, y_value, localRegion)
+                        logNamesList = logsNamesListWidgetBuilder(localLogNames, y_value, localRegion)
                         dashboardList = appendList(dashboardList, logNamesList)
+                    y_value = y_value+10
+
+                    # api gw logs for the microservice
+                    if event["params"]["APIGWLogGroupsNames"] == [''] or len(event["params"]["APIGWLogGroupsNames"]) == 0:
+                        print("APIGWLogGroupsNames param is missing or empty")
+                    else:
+                        localAPIGWLogNames = event["params"]["APIGWLogGroupsNames"]
+                        logNamesList = apigwLogsNamesListWidgetBuilder(localAPIGWLogNames, y_value, localRegion)
+                        dashboardList = appendList(dashboardList, localAPIGWLogNames)
 
                 data["widgets"] = dashboardList
                 print(data)
@@ -930,8 +939,9 @@ Resources:
                 return dynamoList
 
             # the builder for logs
-            def logsArnsListWidgetBuilder(localArray, widgetYvalue, localRegion):
+            def logsNamesListWidgetBuilder(localArray, widgetYvalue, localRegion):
                 limit = 20 # HOW TO make this configurable?
+                filter = "(ispresent(level) and level = \"ERROR\") or (strcontains(@message, \"ERROR\") or strcontains(@message, \"FATAL\"))"
                 
                 LogsArns = []
                 
@@ -955,7 +965,46 @@ Resources:
                         "width": 24,
                         "height": 6,
                         "properties": {
-                            "query": "SOURCE '" + source + "' | fields @timestamp, @message, @logStream, @log, level\n| filter level = \"ERROR\" or strcontains(@message, \"ERROR\") or strcontains(@message, \"FATAL\")\n| sort @timestamp desc\n| limit " + str(limit),
+                            "query": "SOURCE '" + source + "' | fields @timestamp, @message, @logStream, @log, level\n| filter " + filter + "\n| sort @timestamp desc\n| limit " + str(limit),
+                            "region": localRegion,
+                            "stacked": False,
+                            "view": "table"
+                        }
+                    }
+                    LogsArns.append(LogsArnsJson)
+
+                    widgetYvalue = widgetYvalue + 6
+
+                return LogsArns
+
+            # the builder for API gateway logs
+            def apigwLogsNamesListWidgetBuilder(localArray, widgetYvalue, localRegion):
+                limit = 20 # HOW TO make this configurable?
+                filter = "(ispresent(status) and status >= 400)"
+                
+                LogsArns = []
+                
+                message = textSeparator("Latest APIGateway Error Logs Widgets", widgetYvalue)
+                LogsArns.append(message)
+
+                widgetYvalue = widgetYvalue + 5
+
+                for x in range(len(localArray)):
+                    source = localArray[x] # example
+
+                    # not needed: log name already showed inside the widget
+                    #message = textSeparator2("Logs for " + source, widgetYvalue, 24, 0)
+                    #LogsArns.append(message)
+                    #widgetYvalue = widgetYvalue + 5
+
+                    LogsArnsJson = {
+                        "type": "log",
+                        "x": 0,
+                        "y": widgetYvalue,
+                        "width": 24,
+                        "height": 6,
+                        "properties": {
+                            "query": "SOURCE '" + source + "' | fields @timestamp, @message, @logStream, @log, status\n| filter " + filter + "\n| sort @timestamp desc\n| limit " + str(limit),
                             "region": localRegion,
                             "stacked": False,
                             "view": "table"
