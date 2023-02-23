@@ -149,117 +149,106 @@ Resources:
                 else:
                     localRegion = event["params"]["Region"]
                 
-                    if "AlarmArns" in event["params"]:
-                        if event["params"]["AlarmArns"] == [''] or len(event["params"]["AlarmArns"]) == 0:
-                            print("AlarmArns param is missing or empty")
+                    if "AlarmArns" not in event["params"] or event["params"]["AlarmArns"] == [''] or len(event["params"]["AlarmArns"]) == 0:
+                        print("AlarmArns param is missing or empty")
+                    else:
+                        localAlarmArns = event["params"]["AlarmArns"]
+                        localAlarmArns = list(filter(None, localAlarmArns))
+                        alarmList = alarmWidgetBuilder(localAlarmArns, y_value ,localRegion, 4)
+                        dashboardList = appendList(dashboardList, alarmList)
+                        if(len(localAlarmArns)%4==0):
+                            y_value = y_value+9+6*int((len(localAlarmArns)/4))
                         else:
-                            localAlarmArns = event["params"]["AlarmArns"]
-                            localAlarmArns = list(filter(None, localAlarmArns))
-                            alarmList = alarmWidgetBuilder(localAlarmArns, y_value ,localRegion, 4)
-                            dashboardList = appendList(dashboardList, alarmList)
-                            if(len(localAlarmArns)%4==0):
-                                y_value = y_value+9+6*int((len(localAlarmArns)/4))
-                            else:
-                                y_value = y_value+9+6*int((len(localAlarmArns)/4))+6
+                            y_value = y_value+9+6*int((len(localAlarmArns)/4))+6
 
-                    if "QueueArns" in event["params"]:
-                        if event["params"]["QueueArns"] == [''] or len(event["params"]["QueueArns"]) == 0:
-                            print("QueueArns param is missing or empty")
-                        else:
-                            localQueueArns = event["params"]["QueueArns"]
-                            localQueueArns = list(filter(None, localQueueArns))
-                            queueList = queueWidgetBuilder(localQueueArns, y_value ,localRegion)
-                            dashboardList = appendList(dashboardList, queueList)
-                            y_value=y_value+6
+                    if "QueueArns" not in event["params"] or event["params"]["QueueArns"] == [''] or len(event["params"]["QueueArns"]) == 0:
+                        print("QueueArns param is missing or empty")
+                    else:
+                        localQueueArns = event["params"]["QueueArns"]
+                        localQueueArns = list(filter(None, localQueueArns))
+                        queueList = queueWidgetBuilder(localQueueArns, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, queueList)
+                        y_value=y_value+6
                         
-                    if "RestApiStageArns" in event["params"]:
-                        if event["params"]["RestApiStageArns"] == [''] and event["params"]["RestApiNames"] == ['']:
-                            print("RestApiStageArns and RestApiNames params are missing or empty")
-                        else:
-                            localRestApiArns = event["params"]["RestApiStageArns"]
-                            localRestAPINames = event["params"]["RestApiNames"]
-                            restAPIList = restApiWidgetBuilder(localRestApiArns, y_value, localRegion, localRestAPINames)
-                            dashboardList = appendList(dashboardList, restAPIList)
-                            y_value=y_value+6
+                    if "RestApiStageArns" not in event["params"] or event["params"]["RestApiStageArns"] == [''] and event["params"]["RestApiNames"] == ['']:
+                        print("RestApiStageArns and RestApiNames params are missing or empty")
+                    else:
+                        localRestApiArns = event["params"]["RestApiStageArns"]
+                        localRestAPINames = event["params"]["RestApiNames"]
+                        restAPIList = restApiWidgetBuilder(localRestApiArns, y_value, localRegion, localRestAPINames)
+                        dashboardList = appendList(dashboardList, restAPIList)
+                        y_value=y_value+6
                 
-                    if "KinesisDataArns" in event["params"]:
-                        if event["params"]["KinesisDataArns"] == [''] or len(event["params"]["KinesisDataArns"]) == 0:
-                            print("KinesisDataArns param is missing or empty")
-                        else:
-                            localKinesisDataArns = event["params"]["KinesisDataArns"]
-                            localKinesisDataArns = list(filter(None, localKinesisDataArns))
-                            kinesisDataList = kinesisDataWidgetBuilder(localKinesisDataArns, y_value ,localRegion)
-                            dashboardList = appendList(dashboardList, kinesisDataList)
-                            y_value = y_value+12
+                    if "KinesisDataArns" not in event["params"] or event["params"]["KinesisDataArns"] == [''] or len(event["params"]["KinesisDataArns"]) == 0:
+                        print("KinesisDataArns param is missing or empty")
+                    else:
+                        localKinesisDataArns = event["params"]["KinesisDataArns"]
+                        localKinesisDataArns = list(filter(None, localKinesisDataArns))
+                        kinesisDataList = kinesisDataWidgetBuilder(localKinesisDataArns, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, kinesisDataList)
+                        y_value = y_value+12
 
-                    if "KinesisFirehoseArns" in event["params"]:
-                        if event["params"]["KinesisFirehoseArns"] == [''] or len(event["params"]["KinesisFirehoseArns"]) == 0:
-                            print("KinesisFirehoseArns param is missing or empty")
-                        else:
-                            localKinesisFirehoseArns = event["params"]["KinesisFirehoseArns"]
-                            localKinesisFirehoseArns = list(filter(None, localKinesisFirehoseArns))
-                            kinesisFirehoseList = kinesisFirehoseWidgetBuilder(localKinesisFirehoseArns, y_value ,localRegion)
-                            dashboardList = appendList(dashboardList, kinesisFirehoseList)
-                            y_value = y_value+12
+                    if "KinesisFirehoseArns" not in event["params"] or event["params"]["KinesisFirehoseArns"] == [''] or len(event["params"]["KinesisFirehoseArns"]) == 0:
+                        print("KinesisFirehoseArns param is missing or empty")
+                    else:
+                        localKinesisFirehoseArns = event["params"]["KinesisFirehoseArns"]
+                        localKinesisFirehoseArns = list(filter(None, localKinesisFirehoseArns))
+                        kinesisFirehoseList = kinesisFirehoseWidgetBuilder(localKinesisFirehoseArns, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, kinesisFirehoseList)
+                        y_value = y_value+12
 
-                    if "LambdaArns" in event["params"]:
-                        if event["params"]["LambdaArns"] == [''] or len(event["params"]["LambdaArns"]) == 0:
-                            print("LambdaArns param is missing or empty")
-                        else:
-                            localLambdaArns = event["params"]["LambdaArns"]
-                            localLambdaArns = list(filter(None, localLambdaArns))
-                            lambdaList = lambdaNewWidgetBuilder(localLambdaArns, y_value ,localRegion)
-                            dashboardList = appendList(dashboardList, lambdaList)
-                            y_value = y_value+18
+                    if "LambdaArns" not in event["params"] or event["params"]["LambdaArns"] == [''] or len(event["params"]["LambdaArns"]) == 0:
+                        print("LambdaArns param is missing or empty")
+                    else:
+                        localLambdaArns = event["params"]["LambdaArns"]
+                        localLambdaArns = list(filter(None, localLambdaArns))
+                        lambdaList = lambdaNewWidgetBuilder(localLambdaArns, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, lambdaList)
+                        y_value = y_value+18
                         
-                    if "EventRuleArns" in event["params"]:
-                        if event["params"]["EventRuleArns"] == [''] or len(event["params"]["EventRuleArns"]) == 0:
-                            print("EventRuleArns param is missing or empty")
-                        else:
-                            localEventRuleArns = event["params"]["EventRuleArns"]
-                            localEventRuleArns = list(filter(None, localEventRuleArns))
-                            eventRuleList = eventRuleWidgetBuilder(localEventRuleArns, y_value ,localRegion)
-                            dashboardList = appendList(dashboardList, eventRuleList)
-                            y_value = y_value+6
+                    if "EventRuleArns" not in event["params"] or event["params"]["EventRuleArns"] == [''] or len(event["params"]["EventRuleArns"]) == 0:
+                        print("EventRuleArns param is missing or empty")
+                    else:
+                        localEventRuleArns = event["params"]["EventRuleArns"]
+                        localEventRuleArns = list(filter(None, localEventRuleArns))
+                        eventRuleList = eventRuleWidgetBuilder(localEventRuleArns, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, eventRuleList)
+                        y_value = y_value+6
 
-                    if "BucketNames" in event["params"]:
-                        if event["params"]["BucketNames"] == [''] or len(event["params"]["BucketNames"]) == 0:
-                            print("BucketNames param is missing or empty")
-                        else:
-                            localBucketNames = event["params"]["BucketNames"]
-                            localBucketNames = list(filter(None, localBucketNames))
-                            bucketWidgetList = bucketWidgetBuilder(localBucketNames, y_value ,localRegion)
-                            dashboardList = appendList(dashboardList, bucketWidgetList)
-                            y_value = y_value+6
+                    if "BucketNames" not in event["params"] or event["params"]["BucketNames"] == [''] or len(event["params"]["BucketNames"]) == 0:
+                        print("BucketNames param is missing or empty")
+                    else:
+                        localBucketNames = event["params"]["BucketNames"]
+                        localBucketNames = list(filter(None, localBucketNames))
+                        bucketWidgetList = bucketWidgetBuilder(localBucketNames, y_value ,localRegion)
+                        dashboardList = appendList(dashboardList, bucketWidgetList)
+                        y_value = y_value+6
 
-                    if "DynamoDBTableNames" in event["params"]:
-                        if event["params"]["DynamoDBTableNames"] == [''] or len(event["params"]["DynamoDBTableNames"]) == 0:
-                            print("DynamoDBTableNames param is missing or empty")
-                        else:
-                            localDynamoDBTableNames = event["params"]["DynamoDBTableNames"]
-                            dynamoList = dynamoDBWidgetBuilder(localDynamoDBTableNames, y_value, localRegion)
-                            dashboardList = appendList(dashboardList, dynamoList)
-                            y_value = y_value+25
+                    if "DynamoDBTableNames" not in event["params"] or event["params"]["DynamoDBTableNames"] == [''] or len(event["params"]["DynamoDBTableNames"]) == 0:
+                        print("DynamoDBTableNames param is missing or empty")
+                    else:
+                        localDynamoDBTableNames = event["params"]["DynamoDBTableNames"]
+                        dynamoList = dynamoDBWidgetBuilder(localDynamoDBTableNames, y_value, localRegion)
+                        dashboardList = appendList(dashboardList, dynamoList)
+                        y_value = y_value+25
 
                     # logs for the microservice
-                    if "LogGroupsNames" in event["params"]:
-                        if event["params"]["LogGroupsNames"] == [''] or len(event["params"]["LogGroupsNames"]) == 0:
-                            print("LogGroupsNames param is missing or empty")
-                        else:
-                            localLogNames = event["params"]["LogGroupsNames"]
-                            logNamesList = logsNamesListWidgetBuilder(localLogNames, y_value, localRegion)
-                            dashboardList = appendList(dashboardList, logNamesList)
-                            y_value = y_value+10
+                    if "LogGroupsNames" not in event["params"] or event["params"]["LogGroupsNames"] == [''] or len(event["params"]["LogGroupsNames"]) == 0:
+                        print("LogGroupsNames param is missing or empty")
+                    else:
+                        localLogNames = event["params"]["LogGroupsNames"]
+                        logNamesList = logsNamesListWidgetBuilder(localLogNames, y_value, localRegion)
+                        dashboardList = appendList(dashboardList, logNamesList)
+                        y_value = y_value+10
 
                     # api gw logs for the microservice
-                    if "APIGWLogGroupsNames" in event["params"]:
-                        if event["params"]["APIGWLogGroupsNames"] == [''] or len(event["params"]["APIGWLogGroupsNames"]) == 0:
-                            print("APIGWLogGroupsNames param is missing or empty")
-                        else:
-                            localAPIGWLogNames = event["params"]["APIGWLogGroupsNames"]
-                            logNamesList = apigwLogsNamesListWidgetBuilder(localAPIGWLogNames, y_value, localRegion)
-                            dashboardList = appendList(dashboardList, localAPIGWLogNames)
-                            #y_value = y_value+10
+                    if "APIGWLogGroupsNames" not in event["params"] or event["params"]["APIGWLogGroupsNames"] == [''] or len(event["params"]["APIGWLogGroupsNames"]) == 0:
+                        print("APIGWLogGroupsNames param is missing or empty")
+                    else:
+                        localAPIGWLogNames = event["params"]["APIGWLogGroupsNames"]
+                        logNamesList = apigwLogsNamesListWidgetBuilder(localAPIGWLogNames, y_value, localRegion)
+                        dashboardList = appendList(dashboardList, localAPIGWLogNames)
+                        #y_value = y_value+10
 
                 data["widgets"] = dashboardList
                 print(data)
