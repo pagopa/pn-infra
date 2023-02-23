@@ -942,7 +942,7 @@ Resources:
             # the builder for logs
             def logsNamesListWidgetBuilder(localArray, widgetYvalue, localRegion):
                 limit = 20 # HOW TO make this configurable?
-                filter = "(ispresent(level) and level = \"ERROR\") or (strcontains(@message, \"ERROR\") or strcontains(@message, \"FATAL\"))"
+                filter = "(ispresent(level) and level = \"ERROR\") or (not ispresent(level) and (strcontains(@message, \"ERROR\") or strcontains(@message, \"FATAL\")))"
                 
                 LogsArns = []
                 
