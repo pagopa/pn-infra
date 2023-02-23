@@ -107,9 +107,9 @@ for loggr in  $(aws ${aws_command_base_args} logs describe-log-groups --log-grou
 #FOR TESTING ONLY:
 #for loggr in  $(aws ${aws_command_base_args} logs describe-log-groups --log-group-name-prefix /ecs | grep -i logGroupName | awk '{print $2}' | cut -d "\"" -f 2 | cut -d "\"" -f 1 | head -2) ; do
 
-aws ${aws_command_base_args} logs start-query  --log-group-name $loggr  --start-time `date -j -v-$time +%s000` --end-time `date +%s000`  --query-string 'fields @message | filter @message like /testpagopa1@pnpagopa.postecert.local|testpagopa2@pnpagopa.postecert.local|(?i)RMTTR76M06B715E|(?i)CLMCST42R12D969Z|(?i)MSSLGU51P10A087J|(?i)Cucumber|(?i)Colombo|(?i)Fieramosca|(?i)Gherkin|(?i)Via senza nome|(?i)Milano|77777777777/ | sort @timestamp desc'  | awk '{print $2}' | cut -d "\"" -f 2 | cut -d "\"" -f 1 > query &&
+aws ${aws_command_base_args} logs start-query  --log-group-name $loggr  --start-time `date -j -v-$time +%s000` --end-time `date +%s000`  --query-string 'fields @message | filter @message like /testpagopa1@pnpagopa.postecert.local|testpagopa2@pnpagopa.postecert.local|(?i)RMTTR76M06B715E|(?i)CLMCST42R12D969Z|(?i)MSSLGU51P10A087J|(?)Mario Cucumber|(?)Cristoforo Colombo|(?)Ettore Fieramosca|(?i)Mario Gherkin|(?i)Via senza nome|77777777777|(?)Gherkin_spa|(?)Cucumber_srl/ | filter @message not like /paymentId=77777777777/  | sort @timestamp desc'  | awk '{print $2}' | cut -d "\"" -f 2 | cut -d "\"" -f 1 > query &&
 
-aws ${aws_command_base_args} logs get-query-results --query-id $(cat query) --output text > result$(echo $loggr | sed 's/\//_/g').txt && echo $loggr it has been verified ;
+aws ${aws_command_base_args} logs get-query-results --query-id $(cat query) --output text > result$(echo $loggr | sed 's/\//_/g').txt && echo $loggr has been verified ;
 
 done
 
@@ -120,9 +120,9 @@ for loggrlb in $(aws logs ${aws_command_base_args} describe-log-groups --log-gro
 #FOR TESTING ONLY:
 #for loggrlb in $(aws ${aws_command_base_args} logs describe-log-groups --log-group-name-prefix /aws/lambda | grep -i logGroupName | awk '{print $2}' | cut -d "\"" -f 2 | cut -d "\"" -f 1 | head -2); do
 
-aws ${aws_command_base_args} logs start-query  --log-group-name $loggrlb  --start-time `date -j -v-1H +%s000` --end-time `date +%s000`  --query-string 'fields @message | filter @message like /testpagopa1@pnpagopa.postecert.local|testpagopa2@pnpagopa.postecert.local|(?i)RMTTR76M06B715E|(?i)CLMCST42R12D969Z|(?i)MSSLGU51P10A087J|(?i)Cucumber|(?i)Colombo|(?i)Fieramosca|(?i)Gherkin|(?i)Via senza nome|(?i)Milano|77777777777/ | sort @timestamp desc'  | awk '{print $2}' | cut -d "\"" -f 2 | cut -d "\"" -f 1 > query &&
+aws ${aws_command_base_args} logs start-query  --log-group-name $loggrlb  --start-time `date -j -v-1H +%s000` --end-time `date +%s000`  --query-string 'fields @message | filter @message like /testpagopa1@pnpagopa.postecert.local|testpagopa2@pnpagopa.postecert.local|(?i)RMTTR76M06B715E|(?i)CLMCST42R12D969Z|(?i)MSSLGU51P10A087J|(?)Mario Cucumber|(?)Cristoforo Colombo|(?)Ettore Fieramosca|(?i)Mario Gherkin|(?i)Via senza nome|77777777777|(?)Gherkin_spa|(?)Cucumber_srl/ | filter @message not like /paymentId=77777777777/ | sort @timestamp desc'  | awk '{print $2}' | cut -d "\"" -f 2 | cut -d "\"" -f 1 > query &&
 
-aws ${aws_command_base_args} logs get-query-results --query-id $(cat query) --output text > result$(echo $loggrlb | sed 's/\//_/g').txt && echo $loggrlb it has been verified ;
+aws ${aws_command_base_args} logs get-query-results --query-id $(cat query) --output text > result$(echo $loggrlb | sed 's/\//_/g').txt && echo $loggrlb has been verified ;
 
 done 
 
