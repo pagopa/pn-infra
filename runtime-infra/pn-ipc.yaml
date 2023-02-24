@@ -628,7 +628,8 @@ Resources:
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "NationalRegistriesOutcomeEvent" ]
-        detail-source: [ "pn-paper-channel" ]
+        detail: 
+          source: [ "pn-paper-channel" ]
       Targets: 
         - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
           Id: !Sub ${ProjectName}-Logger-NationalRegistries2PaperChannel
