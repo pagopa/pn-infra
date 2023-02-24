@@ -52,7 +52,12 @@ Parameters:
     Type: String
     Default: '-'
     Description: Data lake can read logs
-  
+
+  SafeStorageAccountId:
+    Type: String
+    Default: '-'
+    Description: Data lake can read logs
+
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
@@ -144,6 +149,7 @@ Resources:
         BucketSuffix: !Ref BucketSuffix
         DataLakeAccountId1: !Ref DataLakeAccountId1
         DataLakeAccountId2: !Ref DataLakeAccountId2
+        SafeStorageAccountId: !Ref SafeStorageAccountId
 
   # Exporter role
   LogsExporterRole:
@@ -220,3 +226,5 @@ Outputs:
     Value: !Ref EcsDefaultSecurityGroup
   AlbSecurityGroup:
     Value: !GetAtt LoadBalancer.Outputs.AlbSecurityGroup
+  SafeStorageAccountId:
+    Value: !Ref SafeStorageAccountId

@@ -22,6 +22,11 @@ Parameters:
     Default: '-'
     Description: Data lake can read logs
   
+  SafeStorageAccountId:
+    Type: String
+    Default: '-'
+    Description: Safestorage Account ID
+
   # ActivateCrossAccountRole:
   #   Type: String
   #   Default: false
@@ -42,6 +47,9 @@ Conditions:
       - !Not [ !Equals [ !Ref DataLakeAccountId1, '-' ]] 
       - !Not [ !Equals [ !Ref DataLakeAccountId2, '-' ]] 
 
+  HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
+
+  ActivateSafeStorageCondition: !And [ !Condition MakeBucketCondition, !Condition HasStorageStorageAccountId]
 Resources:
   
   ### - S3 Bucket for logs storages
@@ -122,6 +130,25 @@ Resources:
               - kms:GenerateDataKey*
               - kms:DescribeKey
             Resource: "*"
+          - Fn::If:
+            - ActivateSafeStorageCondition
+            - Sid: Allow safe storage kms usage
+              Effect: Allow
+              Action:
+                - kms:Encrypt
+                - kms:Decrypt
+                - kms:GenerateDataKey*
+              Principal:
+                Service: "cloudtrail.amazonaws.com"
+              Resource:
+                - "*"
+              Condition:
+                - StringLike:
+                    "kms:EncryptionContext:aws:cloudtrail:arn":
+                      - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                    "aws:SourceArn":
+                      - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+            - !Ref AWS::NoValue
 
   # - Bucket access policy
   LogsBucketPolicy:
@@ -212,6 +239,59 @@ Resources:
               Resource: 
                 - !Sub "${LogsBucketKmsKey.Arn}"
                 - !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/${ProjectName}-logs-bucket-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}-key-alias'
+
+  CloudTrailDestinationBucketResourcePolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: ActivateSafeStorageCondition
+    Properties: 
+      Bucket: !Ref LogsBucket
+      PolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AWSCloudTrailWriteAclCheck",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudtrail.amazonaws.com"
+              },
+              "Action": [
+                "s3:GetBucketAcl"
+              ],
+              "Resource": [
+                "arn:${AWS::Partition}:s3:::${LogsBucket}"
+              ],
+              "Condition":{
+                "StringLike":{
+                  "aws:SourceArn": [ 
+                    "arn:aws:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                  ]
+                }
+              }
+            },
+            {
+              "Sid": "AWSCloudTrailWrite",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudtrail.amazonaws.com"
+              },
+              "Action": [
+                "s3:PutObject"
+              ],
+              "Resource": [
+                "arn:${AWS::Partition}:s3:::${LogsBucket}/safeStorageObjectPutAndGetTacing/*"
+              ],
+              "Condition":{
+                "StringLike":{
+                  "aws:SourceArn": [ 
+                    "arn:aws:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                  ]                  
+                }
+              }
+            }
+          ]
+        }
+
 Outputs:
   LogsBucketKmsKeyArn:
     Value: 
