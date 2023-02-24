@@ -1115,7 +1115,7 @@ Resources:
     Type: AWS::Logs::MetricFilter
     Properties: 
       LogGroupName: !Ref LogGroup
-      FilterPattern: '?ERROR ?FATAL ?CRITICAL'
+      FilterPattern: '{ $.level = "ERROR" }'
       MetricTransformations: 
         - MetricValue: 1
           MetricNamespace: "ErrorFatalLogs"
@@ -1332,3 +1332,4 @@ Outputs:
           - !GetAtt AlarmHighRequests.Arn
           - !GetAtt AlarmSQS.Arn
         - ''
+        
