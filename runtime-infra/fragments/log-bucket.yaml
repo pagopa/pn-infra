@@ -140,14 +140,10 @@ Resources:
                 - kms:GenerateDataKey*
               Principal:
                 Service: "cloudtrail.amazonaws.com"
-              Resource:
-                - "*"
+              Resource: "*"
               Condition:
-                - StringLike:
-                    "kms:EncryptionContext:aws:cloudtrail:arn":
-                      - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
-                    "aws:SourceArn":
-                      - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                ArnLike: 
+                  aws:SourceArn: !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
             - !Ref AWS::NoValue
 
   # - Bucket access policy
