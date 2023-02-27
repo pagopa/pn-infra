@@ -98,7 +98,7 @@ Resources:
           Value: !Ref ServiceApiPath
       Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
       FailOnWarnings: true
-      Mode: overwrite
+      Mode: merge
       DisableExecuteApiEndpoint: true      
       ApiKeySourceType: !If [ IsB2B, AUTHORIZER, HEADER ]
       BodyS3Location:
