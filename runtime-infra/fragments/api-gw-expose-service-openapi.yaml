@@ -70,11 +70,17 @@ Parameters:
     Description: Bucket key of the OpenAPI file in the s3 bucket
 
 Conditions:
+  IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
   IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
+  IsIO: !Equals [ !Ref IntendedUsage, 'IO' ]
+  IsPNPG: !Equals [ !Ref IntendedUsage, 'PNPG' ]
+  IsBackoffice: !Equals [ !Ref IntendedUsage, 'BACKOFFICE' ]
+  UseApiKey: !Or [ !Equals [ !Ref IntendedUsage, 'B2B' ], !Equals [ !Ref IntendedUsage, 'IO' ], !Equals [ !Ref IntendedUsage, 'PNPG' ] ]
   SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
   HasOpenApiBucketName: !Not [ !Equals [ !Ref OpenApiBucketName, '' ] ]
   HasOpenApiBucketKey: !Not [ !Equals [ !Ref OpenApiBucketKey, '' ] ]
   HasOpenApiSpecs: !And [ !Condition HasOpenApiBucketName, !Condition HasOpenApiBucketKey ]
+  IsWebOrBackoffice: !Or [ !Condition IsWeb, !Condition IsBackoffice ]
 Resources:
 
   # API definition
@@ -139,6 +145,50 @@ Resources:
         MicroServiceUniqueName: !Ref MicroServiceUniqueName
         IntendedUsage: !Ref IntendedUsage
         DnsName: !Ref DnsName
+
+    # B2B Authorizer
+  ApiKeyLambdaPermission:
+    Condition: IsB2B
+    Type: AWS::Lambda::Permission
+    DependsOn: PublicRestApi
+    Properties:
+      FunctionName: !Sub '${ProjectName}-ApiKeyAuthorizerV2Lambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/pn-auth-fleet_ApiKeyAuthorizerV2"
+
+  # WEB Authorizer
+  JwtLambdaPermission:
+    Condition: IsWeb
+    Type: AWS::Lambda::Permission
+    DependsOn: PublicRestApi
+    Properties:
+      FunctionName: !Sub '${ProjectName}-jwtAuthorizerLambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/pn-auth-fleet_jwtAuthorizer"
+
+  # IO Authorizer
+  IoLambdaPermission:
+    Condition: IsIO
+    Type: AWS::Lambda::Permission
+    DependsOn: PublicRestApi
+    Properties:
+      FunctionName: !Sub '${ProjectName}-ioAuthorizerLambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/pn-auth-fleet_IoAuthorizer"
+
+  # Backoffice Authorizer
+  BackofficeLambdaPermission:
+    Condition: IsBackoffice
+    Type: AWS::Lambda::Permission
+    DependsOn: PublicRestApi
+    Properties:
+      FunctionName: !Sub '${ProjectName}-backofficeAuthorizerLambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/pn-auth-fleet_backofficeAuthorizer"
 
   # Log Group
   PublicApiLogGroup:
