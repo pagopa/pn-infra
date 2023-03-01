@@ -1,0 +1,356 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Expose a microservice API using API-GW via OpenApi file'
+
+Transform:
+  - UpdateDeploymentTransform
+
+Parameters:
+
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+        experimental environments without crash official development environment'
+
+  MicroServiceUniqueName:
+    Type: String
+    Description: Microservice unique name
+
+  DnsName:
+    Type: String
+    Description: Custom DNS to register this api to
+
+  IntendedUsage:
+    Type: String
+    AllowedValues:
+      - B2B
+      - WEB
+      - IO
+      - BACKOFFICE
+      - PNPG
+    Description: B2B, WEB, BACKOFFICE, PNPG or IO usage. Used from other back-end system or used from a browser
+
+  ServiceApiPath:
+    Type: String
+    Description: path of the exposed API
+
+  NetworkLoadBalancerLink:
+    Type: String
+    Description: Link inside the VPC
+
+  ApplicationLoadBalancerDomain:
+    Type: String
+    Description: Application load balancer that dispatch request to microserveces
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of SNS topic where to send alarm when log line includes 5XX and 4XX errors
+
+  # - Log exports parameters
+  CloudwatchFilterPattern:
+    Default: ''
+    Type: String
+    Description: filter expression for exported logs
+
+  CloudwatchLogKinesisStreamArn:
+    Default: ''
+    Type: String
+    Description: where to send logs
+
+  ApiGwLatencyLimit:
+    Default: 2000
+    Type: Number
+    Description: Latency limit before raising alarm (milliseconds)
+
+  OpenApiBucketName:
+    Type: String
+    Description: Bucket name where the OpenAPI files are located
+
+  OpenApiBucketKey:
+    Type: String
+    Description: Bucket key of the OpenAPI file in the s3 bucket
+
+Conditions:
+  IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
+  IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
+  IsIO: !Equals [ !Ref IntendedUsage, 'IO' ]
+  IsBackoffice: !Equals [ !Ref IntendedUsage, 'BACKOFFICE' ]
+  SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
+  HasOpenApiBucketName: !Not [ !Equals [ !Ref OpenApiBucketName, '' ] ]
+  HasOpenApiBucketKey: !Not [ !Equals [ !Ref OpenApiBucketKey, '' ] ]
+  HasOpenApiSpecs: !And [ !Condition HasOpenApiBucketName, !Condition HasOpenApiBucketKey ]
+Resources:
+
+  # API definition
+  PublicRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Tags:
+        - Key: "PN_APIGW_TYPE"
+          Value: !Ref IntendedUsage
+        - Fn::If:
+          - HasOpenApiSpecs
+          - Key: "PN_OPENAPI_BUCKET_NAME"
+            Value: !Ref OpenApiBucketName
+          - !Ref AWS::NoValue
+        - Fn::If:
+          - HasOpenApiSpecs
+          - Key: "PN_OPENAPI_BUCKET_KEY"
+            Value: !Ref OpenApiBucketKey   
+          - !Ref AWS::NoValue
+        - Key: "PN_SERVICE_PATH"
+          Value: !Ref ServiceApiPath
+      Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+      FailOnWarnings: true
+      Mode: merge
+      DisableExecuteApiEndpoint: true      
+      ApiKeySourceType: !If [ IsB2B, AUTHORIZER, HEADER ]
+      BodyS3Location:
+        Bucket: !Ref OpenApiBucketName
+        Key: !Ref OpenApiBucketKey
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+  
+  
+  # Deployment
+  PublicRestApiDeploymentPnPlaceholderEpochSeconds:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref PublicRestApi
+
+  # Stage
+  PublicRestApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref PublicRestApi
+      StageName: unique
+      TracingEnabled: true
+      DeploymentId: !Ref PublicRestApiDeploymentPnPlaceholderEpochSeconds
+      AccessLogSetting:
+        DestinationArn: !GetAtt "PublicApiLogGroup.Arn"
+        Format: '{"requestTime":"$context.requestTime","requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","resourcePath":"$context.resourcePath","status":$context.status,"responseLatency":$context.responseLatency,"xrayTraceId":"$context.xrayTraceId","errorMessage":"$context.error.message","validationError":"$context.error.validationErrorString","integrationRequestId":"$context.integration.requestId","functionResponseStatus":"$context.integration.status","integrationLatency":"$context.integration.latency","integrationServiceStatus":"$context.integration.integrationStatus","authorizeStatus":"$context.authorize.status","authorizerStatus":"$context.authorizer.status","authorizerLatency":"$context.authorizer.latency","authorizerRequestId":"$context.authorizer.requestId","ip":"$context.identity.sourceIp","userAgent":"$context.identity.userAgent","principalId":"$context.authorizer.principalId"}'
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          MetricsEnabled: 'true'
+          DataTraceEnabled: 'false'
+      Variables: 
+        ServiceApiPath: !Ref ServiceApiPath
+        ApplicationLoadBalancerDomain: !Ref ApplicationLoadBalancerDomain
+        NetworkLoadBalancerLink: !Ref NetworkLoadBalancerLink
+        ProjectName: !Ref ProjectName
+        MicroServiceUniqueName: !Ref MicroServiceUniqueName
+        IntendedUsage: !Ref IntendedUsage
+        DnsName: !Ref DnsName
+
+    # B2B Authorizer
+  ApiKeyLambdaPermission:
+    Condition: IsB2B
+    Type: AWS::Lambda::Permission
+    DependsOn: PublicRestApi
+    Properties:
+      FunctionName: !Sub '${ProjectName}-ApiKeyAuthorizerV2Lambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/*"
+
+  # WEB Authorizer
+  JwtLambdaPermission:
+    Condition: IsWeb
+    Type: AWS::Lambda::Permission
+    DependsOn: PublicRestApi
+    Properties:
+      FunctionName: !Sub '${ProjectName}-jwtAuthorizerLambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/*"
+
+  # IO Authorizer
+  IoLambdaPermission:
+    Condition: IsIO
+    Type: AWS::Lambda::Permission
+    DependsOn: PublicRestApi
+    Properties:
+      FunctionName: !Sub '${ProjectName}-ioAuthorizerLambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/*"
+
+  # Backoffice Authorizer
+  BackofficeLambdaPermission:
+    Condition: IsBackoffice
+    Type: AWS::Lambda::Permission
+    DependsOn: PublicRestApi
+    Properties:
+      FunctionName: !Sub '${ProjectName}-backofficeAuthorizerLambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/*"
+
+  # Log Group
+  PublicApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 14
+
+  # Expose API to custom domain
+  APIMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Properties:
+      BasePath: !Ref ServiceApiPath
+      DomainName: !Ref DnsName
+      RestApiId: !Ref PublicRestApi
+      Stage: !Ref PublicRestApiStage
+
+  # Rest API CloudWatch alarm 
+  APIGatewayApiLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-ApiGwLatencyAlarm"
+      AlarmDescription: "CloudWatch alarm for when API Gateway latency exceeds the limit."
+      AlarmActions: 
+        - !Ref AlarmSNSTopicArn
+      InsufficientDataActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 5
+      Threshold: !Ref ApiGwLatencyLimit
+      TreatMissingData: notBreaching
+      Namespace: "AWS/ApiGateway"
+      MetricName: "Latency"
+      Period: 60
+      Dimensions:
+        - Name: ApiName
+          Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+      ExtendedStatistic: "p90"
+
+  APIGatewayApiErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-ApiGwAlarm"
+      AlarmDescription: "CloudWatch alarm for when API Gateway has 4xx or 5xx error."
+      AlarmActions: 
+        - !Ref AlarmSNSTopicArn
+      InsufficientDataActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 5
+      Threshold: 1
+      TreatMissingData: notBreaching
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: ApiName
+                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+              MetricName: 4XXError
+              Namespace: AWS/ApiGateway
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m2
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: ApiName
+                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+              MetricName: 5XXError
+              Namespace: AWS/ApiGateway
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: e2
+          Expression: "m1*(0.1)"
+          Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-4XXError-weight-adjust"
+          ReturnData: False
+        - Id: e1
+          Expression: SUM([e2,m2])
+          Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-APIGatewayErrorMetric"
+
+  ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
+  SubscriptionFilter:
+    Condition: SendLogToKinesis
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      RoleArn:
+        Fn::GetAtt:
+          - "SubscriptionFilterServiceRole"
+          - "Arn"
+      LogGroupName: !Ref PublicApiLogGroup
+      FilterPattern: !Ref CloudwatchFilterPattern
+      DestinationArn: !Ref CloudwatchLogKinesisStreamArn
+
+  ### IAM Role used by Subscription filters to allow read logs from Cloudwatch and send logs to Kinesis Firehose
+  SubscriptionFilterServiceRole:
+    Condition: SendLogToKinesis
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: logs.amazonaws.com
+        Version: "2012-10-17"
+      Path: /
+      Policies:
+        -
+          PolicyName: !Sub '${MicroServiceUniqueName}-access-logs-subscription-role'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - kinesis:PutRecord
+                Effect: Allow
+                Resource: !Ref CloudwatchLogKinesisStreamArn
+              - Action:
+                - "kms:Encrypt"
+                - "kms:GenerateDataKey"
+                - "kms:Decrypt"
+                Effect: Allow
+                Resource: "*"
+
+Outputs:
+
+  # - Public API URL
+  ApiGatewayUrlBeta:
+    Value: !Sub 'https://${PublicRestApi}.execute-api.${AWS::Region}.amazonaws.com/unique/'
+    Description: Base URL for API Requests
+
+  # Rest API ARN used for WAF Configuration
+  APIGatewayARN:
+    Value: !Sub 'arn:aws:apigateway:${AWS::Region}::/restapis/${PublicRestApi}/stages/${PublicRestApiStage}'
+    Description: "Rest API ARN" 
+
+  # Rest API definition
+  RestApiId:
+    Value: !Ref PublicRestApi
+    Description: "Rest API ID" 
+
+  # Rest API parent id
+  RootResourceId:
+    Value: !GetAtt PublicRestApi.RootResourceId
+    Description: "Root resource ID"
+
+  RestApiName:
+    Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+    Description: "Name of the Rest API"
+
+  RestApiStageArn:
+    Value: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/${PublicRestApi}/stages/${PublicRestApiStage}"
+    Description: "Stage ARN of the Rest API"
+
+  RestApiErrorAlarmArn:
+    Value: !GetAtt APIGatewayApiErrorAlarm.Arn
+    Description: "ARN of the errors alarm"
+
+  RestApiLatencyAlarmArn:
+    Value: !GetAtt APIGatewayApiLatencyAlarm.Arn
+    Description: "ARN of the latency alarm"
