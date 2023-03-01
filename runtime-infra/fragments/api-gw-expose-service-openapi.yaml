@@ -57,7 +57,7 @@ Parameters:
     Description: where to send logs
 
   ApiGwLatencyLimit:
-    Default: 1000
+    Default: 2000
     Type: Number
     Description: Latency limit before raising alarm (milliseconds)
 
@@ -225,7 +225,7 @@ Resources:
       Dimensions:
         - Name: ApiName
           Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
-      ExtendedStatistic: "p95"
+      ExtendedStatistic: "p90"
 
   APIGatewayApiErrorAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -266,8 +266,12 @@ Resources:
             Period: 60
             Stat: Sum
           ReturnData: False
+        - Id: e2
+          Expression: "m1*(0.1)"
+          Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-4XXError-weight-adjust"
+          ReturnData: False
         - Id: e1
-          Expression: SUM([m1,m2])
+          Expression: SUM([e2,m2])
           Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-APIGatewayErrorMetric"
 
   ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
