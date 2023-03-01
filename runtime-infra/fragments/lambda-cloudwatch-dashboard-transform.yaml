@@ -1511,7 +1511,7 @@ Resources:
             def availabilityWidget(resources, widgetYvalue, title, region):
                 rate5xx = 0.01
                 rate4xx = 0.1
-                latency = 1000
+                latency = 2000
                 
                 width = 24
 
@@ -1534,7 +1534,7 @@ Resources:
                             "AWS/ApiGateway", "Count", "ApiName", apiName, "Stage", "unique", { "id": "cnt"+str(i+1), "visible": False, "region": region }
                         ]
                         latencyMetric = [
-                            "AWS/ApiGateway", "Latency", "ApiName", apiName, "Stage", "unique", { "id": "lat"+str(i+1), "visible": False, "stat": "p95", "region": region }
+                            "AWS/ApiGateway", "Latency", "ApiName", apiName, "Stage", "unique", { "id": "lat"+str(i+1), "visible": False, "stat": "p90", "region": region }
                         ]
 
                         filledError4xxMetric = [
@@ -1546,7 +1546,7 @@ Resources:
                         ]
                         
                         filledLatencyMetric = [
-                            { "expression": "FILL(lat"+str(i+1)+", 0)", "label": "latency", "id": "latFilled"+str(i+1), "stat": "p95", "period": 300, "region": region, "visible": False } 
+                            { "expression": "FILL(lat"+str(i+1)+", 0)", "label": "latency", "id": "latFilled"+str(i+1), "stat": "p90", "period": 300, "region": region, "visible": False } 
                         ]
                         
                         instantAvailabilityMetric = [ 
