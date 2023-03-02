@@ -81,7 +81,7 @@ Conditions:
 Resources:
 
   # API definition
-  PublicRestApi:
+  PublicRestApiOpenapi:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Tags:
@@ -99,9 +99,9 @@ Resources:
           - !Ref AWS::NoValue
         - Key: "PN_SERVICE_PATH"
           Value: !Ref ServiceApiPath
-      Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+      Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
       FailOnWarnings: true
-      Mode: merge
+      Mode: overwrite
       DisableExecuteApiEndpoint: true      
       ApiKeySourceType: !If [ IsB2B, AUTHORIZER, HEADER ]
       BodyS3Location:
@@ -116,13 +116,13 @@ Resources:
   PublicRestApiDeploymentPnPlaceholderEpochSeconds:
     Type: AWS::ApiGateway::Deployment
     Properties:
-      RestApiId: !Ref PublicRestApi
+      RestApiId: !Ref PublicRestApiOpenapi
 
   # Stage
   PublicRestApiStage:
     Type: AWS::ApiGateway::Stage
     Properties:
-      RestApiId: !Ref PublicRestApi
+      RestApiId: !Ref PublicRestApiOpenapi
       StageName: unique
       TracingEnabled: true
       DeploymentId: !Ref PublicRestApiDeploymentPnPlaceholderEpochSeconds
@@ -147,45 +147,45 @@ Resources:
   ApiKeyLambdaPermission:
     Condition: IsB2B
     Type: AWS::Lambda::Permission
-    DependsOn: PublicRestApi
+    DependsOn: PublicRestApiOpenapi
     Properties:
       FunctionName: !Sub '${ProjectName}-ApiKeyAuthorizerV2Lambda'
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/*"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
 
   # WEB Authorizer
   JwtLambdaPermission:
     Condition: IsWeb
     Type: AWS::Lambda::Permission
-    DependsOn: PublicRestApi
+    DependsOn: PublicRestApiOpenapi
     Properties:
       FunctionName: !Sub '${ProjectName}-jwtAuthorizerLambda'
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/*"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
 
   # IO Authorizer
   IoLambdaPermission:
     Condition: IsIO
     Type: AWS::Lambda::Permission
-    DependsOn: PublicRestApi
+    DependsOn: PublicRestApiOpenapi
     Properties:
       FunctionName: !Sub '${ProjectName}-ioAuthorizerLambda'
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/*"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
 
   # Backoffice Authorizer
   BackofficeLambdaPermission:
     Condition: IsBackoffice
     Type: AWS::Lambda::Permission
-    DependsOn: PublicRestApi
+    DependsOn: PublicRestApiOpenapi
     Properties:
       FunctionName: !Sub '${ProjectName}-backofficeAuthorizerLambda'
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/*"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
 
   # Log Group
   PublicApiLogGroup:
@@ -199,7 +199,7 @@ Resources:
     Properties:
       BasePath: !Ref ServiceApiPath
       DomainName: !Ref DnsName
-      RestApiId: !Ref PublicRestApi
+      RestApiId: !Ref PublicRestApiOpenapi
       Stage: !Ref PublicRestApiStage
 
   # Rest API CloudWatch alarm 
@@ -224,7 +224,7 @@ Resources:
       Period: 60
       Dimensions:
         - Name: ApiName
-          Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+          Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
       ExtendedStatistic: "p90"
 
   APIGatewayApiErrorAlarm:
@@ -249,7 +249,7 @@ Resources:
             Metric:
               Dimensions:
                 - Name: ApiName
-                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
               MetricName: 4XXError
               Namespace: AWS/ApiGateway
             Period: 60
@@ -260,7 +260,7 @@ Resources:
             Metric:
               Dimensions:
                 - Name: ApiName
-                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
               MetricName: 5XXError
               Namespace: AWS/ApiGateway
             Period: 60
@@ -321,30 +321,30 @@ Outputs:
 
   # - Public API URL
   ApiGatewayUrlBeta:
-    Value: !Sub 'https://${PublicRestApi}.execute-api.${AWS::Region}.amazonaws.com/unique/'
+    Value: !Sub 'https://${PublicRestApiOpenapi}.execute-api.${AWS::Region}.amazonaws.com/unique/'
     Description: Base URL for API Requests
 
   # Rest API ARN used for WAF Configuration
   APIGatewayARN:
-    Value: !Sub 'arn:aws:apigateway:${AWS::Region}::/restapis/${PublicRestApi}/stages/${PublicRestApiStage}'
+    Value: !Sub 'arn:aws:apigateway:${AWS::Region}::/restapis/${PublicRestApiOpenapi}/stages/${PublicRestApiStage}'
     Description: "Rest API ARN" 
 
   # Rest API definition
   RestApiId:
-    Value: !Ref PublicRestApi
+    Value: !Ref PublicRestApiOpenapi
     Description: "Rest API ID" 
 
   # Rest API parent id
   RootResourceId:
-    Value: !GetAtt PublicRestApi.RootResourceId
+    Value: !GetAtt PublicRestApiOpenapi.RootResourceId
     Description: "Root resource ID"
 
   RestApiName:
-    Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+    Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
     Description: "Name of the Rest API"
 
   RestApiStageArn:
-    Value: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/${PublicRestApi}/stages/${PublicRestApiStage}"
+    Value: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/${PublicRestApiOpenapi}/stages/${PublicRestApiStage}"
     Description: "Stage ARN of the Rest API"
 
   RestApiErrorAlarmArn:
