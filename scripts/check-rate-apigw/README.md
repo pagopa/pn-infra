@@ -6,7 +6,7 @@ usage:
 
 `./checkrateapigw.sh`
 
-and than insert api-key.
+than insert api-key and time (in seconds or insert 0.0x for milliseconds) between one curl and the next.
 
 Test report:
 
