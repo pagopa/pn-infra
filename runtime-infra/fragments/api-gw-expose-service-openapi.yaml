@@ -224,7 +224,7 @@ Resources:
       Period: 60
       Dimensions:
         - Name: ApiName
-          Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+          Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
       ExtendedStatistic: "p90"
 
   APIGatewayApiErrorAlarm:
@@ -249,7 +249,7 @@ Resources:
             Metric:
               Dimensions:
                 - Name: ApiName
-                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
               MetricName: 4XXError
               Namespace: AWS/ApiGateway
             Period: 60
@@ -260,7 +260,7 @@ Resources:
             Metric:
               Dimensions:
                 - Name: ApiName
-                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
               MetricName: 5XXError
               Namespace: AWS/ApiGateway
             Period: 60
@@ -340,7 +340,7 @@ Outputs:
     Description: "Root resource ID"
 
   RestApiName:
-    Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+    Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
     Description: "Name of the Rest API"
 
   RestApiStageArn:
