@@ -156,8 +156,7 @@ Resources:
           import json
           import boto3
           import os
-
-          logs_client = boto3.client('logs')
+          import traceback
 
           def lambda_handler(event, context):
               success = {}
@@ -195,47 +194,10 @@ Resources:
                     sns = boto3.client('sns')
                     print('########### INPUT MESSAGE #############')
                     print(sqs_message)
-                              
-                    
+                                                  
                     if 'AlarmName' in sqs_message:
                         #Message type is an Alarm message
-                        
-                        metric_name = sqs_message['Trigger']['MetricName']
-                        metric_namespace = sqs_message['Trigger']['Namespace']
-                        log_group_response_name = get_log_group_name(metric_name, metric_namespace)
-                        print("==> LogGroups", log_group_response_name)
-                        
-                        if log_group_response_name == "NotFound":
-                            #No log groups found - Send message with no enrichment
-                            _message=sqs_message
-                        else:
-                            #Log group found - Create enriched message
-                            log_stream_response_id = get_log_stream_id(log_group_response_name)
-                            log_name = does_log_start_with_hash(log_group_response_name)
-                            cloud_watch_location = "https://"+region+".console.aws.amazon.com/cloudwatch/home?region="+region+"#logsV2:log-groups/log-group/"+log_name+"/log-events/"+encode_string(log_stream_response_id)
-                            print("Cloudwatch error log", cloud_watch_location)
-                            
-                            resource_data = [ "arn:" + cloud_watch_location ]
-                            account_id = sqs_message['AWSAccountId']
-                            time = sqs_message['StateChangeTime']
-                            resource_message = "Cloudwatch log " + sqs_message['NewStateValue'] + " in " + log_name
-                            
-                            _message = {
-                                "version":"0",
-                                "id":origMessageId,
-                                "detail-type":resource_message,
-                                "source":"aws.ecr",
-                                "account":account_id,
-                                "time":time,
-                                "region": region,
-                                "resources": resource_data,
-                                "detail":{
-                                    "result":"SUCCESS",
-                                    "image-digest":"sha256:7f5b2640fe6fb4f46592dfd3410c4a79dac4f89e4782432e0378abcd1234",
-                                    "action-type":"PUSH",
-                                    "image-tag":"latest"
-                                }
-                            }
+                        _message=sqs_message
                     else:
                         #Message not Alarm type - Handle CodeBuild/CodePipeline
                         resource_source = sqs_message['source']
@@ -248,7 +210,6 @@ Resources:
                         if resource_source == "aws.codebuild":
                             project_name = sqs_message['detail']['project-name']
                             if project_name == "pn-RunE2eTestsCodeBuildProject":
-                                project_link = "https://"+region+".console.aws.amazon.com/codesuite/codebuild/"+account_id+"/projects/"+project_name
                                 cloudwatch_logs = sqs_message['detail']['additional-information']['logs']['deep-link']
                                 resource_message = "TEST E2E FALLITI" 
                                 resource_data = [
@@ -259,7 +220,6 @@ Resources:
                             
                         elif resource_source == "aws.codepipeline":
                             pipeline = sqs_message['detail']['pipeline']
-                            pipeline_link = "https://"+region+".console.aws.amazon.com/codesuite/codepipeline/pipelines/"+pipeline+"/view?region="+region
                             resource_message = "PIPELINE " + pipeline + " FALLITA" 
                             resource_data = []
                         else:
@@ -313,59 +273,6 @@ Resources:
             
             return data
 
-
-          # This function will return the CloudWatch Log group name
-          def get_log_group_name(metric_name, metric_namespace):
-              log_group_name = ''
-              try:
-                  response = logs_client.describe_metric_filters(
-                      metricName=metric_name,
-                      metricNamespace=metric_namespace
-                  )
-                  
-                  log_group_name = response["metricFilters"][0]["logGroupName"]
-              except Exception as e:
-                  print("Exception raised: ", e)
-                  log_group_name = "NotFound"
-                  
-              return log_group_name
-              
-          # This function will return the CloudWatch Log Stream ID triggered by the alarm 
-          def get_log_stream_id(log_group_name):
-              log_stream_id = ''
-              try:
-                  response = logs_client.describe_log_streams(
-                      logGroupName=log_group_name,
-                      orderBy="LastEventTime",
-                      limit=1,
-                      descending=True
-                      )
-                      
-                  if response["logStreams"] is not None:
-                      log_stream_id = response["logStreams"][0]["logStreamName"]
-                  else:
-                      log_stream_id = 'NotFound'
-              
-              except Exception as e:
-                  print("Exception raised: ", e)
-                  log_stream_id = 'NotFound'
-              
-              return log_stream_id
-              
-          #This function checks whether the log group being with a "/"
-          def does_log_start_with_hash(log_group_name):
-              if log_group_name[0] == '/':
-                  result = encode_string(log_group_name)
-                  return result
-              else:
-                  return log_group_name
-              
-          # This function is used to generate the URL to the Log group
-          # It will return an encoded string of the URL
-          def encode_string(log_group_name):
-              return log_group_name.replace("/", "$252F")
-
-  
       Description: AWS Lambda function to customize CloudWatch Alarm notification
       Environment: 
         Variables:  
