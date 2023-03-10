@@ -57,6 +57,10 @@ Parameters:
     Type: Number
     Default: '21600'
     Description: 'Oldest job age (in seconds) before raising an alarm'
+  VisibilityTimeout:
+    Type: Number
+    Default: 30
+    Description: 'The length of time during which a message will be unavailable after a message is delivered from the queue'
 
 Conditions:
   DlqHasDefaultName: !Equals [ !Ref DeadLetterQueueName, '-' ]
@@ -92,6 +96,7 @@ Resources:
             maxReceiveCount: !Ref MaxReceiveCount
           - !Ref AWS::NoValue
       DelaySeconds: !Ref DelaySeconds
+      VisibilityTimeout: !Ref VisibilityTimeout
       MessageRetentionPeriod: !Ref MessageRetentionPeriod
 
   QueueFifo:
@@ -109,6 +114,7 @@ Resources:
       DelaySeconds: !Ref DelaySeconds
       MessageRetentionPeriod: !Ref MessageRetentionPeriod
       FifoQueue: true
+      VisibilityTimeout: !Ref VisibilityTimeout
       ContentBasedDeduplication: !If [IsContentBasedDeduplication, true, false]
       DeduplicationScope: !Ref DeduplicationScope
 
