@@ -102,18 +102,22 @@ cd $dir
 
 echo "set query variable"
 
-searchquery=" fields @timestamp, @message, @logStream, @log, level | filter level like  /ERROR/  | sort @timestamp desciii  " 
+searchquery=" fields @timestamp, @message, @logStream, @log, level | filter level like  /ERROR/  | sort @timestamp desc  " 
 
-echo "the query that will be executed: "
+searchquerylambda=$(echo ${searchquery} |  sed  's/filter level/filter message/g' )
 
-echo $searchquery
+echo "the query that will be executed for ecs and lambda log group: "
+
+echo $searchquery 
+
+echo $searchquerylambda 
 
 #ECS LOG:
 
 for loggr in  $(aws ${aws_command_base_args} logs describe-log-groups --log-group-name-prefix /ecs | grep -i logGroupName | awk '{print $2}' | cut -d "\"" -f 2 | cut -d "\"" -f 1) ; do
 
 #FOR TESTING ONLY:
-#for loggr in  $(aws ${aws_command_base_args} logs describe-log-groups --log-group-name-prefix /ecs | grep -i logGroupName | awk '{print $2}' | cut -d "\"" -f 2 | cut -d "\"" -f 1 | head -2) ; do
+#for loggr in  $(aws ${aws_command_base_args} logs describe-log-groups --log-group-name-prefix /ecs | grep -i logGroupName | awk '{print $2}' | cut -d "\"" -f 2 | cut -d "\"" -f 1 | grep push) ; do
 
 aws ${aws_command_base_args} logs start-query  --log-group-name $loggr  --start-time `date -j -v-$time +%s000` --end-time `date +%s000`  --query-string "${searchquery}"  | awk '{print $2}' | cut -d "\"" -f 2 | cut -d "\"" -f 1 > query &&
 
@@ -126,9 +130,9 @@ done
 for loggrlb in $(aws logs ${aws_command_base_args} describe-log-groups --log-group-name-prefix /aws/lambda | grep -i logGroupName | awk '{print $2}' | cut -d "\"" -f 2 | cut -d "\"" -f 1); do
 
 #FOR TESTING ONLY:
-#for loggrlb in $(aws ${aws_command_base_args} logs describe-log-groups --log-group-name-prefix /aws/lambda | grep -i logGroupName | awk '{print $2}' | cut -d "\"" -f 2 | cut -d "\"" -f 1 | head -2); do
+#for loggrlb in $(aws ${aws_command_base_args} logs describe-log-groups --log-group-name-prefix /aws/lambda | grep -i logGroupName | awk '{print $2}' | cut -d "\"" -f 2 | cut -d "\"" -f 1 | grep -i push); do
 
-aws ${aws_command_base_args} logs start-query  --log-group-name $loggrlb  --start-time `date -j -v-1H +%s000` --end-time `date +%s000`  --query-string "${searchquery}"  | awk '{print $2}' | cut -d "\"" -f 2 | cut -d "\"" -f 1 > query &&
+aws ${aws_command_base_args} logs start-query  --log-group-name $loggrlb  --start-time `date -j -v-1H +%s000` --end-time `date +%s000`  --query-string "${searchquerylambda}"  | awk '{print $2}' | cut -d "\"" -f 2 | cut -d "\"" -f 1 > query &&
 
 aws ${aws_command_base_args} logs get-query-results --query-id $(cat query) --output text > result$(echo $loggrlb | sed 's/\//_/g').txt && echo $loggrlb has been verified ;
 
@@ -146,7 +150,7 @@ fi
 
 echo "####REPORT VIOLATIONS $(date)####" > report.txt
 
-for rep in $(ls | grep result) ; do echo "Violation in log-group $rep : $(grep -i result $rep | grep -i message | wc -l)" >> report.txt ;
+for rep in $(ls | grep result) ; do echo "Errors in log-group $rep : $(grep -i result $rep | grep -i message | wc -l)" >> report.txt ;
 
 done
 
