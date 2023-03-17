@@ -25,7 +25,11 @@ const coreMapping = {
         'pn-token-exchange-api-ErrorAlarm'
     ],
     'pn-paper-channel': [
-        'pn-paper-channel-ErrorFatalLogs-Alarm'
+        'pn-nationalregistries_to_paperchannel-HasOldMessage',
+        'pn-paper-channel-ErrorFatalLogs-Alarm',
+        'pn-nationalregistries_to_paperchannel-DLQ-HasMessage',
+        'pn-PaperChannel-bo-BACKOFFICE-ApiGwLatencyAlarm',
+        'pn-PaperChannel-bo-BACKOFFICE-ApiGwAlarm'
     ],
     'pn-external-registries': [
         'pn-ExternalRegistry-B2B-ApiGwAlarm',
@@ -49,7 +53,8 @@ const coreMapping = {
         'pn-slaViolationCloseSchedulingLambda-LogInvocationErrors-Alarm',
         'pn-activityStepManagerLambda-LogInvocationErrors-Alarm',
         'pn-searchSLAViolationsLambda-LogInvocationErrors-Alarm',
-        'pn-progression-sensor-queue-HasOldMessage'
+        'pn-progression-sensor-queue-HasOldMessage',
+        'pn-progression-sensor-queue-DLQ-HasMessage'
     ],
     'pn-downtime-logs': [
         'pn-downtime-logs-WEB-ApiGwAlarm',
@@ -104,7 +109,11 @@ const coreMapping = {
         'pn-logsaver-be-FailedInvocation-Alarm'
     ],
     'pn-national-registries': [
-        'pn-NationalRegistry-ErrorFatalLogs-Alarm'
+        'pn-NationalRegistry-ErrorFatalLogs-Alarm',
+        'pn-NationalRegistry-PNPG-ApiGwLatencyAlarm',
+        'pn-NationalRegistry-PNPG-ApiGwAlarm',
+        'pn-national_registry_gateway_outputs-HasOldMessage',
+        'pn-national_registry_gateway_outputs-DLQ-HasMessage'
     ],
     'pn-radd-fsu': [
         'pn-radd-fsu-ErrorFatalLogs-Alarm'
