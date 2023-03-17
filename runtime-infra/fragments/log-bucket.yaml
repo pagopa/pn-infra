@@ -87,6 +87,8 @@ Resources:
   LogsBucketKmsKey:
     Condition: MakeBucketCondition
     Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       Description: Used by Assumed Roles to Encrypt/Decrypt raw data
       EnableKeyRotation: true
