@@ -44,7 +44,24 @@ Parameters:
   OpenSearchSecretArn:
     Type: String
     Description: The ARN of the secret containing OpenSearch credentials
-  
+
+  OpenSearchLambdaMemory:
+    Type: Number
+    Default: 512
+    MinValue: 256
+    MaxValue: 10240
+    Description: OpenSearch logs ingestion lambda memory
+
+  OpenSearchKinesisBatchSize:
+    Type: Number
+    Default: 100
+    Description: Kinesis logs batch size
+
+  OpenSearchKinesisWindow:
+    Type: Number
+    Default: 300
+    Description: Kinesis logs window size in seconds
+
   LambdasBucketName:
     Type: String
     Description: s3 bucket name of the lambda used to delivery events to opensearch
@@ -139,6 +156,9 @@ Resources:
         OpenSearchSecretArn: !Ref OpenSearchSecretArn
         OpenSearchDeliveryLambdaS3Bucket: !Ref LambdasBucketName
         OpenSearchDeliveryLambdaS3Key: !Sub "${LambdasBasePath}/opensearch-delivery.zip"
+        OpenSearchLambdaMemory: !Ref OpenSearchLambdaMemory
+        OpenSearchKinesisBatchSize: !Ref OpenSearchKinesisBatchSize
+        OpenSearchKinesisWindow: !Ref OpenSearchKinesisWindow
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 Outputs:

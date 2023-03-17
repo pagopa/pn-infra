@@ -51,6 +51,23 @@ Parameters:
     Type: String
     Description: ARN of the secret containing the credentials to access the OpenSearch cluster
 
+  OpenSearchLambdaMemory:
+    Type: Number
+    Default: 512
+    MinValue: 256
+    MaxValue: 10240
+    Description: OpenSearch logs ingestion lambda memory
+
+  OpenSearchKinesisBatchSize:
+    Type: Number
+    Default: 100
+    Description: Kinesis logs batch size
+
+  OpenSearchKinesisWindow:
+    Type: Number
+    Default: 300
+    Description: Kinesis logs window size in seconds
+
   AlarmSNSTopicArn:
     Type: String
     Description: ARN of the SNS topic for alarms
@@ -113,7 +130,7 @@ Resources:
       Runtime: nodejs16.x
       Role: !GetAtt DeliveryLambdaRole.Arn
       Handler: index.handler
-      MemorySize: 256
+      MemorySize: !Ref OpenSearchLambdaMemory
       Timeout: 900 # 15 minutes
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"      
@@ -133,13 +150,13 @@ Resources:
   DeliveryLambdaKinesisSource:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
-      BatchSize: 100
+      BatchSize: !Ref OpenSearchKinesisBatchSize
       BisectBatchOnFunctionError: true
       EventSourceArn: !Ref KinesisStreamArn
       FunctionName: !Ref DeliveryLambda
       FunctionResponseTypes:
         - ReportBatchItemFailures
-      MaximumBatchingWindowInSeconds: 300 # 5 minutes
+      MaximumBatchingWindowInSeconds: !Ref OpenSearchKinesisWindow # 5 minutes
       StartingPosition: LATEST
 
   DeliveryLambdaAlarms:
