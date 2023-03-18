@@ -1,3 +1,5 @@
+'use strict';
+
 import { initOpenSearchClient } from './lib/init.js';
 import { extractKinesisData } from './lib/kinesis.js';
 import { prepareBulkBody, failedSeqNumbers } from './lib/openSearch.js';
@@ -19,22 +21,29 @@ const handler = async (event) => {
   logMemory('before loop')
   if(bulkBodyBatches.length>0){
     const seqNumbers = []
-    for(let i=0; i<bulkBodyBatches.length; i++){
+
+    let i = 0
+    for (const bulkBody of bulkBodyBatches){
       logMemory('start loop '+i)
-      const bulkBody = bulkBodyBatches[i]
-      logMemory('start loop A: '+i)
       console.log(`Bulk batch size: ${bulkBody.length}`);
-      const bulkResponse = await openSearch.bulk({ body: bulkBody });
+      const { body: { errors, items } = {} } = await openSearch.bulk({ body: bulkBody });
       logMemory('start loop B: '+i)
-      const batchSeqNumbers = failedSeqNumbers(bulkResponse, bulkBody);
-      console.log(`Bulk done with ${batchSeqNumbers.length} errors`);
-      logMemory('start loop C: '+i)
-      if(batchSeqNumbers.length>0){
-        console.log(JSON.stringify(bulkResponse))
+      if(errors){
+        const batchSeqNumbers = failedSeqNumbers({ errors, items}, bulkBody);
+        if(batchSeqNumbers.length>0){
+          console.log(JSON.stringify(bulkResponse))
+        }
+        logMemory('start loop C: '+i)
+        console.log(`Bulk done with ${batchSeqNumbers.length} errors`);
+        seqNumbers.push(...batchSeqNumbers);
       }
-      seqNumbers.push(...batchSeqNumbers);
       logMemory('end loop: '+i)
+      i++
     }
+
+    /*for(let i=0; i<bulkBodyBatches.length; i++){
+
+    }*/
 
     if(seqNumbers.length>0){
       console.error(`Bulk import has ${seqNumbers.length} failures`);
