@@ -421,7 +421,7 @@ Resources:
             Metric:
               Dimensions:
                 - Name: ApiName
-                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
               MetricName: 4XXError
               Namespace: AWS/ApiGateway
             Period: 60
@@ -432,18 +432,33 @@ Resources:
             Metric:
               Dimensions:
                 - Name: ApiName
-                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}'
+                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
               MetricName: 5XXError
               Namespace: AWS/ApiGateway
             Period: 60
             Stat: Sum
           ReturnData: False
-        - Id: e2
-          Expression: "m1*(0.1)"
-          Label: !Sub "4XXError-weight-adjust"
-          ReturnData: False
+        - Id: m3
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: ApiName
+                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
+              MetricName: Count
+              Namespace: AWS/ApiGateway
+            Period: 60
+            Stat: Sum
+          ReturnData: False          
         - Id: e1
-          Expression: SUM([e2,m2])
+          Expression: "FILL(m2, 0)/FILL(m3, 1)"
+          Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-5XXError-weight-adjust"
+          ReturnData: False
+        - Id: e2
+          Expression: "FILL(m1, 0)/FILL(m3, 1)"
+          Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-4XXError-weight-adjust"
+          ReturnData: False
+        - Id: e3
+          Expression: IF(e1>=0.01 OR e2>=0.1, 1, 0)
           Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-APIGatewayErrorMetric"
 
   ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample

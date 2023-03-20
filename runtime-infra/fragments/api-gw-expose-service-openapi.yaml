@@ -286,7 +286,7 @@ Resources:
           Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-4XXError-weight-adjust"
           ReturnData: False
         - Id: e3
-          Expression: IF(e1>=0.01 AND e2>=0.1, 1, 0)
+          Expression: IF(e1>=0.01 OR e2>=0.1, 1, 0)
           Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-APIGatewayErrorMetric"
 
   ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
