@@ -5,7 +5,7 @@ const handler = async (event) => {
     console.info("New event received ", event);
 
     const region = process.env.REGION
-    const accountId = process.env.ACCOUNT_ID
+    let accountId = process.env.ACCOUNT_ID
     const envType = process.env.ENVIRONMENT_TYPE;
 
     // find alarm
