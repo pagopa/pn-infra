@@ -13,7 +13,7 @@ const logMemory = (message) => {
 const handler = async (event) => {
   logMemory('start')
   const logs = extractKinesisData(event);
-  console.log(`Batch size: ${logs.length} logs`);
+  console.log(`Batch size: ${logs.length}`);
   logMemory('before bulkBodyBatches')
 
   const bulkBodyBatches = prepareBulkBody(logs);
@@ -23,15 +23,17 @@ const handler = async (event) => {
     const seqNumbers = []
 
     let i = 0
-    for (const bulkBody of bulkBodyBatches){
+    for (const bulkBodyOrig of bulkBodyBatches){
       logMemory('start loop '+i)
+      const bulkBody = bulkBodyOrig.map(a => {return {...a}}) // copy to allow memory reclaim
       console.log(`Bulk batch size: ${bulkBody.length}`);
+
       const { body: { errors, items } = {} } = await openSearch.bulk({ body: bulkBody });
       logMemory('start loop B: '+i)
       if(errors){
-        const batchSeqNumbers = failedSeqNumbers({ errors, items}, bulkBody);
+        const batchSeqNumbers = failedSeqNumbers({ body: {errors, items} }, bulkBody);
         if(batchSeqNumbers.length>0){
-          console.log(JSON.stringify(bulkResponse))
+          console.log(JSON.stringify(items))
         }
         logMemory('start loop C: '+i)
         console.log(`Bulk done with ${batchSeqNumbers.length} errors`);
@@ -40,10 +42,6 @@ const handler = async (event) => {
       logMemory('end loop: '+i)
       i++
     }
-
-    /*for(let i=0; i<bulkBodyBatches.length; i++){
-
-    }*/
 
     if(seqNumbers.length>0){
       console.error(`Bulk import has ${seqNumbers.length} failures`);

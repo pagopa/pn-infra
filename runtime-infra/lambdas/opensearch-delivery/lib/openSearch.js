@@ -50,68 +50,66 @@ function truncateMessage(message, limit = 30000){
 function prepareBulkBody(logs){
     let formattedLogs = []
 
-    logs.forEach((doc) => {
-        doc.logEvents.forEach((log) => {
-            try {
-                const jsonMessage = JSON.parse(log.message)
-                if(jsonMessage){
-                    if(!jsonMessage.iun){
-                      const extractedIun = extractIun(jsonMessage.message)
-                      if(extractedIun){
-                        jsonMessage.iun = extractedIun;
-                      }
-                    }
-
-                    // fix to handle bunyan nodejs logger format
-                    if(jsonMessage.time && !jsonMessage['@timestamp']){
-                      jsonMessage['@timestamp'] = jsonMessage.time
-                    }
-                    
-                    jsonMessage.message = truncateMessage(jsonMessage.message, 30000)
-                    jsonMessage._id = log.id
-                    jsonMessage.kinesisSeqNumber = doc.kinesisSeqNumber
-                    jsonMessage.logGroup = doc.logGroup
-                    jsonMessage.logStream = doc.logStream
-
-                    if(jsonMessage.stack_trace) {
-                      jsonMessage.stack_trace = truncateMessage(jsonMessage.stack_trace, 20000)
-                    }
-                    
-                    formattedLogs.push(jsonMessage);
-                }
-            } catch(e){
-                const timestamp = new Date(log.timestamp);
-
-                
-                const fakeLog = {
-                    _id: log.id,
-                    kinesisSeqNumber: doc.kinesisSeqNumber,
-                    logGroup: doc.logGroup,
-                    logStream: doc.logStream,
-                    message: truncateMessage(log.message, 30000),
-                    '@timestamp': timestamp.toISOString(),
-                    '@version': 1,
-                    error_code: 'INVALID_JSON_MESSAGE',
-                    level: 'FATAL',
-                    logger_name: 'logs-to-opensearch-lambda'
-                }
-
-                formattedLogs.push(fakeLog);
+    for(const doc of logs) {
+      for (const log of doc.logEvents){
+        try {
+          const jsonMessage = JSON.parse(log.message)
+          if(jsonMessage){
+            if(!jsonMessage.iun){
+              const extractedIun = extractIun(jsonMessage.message)
+              if(extractedIun){
+                jsonMessage.iun = extractedIun;
+              }
             }
-        })
-    })
 
+            // fix to handle bunyan nodejs logger format
+            if(jsonMessage.time && !jsonMessage['@timestamp']){
+              jsonMessage['@timestamp'] = jsonMessage.time
+            }
+            
+            jsonMessage.message = truncateMessage(jsonMessage.message, 30000)
+            jsonMessage._id = log.id
+            jsonMessage.kinesisSeqNumber = doc.kinesisSeqNumber
+            jsonMessage.logGroup = doc.logGroup
+            jsonMessage.logStream = doc.logStream
+
+            if(jsonMessage.stack_trace) {
+              jsonMessage.stack_trace = truncateMessage(jsonMessage.stack_trace, 20000)
+            }
+            
+            formattedLogs.push(jsonMessage);
+          }
+        } catch(e){
+          console.log(e)
+          const timestamp = new Date(log.timestamp);
+
+          
+          const fakeLog = {
+              _id: log.id,
+              kinesisSeqNumber: doc.kinesisSeqNumber,
+              logGroup: doc.logGroup,
+              logStream: doc.logStream,
+              message: truncateMessage(log.message, 30000),
+              '@timestamp': timestamp.toISOString(),
+              '@version': 1,
+              error_code: 'INVALID_JSON_MESSAGE',
+              level: 'FATAL',
+              logger_name: 'logs-to-opensearch-lambda'
+          }
+
+          formattedLogs.push(fakeLog);
+        }
+      }
+    }
+    
     if(formattedLogs.length>0){
         formattedLogs = chunk(formattedLogs, 500)
         return formattedLogs.map((formattedLogBatch) => {
-          return formattedLogBatch.flatMap((doc) => [{ index: { _index: process.env.INDEX_NAME, _id: doc._id }}, doc]
-          
-          );
+          return formattedLogBatch.flatMap((doc) => [{ index: { _index: process.env.INDEX_NAME, _id: doc._id }}, doc]);
         })
       } else {
         return [];
     }
-
 }
 
 export { prepareBulkBody, failedSeqNumbers };
