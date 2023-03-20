@@ -416,6 +416,12 @@ Parameters:
     Type: String
     Default: ''
     
+  # Alarm
+  LogAlarmStrategy:
+    Description: Log alarm strategy, one of "-" or "FULL"
+    Default: '-'
+    Type: String
+
 Mappings:
   ContainerMemory:
     2GB:
@@ -439,6 +445,8 @@ Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
   HasDefaultSecurityGroup: !Not [ !Equals [ !Ref EcsDefaultSecurityGroup, '' ] ]
   HasAlbSecurityGroup: !Not [ !Equals [ !Ref AlbSecurityGroup, '' ] ]
+
+  HasFullLogAlarm: !Equals [ !Ref LogAlarmStrategy, 'FULL' ]
 
   AutoscalingByRestApi: !Equals [ !Ref AutoscalingStrategy, REST-API]
   AutoscalingBySQS: !Equals [ !Ref AutoscalingStrategy, SQS]
@@ -1115,7 +1123,7 @@ Resources:
     Type: AWS::Logs::MetricFilter
     Properties: 
       LogGroupName: !Ref LogGroup
-      FilterPattern: '{ $.level = "ERROR" }'
+      FilterPattern: !If [ HasFullLogAlarm, '{ $.level = "ERROR" || $.message = *FATAL* }', '{ $.message = *FATAL* }']
       MetricTransformations: 
         - MetricValue: 1
           MetricNamespace: "ErrorFatalLogs"
