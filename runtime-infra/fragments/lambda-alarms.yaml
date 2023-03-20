@@ -16,7 +16,7 @@ Resources:
     Type: AWS::Logs::MetricFilter
     Properties: 
       LogGroupName: !Sub /aws/lambda/${FunctionName}
-      FilterPattern: '?ERROR'
+      FilterPattern: '[w1, w2, w3="ERROR", w4]'
       MetricTransformations: 
         - MetricValue: 1
           MetricNamespace: "ErrorFatalLogs"
