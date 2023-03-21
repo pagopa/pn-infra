@@ -450,15 +450,11 @@ Resources:
             Stat: Sum
           ReturnData: False          
         - Id: e1
-          Expression: "FILL(m2, 0)/FILL(m3, 1)"
-          Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-5XXError-weight-adjust"
-          ReturnData: False
-        - Id: e2
           Expression: "FILL(m1, 0)/FILL(m3, 1)"
           Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-4XXError-weight-adjust"
           ReturnData: False
-        - Id: e3
-          Expression: IF(e1>=0.01 OR e2>=0.1, 1, 0)
+        - Id: e2
+          Expression: IF(m2>=1 OR e1>=0.1, 1, 0)
           Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-APIGatewayErrorMetric"
 
   ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
