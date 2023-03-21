@@ -422,8 +422,12 @@ Parameters:
     
   # Alarm
   LogAlarmStrategy:
-    Description: Log alarm strategy, one of "-" or "FULL"
+    Description: Log alarm strategy, one of "-", "FATAL" or "ERROR_FATAL"
     Default: '-'
+    AllowedValues:
+      - "-"
+      - "FATAL"
+      - "ERROR_FATAL"
     Type: String
 
 Mappings:
@@ -450,7 +454,9 @@ Conditions:
   HasDefaultSecurityGroup: !Not [ !Equals [ !Ref EcsDefaultSecurityGroup, '' ] ]
   HasAlbSecurityGroup: !Not [ !Equals [ !Ref AlbSecurityGroup, '' ] ]
 
-  HasFullLogAlarm: !Equals [ !Ref LogAlarmStrategy, 'FULL' ]
+  LogAlarmErrorFatal: !Equals [ !Ref LogAlarmStrategy, 'ERROR_FATAL' ]
+  LogAlarmNotNone: !Not [ !Equals [ !Ref LogAlarmStrategy, '-' ] ]
+  HasLogAlarm: !And [ !Condition HasAlarmTopic, !Condition LogAlarmNotNone ]
 
   AutoscalingByRestApi: !Equals [ !Ref AutoscalingStrategy, REST-API]
   AutoscalingBySQS: !Equals [ !Ref AutoscalingStrategy, SQS]
@@ -1130,11 +1136,11 @@ Resources:
 
   # CloudWatch metric to filer ERROR - FATAL lines, in Log group
   ErrorFatalLogsMetricFilter: 
-    Condition: HasAlarmTopic
+    Condition: HasLogAlarm
     Type: AWS::Logs::MetricFilter
     Properties: 
       LogGroupName: !Ref LogGroup
-      FilterPattern: !If [ HasFullLogAlarm, '{ $.level = "ERROR" || $.message = *FATAL* }', '{ $.message = *FATAL* }']
+      FilterPattern: !If [ LogAlarmErrorFatal, '{ $.level = "ERROR" || $.message = *FATAL* }', '{ $.message = *FATAL* }']
       MetricTransformations: 
         - MetricValue: 1
           MetricNamespace: "ErrorFatalLogs"
@@ -1143,7 +1149,7 @@ Resources:
   # Create alarm
   ErrorFatalLogsMetricAlarm:
     Type: AWS::CloudWatch::Alarm
-    Condition: HasAlarmTopic
+    Condition: HasLogAlarm
     DependsOn: ErrorFatalLogsMetricFilter
     Properties:
       AlarmName: !Sub "${MicroServiceUniqueName}-ErrorFatalLogs-Alarm"
@@ -1338,7 +1344,7 @@ Outputs:
     Description: ARN of the fatal logs alarm
     Value:
       !If
-        - HasAlarmTopic
+        - HasLogAlarm
         - !GetAtt ErrorFatalLogsMetricAlarm.Arn
         - ''
   AutoScalingAlarmArn:
