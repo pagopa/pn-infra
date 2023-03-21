@@ -68,6 +68,10 @@ Parameters:
     Default: 300
     Description: Kinesis logs window size in seconds
 
+  OpenSearchParallelizationFactor:
+    Type: Number
+    Default: 1
+
   AlarmSNSTopicArn:
     Type: String
     Description: ARN of the SNS topic for alarms
@@ -157,6 +161,7 @@ Resources:
       FunctionResponseTypes:
         - ReportBatchItemFailures
       MaximumBatchingWindowInSeconds: !Ref OpenSearchKinesisWindow # 5 minutes
+      ParallelizationFactor: !Ref OpenSearchParallelizationFactor
       StartingPosition: LATEST
 
   DeliveryLambdaAlarms:
