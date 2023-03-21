@@ -121,10 +121,6 @@ Resources:
             Principal:
               AWS:
                 - !Sub arn:aws:iam::${AWS::AccountId}:root
-                # - Fn::If:
-                #   - ActivateCrossAccountCondition
-                #   - !Sub 'arn:aws:iam::${PnCoreAccount}:role/${ProjectName}-logs-ingestion-role'
-                #   - !Ref AWS::NoValue
             Action:
               - kms:Encrypt
               - kms:Decrypt
