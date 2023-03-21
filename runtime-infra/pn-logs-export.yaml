@@ -62,6 +62,11 @@ Parameters:
     Default: 300
     Description: Kinesis logs window size in seconds
 
+  OpenSearchParallelizationFactor:
+    Type: Number
+    Default: 1
+    Description: The number of batches to process concurrently from each shard
+
   LambdasBucketName:
     Type: String
     Description: s3 bucket name of the lambda used to delivery events to opensearch
@@ -159,6 +164,7 @@ Resources:
         OpenSearchLambdaMemory: !Ref OpenSearchLambdaMemory
         OpenSearchKinesisBatchSize: !Ref OpenSearchKinesisBatchSize
         OpenSearchKinesisWindow: !Ref OpenSearchKinesisWindow
+        OpenSearchParallelizationFactor: !Ref OpenSearchParallelizationFactor
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 Outputs:

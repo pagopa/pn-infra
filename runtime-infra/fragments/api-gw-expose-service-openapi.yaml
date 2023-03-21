@@ -266,12 +266,23 @@ Resources:
             Period: 60
             Stat: Sum
           ReturnData: False
-        - Id: e2
-          Expression: "m1*(0.1)"
+        - Id: m3
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: ApiName
+                  Value: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
+              MetricName: Count
+              Namespace: AWS/ApiGateway
+            Period: 60
+            Stat: Sum
+          ReturnData: False          
+        - Id: e1
+          Expression: "FILL(m1, 0)/FILL(m3, 1)"
           Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-4XXError-weight-adjust"
           ReturnData: False
-        - Id: e1
-          Expression: SUM([e2,m2])
+        - Id: e2
+          Expression: IF(m2>=1 OR e1>=0.1, 1, 0)
           Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-APIGatewayErrorMetric"
 
   ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample

@@ -409,6 +409,10 @@ Parameters:
   ContainerSecret6:
     Description: 6th container secret in the form key=secret arn
     Type: String
+    Default: ''       
+  ContainerSecret7:
+    Description: 7th container secret in the form key=secret arn
+    Type: String
     Default: ''        
 
   MicroServiceSecretPrefix:
@@ -516,6 +520,7 @@ Conditions:
   Secret4Exist: !Not [ !Equals [ !Ref ContainerSecret4, '' ] ]
   Secret5Exist: !Not [ !Equals [ !Ref ContainerSecret5, '' ] ]
   Secret6Exist: !Not [ !Equals [ !Ref ContainerSecret6, '' ] ]
+  Secret7Exist: !Not [ !Equals [ !Ref ContainerSecret7, '' ] ]
 
   HasSecrets: !Or [ !Condition Secret1Exist, !Condition Secret2Exist, !Condition Secret3Exist, !Condition Secret4Exist, !Condition Secret5Exist, !Condition Secret6Exist ]
 Resources:
@@ -645,6 +650,12 @@ Resources:
               - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret6 ] ]
                 ValueFrom:
                   !Select [ 1, !Split [ "=", !Ref ContainerSecret6 ] ]
+              - !Ref "AWS::NoValue"              
+            - 'Fn::If':
+              - Secret7Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret7 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret7 ] ]
               - !Ref "AWS::NoValue"              
           Environment:
             - Name: 'OTEL_RESOURCE_ATTRIBUTES'
