@@ -31,6 +31,10 @@ Parameters:
     Default: '-'
     Description: Safestorage Account ID
 
+  BucketSuffix:
+    Type: String
+    Description: Bucket suffix
+    
 Conditions:
 
   ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
@@ -44,6 +48,12 @@ Conditions:
   HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
 
 Resources:
+
+  LogsBucketKmsAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/${ProjectName}-logs-bucket-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}-key-alias'
+      TargetKeyId: !Ref LogsBucketKmsKeyArn
 
   ### - IAM role assumed by data lake
   ###########################################
