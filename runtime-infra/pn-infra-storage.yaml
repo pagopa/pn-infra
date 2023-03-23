@@ -274,6 +274,9 @@ Outputs:
     Value: !GetAtt LogsKinesisServerSideEncryptionKey.Arn
     Description: 'Arn of the KMS key used to encrypt the Kinesis source stream'
 
+  BucketSuffix: # used to generate kms alias
+    Value: !Ref BucketSuffix 
+
   # Pass through parameters
   AlarmSNSTopicArn:
     Value: !Ref AlarmSNSTopicArn
