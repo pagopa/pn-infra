@@ -127,10 +127,16 @@ Resources:
       GroupDescription: !Sub '${ProjectName}-${StreamNamePrefix}-lambda-opensearch'
       VpcId: !Ref OpenSearchDeliveryVpcId
 
+  DeliveryLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${DeliveryLambda}"
+      RetentionInDays: 14
+
   DeliveryLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${ProjectName}-${StreamNamePrefix}-opensearch-delivery'
+      FunctionName: !Sub '${ProjectName}-${StreamNamePrefix}-opensearch-ingestion'
       Runtime: nodejs16.x
       Role: !GetAtt DeliveryLambdaRole.Arn
       Handler: index.handler
