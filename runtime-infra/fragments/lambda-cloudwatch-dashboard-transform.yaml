@@ -107,6 +107,12 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/TrimListTransform:*'
 
+  TrimListFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${TrimListFunction}"
+      RetentionInDays: 14
+  
   TrimListFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -131,6 +137,11 @@ Resources:
         Runtime: python3.9
         Role: !GetAtt TrimListExecutionRole.Arn
                 
+  TransformFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${TransformFunction}"
+      RetentionInDays: 14
 
   TransformFunction:
     Type: AWS::Lambda::Function
@@ -1265,6 +1276,12 @@ Resources:
       Handler: index.lambda_handler
       Runtime: python3.9
       Role: !GetAtt TransformExecutionRole.Arn
+
+  OerTransformFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${OerTransformFunction}"
+      RetentionInDays: 14
 
   OerTransformFunction:
     Type: AWS::Lambda::Function
