@@ -61,6 +61,13 @@ Parameters:
     Type: String
     Description: 'keep track of used projects commitIds'
 
+  VpcEndpointsRequired:
+    Type: String
+    Default: true
+    AllowedValues:
+      - true
+      - false
+      
   # pass-through parameters
   AlarmSNSTopicArn:
     Type: String
@@ -87,6 +94,9 @@ Parameters:
   LogsKinesisStreamKeyArn:
     Type: String
 
+Conditions:
+  RequiresVpcEndpoints: !Equals [ !Ref VpcEndpointsRequired, true ]
+
 Resources:
 
   ###                       VPC BASE CONFIGURATIONS                       ###
@@ -104,6 +114,7 @@ Resources:
   # Private connection from subnets to AWS services
   VPCEndpoints:
     Type: AWS::CloudFormation::Stack
+    Condition: RequiresVpcEndpoints
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/vpc-endpoints.yaml"
       Parameters:
