@@ -27,6 +27,13 @@ Resources:
                   - logs:PutLogEvents
                 Resource:
                   - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
+  
+  rTransformFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${rTransformFunction}"
+      RetentionInDays: 14
+
   rTransformFunction:
     Type: AWS::Lambda::Function
     Properties:

@@ -68,7 +68,7 @@ const coreMapping = {
     ],
     'pn-infra': [
         'LogsBucket-Storage-Limit-Exceeded',
-        'pn-logsToOpenSearch-opensearch-delivery-LogInvocationErrors-Alarm',
+        'pn-logsToOpenSearch-opensearch-ingestion-LogInvocationErrors-Alarm',
         'pn-logsTos3-Kinesis-Alarm',
         'pn-cdcTos3-Kinesis-Alarm',
         'pn-ECSOutOfMemory-Alarm',
