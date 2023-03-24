@@ -111,6 +111,13 @@ Parameters:
     Default: 2
     Description: events batch size of national registries pipe (sqs to sqs)
 
+  CustomDomainsRequired:
+    Type: String
+    Default: true
+    AllowedValues:
+      - true
+      - false
+
   # pass-though parameters
   LambdasBucketName:
     Type: String
@@ -175,9 +182,11 @@ Parameters:
     Type: String
 
 Conditions:
+  RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
+
   HasSelcpgApiDns: !Not [ !Equals [ !Ref SelcpgApiDnsName, '' ] ]
   HasSelcpgApiCertificate: !Not [ !Equals [ !Ref SelcpgApiCertificateArn, '' ] ]  
-  HasSelcpgApi: !And [ !Condition HasSelcpgApiDns, !Condition HasSelcpgApiCertificate ]
+  HasSelcpgApi: !And [ !Condition HasSelcpgApiDns, !Condition HasSelcpgApiCertificate, !Condition RequiresCustomDomains ]
 
   HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
 
@@ -208,6 +217,7 @@ Resources:
   # Custom domain for B2B api
   ApiCustomDomain:
     Type: AWS::CloudFormation::Stack
+    Condition: RequiresCustomDomains
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
       Parameters:
@@ -231,6 +241,7 @@ Resources:
   # Custom domain for B2B api
   WebApiCustomDomain:
     Type: AWS::CloudFormation::Stack
+    Condition: RequiresCustomDomains
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
       Parameters:
@@ -242,6 +253,7 @@ Resources:
   # Custom domain for IO api
   IoApiCustomDomain:
     Type: AWS::CloudFormation::Stack
+    Condition: RequiresCustomDomains
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
       Parameters:
