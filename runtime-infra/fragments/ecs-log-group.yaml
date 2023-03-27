@@ -18,13 +18,13 @@ Parameters:
     Type: String
     Description: filter expression for exported logs
 
-  LogKinesisStreamArn:
+  LogsKinesisSourceStreamArn:
     Default: ''
     Type: String
     Description: where to send logs
   
 Conditions:
-  SendLogToKinesis: !Not [ !Equals [ !Ref LogKinesisStreamArn, '' ] ]
+  SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
 
 Resources:
 
@@ -89,7 +89,7 @@ Resources:
           - "Arn"
       LogGroupName: !Ref LogGroup
       FilterPattern: !Ref LogFilterPattern
-      DestinationArn: !Ref LogKinesisStreamArn
+      DestinationArn: !Ref LogsKinesisSourceStreamArn
 
   ### IAM Role used by Subscription filters to allow read logs from Cloudwatch and send logs to Kinesis Firehose
   SubscriptionFilterServiceRole:
