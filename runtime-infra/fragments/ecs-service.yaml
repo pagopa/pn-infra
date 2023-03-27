@@ -182,6 +182,10 @@ Parameters:
     Default: ''
     Description: Application load balancer seecurity group
 
+  EcsLogGroup:
+    Type: String
+    Description: ECS Log group
+
   # Technical parameters
   VpcId:
     Type: AWS::EC2::VPC::Id
@@ -922,7 +926,7 @@ Resources:
             LogDriver: awslogs
             Options:
               awslogs-region: !Ref AWS::Region
-              awslogs-group: !Ref LogGroup
+              awslogs-group: !Ref EcsLogGroup
               awslogs-stream-prefix: ecs
         - 'Fn::If':
           - ShouldEnableOtelXRay
@@ -935,7 +939,7 @@ Resources:
               LogDriver: awslogs
               Options:
                 awslogs-create-group: 'True'
-                awslogs-group: !Ref LogGroup
+                awslogs-group: !Ref EcsLogGroup
                 awslogs-region: !Ref 'AWS::Region'
                 awslogs-stream-prefix: ecs
           - !Ref "AWS::NoValue"
@@ -955,59 +959,12 @@ Resources:
               LogDriver: awslogs
               Options:
                 awslogs-create-group: 'True'
-                awslogs-group: !Ref LogGroup
+                awslogs-group: !Ref EcsLogGroup
                 awslogs-region: !Ref 'AWS::Region'
                 awslogs-stream-prefix: ecs
           - !Ref "AWS::NoValue"
       Volumes:
         - Name: "my-vol"
-
-
-  # Microservice Log group
-  LogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub '/ecs/${MicroServiceUniqueName}'
-      RetentionInDays: 14
-      KmsKeyId:
-        Fn::GetAtt:
-          - LogGroupKmsKey
-          - Arn
-
-  # KMS Key for Encrypt log data in CloudWatch Logs
-  LogGroupKmsKey:
-    Type: AWS::KMS::Key
-    Properties:
-      KeyPolicy:
-        Statement:
-          - Action: kms:*
-            Effect: Allow
-            Principal:
-              AWS:
-                Fn::Join:
-                  - ""
-                  - - "arn:"
-                    - Ref: AWS::Partition
-                    - ":iam::"
-                    - Ref: AWS::AccountId
-                    - :root
-            Resource: "*"
-          - Action:
-              - kms:Encrypt*
-              - kms:Decrypt*
-              - kms:ReEncrypt*
-              - kms:GenerateDataKey*
-              - kms:Describe*
-            Effect: Allow      
-            Principal:
-                Service: !Sub logs.${AWS::Region}.amazonaws.com
-            Resource: '*'
-            Condition:
-                ArnLike:
-                    'kms:EncryptionContext:aws:logs:arn': !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*' 
-        Version: "2012-10-17"
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain    
 
   # A role needed by ECS
   ExecutionRole:
@@ -1139,7 +1096,7 @@ Resources:
     Condition: HasLogAlarm
     Type: AWS::Logs::MetricFilter
     Properties: 
-      LogGroupName: !Ref LogGroup
+      LogGroupName: !Ref EcsLogGroup
       FilterPattern: !If [ LogAlarmErrorFatal, '{ $.level = "ERROR" || $.message = *FATAL* }', '{ $.message = *FATAL* }']
       MetricTransformations: 
         - MetricValue: 1
@@ -1285,50 +1242,6 @@ Resources:
         - !Ref ScaleUpPolicy
       OKActions:
         - !Ref ScaleDownPolicy
-        
-
-  ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
-  SubscriptionFilter:
-    Condition: SendLogToKinesis
-    Type: AWS::Logs::SubscriptionFilter
-    Properties:
-      RoleArn:
-        Fn::GetAtt:
-          - "SubscriptionFilterServiceRole"
-          - "Arn"
-      LogGroupName: !Ref LogGroup
-      FilterPattern: !Ref CloudwatchFilterPattern
-      DestinationArn: !Ref CloudwatchLogKinesisStreamArn
-
-  ### IAM Role used by Subscription filters to allow read logs from Cloudwatch and send logs to Kinesis Firehose
-  SubscriptionFilterServiceRole:
-    Condition: SendLogToKinesis
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service: logs.amazonaws.com
-        Version: "2012-10-17"
-      Path: /
-      Policies:
-        -
-          PolicyName: !Sub '${MicroServiceUniqueName}-ecs-logs-subscription-role'
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Action:
-                  - kinesis:PutRecord
-                Effect: Allow
-                Resource: "*"
-              - Action:
-                - "kms:Encrypt"
-                - "kms:GenerateDataKey"
-                - "kms:Decrypt"
-                Effect: Allow
-                Resource: "*"
 
 Outputs:
   ServiceName:
