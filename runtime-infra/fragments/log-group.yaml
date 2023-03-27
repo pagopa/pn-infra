@@ -7,6 +7,14 @@ Parameters:
     Type: String
     Description: Log group name
 
+  LogGroupPrefix:
+    Type: String
+    Default: '/aws/ecs'
+    Description: 'Log group AWS prefix (/aws/ecs or /aws/lambda)'
+    AllowedValues:
+      - "/aws/ecs"
+      - "/aws/lambda"
+
   LogGroupRetention:
     Type: Number
     Default: 14
@@ -34,7 +42,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain      
     Properties:
-      LogGroupName: !Sub '/aws/ecs/${LogGroupName}'
+      LogGroupName: !Sub '${LogGroupPrefix}/${LogGroupName}'
       RetentionInDays: !Ref LogGroupRetention
       KmsKeyId:
         Fn::GetAtt:
