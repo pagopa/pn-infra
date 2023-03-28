@@ -77,6 +77,7 @@ Parameters:
   
   SafeStorageAccountId:
     Description: "SafeStorage AWS Account id. Useful to grant rights to send feedback to EventBus"
+    Default: "-"
     Type: String
   
   DeliveryPushExtChUser:
@@ -96,14 +97,6 @@ Parameters:
     Description: "The number of seconds that Amazon SQS retains a message. You can specify an integer 
       value from 60 seconds (1 minute) to 1,209,600 seconds (14 days)."
   
-  CdcStreamRetentionHours:
-    Type: Number
-    Description: 'Change Data Capture Kinesis Data Stream retention period in hours'
-
-  LogsStreamRetentionHours:
-    Type: Number
-    Description: 'Cloudwatch Logs Kinesis Data Stream retention period in hours'
-
   Version:
     Type: String
     Description: 'keep track of used projects commitIds'
@@ -117,6 +110,13 @@ Parameters:
     Type: Number
     Default: 2
     Description: events batch size of national registries pipe (sqs to sqs)
+
+  CustomDomainsRequired:
+    Type: String
+    Default: true
+    AllowedValues:
+      - true
+      - false
 
   # pass-though parameters
   LambdasBucketName:
@@ -168,11 +168,27 @@ Parameters:
   HelpdeskAccountId:
     Default: ''
     Type: String
+  CdcKinesisStreamName:
+    Type: String
+  CdcKinesisStreamArn:
+    Type: String
+  CdcKinesisStreamKeyArn:
+    Type: String
+  LogsKinesisStreamName:
+    Type: String
+  LogsKinesisStreamArn:
+    Type: String
+  LogsKinesisStreamKeyArn:
+    Type: String
 
 Conditions:
+  RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
+
   HasSelcpgApiDns: !Not [ !Equals [ !Ref SelcpgApiDnsName, '' ] ]
   HasSelcpgApiCertificate: !Not [ !Equals [ !Ref SelcpgApiCertificateArn, '' ] ]  
-  HasSelcpgApi: !And [ !Condition HasSelcpgApiDns, !Condition HasSelcpgApiCertificate ]
+  HasSelcpgApi: !And [ !Condition HasSelcpgApiDns, !Condition HasSelcpgApiCertificate, !Condition RequiresCustomDomains ]
+
+  HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
 
   HasAlternateApiDnsName: !Not 
     - !Equals
@@ -201,6 +217,7 @@ Resources:
   # Custom domain for B2B api
   ApiCustomDomain:
     Type: AWS::CloudFormation::Stack
+    Condition: RequiresCustomDomains
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
       Parameters:
@@ -224,6 +241,7 @@ Resources:
   # Custom domain for B2B api
   WebApiCustomDomain:
     Type: AWS::CloudFormation::Stack
+    Condition: RequiresCustomDomains
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
       Parameters:
@@ -235,6 +253,7 @@ Resources:
   # Custom domain for IO api
   IoApiCustomDomain:
     Type: AWS::CloudFormation::Stack
+    Condition: RequiresCustomDomains
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
       Parameters:
@@ -388,6 +407,7 @@ Resources:
   # Allow access from partner system
   PnCoreEventBusSafeStoreAccessPolicy: 
     Type: AWS::Events::EventBusPolicy
+    Condition: HasStorageStorageAccountId
     Properties: 
       EventBusName: !Ref PnCoreEventBus
       StatementId: "AllowEventPutBySafeStorage"
@@ -534,7 +554,7 @@ Resources:
           - "Arn"
       LogGroupName: !Ref CoreEventBusEventsLogGroup
       FilterPattern: ' '
-      DestinationArn: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamArn
+      DestinationArn: !Ref LogsKinesisStreamArn
 
   CoreEventBusMatchedEventsLogGroupSubscriptionFilter:
     Type: AWS::Logs::SubscriptionFilter
@@ -545,7 +565,7 @@ Resources:
           - "Arn"
       LogGroupName: !Ref CoreEventBusMatchedEventsLoggerFnLogGroup
       FilterPattern: ' '
-      DestinationArn: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamArn
+      DestinationArn: !Ref LogsKinesisStreamArn
 
   SubscriptionFilterServiceRole:
     Type: AWS::IAM::Role
@@ -910,24 +930,6 @@ Resources:
       OKActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
-  ## KINESIS SOURCE STREAM FOR Change Data Capture
-  CdcKinesisSourceStream:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-stream.yaml"
-      Parameters:
-        StreamName: !Sub '${ProjectName}-cdc-stream'
-        StreamRetentionPeriodHours: !Ref CdcStreamRetentionHours
-  
-  ## KINESIS SOURCE STREAM FOR Logs
-  LogsKinesisSourceStream:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-stream.yaml"
-      Parameters:
-        StreamName: !Sub '${ProjectName}-logs-stream'
-        StreamRetentionPeriodHours: !Ref LogsStreamRetentionHours
-  
   ###          Allow  EVENTS FROM CONFIDENTIAL AND HELPDESK         ###
   #####################################################################
   ## Composite alarm event bus and rule
@@ -1250,24 +1252,24 @@ Outputs:
   # Kinesis Source Stream containing the DynamoDB Change Data Capture events
   CdcKinesisSourceStreamName:
     Description: 'Kinesis source CDC stream name'
-    Value: !GetAtt CdcKinesisSourceStream.Outputs.KinesisStreamName
+    Value: !Ref CdcKinesisStreamName
   CdcKinesisSourceStreamArn:
     Description: 'Kinesis source CDC stream ARN'
-    Value: !GetAtt CdcKinesisSourceStream.Outputs.KinesisStreamArn
+    Value: !Ref CdcKinesisStreamArn
   CdcKinesisSourceStreamKeyArn:
     Description: 'Kinesis source CDC stream crypto key ARN'
-    Value: !GetAtt CdcKinesisSourceStream.Outputs.KinesisStreamKeyArn
+    Value: !Ref CdcKinesisStreamKeyArn
 
   # Kinesis Source Stream containing the CloudWatch Logs
   LogsKinesisSourceStreamName:
     Description: 'Kinesis source Logs stream name'
-    Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamName
+    Value: !Ref LogsKinesisStreamName
   LogsKinesisSourceStreamArn:
     Description: 'Kinesis source Logs stream ARN'
-    Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamArn
+    Value: !Ref LogsKinesisStreamArn
   LogsKinesisSourceStreamKeyArn:
     Description: 'Kinesis source Logs stream crypto key ARN'
-    Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamKeyArn
+    Value: !Ref LogsKinesisStreamKeyArn
 
   # Event Bus Alarm
   EventBusDLQHasMessagesAlarmArn:

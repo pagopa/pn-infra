@@ -421,9 +421,9 @@ Parameters:
     Default: ''
     
   # Alarm
-  LogAlarmStrategy:
+  LogAlarmStrategyV1: # updated parameter name to allow a new default value, will be restored with task PN-4855 
     Description: Log alarm strategy, one of "-", "FATAL" or "ERROR_FATAL"
-    Default: '-'
+    Default: 'ERROR_FATAL'
     AllowedValues:
       - "-"
       - "FATAL"
@@ -454,8 +454,8 @@ Conditions:
   HasDefaultSecurityGroup: !Not [ !Equals [ !Ref EcsDefaultSecurityGroup, '' ] ]
   HasAlbSecurityGroup: !Not [ !Equals [ !Ref AlbSecurityGroup, '' ] ]
 
-  LogAlarmErrorFatal: !Equals [ !Ref LogAlarmStrategy, 'ERROR_FATAL' ]
-  LogAlarmNotNone: !Not [ !Equals [ !Ref LogAlarmStrategy, '-' ] ]
+  LogAlarmErrorFatal: !Equals [ !Ref LogAlarmStrategyV1, 'ERROR_FATAL' ]
+  LogAlarmNotNone: !Not [ !Equals [ !Ref LogAlarmStrategyV1, '-' ] ]
   HasLogAlarm: !And [ !Condition HasAlarmTopic, !Condition LogAlarmNotNone ]
 
   AutoscalingByRestApi: !Equals [ !Ref AutoscalingStrategy, REST-API]

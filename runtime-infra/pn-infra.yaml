@@ -53,18 +53,21 @@ Parameters:
     Default: '-'
     Description: Data lake can read logs
 
-  SafeStorageAccountId:
-    Type: String
-    Default: '-'
-    Description: Data lake can read logs
-
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+    
   Version:
     Type: String
     Description: 'keep track of used projects commitIds'
 
+  VpcEndpointsRequired:
+    Type: String
+    Default: true
+    AllowedValues:
+      - true
+      - false
+      
   # pass-through parameters
   AlarmSNSTopicArn:
     Type: String
@@ -72,6 +75,27 @@ Parameters:
     Type: String
   EcsDefaultSecurityGroup:
     Type: String
+  LogsBucketKmsKeyArn:
+    Type: String
+  LogsBucketName:
+    Type: String
+  SafeStorageAccountId:
+    Type: String
+  CdcKinesisStreamName:
+    Type: String
+  CdcKinesisStreamArn:
+    Type: String
+  CdcKinesisStreamKeyArn:
+    Type: String
+  LogsKinesisStreamName:
+    Type: String
+  LogsKinesisStreamArn:
+    Type: String
+  LogsKinesisStreamKeyArn:
+    Type: String
+
+Conditions:
+  RequiresVpcEndpoints: !Equals [ !Ref VpcEndpointsRequired, true ]
 
 Resources:
 
@@ -90,6 +114,7 @@ Resources:
   # Private connection from subnets to AWS services
   VPCEndpoints:
     Type: AWS::CloudFormation::Stack
+    Condition: RequiresVpcEndpoints
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/vpc-endpoints.yaml"
       Parameters:
@@ -137,20 +162,6 @@ Resources:
       Parameters:
         MacroServiceName: !Sub '${ProjectName}-core'
   
-  ###                       LOGS STREAMS PREPARATION                      ###
-  ###########################################################################
-  # Logs bucket
-  LogsBucket:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-bucket.yaml"
-      Parameters:
-        ProjectName: !Ref ProjectName
-        BucketSuffix: !Ref BucketSuffix
-        DataLakeAccountId1: !Ref DataLakeAccountId1
-        DataLakeAccountId2: !Ref DataLakeAccountId2
-        SafeStorageAccountId: !Ref SafeStorageAccountId
-
   # Exporter role
   LogsExporterRole:
     Type: AWS::CloudFormation::Stack
@@ -158,9 +169,12 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-bucket-access-role.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
-        LogsBucketName: !GetAtt LogsBucket.Outputs.LogsBucketName
-        LogsAccountId: !Ref AWS::AccountId
-
+        LogsBucketName: !Ref LogsBucketName
+        LogsBucketKmsKeyArn: !Ref LogsBucketKmsKeyArn
+        DataLakeAccountId1: !Ref DataLakeAccountId1
+        DataLakeAccountId2: !Ref DataLakeAccountId2
+        SafeStorageAccountId: !Ref SafeStorageAccountId
+        BucketSuffix: !Ref BucketSuffix 
   
   ###                       CLOUDFORMATION TRANSFORM LAMBDAS              ###
   ###########################################################################
@@ -186,7 +200,6 @@ Outputs:
     Value: !Ref VpcSubnets
     Description: Subnets
 
-
   # Load balancers outputs
   NetworkLoadBalancerLink:
     Value: !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink
@@ -206,9 +219,6 @@ Outputs:
     Description: ECS cluster name
   
   # Log exports outputs
-  LogsBucketName:
-    Description: The name of the bucket where logs must be exported
-    Value: !GetAtt LogsBucket.Outputs.LogsBucketName
   LogsExporterRoleArn:
     Description: Role used to export logs to external bucket
     Value: !GetAtt LogsExporterRole.Outputs.LogsIngestionRoleArn
@@ -216,7 +226,6 @@ Outputs:
     Description: Policy used by LogsExporterRoleArn Role
     Value: !GetAtt LogsExporterRole.Outputs.LogsIngestionPolicyArn
     
-
   # pass-though parameters
   AlarmSNSTopicArn:
     Value: !Ref AlarmSNSTopicArn
@@ -228,3 +237,19 @@ Outputs:
     Value: !GetAtt LoadBalancer.Outputs.AlbSecurityGroup
   SafeStorageAccountId:
     Value: !Ref SafeStorageAccountId
+  LogsBucketKmsKeyArn:
+    Value: !Ref LogsBucketKmsKeyArn
+  LogsBucketName:
+    Value: !Ref LogsBucketName
+  CdcKinesisStreamName:
+    Value: !Ref CdcKinesisStreamName
+  CdcKinesisStreamArn:
+    Value: !Ref CdcKinesisStreamArn
+  CdcKinesisStreamKeyArn:
+    Value: !Ref CdcKinesisStreamKeyArn
+  LogsKinesisStreamName:
+    Value: !Ref LogsKinesisStreamName
+  LogsKinesisStreamArn:
+    Value: !Ref LogsKinesisStreamArn
+  LogsKinesisStreamKeyArn:
+    Value: !Ref LogsKinesisStreamKeyArn
