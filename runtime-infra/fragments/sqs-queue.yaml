@@ -86,6 +86,8 @@ Resources:
   Queue:
     Condition: IsNotFifo
     Type: AWS::SQS::Queue
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
     Properties:
       QueueName: !Ref QueueName
       RedrivePolicy:
@@ -102,6 +104,8 @@ Resources:
   QueueFifo:
     Condition: IsFifo
     Type: AWS::SQS::Queue
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
     Properties:
       QueueName: !Sub "${QueueName}.fifo"
       RedrivePolicy:
@@ -121,6 +125,8 @@ Resources:
   DeadLetterQueue:
     Condition: IsNotFifoWithDLQ
     Type: AWS::SQS::Queue
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
     Properties:
       QueueName:
         Fn::If:
@@ -132,6 +138,8 @@ Resources:
   DeadLetterQueueFifo:
     Condition: IsFifoWithDLQ
     Type: AWS::SQS::Queue
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
     Properties:
       QueueName:
         Fn::If:

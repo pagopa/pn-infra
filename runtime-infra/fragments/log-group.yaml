@@ -1,0 +1,137 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECS Log group fragment
+
+Parameters:
+
+  LogGroupName:
+    Type: String
+    Description: Log group name
+
+  LogGroupPrefix:
+    Type: String
+    Default: '/aws/ecs'
+    Description: 'Log group AWS prefix (/aws/ecs or /aws/lambda)'
+    AllowedValues:
+      - "/aws/ecs"
+      - "/aws/lambda"
+
+  LogGroupRetention:
+    Type: Number
+    Default: 14
+    Description: Log group retention in days 
+
+  # - Log exports parameters
+  LogFilterPattern:
+    Default: ''
+    Type: String
+    Description: filter expression for exported logs
+
+  LogsKinesisSourceStreamArn:
+    Default: ''
+    Type: String
+    Description: where to send logs
+  
+Conditions:
+  SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
+
+Resources:
+
+  # Microservice Log group
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
+    Properties:
+      LogGroupName: !Sub '${LogGroupPrefix}/${LogGroupName}'
+      RetentionInDays: !Ref LogGroupRetention
+      KmsKeyId:
+        Fn::GetAtt:
+          - LogGroupKmsKey
+          - Arn
+
+  # KMS Key for Encrypt log data in CloudWatch Logs
+  LogGroupKmsKey:
+    Type: AWS::KMS::Key
+    Properties:
+      KeyPolicy:
+        Statement:
+          - Action: kms:*
+            Effect: Allow
+            Principal:
+              AWS:
+                Fn::Join:
+                  - ""
+                  - - "arn:"
+                    - Ref: AWS::Partition
+                    - ":iam::"
+                    - Ref: AWS::AccountId
+                    - :root
+            Resource: "*"
+          - Action:
+              - kms:Encrypt*
+              - kms:Decrypt*
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:Describe*
+            Effect: Allow      
+            Principal:
+                Service: !Sub logs.${AWS::Region}.amazonaws.com
+            Resource: '*'
+            Condition:
+                ArnLike:
+                    'kms:EncryptionContext:aws:logs:arn': !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*' 
+        Version: "2012-10-17"
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
+
+  ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
+  SubscriptionFilter:
+    Condition: SendLogToKinesis
+    Type: AWS::Logs::SubscriptionFilter
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
+    Properties:
+      RoleArn:
+        Fn::GetAtt:
+          - "SubscriptionFilterServiceRole"
+          - "Arn"
+      LogGroupName: !Ref LogGroup
+      FilterPattern: !Ref LogFilterPattern
+      DestinationArn: !Ref LogsKinesisSourceStreamArn
+
+  ### IAM Role used by Subscription filters to allow read logs from Cloudwatch and send logs to Kinesis Firehose
+  SubscriptionFilterServiceRole:
+    Condition: SendLogToKinesis
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: logs.amazonaws.com
+        Version: "2012-10-17"
+      Path: /
+      Policies:
+        -
+          PolicyName: !Sub '${LogGroupName}-logs-subscription-role'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - kinesis:PutRecord
+                Effect: Allow
+                Resource: "*"
+              - Action:
+                - "kms:Encrypt"
+                - "kms:GenerateDataKey"
+                - "kms:Decrypt"
+                Effect: Allow
+                Resource: "*"
+
+Outputs:
+  LogGroupName:
+    Value: !Ref LogGroup
+  
+  LogGroupKmsKeyId:
+    Value: !Ref LogGroupKmsKey

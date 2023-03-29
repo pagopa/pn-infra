@@ -1,20 +1,20 @@
 const coreMapping = {
     'pn-user-attributes': [
-        'pn-UserAttributes-ErrorFatalLogs-Alarm',
-        'pn-UserAttributes-WEB-ApiGwAlarm',
-        'pn-AddressBook-WEB-ApiGwAlarm',
-        'pn-AddressBookIO-IO-ApiGwAlarm',
-        'pn-UserAttributes-WEB-ApiGwLatencyAlarm',
-        'pn-AddressBook-WEB-ApiGwLatencyAlarm',
-        'pn-AddressBookIO-IO-ApiGwLatencyAlarm',
+        'pn-user-attributes-ErrorFatalLogs-Alarm',
+        'pn-user-attributes-WEB-ApiGwAlarm',
+        'pn-address-book-WEB-ApiGwAlarm',
+        'pn-address-book-io-IO-ApiGwAlarm',
+        'pn-user-attributes-WEB-ApiGwLatencyAlarm',
+        'pn-address-book-WEB-ApiGwLatencyAlarm',
+        'pn-address-book-io-IO-ApiGwLatencyAlarm',
         'pn-user-attributes-actions-HasOldMessage'
     ],
     'pn-apikey-manager': [
-        'pn-ApikeyManager-WEB-ApiGwAlarm',
-        'pn-ApikeyManager-bo-BACKOFFICE-ApiGwAlarm',
-        'pn-ApikeyManager-ErrorFatalLogs-Alarm',
-        'pn-ApikeyManager-bo-BACKOFFICE-ApiGwLatencyAlarm',
-        'pn-ApikeyManager-WEB-ApiGwLatencyAlarm'
+        'pn-apikey-manager-WEB-ApiGwAlarm',
+        'pn-apikey-manager-bo-BACKOFFICE-ApiGwAlarm',
+        'pn-apikey-manager-ErrorFatalLogs-Alarm',
+        'pn-apikey-manager-bo-BACKOFFICE-ApiGwLatencyAlarm',
+        'pn-apikey-manager-WEB-ApiGwLatencyAlarm'
     ],
     'pn-auth-fleet-v2': [
         'pn-authFleet-JwtAuthorizerErrorFatalLogsMetricAlarm',
@@ -28,15 +28,15 @@ const coreMapping = {
         'pn-nationalregistries_to_paperchannel-HasOldMessage',
         'pn-paper-channel-ErrorFatalLogs-Alarm',
         'pn-nationalregistries_to_paperchannel-DLQ-HasMessage',
-        'pn-PaperChannel-bo-BACKOFFICE-ApiGwLatencyAlarm',
-        'pn-PaperChannel-bo-BACKOFFICE-ApiGwAlarm'
+        'pn-paper-channel-bo-BACKOFFICE-ApiGwLatencyAlarm',
+        'pn-paper-channel-bo-BACKOFFICE-ApiGwAlarm'
     ],
     'pn-external-registries': [
-        'pn-ExternalRegistry-B2B-ApiGwAlarm',
-        'pn-ExternalRegistry-ErrorFatalLogs-Alarm',
-        'pn-ExternalRegistry-WEB-ApiGwAlarm',
-        'pn-ExternalRegistry-B2B-ApiGwLatencyAlarm',
-        'pn-ExternalRegistry-WEB-ApiGwLatencyAlarm'
+        'pn-external-registries-B2B-ApiGwAlarm',
+        'pn-external-registries-ErrorFatalLogs-Alarm',
+        'pn-external-registries-WEB-ApiGwAlarm',
+        'pn-external-registries-B2B-ApiGwLatencyAlarm',
+        'pn-external-registries-WEB-ApiGwLatencyAlarm'
     ],
     'pn-delivery': [
         'pn-delivery-B2B-ApiGwAlarm',
@@ -109,9 +109,9 @@ const coreMapping = {
         'pn-logsaver-be-FailedInvocation-Alarm'
     ],
     'pn-national-registries': [
-        'pn-NationalRegistry-ErrorFatalLogs-Alarm',
-        'pn-NationalRegistry-PNPG-ApiGwLatencyAlarm',
-        'pn-NationalRegistry-PNPG-ApiGwAlarm',
+        'pn-national-registries-ErrorFatalLogs-Alarm',
+        'pn-national-registries-PNPG-ApiGwLatencyAlarm',
+        'pn-national-registries-PNPG-ApiGwAlarm',
         'pn-national_registry_gateway_outputs-HasOldMessage',
         'pn-national_registry_gateway_outputs-DLQ-HasMessage'
     ],
