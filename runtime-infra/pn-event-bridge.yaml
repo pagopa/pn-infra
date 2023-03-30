@@ -59,17 +59,17 @@ Parameters:
   HelpdeskAccountId:
     Default: ''
     Type: String
-  CdcKinesisStreamName:
+  CdcKinesisSourceStreamName:
     Type: String
-  CdcKinesisStreamArn:
+  CdcKinesisSourceStreamArn:
     Type: String
-  CdcKinesisStreamKeyArn:
+  CdcKinesisSourceStreamKeyArn:
     Type: String
-  LogsKinesisStreamName:
+  LogsKinesisSourceStreamName:
     Type: String
-  LogsKinesisStreamArn:
+  LogsKinesisSourceStreamArn:
     Type: String
-  LogsKinesisStreamKeyArn:
+  LogsKinesisSourceStreamKeyArn:
     Type: String
 
 
@@ -133,10 +133,10 @@ Parameters:
   NationalRegistries2SelcPGQueueURL:
     Type: String
 
-  SafeStorageToDowntimeLogsQueueARN:
+  DowntimeLogsSafeStorageEventsQueueARN:
     Type: String
 
-  SafeStorageToDowntimeLogsQueueURL:
+  DowntimeLogsSafeStorageEventsQueueURL:
     Type: String
 Conditions:
   HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
@@ -194,7 +194,7 @@ Resources:
                   - !Ref ExternalChannelsOutputsQueueARN
                   - !Ref ExternalChannels2UserAttributesQueueARN
                   - !Ref SafeStorageToDeliveryPushQueueARN
-                  - !Ref "SafeStorageToDowntimeLogsQueueARN"
+                  - !Ref "DowntimeLogsSafeStorageEventsQueueARN"
                   - !Ref "NationalRegistries2DeliveryPushQueueARN"
                   - !Ref "NationalRegistries2PaperChannelQueueARN"
                   - !Ref "NationalRegistries2SelcPGQueueARN"
@@ -257,7 +257,7 @@ Resources:
         - !Ref "ExternalChannels2UserAttributesQueueURL"
         - !Ref "ExternalChannels2PaperChannelQueueURL"
         - !Ref "SafeStorageToDeliveryPushQueueURL"
-        - !Ref "SafeStorageToDowntimeLogsQueueURL"
+        - !Ref "DowntimeLogsSafeStorageEventsQueueARN"
         - !Ref "NationalRegistries2DeliveryPushQueueURL"
         - !Ref "NationalRegistries2PaperChannelQueueURL"
         - !Ref "NationalRegistries2SelcPGQueueURL"        
@@ -275,7 +275,7 @@ Resources:
               - !Ref "ExternalChannels2UserAttributesQueueARN"
               - !Ref "ExternalChannels2PaperChannelQueueARN"
               - !Ref "SafeStorageToDeliveryPushQueueARN"
-              - !Ref "SafeStorageToDowntimeLogsQueueARN"
+              - !Ref "DowntimeLogsSafeStorageEventsQueueARN"
               - !Ref "NationalRegistries2DeliveryPushQueueARN"
               - !Ref "NationalRegistries2PaperChannelQueueARN"
               - !Ref "NationalRegistries2SelcPGQueueARN"        
@@ -302,7 +302,7 @@ Resources:
           - "Arn"
       LogGroupName: !Ref CoreEventBusEventsLogGroup
       FilterPattern: ' '
-      DestinationArn: !Ref LogsKinesisStreamArn
+      DestinationArn: !Ref LogsKinesisSourceStreamArn
 
   CoreEventBusMatchedEventsLogGroupSubscriptionFilter:
     Type: AWS::Logs::SubscriptionFilter
@@ -313,7 +313,7 @@ Resources:
           - "Arn"
       LogGroupName: !Ref CoreEventBusMatchedEventsLoggerFnLogGroup
       FilterPattern: ' '
-      DestinationArn: !Ref LogsKinesisStreamArn
+      DestinationArn: !Ref LogsKinesisSourceStreamArn
 
   SubscriptionFilterServiceRole:
     Type: AWS::IAM::Role
@@ -475,7 +475,7 @@ Resources:
                   "originalEvent": <aws.events.event.json>
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DowntimeLogs'
-          Arn: !Ref SafeStorageToDowntimeLogsQueueARN
+          Arn: !Ref DowntimeLogsSafeStorageEventsQueueARN
           InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
@@ -765,24 +765,24 @@ Outputs:
   # Kinesis Source Stream containing the DynamoDB Change Data Capture events
   CdcKinesisSourceStreamName:
     Description: 'Kinesis source CDC stream name'
-    Value: !Ref CdcKinesisStreamName
+    Value: !Ref CdcKinesisSourceStreamName
   CdcKinesisSourceStreamArn:
     Description: 'Kinesis source CDC stream ARN'
-    Value: !Ref CdcKinesisStreamArn
+    Value: !Ref CdcKinesisSourceStreamArn
   CdcKinesisSourceStreamKeyArn:
     Description: 'Kinesis source CDC stream crypto key ARN'
-    Value: !Ref CdcKinesisStreamKeyArn
+    Value: !Ref CdcKinesisSourceStreamKeyArn
 
   # Kinesis Source Stream containing the CloudWatch Logs
   LogsKinesisSourceStreamName:
     Description: 'Kinesis source Logs stream name'
-    Value: !Ref LogsKinesisStreamName
+    Value: !Ref LogsKinesisSourceStreamName
   LogsKinesisSourceStreamArn:
     Description: 'Kinesis source Logs stream ARN'
-    Value: !Ref LogsKinesisStreamArn
+    Value: !Ref LogsKinesisSourceStreamArn
   LogsKinesisSourceStreamKeyArn:
     Description: 'Kinesis source Logs stream crypto key ARN'
-    Value: !Ref LogsKinesisStreamKeyArn
+    Value: !Ref LogsKinesisSourceStreamKeyArn
 
   # Event Bus Alarm
   EventBusDLQHasMessagesAlarmArn:
