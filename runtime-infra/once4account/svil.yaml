@@ -21,6 +21,36 @@ Parameters:
     Description: 'keep track of used projects commitIds'
 
 Resources:
+  ###              API GATEWAY ACCOUNT-GLOBAL CONFIGURATIONS              ###
+  ###########################################################################
+  ### The ApiGwAccountConfig and ApiGatewayLoggingRole resources are not  ###
+  ###        related to alarms; make sure to not delete them              ###
+  ###########################################################################
+  # - Enable API-Gateway access log capability
+  ApiGwAccountConfig:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt "ApiGatewayLoggingRole.Arn"
+
+  ###########################################################################
+  ### The ApiGwAccountConfig and ApiGatewayLoggingRole resources are not  ###
+  ###        related to alarms; make sure to not delete them              ###
+  ###########################################################################
+  # - Grant CloudWatch write access permission to AWS API-Gateway
+  ApiGatewayLoggingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "apigateway.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
 
   ###                          DEFINE ALARM TOPIC                          ###
   ############################################################################
@@ -92,30 +122,6 @@ Resources:
       Targets:
         - Arn: !Ref AlarmSNSTopic
           Id: "AlarmSnsTopic"
-
-  ###              API GATEWAY ACCOUNT-GLOBAL CONFIGURATIONS              ###
-  ###########################################################################
-  # - Enable API-Gateway access log capability
-  ApiGwAccountConfig:
-    Type: AWS::ApiGateway::Account
-    Properties:
-      CloudWatchRoleArn: !GetAtt "ApiGatewayLoggingRole.Arn"
-
-  # - Grant CloudWatch write access permission to AWS API-Gateway
-  ApiGatewayLoggingRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - "apigateway.amazonaws.com"
-            Action: "sts:AssumeRole"
-      Path: "/"
-      ManagedPolicyArns:
-        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
 
 Outputs:
 
