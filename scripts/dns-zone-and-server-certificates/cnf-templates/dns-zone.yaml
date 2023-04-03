@@ -11,17 +11,17 @@ Resources:
   HostedZone:
     Type: AWS::Route53::HostedZone
     Properties:
-      Name: !Sub '${EnvName}.pn.pagopa.it'
+      Name: !Sub '${EnvName}.notifichedigitali.it'
       HostedZoneConfig:
-        Comment: !Sub Public zone for 'Piattaforma notifiche' ambiente ${EnvName}
+        Comment: !Sub Public zone for 'notifichedigitali.it' ambiente ${EnvName}
 
 
   TextRecord:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId: !Ref HostedZone
-      Name: !Sub 'testdns.${EnvName}.pn.pagopa.it'
-      Comment: !Sub "Entry DNS di prova per PN ${EnvName}"
+      Name: !Sub 'testdns.${EnvName}.notifichedigitali.it'
+      Comment: !Sub "Entry DNS di prova per notifichedigitali.it ${EnvName}"
       ResourceRecords:
         - !Sub '"Test DNS entry for PN ${EnvName}"'
       TTL: 120
@@ -33,8 +33,8 @@ Resources:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId: !Ref HostedZone
-      Name: !Sub '${EnvName}.pn.pagopa.it'
-      Comment: !Sub "CAA DNS record for PN ${EnvName}"
+      Name: !Sub '${EnvName}.notifichedigitali.it'
+      Comment: !Sub "CAA DNS record for notifichedigitali.it ${EnvName}"
       ResourceRecords: 
         - '0 issue "amazonaws.com"'
       TTL: 120

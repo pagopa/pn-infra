@@ -1,6 +1,6 @@
 #! /bin/bash
 
-if ( [ $# -ne 4 ] ) then
+if ( [ $# -ne 3 ] ) then
   echo "This script create DNS zone for a PN environment and create the delegation in parent zone pn.pagopa.it"
   echo "Usage: $0 <environment-name> <zone-profile> <parent-zone-profile> <region>"
   echo ""
@@ -22,10 +22,9 @@ zoneStackName="${envName}-dnszone"
 parentZoneStackName="${envName}-dnszone-delegation"
 
 zoneProfile=$2
-parentZoneProfile=$3
 
-zoneRegion=$4
-parentZoneRegion=$4
+zoneRegion=$3
+parentZoneRegion=$3
 
 
 function createOrUpdateStack() {
@@ -61,7 +60,4 @@ echo $nameservers | tr "," "\n"
 nameserverParamValue=$( echo $nameservers | sed -e 's/,/|/g' )
 
 echo $nameserverParamValue
-
-echo "CONFIGURE DELEGATION"
-createOrUpdateStack $parentZoneProfile $parentZoneRegion $parentZoneStackName zone-delegation-recordset.yaml "EnvName=${envName}" "NameServers=${nameserverParamValue}"
 
