@@ -389,6 +389,18 @@ Parameters:
     Description: 46th container environment entry in the form key=value
     Type: String
     Default: ''
+  ContainerEnvEntry47:
+    Description: 47th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry48:
+    Description: 48th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry49:
+    Description: 48th container environment entry in the form key=value
+    Type: String
+    Default: ''
 
   # Secrets
   ContainerSecret1:
@@ -526,6 +538,9 @@ Conditions:
   Env44Exist: !Not [ !Equals [ !Ref ContainerEnvEntry44, '' ] ]
   Env45Exist: !Not [ !Equals [ !Ref ContainerEnvEntry45, '' ] ]
   Env46Exist: !Not [ !Equals [ !Ref ContainerEnvEntry46, '' ] ]
+  Env47Exist: !Not [ !Equals [ !Ref ContainerEnvEntry47, '' ] ]
+  Env48Exist: !Not [ !Equals [ !Ref ContainerEnvEntry48, '' ] ]
+  Env49Exist: !Not [ !Equals [ !Ref ContainerEnvEntry49, '' ] ]
 
   Secret1Exist: !Not [ !Equals [ !Ref ContainerSecret1, '' ] ]
   Secret2Exist: !Not [ !Equals [ !Ref ContainerSecret2, '' ] ]
@@ -1011,6 +1026,21 @@ Resources:
                 - Env46Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry46 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry46 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env47Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry47 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry47 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env48Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry48 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry48 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env49Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry49 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry49 ] ]
                 - !Ref "AWS::NoValue"
           PortMappings:
             - ContainerPort: 8080
