@@ -68,6 +68,36 @@ Parameters:
       - true
       - false
       
+  ApplicationLoadBalancerArn: 
+    Type: String
+    Default: '-'
+    Description: Application load balancer
+
+  ApplicationLoadBalancerAwsDns: 
+    Type: String
+    Default: '-'
+    Description: Application load balancer AWS DNS
+
+  ApplicationLoadBalancerAwsDnsZoneId:
+    Type: String
+    Default: '-'
+    Description: Application load balancer AWS DNS Zone ID
+
+  ApplicationLoadBalancerListenerArn:
+    Type: String
+    Default: '-'
+    Description: Application load balancer listener ARN
+
+  NetworkLoadBalancerLink: 
+    Type: String
+    Default: '-'
+    Description: Network load balancer VpcLink (used by api-gw)
+
+  VpcEgressSubnetsIds:
+    Type: String
+    Default: '-'
+    Description: List of egress subnets
+
   # pass-through parameters
   AlarmSNSTopicArn:
     Type: String
@@ -96,8 +126,17 @@ Parameters:
   ApiKeyTablesEncryptKeyId:
     Type: String
 Conditions:
+  IsAlbArnEmpty: !Equals [ !Ref ApplicationLoadBalancerArn, '-' ]
+  IsAlbArnDnsEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDns, '-' ]
+  IsAlbArnDnsZoneIdEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDnsZoneId, '-' ]
+  IsAlbListenerArnEmpty: !Equals [ !Ref ApplicationLoadBalancerListenerArn, '-' ]
+  IsNetworkLoadBalancerLinkEmpty: !Equals [ !Ref NetworkLoadBalancerLink, '-' ]
+
+  RequiresAlbCreation: !Or [ !Condition IsAlbArnEmpty, !Condition IsAlbArnDnsEmpty, !Condition IsAlbArnDnsZoneIdEmpty, !Condition IsAlbListenerArnEmpty, !Condition IsNetworkLoadBalancerLinkEmpty ]
+  
   RequiresVpcEndpoints: !Equals [ !Ref VpcEndpointsRequired, true ]
 
+  IsEgressDefined: !Not [ !Equals [ !Ref VpcEgressSubnetsIds, '-' ] ]
 Resources:
 
   ###                       VPC BASE CONFIGURATIONS                       ###
@@ -128,6 +167,7 @@ Resources:
   # LoadBalancer
   LoadBalancer:
     Type: AWS::CloudFormation::Stack
+    Condition: RequiresAlbCreation
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/load-balancer.yaml"
       Parameters:
@@ -138,9 +178,10 @@ Resources:
         RaddApiDnsName: !Ref RaddApiDnsName
         HostedZoneId: !Ref HostedZoneId
         InternalNlbIps: !Ref InternalNlbIps
-  
+
   # Load balancer private fixed DNS
   Route53RecordSetGroup:
+    Condition: RequiresAlbCreation
     Type: AWS::Route53::RecordSet
     Properties:
       Name: !Sub 'alb.core.${ProjectName}.internal'
@@ -156,7 +197,6 @@ Resources:
 
   # The cluster
   ECSCluster:
-    DependsOn: LoadBalancer
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-cluster.yaml"
@@ -203,15 +243,15 @@ Outputs:
 
   # Load balancers outputs
   NetworkLoadBalancerLink:
-    Value: !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink
+    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink, !Ref NetworkLoadBalancerLink ]
     Description: Used by API-Gw to connect into VPC
 
   ApplicationLoadBalancerListenerArn:
-    Value: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerListenerArn
+    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerListenerArn, !Ref ApplicationLoadBalancerListenerArn ]
     Description: Application Load Balancerlistener Arn
 
   ApplicationLoadBalancerDomain:
-    Value: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain
+    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain, !Ref ApplicationLoadBalancerAwsDns ]
     Description: Application Load Balancer Domain to use for http URL
 
   # ECS Cluster
@@ -256,3 +296,6 @@ Outputs:
     Value: !Ref LogsKinesisStreamKeyArn
   ApiKeyTablesEncryptKeyId:
     Value: !Ref ApiKeyTablesEncryptKeyId
+
+  VpcEgressSubnetsIds:
+    Value: !If [ IsEgressDefined, !Ref VpcEgressSubnetsIds, !!Ref VpcSubnets ]
