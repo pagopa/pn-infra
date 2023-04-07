@@ -93,6 +93,11 @@ Parameters:
     Default: '-'
     Description: Network load balancer VpcLink (used by api-gw)
 
+  WebappSecurityGroupId: 
+    Type: String
+    Default: '-'
+    Description: ALB security group ID
+
   VpcEgressSubnetsIds:
     Type: String
     Default: '-'
@@ -131,8 +136,8 @@ Conditions:
   IsAlbArnDnsZoneIdEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDnsZoneId, '-' ]
   IsAlbListenerArnEmpty: !Equals [ !Ref ApplicationLoadBalancerListenerArn, '-' ]
   IsNetworkLoadBalancerLinkEmpty: !Equals [ !Ref NetworkLoadBalancerLink, '-' ]
-
-  RequiresAlbCreation: !Or [ !Condition IsAlbArnEmpty, !Condition IsAlbArnDnsEmpty, !Condition IsAlbArnDnsZoneIdEmpty, !Condition IsAlbListenerArnEmpty, !Condition IsNetworkLoadBalancerLinkEmpty ]
+  IsWebappSecurityGroupIdEmpty: !Equals [ !Ref WebappSecurityGroupId, '-' ]
+  RequiresAlbCreation: !Or [ !Condition IsAlbArnEmpty, !Condition IsAlbArnDnsEmpty, !Condition IsAlbArnDnsZoneIdEmpty, !Condition IsAlbListenerArnEmpty, !Condition IsNetworkLoadBalancerLinkEmpty, !Condition IsWebappSecurityGroupIdEmpty ]
   
   RequiresVpcEndpoints: !Equals [ !Ref VpcEndpointsRequired, true ]
 
@@ -254,6 +259,9 @@ Outputs:
     Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain, !Ref ApplicationLoadBalancerAwsDns ]
     Description: Application Load Balancer Domain to use for http URL
 
+  AlbSecurityGroup:
+    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.AlbSecurityGroup, !Ref WebappSecurityGroupId ]
+
   # ECS Cluster
   ECSClusterName:
     Value: !GetAtt ECSCluster.Outputs.ClusterName
@@ -274,8 +282,6 @@ Outputs:
     Value: !Ref AlarmSNSTopicName
   EcsDefaultSecurityGroup:
     Value: !Ref EcsDefaultSecurityGroup
-  AlbSecurityGroup:
-    Value: !GetAtt LoadBalancer.Outputs.AlbSecurityGroup
   SafeStorageAccountId:
     Value: !Ref SafeStorageAccountId
   LogsBucketKmsKeyArn:
@@ -298,4 +304,4 @@ Outputs:
     Value: !Ref ApiKeyTablesEncryptKeyId
 
   VpcEgressSubnetsIds:
-    Value: !If [ IsEgressDefined, !Ref VpcEgressSubnetsIds, !!Ref VpcSubnets ]
+    Value: !If [ IsEgressDefined, !Ref VpcEgressSubnetsIds, !Ref VpcSubnets ]
