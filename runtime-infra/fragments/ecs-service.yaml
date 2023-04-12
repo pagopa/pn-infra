@@ -54,12 +54,13 @@ Parameters:
   ContainerImageOtelURI:
     Type: String
     Description: Container image URI for Open telemetry
-    Default: 911845998067.dkr.ecr.eu-central-1.amazonaws.com/aws-otel-collector:v0.23.0
+    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-collector:v0.23.0
 
   ContainerImageInjectorURI:
     Type: String
     Description: Container image URI for Open telemetry
-    Default: 911845998067.dkr.ecr.eu-central-1.amazonaws.com/alpine:3.14
+    #Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/alpine:3.14
+    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.19.2_1
 
 # The AWS collector comes with two configs baked in for ECS:
 #
@@ -1072,8 +1073,8 @@ Resources:
           - ShouldEnableOtelXRay
           - Name: sidecar-injector
             Image: !Ref ContainerImageInjectorURI
-            Command: !Ref CommandSidecarInjector
-            EntryPoint: [!Ref EntrypointSidecarInjector]
+            #Command: !Ref CommandSidecarInjector
+            #EntryPoint: [!Ref EntrypointSidecarInjector]
             Essential: false
             MountPoints:
               - SourceVolume: "my-vol"
