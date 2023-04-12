@@ -161,6 +161,31 @@ Parameters:
   VpcEgressSubnetsIds:
     Type: String
 
+  CdnZoneId:
+    Type: String
+    Default: '-'  
+  PortalePaCertificateArn:
+    Type: String
+    Default: '-'
+  PortalePfCertificateArn:
+    Type: String
+    Default: '-'    
+  PortalePfLoginCertificateArn:
+    Type: String
+    Default: '-'    
+  LandingCertificateArn:
+    Type: String
+    Default: '-' 
+  PortalePgCertificateArn:
+    Type: String
+    Default: '-' 
+  PortaleStatusCertificateArn:
+    Type: String
+    Default: '-' 
+  ReactAppUrlApi:
+    Type: String
+    Default: '-' 
+
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
 
@@ -715,3 +740,20 @@ Outputs:
     Value: !Ref ApiKeyTablesEncryptKeyId
   VpcEgressSubnetsIds:
     Value: !Ref VpcEgressSubnetsIds
+
+  CdnZoneId:
+    Value: !Ref CdnZoneId
+  PortalePaCertificateArn:
+    Value: !Ref PortalePaCertificateArn
+  PortalePfCertificateArn:
+    Value: !Ref PortalePfCertificateArn
+  PortalePfLoginCertificateArn:
+    Value: !Ref PortalePfLoginCertificateArn   
+  LandingCertificateArn:
+    Value: !Ref LandingCertificateArn 
+  PortalePgCertificateArn:
+    Value: !Ref PortalePgCertificateArn
+  PortaleStatusCertificateArn:
+    Value: !Ref PortaleStatusCertificateArn 
+  ReactAppUrlApi:
+    Value: !Ref ReactAppUrlApi
