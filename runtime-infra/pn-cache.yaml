@@ -16,7 +16,7 @@ Parameters:
     Type: Number
     Description: Number of nodes
 
-  SubnetIds:
+  SubnetsIds:
     Type: "List<AWS::EC2::Subnet::Id>"
     Description: Private subnets to deploy resources into
 
@@ -29,7 +29,7 @@ Resources:
     Type: "AWS::ElastiCache::SubnetGroup"
     Properties:
       Description: Cache Subnet Group
-      SubnetIds: !Ref SubnetIds
+      SubnetIds: !Ref SubnetsIds
 
   AllowedSecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
