@@ -138,6 +138,9 @@ Parameters:
   OpenSearchArn:
     Default: ''
     Type: String
+  OpenSearchEndpoint:
+    Type: String
+    Default: ''
   HelpdeskAccountId:
     Default: ''
     Type: String
@@ -159,6 +162,11 @@ Parameters:
     Type: String
 
   VpcEgressSubnetsIds:
+    Type: String
+
+  ElasticacheEndpoint:
+    Type: String
+  ElasticacheSecurityGroup:
     Type: String
 
   CdnZoneId:
@@ -742,6 +750,8 @@ Outputs:
     Value: !Ref HelpdeskAccountId
   OpenSearchArn:
     Value: !Ref OpenSearchArn
+  OpenSearchEndpoint:
+    Value: !Ref OpenSearchEndpoint
   LambdasBucketName:
     Value: !Ref LambdasBucketName
   LambdasBasePath:
@@ -758,6 +768,10 @@ Outputs:
     Value: !Ref ApiKeyTablesEncryptKeyId
   VpcEgressSubnetsIds:
     Value: !Ref VpcEgressSubnetsIds
+  ElasticacheEndpoint:
+    Value: !Ref ElasticacheEndpoint
+  ElasticacheSecurityGroup:
+    Value: !Ref ElasticacheSecurityGroup
 
   CdnZoneId:
     Value: !Ref CdnZoneId
