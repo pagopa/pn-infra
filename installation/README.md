@@ -383,6 +383,8 @@ Valorizzando `monitoring-aws-accounts` con l'ID dell'account _Core_.
 ### Account di monitoraggio (PN-CORE)
 Sull'account PN-CORE deve essere eseguita una configurazione manuale dalla console AWS, descritta a questo link [this link](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Cross-Account-Cross-Region.html#enable-cross-account-cross-Region) nella sezione _Set up a monitoring account_.
 
+### Nota su "once4account"
+Lo stack definito in once4account contiene due risorse che non vanno assolutamente eliminate, ossia `ApiGwAccountConfig` e `ApiGatewayLoggingRole`.
 ## Test
 
 Testare il nuovo ambiente di PN

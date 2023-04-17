@@ -69,6 +69,14 @@ Parameters:
     Type: String
     Description: Bucket key of the OpenAPI file in the s3 bucket
 
+  AlarmOn4xx:
+    Type: String
+    Default: 'false'
+    Description: Alarms enable on 4xx
+    AllowedValues:
+      - 'true'
+      - 'false'
+
 Conditions:
   IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
   IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
@@ -78,6 +86,7 @@ Conditions:
   HasOpenApiBucketName: !Not [ !Equals [ !Ref OpenApiBucketName, '' ] ]
   HasOpenApiBucketKey: !Not [ !Equals [ !Ref OpenApiBucketKey, '' ] ]
   HasOpenApiSpecs: !And [ !Condition HasOpenApiBucketName, !Condition HasOpenApiBucketKey ]
+  AlarmOn4xxEnabled: !Equals [ !Ref AlarmOn4xx, 'true' ]
 Resources:
 
   # API definition
@@ -282,7 +291,11 @@ Resources:
           Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-4XXError-weight-adjust"
           ReturnData: False
         - Id: e2
-          Expression: IF(m2>=1 OR e1>=0.1, 1, 0)
+          Expression:
+            Fn::If:
+              - AlarmOn4xxEnabled
+              - IF(m2>=1 OR e1>=0.1, 1, 0)
+              - IF(m2>=1, 1, 0)
           Label: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-APIGatewayErrorMetric"
 
   ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
