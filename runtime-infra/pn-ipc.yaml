@@ -224,6 +224,26 @@ Parameters:
   ReactAppUrlApi:
     Type: String
     Default: '-' 
+  TokenExchangeLambdaEnvironmentIssuer:
+    Type: String
+    Description: Session token issuer
+  TokenExchangeLambdaEnvironmentAllowedIssuer:
+    Type: String
+    Description: 'Comma separated list of external authentication token issuers 
+                  recognized by Piattaforma Notifiche (SelfCare and SpidHub)'
+  TokenExchangeLambdaEnvironmentAllowedOrigin:
+    Type: String
+    Description: 'Comma separated list of websites allowed to use "Piattaforma 
+                 Notifiche" back-ends API'
+  TokenExchangeLambdaEnvironmentJwksMapping:
+    Type: String
+    Description: 'Mapping tra issuer e jwks url non standard in formato json'
+  TokenExchangeLambdaEnvironmentAcceptedAudience:
+    Type: String
+    Description: Comma separated list of token audience accepted
+  TokenExchangeLambdaEnvironmentAudience:
+    Type: String
+    Description: Audience value for token generation
 
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
@@ -820,3 +840,15 @@ Outputs:
     Value: !Ref ReactAppUrlApi
   BoApiDnsName: 
     Value: !Ref BoApiDnsName
+  TokenExchangeLambdaEnvironmentIssuer:
+    Value: !Ref TokenExchangeLambdaEnvironmentIssuer
+  TokenExchangeLambdaEnvironmentAllowedIssuer:
+    Value: !Ref TokenExchangeLambdaEnvironmentAllowedIssuer
+  TokenExchangeLambdaEnvironmentAllowedOrigin:
+    Value: !Ref TokenExchangeLambdaEnvironmentAllowedOrigin
+  TokenExchangeLambdaEnvironmentJwksMapping:
+    Value: !Ref TokenExchangeLambdaEnvironmentJwksMapping
+  TokenExchangeLambdaEnvironmentAcceptedAudience:
+    Value: !Ref TokenExchangeLambdaEnvironmentAcceptedAudience
+  TokenExchangeLambdaEnvironmentAudience:
+    Value: !Ref TokenExchangeLambdaEnvironmentAudience
