@@ -34,6 +34,11 @@ Parameters:
   BucketSuffix:
     Type: String
     Description: Bucket suffix
+  
+  MoreBucketResourcePolicyStatements:
+    Type: String
+    Default: ''
+    Description: Log bucket resource policy custom statements
     
 Conditions:
 
@@ -155,6 +160,7 @@ Resources:
                 }
               }
             }
+            ${MoreBucketResourcePolicyStatements}
           ]
         }
 
