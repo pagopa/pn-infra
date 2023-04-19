@@ -8,6 +8,10 @@ Parameters:
     Default: pn
     Description: Base name for pn project
   
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: cfn template bucket base url
+
   Version:
     Type: String
 
@@ -253,6 +257,18 @@ Resources:
               AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
             Action: 'kms:*'
             Resource: '*'
+
+  SafestorageLoggerLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub '${ProjectName}-safestorage-logger'
+        LogGroupPrefix: '/aws/lambda'
+        LogsKinesisSourceStreamArn: !GetAtt LogsKinesisStream.Arn
+
 Outputs:
   LogsBucketKmsKeyArn:
     Value: 
@@ -310,3 +326,6 @@ Outputs:
 
   ApiKeyTablesEncryptKeyId:
     Value: !Ref ApiKeyTablesEncryptKey
+
+  SafestorageLoggerLogGroupName:
+    Value: !Sub '${ProjectName}-safestorage-logger'
