@@ -83,6 +83,7 @@ Parameters:
 
   SafeStorageAccountId: 
     Type: String
+    Default: '-'
     
   SafestorageLoggerLogGroupName:
     Type: String
@@ -101,6 +102,7 @@ Parameters:
 
 Conditions:
   HasOpenSearchExport: !Not [ !Equals [ !Ref OpenSearchClusterEndpoint, "" ] ]
+  HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, "-" ] ]
 
 Resources:
 
@@ -189,6 +191,7 @@ Resources:
   ###########################################################################
   SafestorageLogger:
     Type: AWS::CloudFormation::Stack
+    Condition: HasStorageStorageAccountId
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/safestorage-logger.yaml"
       Parameters:
