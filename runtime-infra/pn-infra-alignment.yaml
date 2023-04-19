@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: 'This template deploys the base infra for PN. VPC, AWS services endpoints, 
-              load balancer, ECS cluster'
+              load balancer, ECS cluster. The template is used only in task PN-4668 to remove some resource that need to be moved in a separate stack.'
 
 Parameters:
   ProjectName:
@@ -56,52 +56,9 @@ Parameters:
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
-    
   Version:
     Type: String
     Description: 'keep track of used projects commitIds'
-
-  VpcEndpointsRequired:
-    Type: String
-    Default: true
-    AllowedValues:
-      - true
-      - false
-      
-  ApplicationLoadBalancerArn: 
-    Type: String
-    Default: '-'
-    Description: Application load balancer
-
-  ApplicationLoadBalancerAwsDns: 
-    Type: String
-    Default: '-'
-    Description: Application load balancer AWS DNS
-
-  ApplicationLoadBalancerAwsDnsZoneId:
-    Type: String
-    Default: '-'
-    Description: Application load balancer AWS DNS Zone ID
-
-  ApplicationLoadBalancerListenerArn:
-    Type: String
-    Default: '-'
-    Description: Application load balancer listener ARN
-
-  NetworkLoadBalancerLink: 
-    Type: String
-    Default: '-'
-    Description: Network load balancer VpcLink (used by api-gw)
-
-  WebappSecurityGroupId: 
-    Type: String
-    Default: '-'
-    Description: ALB security group ID
-
-  VpcEgressSubnetsIds:
-    Type: String
-    Default: '-'
-    Description: List of egress subnets
 
   # pass-through parameters
   AlarmSNSTopicArn:
@@ -128,20 +85,7 @@ Parameters:
     Type: String
   LogsKinesisStreamKeyArn:
     Type: String
-  ApiKeyTablesEncryptKeyId:
-    Type: String
-Conditions:
-  IsAlbArnEmpty: !Equals [ !Ref ApplicationLoadBalancerArn, '-' ]
-  IsAlbArnDnsEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDns, '-' ]
-  IsAlbArnDnsZoneIdEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDnsZoneId, '-' ]
-  IsAlbListenerArnEmpty: !Equals [ !Ref ApplicationLoadBalancerListenerArn, '-' ]
-  IsNetworkLoadBalancerLinkEmpty: !Equals [ !Ref NetworkLoadBalancerLink, '-' ]
-  IsWebappSecurityGroupIdEmpty: !Equals [ !Ref WebappSecurityGroupId, '-' ]
-  RequiresAlbCreation: !Or [ !Condition IsAlbArnEmpty, !Condition IsAlbArnDnsEmpty, !Condition IsAlbArnDnsZoneIdEmpty, !Condition IsAlbListenerArnEmpty, !Condition IsNetworkLoadBalancerLinkEmpty, !Condition IsWebappSecurityGroupIdEmpty ]
-  
-  RequiresVpcEndpoints: !Equals [ !Ref VpcEndpointsRequired, true ]
 
-  IsEgressDefined: !Not [ !Equals [ !Ref VpcEgressSubnetsIds, '-' ] ]
 Resources:
 
   ###                       VPC BASE CONFIGURATIONS                       ###
@@ -159,7 +103,6 @@ Resources:
   # Private connection from subnets to AWS services
   VPCEndpoints:
     Type: AWS::CloudFormation::Stack
-    Condition: RequiresVpcEndpoints
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/vpc-endpoints.yaml"
       Parameters:
@@ -172,7 +115,6 @@ Resources:
   # LoadBalancer
   LoadBalancer:
     Type: AWS::CloudFormation::Stack
-    Condition: RequiresAlbCreation
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/load-balancer.yaml"
       Parameters:
@@ -183,10 +125,9 @@ Resources:
         RaddApiDnsName: !Ref RaddApiDnsName
         HostedZoneId: !Ref HostedZoneId
         InternalNlbIps: !Ref InternalNlbIps
-
+  
   # Load balancer private fixed DNS
   Route53RecordSetGroup:
-    Condition: RequiresAlbCreation
     Type: AWS::Route53::RecordSet
     Properties:
       Name: !Sub 'alb.core.${ProjectName}.internal'
@@ -202,6 +143,7 @@ Resources:
 
   # The cluster
   ECSCluster:
+    DependsOn: LoadBalancer
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-cluster.yaml"
@@ -216,11 +158,7 @@ Resources:
       Parameters:
         ProjectName: !Ref ProjectName
         LogsBucketName: !Ref LogsBucketName
-        LogsBucketKmsKeyArn: !Ref LogsBucketKmsKeyArn
-        DataLakeAccountId1: !Ref DataLakeAccountId1
-        DataLakeAccountId2: !Ref DataLakeAccountId2
-        SafeStorageAccountId: !Ref SafeStorageAccountId
-        BucketSuffix: !Ref BucketSuffix 
+        LogsAccountId: !Ref AWS::AccountId
   
   ###                       CLOUDFORMATION TRANSFORM LAMBDAS              ###
   ###########################################################################
@@ -248,19 +186,16 @@ Outputs:
 
   # Load balancers outputs
   NetworkLoadBalancerLink:
-    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink, !Ref NetworkLoadBalancerLink ]
+    Value: !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink
     Description: Used by API-Gw to connect into VPC
 
   ApplicationLoadBalancerListenerArn:
-    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerListenerArn, !Ref ApplicationLoadBalancerListenerArn ]
+    Value: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerListenerArn
     Description: Application Load Balancerlistener Arn
 
   ApplicationLoadBalancerDomain:
-    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain, !Ref ApplicationLoadBalancerAwsDns ]
+    Value: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain
     Description: Application Load Balancer Domain to use for http URL
-
-  AlbSecurityGroup:
-    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.AlbSecurityGroup, !Ref WebappSecurityGroupId ]
 
   # ECS Cluster
   ECSClusterName:
@@ -282,6 +217,8 @@ Outputs:
     Value: !Ref AlarmSNSTopicName
   EcsDefaultSecurityGroup:
     Value: !Ref EcsDefaultSecurityGroup
+  AlbSecurityGroup:
+    Value: !GetAtt LoadBalancer.Outputs.AlbSecurityGroup
   SafeStorageAccountId:
     Value: !Ref SafeStorageAccountId
   LogsBucketKmsKeyArn:
@@ -300,8 +237,3 @@ Outputs:
     Value: !Ref LogsKinesisStreamArn
   LogsKinesisStreamKeyArn:
     Value: !Ref LogsKinesisStreamKeyArn
-  ApiKeyTablesEncryptKeyId:
-    Value: !Ref ApiKeyTablesEncryptKeyId
-
-  VpcEgressSubnetsIds:
-    Value: !If [ IsEgressDefined, !Ref VpcEgressSubnetsIds, !Ref VpcSubnets ]

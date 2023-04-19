@@ -1,0 +1,251 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: |
+  CloudFormation definition of Log Extractor system (support)
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Name of the project
+
+  LogRetentionPeriod:
+    Type: Number
+    Default: 1
+    Description: log retention in days
+
+  LambdaS3Bucket:
+    Type: String
+
+  LambdaS3BucketKey:
+    Type: String
+    
+Resources:
+  CognitoLogsS3:
+    Type: AWS::S3::Bucket
+    Properties: 
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      BucketName: !Sub ${ProjectName}-cognito-logs
+      ObjectLockConfiguration: 
+        ObjectLockEnabled: Enabled 
+        Rule: 
+          DefaultRetention:
+            Mode: GOVERNANCE
+            Years: !Ref LogRetentionPeriod
+      ObjectLockEnabled: true
+      PublicAccessBlockConfiguration: 
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration: 
+        Status: Enabled
+
+  CognitoTriggerLambda:
+    Type: AWS::Lambda::Function
+    Properties: 
+      FunctionName: !Sub ${ProjectName}-post-auth-cognito-trigger
+      Code: 
+        S3Bucket: !Ref LambdaS3Bucket
+        S3Key: !Ref LambdaS3BucketKey
+      Description: Cognito Post Confirmation Lambda Trigger.
+      Environment:
+        Variables:
+          BucketName: !Ref CognitoLogsS3
+      Handler: CognitoLogsLambda.handler
+      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-cognito-logs-role"
+      Runtime: nodejs18.x
+      Timeout: 30
+
+  CognitoLambdaRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Description: Lambda execution role.
+      Path: /
+      Policies: 
+        - PolicyName: cognito-logs-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: LogGroup
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:CreateLogGroup
+                  - logs:PutLogEvents
+                Resource:
+                - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-post-auth-cognito-trigger:*"
+              - Sid: S3PutObject
+                Effect: Allow
+                Action: 
+                  - s3:PutObject
+                Resource: !Sub "arn:aws:s3:::${ProjectName}-cognito-logs/*"
+              - Sid: S3ListBuckets
+                Effect: Allow
+                Action:
+                  - S3:ListBucket
+                Resource: !Sub "arn:aws:s3:::${ProjectName}-cognito-logs"
+      RoleName: !Sub ${ProjectName}-cognito-logs-role
+
+  LambdaTriggerLogGroup:
+    Type: "AWS::Logs::LogGroup"
+    Properties:
+      RetentionInDays: 14
+      LogGroupName: !Sub "/aws/lambda/${CognitoTriggerLambda}"
+
+  UserPool:
+    Type: "AWS::Cognito::UserPool"
+    Properties:
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: admin_only
+            Priority: 1
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      AutoVerifiedAttributes:
+        - email
+      LambdaConfig:
+        PostAuthentication: !Sub "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${CognitoTriggerLambda}"        
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 16
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+      Schema:
+        - AttributeDataType: String
+          Name: backoffice_tags
+          Mutable: true
+      UserPoolName: !Sub ${ProjectName}-userpool
+      UsernameAttributes:
+        - email
+      UsernameConfiguration:
+        CaseSensitive: false
+
+  UserPoolClient:
+    Type: "AWS::Cognito::UserPoolClient"
+    Properties:
+      ClientName: ApiClient
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 10
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: hours
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      UserPoolId: !Ref UserPool
+
+  CognitoUserManagementRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !Ref AWS::AccountId
+            Action:
+              - "sts:AssumeRole"
+      Description: Role to manage users in a cognito user pool.
+      Path: /
+      Policies: 
+        - PolicyName: AllowCognitoManagement
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Sid: CognitoUserManagement
+              Effect: Allow
+              Action:
+                - cognito-idp:AdminDeleteUser
+                - cognito-idp:DeleteGroup
+                - cognito-idp:AdminDeleteUserAttributes
+                - cognito-idp:AdminCreateUser
+                - cognito-idp:CreateGroup
+                - cognito-idp:AdminSetUserSettings
+                - cognito-idp:AdminAddUserToGroup
+                - cognito-idp:AdminUpdateUserAttributes
+                - cognito-idp:AdminGetUser
+                - cognito-idp:AdminEnableUser
+                - cognito-idp:AdminDisableUser
+                - cognito-idp:AdminRemoveUserFromGroup
+                - cognito-idp:AdminListGroupsForUser
+                - cognito-idp:AdminInitiateAuth
+                - cognito-idp:DeleteUserAttributes
+                - cognito-idp:GetUser
+                - cognito-idp:UpdateUserAttributes
+                - cognito-idp:DescribeUserPool
+                - cognito-idp:GetGroup
+                - cognito-idp:ListGroups
+                - cognito-idp:ListUsers
+                - cognito-idp:ListUsersInGroup
+                - cognito-idp:SignUp
+                - cognito-idp:ListUserImportJobs
+              Resource: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}"
+            - Sid: UserPoolActions
+              Effect: Allow
+              Action:
+                - cognito-idp:ListUserPools
+              Resource: '*'
+            - Sid: IamRoles
+              Effect: Allow
+              Action:
+                - iam:ListRoles
+                - iam:PassRole
+              Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/*"
+      RoleName: CognitoUserRole
+
+  LambdaResourcePolicy:
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CognitoTriggerLambda
+      Principal: cognito-idp.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}"
+
+  S3BucketPolicy:  
+    Type: AWS::S3::BucketPolicy
+    Properties: 
+      Bucket: !Ref CognitoLogsS3
+      PolicyDocument: 
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyObjectLockChanges
+            Action:
+              - s3:GetBucketObjectLockConfiguration
+            Effect: Deny
+            Resource: !Sub "arn:aws:s3:::${CognitoLogsS3}"
+            Principal: 
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:role/CognitoUserRole"
+
+Outputs:
+
+  CognitoUserPoolArn:
+    Description: Cognito user pool ARN
+    Value: !GetAtt UserPool.Arn
+
+  CognitoWebClientId:
+    Description: Cognito web client ID
+    Value: !Ref UserPoolClient
+  
+  CognitoUserPoolId:
+    Description: Cognito user pool ID
+    Value: !Ref UserPool
+  
+  HelpdeskAccountId:
+    Value: !Sub ${AWS::AccountId}

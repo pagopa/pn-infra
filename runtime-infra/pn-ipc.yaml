@@ -54,6 +54,11 @@ Parameters:
     Type: String
     Description: 'The DNS name used for browser rest API.'
 
+  BoApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The DNS name used for BO API'
+
   AlternateWebApiDnsName:
     Type: String
     Default: ''
@@ -138,6 +143,9 @@ Parameters:
   OpenSearchArn:
     Default: ''
     Type: String
+  OpenSearchEndpoint:
+    Type: String
+    Default: ''
   HelpdeskAccountId:
     Default: ''
     Type: String
@@ -157,6 +165,85 @@ Parameters:
     Type: String
   ApiKeyTablesEncryptKeyId:
     Type: String
+
+  VpcEgressSubnetsIds:
+    Type: String
+
+  ElasticacheEndpoint:
+    Type: String
+    Default: ''
+  ElasticacheSecurityGroup:
+    Type: String
+    Default: ''
+
+  CdnZoneId:
+    Type: String
+    Default: '-'  
+  PortalePaCertificateArn:
+    Type: String
+    Default: '-'
+  PortalePfCertificateArn:
+    Type: String
+    Default: '-'    
+  PortalePfLoginCertificateArn:
+    Type: String
+    Default: '-'    
+  LandingCertificateArn:
+    Type: String
+    Default: '-' 
+  PortalePgCertificateArn:
+    Type: String
+    Default: '-' 
+  PortaleStatusCertificateArn:
+    Type: String
+    Default: '-' 
+  PortaleHelpdeskCertificateArn:
+    Type: String
+    Default: '-'
+  PortalePaDomain:
+    Type: String
+    Default: '-' 
+  PortalePfDomain:
+    Type: String
+    Default: '-' 
+  PortalePfLoginDomain:
+    Type: String
+    Default: '-' 
+  LandingDomain:
+    Type: String
+    Default: '-' 
+  PortalePgDomain:
+    Type: String
+    Default: '-' 
+  PortaleStatusDomain:
+    Type: String
+    Default: '-' 
+  PortaleHelpdeskDomain:
+    Type: String
+    Default: '-'
+  ReactAppUrlApi:
+    Type: String
+    Default: '-' 
+  TokenExchangeLambdaEnvironmentIssuer:
+    Type: String
+    Description: Session token issuer
+  TokenExchangeLambdaEnvironmentAllowedIssuer:
+    Type: String
+    Description: 'Comma separated list of external authentication token issuers 
+                  recognized by Piattaforma Notifiche (SelfCare and SpidHub)'
+  TokenExchangeLambdaEnvironmentAllowedOrigin:
+    Type: String
+    Description: 'Comma separated list of websites allowed to use "Piattaforma 
+                 Notifiche" back-ends API'
+  TokenExchangeLambdaEnvironmentJwksMapping:
+    Type: String
+    Description: 'Mapping tra issuer e jwks url non standard in formato json'
+  TokenExchangeLambdaEnvironmentAcceptedAudience:
+    Type: String
+    Description: Comma separated list of token audience accepted
+  TokenExchangeLambdaEnvironmentAudience:
+    Type: String
+    Description: Audience value for token generation
 
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
@@ -696,6 +783,8 @@ Outputs:
     Value: !Ref HelpdeskAccountId
   OpenSearchArn:
     Value: !Ref OpenSearchArn
+  OpenSearchEndpoint:
+    Value: !Ref OpenSearchEndpoint
   LambdasBucketName:
     Value: !Ref LambdasBucketName
   LambdasBasePath:
@@ -710,3 +799,56 @@ Outputs:
     Value: !Ref SandboxSafeStorageBaseUrl
   ApiKeyTablesEncryptKeyId:
     Value: !Ref ApiKeyTablesEncryptKeyId
+  VpcEgressSubnetsIds:
+    Value: !Ref VpcEgressSubnetsIds
+  ElasticacheEndpoint:
+    Value: !Ref ElasticacheEndpoint
+  ElasticacheSecurityGroup:
+    Value: !Ref ElasticacheSecurityGroup
+
+  CdnZoneId:
+    Value: !Ref CdnZoneId
+  PortalePaCertificateArn:
+    Value: !Ref PortalePaCertificateArn
+  PortalePfCertificateArn:
+    Value: !Ref PortalePfCertificateArn
+  PortalePfLoginCertificateArn:
+    Value: !Ref PortalePfLoginCertificateArn   
+  LandingCertificateArn:
+    Value: !Ref LandingCertificateArn 
+  PortalePgCertificateArn:
+    Value: !Ref PortalePgCertificateArn
+  PortaleStatusCertificateArn:
+    Value: !Ref PortaleStatusCertificateArn 
+  PortaleHelpdeskCertificateArn:
+    Value: !Ref PortaleHelpdeskCertificateArn
+  PortalePaDomain:
+    Value: !Ref PortalePaDomain
+  PortalePfDomain:
+    Value: !Ref PortalePfDomain
+  PortalePfLoginDomain:
+    Value: !Ref PortalePfLoginDomain    
+  LandingDomain:
+    Value: !Ref LandingDomain
+  PortalePgDomain:
+    Value: !Ref PortalePgDomain
+  PortaleStatusDomain:
+    Value: !Ref PortaleStatusDomain    
+  PortaleHelpdeskDomain:
+    Value: !Ref PortaleHelpdeskDomain
+  ReactAppUrlApi:
+    Value: !Ref ReactAppUrlApi
+  BoApiDnsName: 
+    Value: !Ref BoApiDnsName
+  TokenExchangeLambdaEnvironmentIssuer:
+    Value: !Ref TokenExchangeLambdaEnvironmentIssuer
+  TokenExchangeLambdaEnvironmentAllowedIssuer:
+    Value: !Ref TokenExchangeLambdaEnvironmentAllowedIssuer
+  TokenExchangeLambdaEnvironmentAllowedOrigin:
+    Value: !Ref TokenExchangeLambdaEnvironmentAllowedOrigin
+  TokenExchangeLambdaEnvironmentJwksMapping:
+    Value: !Ref TokenExchangeLambdaEnvironmentJwksMapping
+  TokenExchangeLambdaEnvironmentAcceptedAudience:
+    Value: !Ref TokenExchangeLambdaEnvironmentAcceptedAudience
+  TokenExchangeLambdaEnvironmentAudience:
+    Value: !Ref TokenExchangeLambdaEnvironmentAudience
