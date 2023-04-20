@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Define the DNS records neede for a zone delegation
+
+Parameters:
+  EnvName:
+    Type: String
+    Description: The name of the installation devel, beta, uat, preprod, ...
+  NameServers:
+    Type: String
+    Description: A pipe separated list of DNS server names
+  BaseDnsDomain:
+    Type: String
+    Default: 'notifichedigitali.it'
+    Description: 'DNS zone that make delegation to NameServer'
+
+Resources:
+
+  ZoneDelegationRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Sub "${BaseDnsDomain}."
+      Name: !Sub '${EnvName}.${BaseDnsDomain}'
+      Comment: !Sub "Delegation to ${EnvName}.${BaseDnsDomain} zone"
+      ResourceRecords:
+        Fn::Split:
+        - '|'
+        - !Ref NameServers
+      TTL: 600
+      Type: NS
