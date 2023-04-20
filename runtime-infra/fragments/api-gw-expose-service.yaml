@@ -328,7 +328,7 @@ Resources:
       AuthorizerResultTtlInSeconds: '300'
       AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-jwtAuthorizerLambda/invocations'
       IdentitySource: method.request.header.Authorization
-      IdentityValidationExpression: ^Bearer [-0-9a-zA-Z\._]*$
+      IdentityValidationExpression: ^Bearer [-0-9a-zA-Z\._]+$
       RestApiId: !Ref PublicRestApi
 
   # IO Authorizer
