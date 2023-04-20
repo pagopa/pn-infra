@@ -47,7 +47,8 @@ function isLogGroupAllowed(logGroup, allowedLogGroupPatterns){
 
 function mustLog(rec){
   const allowedLogGroupPatterns = [
-    'pn-tokenExchangeLambda'
+    'pn-tokenExchangeLambda',
+    'pn-safestorage-logger'
   ]
 
   const allowedLogStreamPatterns = [
