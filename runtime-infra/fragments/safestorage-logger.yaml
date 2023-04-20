@@ -1,0 +1,146 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+
+Parameters:
+
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  LambdaName:
+    Type: String
+
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
+  LambdaS3Bucket:
+    Type: String
+    Description: s3 bucket name of the lambda used to delivery events to opensearch
+  LambdaS3Key:
+    Type: String
+    Description: s3 object key of the lambda used to delivery events to opensearch
+  
+  LambdaMemory:
+    Type: Number
+    Default: 512
+    MinValue: 256
+    MaxValue: 10240
+    Description: OpenSearch logs ingestion lambda memory
+
+  BatchSize:
+    Type: Number
+    Default: 100
+    Description: Kinesis logs batch size
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic for alarms
+
+  SafeStorageAccountId:
+    Type: String
+
+  QueueName:
+    Type: String
+Resources:
+  SafestorageLoggerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${LambdaName}-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: 
+                - lambda.amazonaws.com
+      Policies:
+        - PolicyName: !Sub '${LambdaName}-role-policy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: allS3
+                Effect: Allow
+                Action:
+                  - 's3:*'
+                Resource: 
+                  - !Sub "arn:${AWS::Partition}:s3:::*"
+                Condition:
+                  StringEquals:
+                    s3:ResourceAccount:
+                      - !Ref SafeStorageAccountId
+              - Sid: kmsDecrypt
+                Effect: Allow
+                Action:
+                  - kms:Encrypt
+                  - kms:Decrypt
+                  - kms:ReEncrypt*
+                  - kms:GenerateDataKey*
+                  - kms:DescribeKey
+                Resource: '*'
+              - Sid: receiveSqs
+                Effect: Allow
+                Action:
+                  - "sqs:ReceiveMessage"
+                  - "sqs:DeleteMessage"
+                  - "sqs:GetQueueAttributes"
+                  - "sqs:ChangeMessageVisibility"
+                  - "sqs:GetQueueUrl"
+                Resource: 
+                  - !Sub 'arn:${AWS::Partition}:sqs:${AWS::Region}:${SafeStorageAccountId}:${QueueName}'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+  SafestorageLoggerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref LambdaName
+      Runtime: nodejs16.x
+      Role: !GetAtt SafestorageLoggerLambdaRole.Arn
+      Handler: index.handler
+      MemorySize: !Ref LambdaMemory
+      Timeout: 30
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"      
+      Code:
+        S3Bucket: !Ref LambdaS3Bucket
+        S3Key: !Ref LambdaS3Key
+
+  SafestorageLoggerLambdaQueuePermission:
+   Type: AWS::Lambda::Permission
+   Properties:
+     Action: 'lambda:InvokeFunction'
+     FunctionName: !GetAtt SafestorageLoggerLambda.Arn
+     Principal: 'sqs.amazonaws.com'
+     SourceAccount: !Ref SafeStorageAccountId
+     SourceArn: !Sub 'arn:${AWS::Partition}:sqs:${AWS::Region}:${SafeStorageAccountId}:${QueueName}'
+
+  SafestorageLoggerLambdaQueueSourceMapping:
+    DependsOn:
+      - SafestorageLoggerLambdaQueuePermission
+    Type: AWS::Lambda::EventSourceMapping
+    Properties: 
+      BatchSize: !Ref BatchSize
+      Enabled: True
+      EventSourceArn: !Sub 'arn:${AWS::Partition}:sqs:${AWS::Region}:${SafeStorageAccountId}:${QueueName}'
+      FunctionName: !Ref SafestorageLoggerLambda
+      MaximumBatchingWindowInSeconds: 0 #default value
+
+  SafestorageLoggerLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref SafestorageLoggerLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+Outputs:
+  InvocationErrorLogsMetricAlarm:
+    Description: 'Lambda alarm ARN'
+    Value: !GetAtt SafestorageLoggerLambdaAlarms.Outputs.LambdaInvocationErrorLogsMetricAlarm
+
+  LambdaArn:
+    Description: 'Lambda ARN'
+    Value: !GetAtt SafestorageLoggerLambda.Arn

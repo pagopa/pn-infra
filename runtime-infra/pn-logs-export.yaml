@@ -81,8 +81,28 @@ Parameters:
     Type: String
     Description: ARN of the SNS topic for alarms
 
+  SafeStorageAccountId: 
+    Type: String
+    Default: '-'
+    
+  SafestorageLoggerLogGroupName:
+    Type: String
+
+  SafestorageLoggerLambdaMemory:
+    Type: Number
+    Default: 512
+    MinValue: 256
+    MaxValue: 10240
+    Description: Safestorage logger lambda memory
+
+  SafestorageLoggerBatchSize:
+    Type: Number
+    Default: 5
+    Description: Safestorage logger batch size
+
 Conditions:
   HasOpenSearchExport: !Not [ !Equals [ !Ref OpenSearchClusterEndpoint, "" ] ]
+  HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, "-" ] ]
 
 Resources:
 
@@ -165,6 +185,25 @@ Resources:
         OpenSearchKinesisBatchSize: !Ref OpenSearchKinesisBatchSize
         OpenSearchKinesisWindow: !Ref OpenSearchKinesisWindow
         OpenSearchParallelizationFactor: !Ref OpenSearchParallelizationFactor
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+ 
+  ###             Safestorage logger                                      ###
+  ###########################################################################
+  SafestorageLogger:
+    Type: AWS::CloudFormation::Stack
+    Condition: HasStorageStorageAccountId
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/safestorage-logger.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
+        LambdaS3Bucket: !Ref LambdasBucketName
+        LambdaS3Key: !Sub "${LambdasBasePath}/safestorage-logger.zip"
+        LambdaMemory: !Ref SafestorageLoggerLambdaMemory
+        BatchSize: !Ref SafestorageLoggerBatchSize
+        SafeStorageAccountId: !Ref SafeStorageAccountId
+        LambdaName: !Ref SafestorageLoggerLogGroupName
+        QueueName: !Sub '${ProjectName}-new-safestorage-cloudtrail-file'
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 Outputs:
