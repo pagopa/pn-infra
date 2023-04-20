@@ -95,7 +95,7 @@ function createAuditLog(record, message = '', aud_type, status) {
         bucketFileKey: record.requestParameters ? record.requestParameters.key : null,
         requestSignedHeaders: record.requestParameters && record.requestParameters.hasOwnProperty('X-Amz-SignedHeaders') ? record.requestParameters['X-Amz-SignedHeaders'] : null,
         requestSigningAlgorithm: record.requestParameters && record.requestParameters.hasOwnProperty('X-Amz-Algorithm') ? record.requestParameters['X-Amz-Algorithm'] : null,
-        requstDate: record.requestParameters && record.requestParameters.hasOwnProperty('X-Amz-Date') ? record.requestParameters['X-Amz-Date'] : null,
+        requestDate: record.requestParameters && record.requestParameters.hasOwnProperty('X-Amz-Date') ? record.requestParameters['X-Amz-Date'] : null,
         trace_id: record.requestParameters && record.requestParameters.hasOwnProperty('x-amzn-trace-id') ? record.requestParameters['x-amzn-trace-id'] : null,
     };
     console.log(JSON.stringify(auditLogRecord));
