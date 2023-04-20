@@ -4,14 +4,13 @@ Description: Define the DNS zone for an installation of "Piattaforma Notifiche"
 Parameters:
   EnvName:
     Type: String
-    Default: 'prod'
     Description: The name of the installation devel, beta, uat, preprod, ...
 
 Resources:
   HostedZone:
     Type: AWS::Route53::HostedZone
     Properties:
-      Name: !Sub '${EnvName}.pn.pagopa.it'
+      Name: !Sub 'spid.${EnvName}.notifichedigitali.it'
       HostedZoneConfig:
         Comment: !Sub Public zone for 'Piattaforma notifiche' ambiente ${EnvName}
 
@@ -20,10 +19,10 @@ Resources:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId: !Ref HostedZone
-      Name: !Sub 'testdns.${EnvName}.pn.pagopa.it'
-      Comment: !Sub "Entry DNS di prova per PN ${EnvName}"
+      Name: !Sub 'testdns.spid.${EnvName}.notifichedigitali.it'
+      Comment: !Sub "Entry DNS di prova per SPID notifichedigitali.it ${EnvName}"
       ResourceRecords:
-        - !Sub '"Test DNS entry for PN ${EnvName}"'
+        - !Sub '"Test DNS entry for notifichedigitali.it SPID ${EnvName}"'
       TTL: 120
       Type: TXT
       Weight: 1
@@ -33,8 +32,8 @@ Resources:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId: !Ref HostedZone
-      Name: !Sub '${EnvName}.pn.pagopa.it'
-      Comment: !Sub "CAA DNS record for PN ${EnvName}"
+      Name: !Sub 'spid.${EnvName}.notifichedigitali.it'
+      Comment: !Sub "CAA DNS record for notifichedigitali.it ${EnvName}"
       ResourceRecords: 
         - '0 issue "amazonaws.com"'
       TTL: 120
@@ -49,6 +48,4 @@ Outputs:
   ZoneId:
     Value: !Ref HostedZone
     Description: 'Zone Id useful if you want add records'
-    Export:
-      Name: !Sub '${EnvName}-pn-zone-id'
 

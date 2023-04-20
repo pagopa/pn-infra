@@ -10,7 +10,7 @@ Resources:
   HostedZone:
     Type: AWS::Route53::HostedZone
     Properties:
-      Name: !Sub 'spid.${EnvName}.notifichedigitali.it'
+      Name: !Sub 'spid.${EnvName}.pn.pagopa.it'
       HostedZoneConfig:
         Comment: !Sub Public zone for 'Piattaforma notifiche' ambiente ${EnvName}
 
@@ -19,10 +19,10 @@ Resources:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId: !Ref HostedZone
-      Name: !Sub 'testdns.spid.${EnvName}.notifichedigitali.it'
-      Comment: !Sub "Entry DNS di prova per SPID notifichedigitali.it ${EnvName}"
+      Name: !Sub 'testdns.spid.${EnvName}.pn.pagopa.it'
+      Comment: !Sub "Entry DNS di prova per SPID PN ${EnvName}"
       ResourceRecords:
-        - !Sub '"Test DNS entry for notifichedigitali.it SPID ${EnvName}"'
+        - !Sub '"Test DNS entry for PN SPID ${EnvName}"'
       TTL: 120
       Type: TXT
       Weight: 1
@@ -32,8 +32,8 @@ Resources:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId: !Ref HostedZone
-      Name: !Sub 'spid.${EnvName}.notifichedigitali.it'
-      Comment: !Sub "CAA DNS record for notifichedigitali.it ${EnvName}"
+      Name: !Sub 'spid.${EnvName}.pn.pagopa.it'
+      Comment: !Sub "CAA DNS record for PN ${EnvName}"
       ResourceRecords: 
         - '0 issue "amazonaws.com"'
       TTL: 120
