@@ -138,8 +138,17 @@ Parameters:
 
   DowntimeLogsSafeStorageEventsQueueURL:
     Type: String
+
+  AddressManagerToDeliveryPushQueueARN:
+    Type: String
+
+  AddressManagerToDeliveryPushQueueURL:
+    Type: String
+
+
 Conditions:
   HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
+  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ]]
 
 Resources:
 
@@ -163,6 +172,20 @@ Resources:
         Effect: "Allow"
         Principal: 
             AWS: !Sub "arn:aws:iam::${SafeStorageAccountId}:root"
+        Action: "events:PutEvents"
+        Resource: !GetAtt "PnCoreEventBus.Arn"
+
+  # Allow access from confinfo
+  PnCoreEventBusConfidentialInfoAccessPolicy: 
+    Type: AWS::Events::EventBusPolicy
+    Condition: HasConfidentialInfoAccountId
+    Properties: 
+      EventBusName: !Ref PnCoreEventBus
+      StatementId: "AllowEventPutByConfidentialInfo"
+      Statement: 
+        Effect: "Allow"
+        Principal: 
+            AWS: !Sub "arn:aws:iam::${ConfidentialInfoAccountId}:root"
         Action: "events:PutEvents"
         Resource: !GetAtt "PnCoreEventBus.Arn"
 
@@ -198,6 +221,7 @@ Resources:
                   - !Ref "NationalRegistries2DeliveryPushQueueARN"
                   - !Ref "NationalRegistries2PaperChannelQueueARN"
                   - !Ref "NationalRegistries2SelcPGQueueARN"
+                  - !Ref "AddressManagerToDeliveryPushQueueARN"
   
   # Resource based policy to allow EventBridge to publish to CloudWatch Logs
   LogGroupCoreEventBusPolicy:
@@ -260,7 +284,8 @@ Resources:
         - !Ref "DowntimeLogsSafeStorageEventsQueueURL"
         - !Ref "NationalRegistries2DeliveryPushQueueURL"
         - !Ref "NationalRegistries2PaperChannelQueueURL"
-        - !Ref "NationalRegistries2SelcPGQueueURL"        
+        - !Ref "NationalRegistries2SelcPGQueueURL"  
+        - !Ref "AddressManagerToDeliveryPushQueueURL"  
       PolicyDocument:
         Statement:
           - Sid: "SendEventsToDLQ"
@@ -279,6 +304,7 @@ Resources:
               - !Ref "NationalRegistries2DeliveryPushQueueARN"
               - !Ref "NationalRegistries2PaperChannelQueueARN"
               - !Ref "NationalRegistries2SelcPGQueueARN"        
+              - !Ref "AddressManagerToDeliveryPushQueueARN"        
 
   # Log all events
   CoreEventBusEventsLogGroup:
@@ -355,6 +381,37 @@ Resources:
       Targets: 
         - Arn: !GetAtt CoreEventBusEventsLogGroup.Arn
           Id: LogTarget
+
+  # Send Address Manager Response to pn-delivery-push
+  PnCoreEventBusToAddressManagerToDeliveryPushResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route Address Manager Events to pn-delivery-push
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "AddressManagerOutcomeEvent" ]
+        detail:
+          source: [ "pn-delivery-push" ]
+      Targets: 
+        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
+          Id: !Sub ${ProjectName}-Logger-AddressManager2DeliveryPush
+          InputTransformer:
+            InputPathsMap:
+              "timestamp": "$.time"
+            InputTemplate: |
+              {
+                  "timestamp": <timestamp>,
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }       
+        - Id: !Sub '${ProjectName}-CoreEventBus-AddressManager2DeliveryPush'
+          Arn: !Ref AddressManagerToDeliveryPushQueueARN
+          InputPath: $.detail.body
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Send National Registries Response to pn-delivery-push
   PnCoreEventBusToNationalRegistries2DeliveryPushResponseQueue:
