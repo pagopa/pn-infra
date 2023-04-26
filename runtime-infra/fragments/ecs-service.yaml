@@ -399,7 +399,47 @@ Parameters:
     Type: String
     Default: ''
   ContainerEnvEntry49:
-    Description: 48th container environment entry in the form key=value
+    Description: 49th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry50:
+    Description: 50th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry51:
+    Description: 51th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry52:
+    Description: 52th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry53:
+    Description: 53th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry54:
+    Description: 54th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry55:
+    Description: 55th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry56:
+    Description: 56th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry57:
+    Description: 57th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry58:
+    Description: 58th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry59:
+    Description: 59th container environment entry in the form key=value
     Type: String
     Default: ''
 
@@ -542,6 +582,16 @@ Conditions:
   Env47Exist: !Not [ !Equals [ !Ref ContainerEnvEntry47, '' ] ]
   Env48Exist: !Not [ !Equals [ !Ref ContainerEnvEntry48, '' ] ]
   Env49Exist: !Not [ !Equals [ !Ref ContainerEnvEntry49, '' ] ]
+  Env50Exist: !Not [ !Equals [ !Ref ContainerEnvEntry50, '' ] ]
+  Env51Exist: !Not [ !Equals [ !Ref ContainerEnvEntry51, '' ] ]
+  Env52Exist: !Not [ !Equals [ !Ref ContainerEnvEntry52, '' ] ]
+  Env53Exist: !Not [ !Equals [ !Ref ContainerEnvEntry53, '' ] ]
+  Env54Exist: !Not [ !Equals [ !Ref ContainerEnvEntry54, '' ] ]
+  Env55Exist: !Not [ !Equals [ !Ref ContainerEnvEntry55, '' ] ]
+  Env56Exist: !Not [ !Equals [ !Ref ContainerEnvEntry56, '' ] ]
+  Env57Exist: !Not [ !Equals [ !Ref ContainerEnvEntry57, '' ] ]
+  Env58Exist: !Not [ !Equals [ !Ref ContainerEnvEntry58, '' ] ]
+  Env59Exist: !Not [ !Equals [ !Ref ContainerEnvEntry59, '' ] ]
 
   Secret1Exist: !Not [ !Equals [ !Ref ContainerSecret1, '' ] ]
   Secret2Exist: !Not [ !Equals [ !Ref ContainerSecret2, '' ] ]
@@ -1042,6 +1092,56 @@ Resources:
                 - Env49Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry49 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry49 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env50Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry50 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry50 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env51Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry51 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry51 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env52Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry52 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry52 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env53Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry53 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry53 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env54Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry54 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry54 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env55Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry55 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry55 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env56Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry56 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry56 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env57Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry57 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry57 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env58Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry58 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry58 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env59Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry59 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry59 ] ]
                 - !Ref "AWS::NoValue"
           PortMappings:
             - ContainerPort: 8080
