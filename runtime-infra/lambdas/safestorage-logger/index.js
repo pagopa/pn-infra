@@ -1,6 +1,7 @@
 const AWS = require('aws-sdk')
 const zlib = require('zlib');
 const stream = require('stream');
+const auditLog = require("./lib/log.js");
 
 exports.handler = async (event) => { 
     console.log( JSON.stringify(event, null, 2) );
@@ -68,12 +69,12 @@ function filterAndPrintElement(unzippedBody) {
     const filteredRecords = body.Records.filter(record => record.eventName === "GetObject");
     filteredRecords.forEach(record => {
         if(record.requestParameters.hasOwnProperty('x-amzn-trace-id')) {
-            createAuditLog(record, '', 'AUD_DOWNLOAD', 'OK')
+            auditLog(record, '', 'AUD_DOWNLOAD', 'OK')
         }
         else {
             const userIdentity = record.userIdentity;
             if(userIdentity.hasOwnProperty('arn') && userIdentity.arn.includes('assumed-role/pn-safe-storage-TaskRole')) {
-                createAuditLog(record, 'Amazon headers are not present!', 'AUD_DOWNLOAD', 'KO')
+                auditLog(record, 'Amazon headers are not present!', 'AUD_DOWNLOAD', 'KO')
             }
             else {
                 // ignoro l'evento
@@ -82,38 +83,4 @@ function filterAndPrintElement(unzippedBody) {
 
 
     });
-}
-
-function createAuditLog(record, message = '', aud_type, status) {
-    let statusMessage = `INFO - ${message}`;
-    if (status === 'OK') {
-        statusMessage = `OK - SUCCESS - ${message}`;
-    }
-    if (status === 'KO') {
-        statusMessage = `KO - FAILURE - ${message}`;
-    }
-    const auditLogRecord = {
-        name: 'AUDIT_LOG',
-        message: `[${aud_type}] - ${statusMessage}`,
-        aud_type: aud_type,
-        level: status === 'KO' ? 'ERROR' : 'INFO',
-        level_value: status === 'KO' ? 40000 : 20000,
-        logger_name: 'pn-safestorage-logger',
-        eventID: record.eventID,
-        eventName: record.eventName,
-        eventTime: record.eventTime,
-        requestID: record.requestID,
-        bucketFileKey: record.requestParameters ? record.requestParameters.key : null,
-        requestSignedHeaders: record.requestParameters && record.requestParameters.hasOwnProperty('X-Amz-SignedHeaders') ? record.requestParameters['X-Amz-SignedHeaders'] : null,
-        requestSigningAlgorithm: record.requestParameters && record.requestParameters.hasOwnProperty('X-Amz-Algorithm') ? record.requestParameters['X-Amz-Algorithm'] : null,
-        requstDate: record.requestParameters && record.requestParameters.hasOwnProperty('X-Amz-Date') ? record.requestParameters['X-Amz-Date'] : null,
-        trace_id: record.requestParameters && record.requestParameters.hasOwnProperty('x-amzn-trace-id') ? record.requestParameters['x-amzn-trace-id'] : null,
-    };
-    if(status === 'KO') {
-        console.error(JSON.stringify(auditLogRecord));
-    }
-    else {
-        console.log(JSON.stringify(auditLogRecord));
-    }
-
 }
