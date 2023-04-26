@@ -69,12 +69,12 @@ function filterAndPrintElement(unzippedBody) {
     const filteredRecords = body.Records.filter(record => record.eventName === "GetObject");
     filteredRecords.forEach(record => {
         if(record.requestParameters.hasOwnProperty('x-amzn-trace-id')) {
-            auditLog(record, '', 'AUD_DOWNLOAD', 'OK')
+            auditLog(record, '', 'AUD_DOWNLOAD', 'OK').info('info')
         }
         else {
             const userIdentity = record.userIdentity;
             if(userIdentity.hasOwnProperty('arn') && userIdentity.arn.includes('assumed-role/pn-safe-storage-TaskRole')) {
-                auditLog(record, 'Amazon headers are not present!', 'AUD_DOWNLOAD', 'KO')
+                auditLog(record, 'Amazon headers are not present!', 'AUD_DOWNLOAD', 'KO').error('error')
             }
             else {
                 // ignoro l'evento
