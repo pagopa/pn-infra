@@ -247,8 +247,13 @@ Parameters:
   TokenExchangeLambdaEnvironmentAudience:
     Type: String
     Description: Audience value for token generation
+  ApikeyAuthorizerV2PDNDAudience:
+    Type: String
+    Description: Pdnd Audience for ApikeyAuthorizerV2
+
   SafestorageLoggerLogGroupName:
     Type: String
+
   
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
@@ -888,5 +893,7 @@ Outputs:
     Value: !Ref TokenExchangeLambdaEnvironmentAcceptedAudience
   TokenExchangeLambdaEnvironmentAudience:
     Value: !Ref TokenExchangeLambdaEnvironmentAudience
+  ApikeyAuthorizerV2PDNDAudience:
+    Value: !Ref ApikeyAuthorizerV2PDNDAudience
   SafestorageLoggerLogGroupName:
     Value: !Ref SafestorageLoggerLogGroupName
