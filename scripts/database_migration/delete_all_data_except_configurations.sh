@@ -172,6 +172,10 @@ delete_some_records "pn-operations-iuns" "id"
 
 delete_some_records "pn-WebhookEvents" "hashKey,sortKey"
 
+delete_some_records "pn-batchPolling" "batchId"
+
+delete_some_records "pn-batchRequests" "correlationId"
+
 
 
 
