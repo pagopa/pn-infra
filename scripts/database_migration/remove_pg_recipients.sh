@@ -91,7 +91,7 @@ dump_params
 
 
 echo "=== Base AWS command parameters"
-aws_command_base_args=""
+aws_command_base_args="--output json"
 if ( [ ! -z "${aws_profile}" ] ) then
   aws_command_base_args="${aws_command_base_args} --profile $aws_profile"
 fi
