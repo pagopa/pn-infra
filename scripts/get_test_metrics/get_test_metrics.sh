@@ -13,7 +13,7 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 usage() {
       cat <<EOF
-    Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] [-p <aws-profile>] -r <aws-region> -s <start-time> -e <end-time> [-P <period>]
+    Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] [-p <aws-profile>] -r <aws-region> -s <start-time> -e <end-time> [-P <period>] [-c <aws-profile-confinfo>]
     [-h]                      : this help message
     [-v]                      : verbose mode
     [-p <aws-profile>]        : aws cli profile (optional)
@@ -21,6 +21,7 @@ usage() {
     -s <start-time>           : aws cloudwatch get metrics start time
     -e <end-time>             : aws cloudwatch get metrics end time
     [-P <period>]             : aws cloudwatch get metrics period of sampling (optional - default=60)
+    [-c <aws-profile-confinfo>] : aws cli profile for confinfo account
 EOF
   exit 1
 }
@@ -64,6 +65,10 @@ parse_params() {
       period="${2-}"
       shift
       ;;
+    -c | --profile-confinfo) 
+      aws_confinfo="${2-}"
+      shift
+      ;;
     -?*) die "Unknown option: $1" ;;
     *) break ;;
     esac
@@ -88,6 +93,7 @@ dump_params(){
   echo "AWS cloudwatch start time:  ${start_time}"
   echo "AWS cloudwatch end time     ${end_time}"
   echo "AWS cloudwatch period       ${period}"
+  echo "AWS confidential profile:   ${aws_confinfo}"
   }
 
 # START SCRIPT
@@ -106,11 +112,23 @@ if ( [ ! -z "${aws_region}" ] ) then
   aws_command_base_args="${aws_command_base_args} --region  $aws_region"
 fi
 echo ${aws_command_base_args}
+echo ""
+echo "=== Base AWS command parameters for confinfo"
+aws_command_base_args_confinfo=""
+if ( [ ! -z "${aws_confinfo}" ] ) then
+  aws_command_base_args_confinfo="${aws_command_base_args_confinfo} --profile $aws_confinfo"
+fi
+if ( [ ! -z "${aws_region}" ] ) then
+  aws_command_base_args_confinfo="${aws_command_base_args_confinfo} --region  $aws_region"
+fi
+echo ${aws_command_base_args_confinfo}
+echo ""
+
 
 ## assign default value for period if not assigned:
 period="${period:=60}"
 
-dir=monitoring_${aws_profile}_$(date +"%d-%m-%Y")
+dir=monitoring_$(date +"%d-%m-%Y")
 
 mkdir -p $dir
 
@@ -132,7 +150,7 @@ lambdainsight=(memory_utilization rx_bytes cpu_total_time)
 aws_lambda_max=(IteratorAge Duration)
 aws_lambda_sum=(Throttles Invocations Errors)
 aws_sqs_max=(ApproximateAgeOfOldestMessage)
-aws_sqs_sum=(ApproximateNumberOfMessagesVisible)
+aws_sqs_sum=(ApproximateNumberOfMessagesVisible NumberOfMessagesSent NumberOfMessagesReceived)
 msvc_max=(TargetResponseTime)
 msvc_sum=(HTTPCode_Target_4XX_Count HTTPCode_Target_5XX_Count RequestCount)
 api_gw_max=(Latency  Count )
@@ -146,6 +164,14 @@ aws ${aws_command_base_args} cloudwatch get-metric-statistics --metric-name $i -
 done
 done
 echo "==> ECS metrics done"
+
+echo "==> start export ECS metrics for Confidential Account"
+for i in ${awsecs[@]}; do
+for ecsmetrics in  $(aws ${aws_command_base_args_confinfo} cloudwatch list-metrics --metric-name $i --namespace AWS/ECS  --output text | grep ServiceName | awk '{print $2",Value="$3}') ; do
+aws ${aws_command_base_args} cloudwatch get-metric-statistics --metric-name $i --start-time $start_time --end-time $end_time --period $period --statistics ${statistics[0]}  --dimensions Name=$ecsmetrics Name=ClusterName,Value=pn-confidential-ecs-cluster --namespace AWS/ECS >> ecs_$(echo $i  | cut -d "=" -f 2)_$(echo $ecsmetrics  | cut -d "=" -f 2).json && echo  ecs export for: $( echo $i  | cut -d "=" -f 2)_$(echo $ecsmetrics  | cut -d "=" -f 2);
+done
+done
+echo "==> ECS metrics for Confidential Account done"
 
 echo "==> start export OutofMemory_Error"
 aws ${aws_command_base_args} cloudwatch get-metric-statistics --metric-name pn-ECSOutOfMemory  --start-time $start_time --end-time $end_time --period $period --statistics ${statistics[1]}  --namespace OutOfMemoryErrors >> oom_metrics.json && echo  "OutofMemory_error export done";
@@ -174,13 +200,31 @@ for aws_sqs in  $(aws ${aws_command_base_args} cloudwatch list-metrics  --namesp
 for not_dlq in $(echo $aws_sqs | grep -v DLQ); do
 for i in ${aws_sqs_max[@]}; do
 aws ${aws_command_base_args} cloudwatch get-metric-statistics --metric-name $i --start-time $start_time --end-time $end_time --period $period --statistics ${statistics[0]} --dimensions Name=$not_dlq --namespace AWS/SQS  >> aws_sqs_$(echo $i  | cut -d "=" -f 2)_$(echo $not_dlq  | cut -d "=" -f 2).json && echo  aws_sqs export for: $( echo $i  | cut -d "=" -f 2)_$(echo $not_dlq  | cut -d "=" -f 2); done
+for k in ${aws_sqs_sum[@]}; do
+aws ${aws_command_base_args} cloudwatch get-metric-statistics --metric-name $k --start-time $start_time --end-time $end_time --period $period --statistics ${statistics[1]} --dimensions Name=$not_dlq --namespace AWS/SQS  >> aws_sqs_$(echo $k  | cut -d "=" -f 2)_$(echo $not_dlq  | cut -d "=" -f 2).json && echo  aws_sqs export for: $( echo $k  | cut -d "=" -f 2)_$(echo $not_dlq  | cut -d "=" -f 2); done
 done
 for dlq in $(echo $aws_sqs | grep DLQ); do
-for j in ${aws_sqs_sum[@]}; do
+for j in ${aws_sqs_sum[0]}; do
 aws ${aws_command_base_args} cloudwatch get-metric-statistics --metric-name $j --start-time $start_time --end-time $end_time --period $period --statistics ${statistics[1]} --dimensions Name=$dlq --namespace AWS/SQS  >> aws_sqs_dlq_$(echo $j  | cut -d "=" -f 2)_$(echo $dlq  | cut -d "=" -f 2).json && echo  aws_sqs_dql export for: $( echo $j  | cut -d "=" -f 2)_$(echo $dlq  | cut -d "=" -f 2); done
 done
 done
 echo "==> AWS/SQS metrics done"
+
+echo "==> start export AWS/SQS metrics for confidentail account":
+for aws_sqs in  $(aws ${aws_command_base_args_confinfo} cloudwatch list-metrics  --namespace AWS/SQS  --output text | grep QueueName | awk '{print $2",Value="$3}' | sort | uniq -c | awk '{print $2}' ) ; do
+for not_dlq in $(echo $aws_sqs | grep -v DLQ); do
+for i in ${aws_sqs_max[@]}; do
+aws ${aws_command_base_args_confinfo} cloudwatch get-metric-statistics --metric-name $i --start-time $start_time --end-time $end_time --period $period --statistics ${statistics[0]} --dimensions Name=$not_dlq --namespace AWS/SQS  >> aws_sqs_$(echo $i  | cut -d "=" -f 2)_$(echo $not_dlq  | cut -d "=" -f 2).json && echo  aws_sqs export for: $( echo $i  | cut -d "=" -f 2)_$(echo $not_dlq  | cut -d "=" -f 2); done
+for k in ${aws_sqs_sum[@]}; do
+aws ${aws_command_base_args_confinfo} cloudwatch get-metric-statistics --metric-name $k --start-time $start_time --end-time $end_time --period $period --statistics ${statistics[1]} --dimensions Name=$not_dlq --namespace AWS/SQS  >> aws_sqs_$(echo $k  | cut -d "=" -f 2)_$(echo $not_dlq  | cut -d "=" -f 2).json && echo  aws_sqs export for: $( echo $k  | cut -d "=" -f 2)_$(echo $not_dlq  | cut -d "=" -f 2); done
+done
+# in attesa di fix nome DLQ su confinfo:
+# for dlq in $(echo $aws_sqs | grep DLQ); do
+# for j in ${aws_sqs_sum[0]}; do
+# aws ${aws_command_base_args_confinfo} cloudwatch get-metric-statistics --metric-name $j --start-time $start_time --end-time $end_time --period $period --statistics ${statistics[1]} --dimensions Name=$dlq --namespace AWS/SQS  >> aws_sqs_dlq_$(echo $j  | cut -d "=" -f 2)_$(echo $dlq  | cut -d "=" -f 2).json && echo  aws_sqs_dlq export for: $( echo $j  | cut -d "=" -f 2)_$(echo $dlq  | cut -d "=" -f 2); done
+# done
+done
+echo "==> AWS/SQS metrics for confidentail account done"
 
 echo "==> start export AWS/ApplicationELB metrics":
 for mscv_metrics in  $(aws ${aws_command_base_args} cloudwatch list-metrics  --namespace AWS/ApplicationELB  --output text | grep TargetGroup | awk '{print $2",Value="$3}' | sort | uniq -c | awk '{print $2}' ) ; do
@@ -207,4 +251,24 @@ aws ${aws_command_base_args} cloudwatch get-metric-statistics --metric-name $i  
 done
 echo "==> OER SLA Violations metrics done"
 
+echo "==> change to parent directory:";
+cd .. ;
+echo "==> starting aws x-ray analisys:"
+if [[ $(ls | grep .json) ]]; then
+    echo "there is a json file, creating directory";
+    mkdir -p monitoring_xray;
+    cat *.json | jq  -r  '.msg'  | grep -E "HTTP/2.0|X-Amzn-Requestid|X-Amzn-Trace-Id" > monitoring_xray/monitoring_xray_search.txt  ; cd monitoring_xray;
+    echo "export json from AWS Xray:"
+    for traceid in $(cat monitoring_xray_search.txt | grep X-Amzn-Trace-Id   | sed -E 's/X-Amzn-Trace-Id: Root=//g') ; do  
+    aws ${aws_command_base_args} xray batch-get-traces --trace-ids $traceid > $traceid.json ; 
+    echo "export json from AWS Xray for TraceID: $traceid " ;
+    done
+    cd .. ;
+    echo "export json from AWS Xray done"
+else
+    echo "no json files found, nothing to do"
+fi
+echo "create tarball:"
+tar -czvf "metrics_$(date '+%Y-%m-%d')_export.tar.gz"   monitoring_* && rm -rf monitoring_* ;
 echo "==> ALL DONE <=="
+
