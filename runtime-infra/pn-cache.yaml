@@ -8,6 +8,10 @@ Parameters:
     Type: String
     Description: Name of the project
 
+  AlarmSNSTopicName:
+    Type: String
+    Description: "A name of an SNS topic where to send alarm." 
+
   NodeType:
     Type: String
     Description: Cache node type (i.e. cache.t2.micro)
@@ -23,6 +27,34 @@ Parameters:
   VpcId:
     Type: "AWS::EC2::VPC::Id"
     Description: VPC id for the cluster
+
+  CPUUtilizationThreshold:
+    Type: Number
+    Description: The threshold percentage of CPU usage.
+    MinValue: 0
+    MaxValue: 100
+    Default: 60
+
+  EngineCPUUtilizationThreshold:
+    Type: Number
+    Description: The threshold percentage of CPU utilization of the Redis engine thread
+    MinValue: 0
+    MaxValue: 100
+    Default: 60
+
+  RedisMemoryUsedThreshold:
+    Type: Number
+    Description: The threshold percentage for the amount of memory utilized.
+    MinValue: 0
+    MaxValue: 100
+    Default: 60
+
+  CurrentConnectionsThreshold:
+    Type: Number
+    Description: "The threshold number of concurrent and active connections. (Max connections: 65000)."
+    MinValue: 0
+    MaxValue: 65000
+    Default: 60000
 
 Resources:
   SubnetGroup:
@@ -62,6 +94,94 @@ Resources:
             - SecurityGroup
             - GroupId
 
+  RedisEngineCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ProjectName}-redis-EngineCPUUtilization
+      AlarmDescription: "CloudWatch alarm for Redis Engine CPU Unilization."
+      AlarmActions: 
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      DatapointsToAlarm: 1
+      Dimensions: 
+        - Name: CacheClusterId
+          Value: !Ref Cluster
+      MetricName: EngineCPUUtilization
+      Namespace: AWS/ElastiCache
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Statistic: Sum
+      Threshold: !Ref EngineCPUUtilizationThreshold
+      TreatMissingData: missing
+
+  RedisCPUUtilizationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ProjectName}-redis-CPUUtilization
+      AlarmDescription: "CloudWatch alarm for Redis  CPU Unilization."
+      AlarmActions: 
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      DatapointsToAlarm: 1
+      Dimensions: 
+        - Name: CacheClusterId
+          Value: !Ref Cluster
+      MetricName: CPUUtilization
+      Namespace: AWS/ElastiCache
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Statistic: Sum
+      Threshold: !Ref CPUUtilizationThreshold
+      TreatMissingData: missing
+
+  RedisMemoryUtilizationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ProjectName}-redis-MemoryUsage
+      AlarmDescription: "CloudWatch alarm for Redis  Memory usage."
+      AlarmActions: 
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      DatapointsToAlarm: 1
+      Dimensions: 
+        - Name: CacheClusterId
+          Value: !Ref Cluster
+      MetricName: DatabaseMemoryUsagePercentage
+      Namespace: AWS/ElastiCache
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Statistic: Sum
+      Threshold: !Ref RedisMemoryUsedThreshold
+      TreatMissingData: missing
+
+  RedisCurrentConnectionsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ProjectName}-redis-CurrentConnections
+      AlarmDescription: "CloudWatch alarm for concurrent and active connections."
+      AlarmActions: 
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      DatapointsToAlarm: 1
+      Dimensions: 
+        - Name: CacheClusterId
+          Value: !Ref Cluster
+      MetricName: CurrConnections
+      Namespace: AWS/ElastiCache
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Statistic: Sum
+      Threshold: !Ref CurrentConnectionsThreshold
+      TreatMissingData: missing
+
 Outputs:
   AllowedSecurityGroupId:
     Description: The id of the security group that can access the cache cluster
@@ -70,3 +190,15 @@ Outputs:
   RedisEndpoint:
     Description: The id of the security group that can access the cache cluster
     Value: !GetAtt Cluster.RedisEndpoint.Address
+  
+  RedisCurrentConnectionsAlarmArn:
+    Value: !GetAtt RedisCurrentConnectionsAlarm.Arn
+
+  RedisMemoryUtilizationAlarm:
+    Value: !GetAtt RedisMemoryUtilizationAlarm.Arn
+
+  RedisCPUUtilizationAlarm:
+    Value: !GetAtt RedisCPUUtilizationAlarm.Arn
+
+  RedisEngineCPUAlarm:
+    Value: !GetAtt RedisEngineCPUAlarm.Arn
