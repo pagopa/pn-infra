@@ -198,6 +198,10 @@ Resources:
                     if 'AlarmName' in sqs_message:
                         #Message type is an Alarm message
                         _message=sqs_message
+                    elif 'alarmName' in sqs_message:
+                        # Message type is an Alarm State Change
+                        if sqs_message['alarmName']=='pn-LambdaAllAlarmSnsPublisher-Alarm':
+                          _message=sqs_message
                     else:
                         #Message not Alarm type - Handle CodeBuild/CodePipeline
                         resource_source = sqs_message['source']
