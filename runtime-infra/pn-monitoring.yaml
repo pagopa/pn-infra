@@ -227,6 +227,9 @@ Resources:
       Targets: 
         - Arn: !GetAtt CompositeMetricGenerator.Arn
           Id: !Sub ${ProjectName}-AlarmStateChangeTarget
+        - Arn: !Ref AlarmSNSTopicArn
+          InputPath: $.detail
+          Id: !Sub ${ProjectName}-AlarmSnsTopic
 
   # - Role and policy used to execute lambda from EventBridge rule
   MonitoringBusExecuteLambdaRole:
