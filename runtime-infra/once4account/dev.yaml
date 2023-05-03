@@ -23,6 +23,8 @@ Conditions:
   MilanRegion: 
     !Equals [!Ref 'AWS::Region', 'eu-south-1']
 
+  HasConfidentialInfoAccount: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
+
 Resources:
 
   ###              API GATEWAY ACCOUNT-GLOBAL CONFIGURATIONS              ###
@@ -87,7 +89,10 @@ Resources:
             Effect: Allow
             Principal:
               AWS: 
-                - !Sub arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root
+                - Fn::If: 
+                  - HasConfidentialInfoAccount
+                  - !Sub arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root
+                  - !Ref AWS::NoValue
             Action:
               - 'sns:Publish'
             Resource:
