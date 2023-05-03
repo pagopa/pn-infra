@@ -53,6 +53,9 @@ Parameters:
     Type: Number
     Default: '15'
   
+  ConfidentialInfoAccountId:
+    Type: String
+  
 Resources:
   MessageEnrichmentQueue:
     Type: AWS::SQS::Queue
@@ -157,6 +160,7 @@ Resources:
           import boto3
           import os
           import traceback
+          from datetime import datetime
 
           def lambda_handler(event, context):
               success = {}
@@ -199,9 +203,24 @@ Resources:
                         #Message type is an Alarm message
                         _message=sqs_message
                     elif 'alarmName' in sqs_message:
-                        # Message type is an Alarm State Change
-                        if sqs_message['alarmName']=='pn-LambdaAllAlarmSnsPublisher-Alarm':
-                          _message=sqs_message
+                      # Message type is an Alarm State Change
+                      if sqs_message['alarmName']=='pn-LambdaAllAlarmSnsPublisher-Alarm':
+                        _message = {
+                          "version": "0",
+                          "id":event['Records'][0]['messageId'],
+                          "detail-type": "ALARM "+sqs_message['alarmName']+" is in state "+sqs_message['state']['value'],
+                          "source": "aws.cloudwatch",
+                          "account": os.environ['ConfidentialInfoAccountId'],
+                          "time": datetime.now().isoformat(sep='T',timespec='seconds')+"Z",
+                          "region": region,
+                          "resources": [],
+                          "detail":{
+                              "result":"SUCCESS",
+                              "image-digest":"sha256:7f5b2640fe6fb4f46592dfd3410c4a79dac4f89e4782432e0378abcd1234",
+                              "action-type":"PUSH",
+                              "image-tag":"latest"
+                          }
+                        }
                     else:
                         #Message not Alarm type - Handle CodeBuild/CodePipeline
                         resource_source = sqs_message['source']
@@ -249,8 +268,8 @@ Resources:
                         }
                     
                     print('########### OUTPUT MESSAGE #############')
-                    print(_message)
                     if _message is not None:
+                        print(_message)
                         response = sns.publish(
                             TopicArn=SlackSNSTopic,
                             Message=json.dumps(_message),
@@ -281,6 +300,7 @@ Resources:
       Environment: 
         Variables:  
           SlackSNSTopic: !Ref SNSTopicToSlack
+          ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
       FunctionName: !Sub ${QueueName}-message-enrich-lambda
       Handler: index.lambda_handler
       Role: !GetAtt MessageCustomizationLambdaRole.Arn
