@@ -85,18 +85,18 @@ Resources:
               - 'sns:Publish'
             Resource:
               - !Ref AlarmSNSTopic
-          - Sid: AllowPublishFromConfinfo
-            Effect: Allow
-            Principal:
-              AWS: 
-                - Fn::If: 
-                  - HasConfidentialInfoAccount
-                  - !Sub arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root
-                  - !Ref AWS::NoValue
-            Action:
+          - Fn::If: 
+            - HasConfidentialInfoAccount
+            - Sid: AllowPublishFromConfinfo
+              Effect: Allow
+              Action:
               - 'sns:Publish'
-            Resource:
-              - !Ref AlarmSNSTopic
+              Principal:
+                AWS: 
+                  - !Sub arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root
+              Resource:
+                - !Ref AlarmSNSTopic
+            - !Ref AWS::NoValue
       Topics:
         - !Ref AlarmSNSTopic
   
