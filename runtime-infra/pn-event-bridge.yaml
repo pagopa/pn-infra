@@ -422,8 +422,7 @@ Resources:
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "NationalRegistriesOutcomeEvent" ]
-        detail:
-          source: [ "pn-delivery-push" ]
+        source: [ "pn-delivery-push" ]
       Targets: 
         - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
           Id: !Sub ${ProjectName}-Logger-NationalRegistries2DeliveryPush
