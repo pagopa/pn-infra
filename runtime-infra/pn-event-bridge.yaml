@@ -391,8 +391,7 @@ Resources:
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "AddressManagerOutcomeEvent" ]
-        detail:
-          source: [ "pn-address-manager" ]
+        source: [ "pn-address-manager" ]
       Targets: 
         - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
           Id: !Sub ${ProjectName}-Logger-AddressManager2DeliveryPush
@@ -422,7 +421,8 @@ Resources:
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "NationalRegistriesOutcomeEvent" ]
-        source: [ "pn-delivery-push" ]
+        detail:
+          source: [ "pn-delivery-push" ]
       Targets: 
         - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
           Id: !Sub ${ProjectName}-Logger-NationalRegistries2DeliveryPush
