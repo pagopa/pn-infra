@@ -8,6 +8,11 @@ Parameters:
     Type: String
     Description: Name of the project
 
+  BucketName:
+    Type: String
+    Description: Name of the project
+    Default: pn-cognito-logs
+
   LogRetentionPeriod:
     Type: Number
     Default: 1
@@ -27,7 +32,7 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
-      BucketName: !Sub ${ProjectName}-cognito-logs
+      BucketName: !Ref BucketName
       ObjectLockConfiguration: 
         ObjectLockEnabled: Enabled 
         Rule: 
