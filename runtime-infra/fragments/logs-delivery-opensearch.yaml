@@ -76,6 +76,10 @@ Parameters:
     Type: String
     Description: ARN of the SNS topic for alarms
 
+  LogRetention:
+    Type: Number
+    Default: 14
+
 Resources:
   DeliveryLambdaRole:
     Type: AWS::IAM::Role
@@ -131,7 +135,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/lambda/${DeliveryLambda}"
-      RetentionInDays: 14
+      RetentionInDays: !Ref LogRetention
 
   DeliveryLambda:
     Type: AWS::Lambda::Function
