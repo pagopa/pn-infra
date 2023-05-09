@@ -60,6 +60,10 @@ Parameters:
   AlarmSNSTopicName:
     Type: String
 
+  LogRetention:
+    Type: Number
+    Default: 14
+
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
   
@@ -267,6 +271,7 @@ Resources:
       Parameters:
         LogGroupName: !Sub '${ProjectName}-safestorage-logger'
         LogGroupPrefix: '/aws/lambda'
+        LogGroupRetention: !Ref LogRetention
         LogsKinesisSourceStreamArn: !GetAtt LogsKinesisStream.Arn
 
 Outputs:
@@ -329,3 +334,6 @@ Outputs:
 
   SafestorageLoggerLogGroupName:
     Value: !Sub '${ProjectName}-safestorage-logger'
+
+  LogRetention:
+    Value: !Ref LogRetention
