@@ -1,0 +1,355 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Lambda proxy stack'
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+
+  ExternalChannelBaseUrl:
+    Type: String
+
+  MockExternalChannelBaseUrl:
+    Type: String
+
+Resources:
+
+  ###                       APPLICATION LOAD BALANCER                       ###
+  #############################################################################
+  # Application load balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internal
+      IpAddressType: ipv4
+      Subnets: !Ref Subnets
+      SecurityGroups:
+        - !Ref WebappSecurityGroup
+
+  # Application load balancer listener
+  ApplicationLoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Protocol: HTTP
+      Port: 8080
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: 404
+            ContentType: "application/json"
+            MessageBody: "{ \"error\": \"404\", \"message\": \"Load balancer rule not configured\" }"
+          Order: 1
+
+  # Application security groups
+  WebappSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: ec-proxy-webapp-security-group
+      GroupDescription: "ingres tcp 8080, egress all"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: "0.0.0.0/0"
+      VpcId: !Ref VpcId
+
+  # Application security groups
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: ec-lambda-proxy-webapp-security-group
+      GroupDescription: "EC Lambda Proxy security group"
+      VpcId: !Ref VpcId
+
+  # Reverse proxy lambda resources
+  EcProxyFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 14
+      LogGroupName: /aws/lambda/pn-ec-reverse-proxy
+
+  EcProxyFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: EcProxyFunctionPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/pn-ec-reverse-proxy*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
+              - Sid: AllowLambdaToReadParameterStore
+                Action:
+                  - ssm:GetParameter
+                Effect: Allow
+                Resource: 
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/pn-DigitalDeliveriesWhitelist"
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+  
+  EcProxyFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: pn-ec-reverse-proxy
+      Code:
+        ZipFile: |
+          function isDigitalDeliveriesPath(path){
+              return path.toLowerCase().indexOf('/digital-deliveries/')>0;
+          }
+
+          function isPaperDeliveriesPath(path){
+              return path.toLowerCase().indexOf('/paper-deliveries-engagements/')>0;
+          }
+
+          function extractDeliveryAddress(jsonBody){
+              if(jsonBody && jsonBody.receiverDigitalAddress){
+                  return jsonBody.receiverDigitalAddress.toLowerCase()
+              }
+              
+              return null;
+          }
+
+          function isDeliveryAddressWhitelisted(recipient, whitelistAsString){
+              const whitelistAsArray = whitelistAsString.split(',').map((w) => {
+                  return w.trim().toLowerCase()
+              })
+              
+              if(whitelistAsArray.indexOf(recipient.toLowerCase())>=0){
+                  return true;
+              }
+              
+              return false;
+          }
+
+          async function forwardToExternalChannel(event){
+              const { httpMethod, path, queryStringParameters, headers, body } = event
+              
+              const url = process.env.ExternalChannelBaseUrl+path.slice(1)
+              
+              let qs = null
+              if(queryStringParameters && !isObjectEmpty(queryStringParameters)){
+                  qs = queryStringParameters
+              }
+              return forwardRequest(url, headers, httpMethod, body, qs)
+          }
+
+          function isObjectEmpty(obj){
+              return Object.keys(obj).length === 0;
+          }
+
+          function filterXHeaders(headers){
+              const xHeaders = {}
+              for (const key in headers) {
+                  if(key.toLowerCase().indexOf('x-')>=0){
+                      xHeaders[key] = headers[key]
+                  }
+              }
+
+              return xHeaders
+          }
+
+          async function forwardToMock(event){
+              const { httpMethod, path, queryStringParameters, headers, body } = event
+              
+              const url = process.env.MockExternalChannelBaseUrl+path.slice(1)
+              
+              let qs = null
+              if(queryStringParameters && !isObjectEmpty(queryStringParameters)){
+                  qs = queryStringParameters
+              }
+              return forwardRequest(url, headers, httpMethod, body, qs)
+          }
+
+          async function getResponseBody(response){
+              if(!response.body){
+                  return null;
+              }
+              const contentType = response.headers.get("content-type");
+              console.log('Content Type', contentType)
+              if (contentType && contentType.toLowerCase().indexOf("application/json") !== -1) {
+                  const data = await response.json()   
+                  return JSON.stringify(data)
+              }
+              
+              const data = await response.text()
+              return data
+          }
+
+          async function getParameterFromStore(parameterName) {
+            try {
+              const response = await fetch(
+                `http://localhost:2773/systemsmanager/parameters/get?name=${encodeURIComponent(
+                  parameterName
+                )}`,
+                {
+                  headers: {
+                    'Content-Type': 'application/json',
+                    "X-Aws-Parameters-Secrets-Token": process.env.AWS_SESSION_TOKEN,
+                  },
+                }
+              );
+              
+              const data = await response.json()
+              return data.Parameter.Value;
+            } catch (err) {
+              console.error("Error in get parameter ", err);
+              throw new Error("Error in get parameter "+parameterName);
+            }
+          }
+
+          async function forwardRequest(url, headers = {}, method, body = null, qs = null){
+              
+              const xHeaders = filterXHeaders(headers)
+              xHeaders['Content-Type'] = 'application/json'
+              const fetchOptions = { 
+                  method,
+                headers: xHeaders
+              }
+
+              if(body){
+                  fetchOptions.body = body // stringified
+              }
+              
+              if(qs){
+                  url = url+new URLSearchParams(qs)
+              }
+
+              const res = await fetch(url, fetchOptions);
+              
+              console.log('url', url)
+              console.log('fetchOptions', fetchOptions)
+              console.log('res', res)
+              console.log('headers', Object.fromEntries(res.headers))
+              
+              if (res.ok) {
+                const data = await getResponseBody(res)
+                console.log('ok data', data)
+                const response = {
+                  statusCode: res.status,
+                  headers: Object.fromEntries(res.headers)
+                };
+                
+                if(data){
+                    response.body = data
+                }
+                
+                console.log('Lambda ok response', response)
+                return response
+              } else {
+                const data = await getResponseBody(res)
+                console.log('nok data', data)
+                const response = {
+                  statusCode: res.status,
+                  headers: Object.fromEntries(res.headers)
+                };
+
+                if(data){
+                    response.body = data
+                }
+
+                console.log('Lambda nok response', response)      
+                return response
+              }
+          }
+
+
+          exports.handler = async(event) => {
+
+              console.log(JSON.stringify(event))
+
+              const { httpMethod, path } = event
+              
+              if(httpMethod=='PUT'){
+                  if(isDigitalDeliveriesPath(path)){
+                      const jsonBody = JSON.parse(event.body)
+                      const deliveryAddress = extractDeliveryAddress(jsonBody)
+                      console.log('Delivery Address', deliveryAddress)
+                      const whitelist = await getParameterFromStore('pn-DigitalDeliveriesWhitelist')
+                      console.log('Whitelist', whitelist)
+                      if(isDeliveryAddressWhitelisted(deliveryAddress, whitelist)){
+                          return forwardToExternalChannel(event)
+                      }
+                  } else if(isPaperDeliveriesPath(path)) {
+                      return forwardToExternalChannel(event)
+                  }
+              } 
+              
+              
+              return forwardToMock(event)
+          };
+
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Environment:
+        Variables:
+          ExternalChannelBaseUrl: !Ref ExternalChannelBaseUrl
+          MockExternalChannelBaseUrl: !Ref MockExternalChannelBaseUrl
+          SSM_PARAMETER_STORE_TIMEOUT_MILLIS: 5000
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt LambdaSecurityGroup.GroupId
+        SubnetIds: !Ref Subnets
+      Role: !GetAtt EcProxyFunctionExecutionRole.Arn
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+        - !Sub "arn:aws:lambda:${AWS::Region}:325218067255:layer:AWS-Parameters-and-Secrets-Lambda-Extension:2"         
+
+
+  # Load balancer target group
+
+  AlbLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt EcProxyFunction.Arn
+      Principal: elasticloadbalancing.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn:
+      - AlbLambdaPermission
+    Properties:
+      TargetType: lambda
+      Targets:
+        - Id: !GetAtt EcProxyFunction.Arn
+
+  # Load balancer forward rule; forward only path pattern defined with MappedPaths
+  LoadBalancerRoutingRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref ApplicationLoadBalancerListener
+      Priority: 10
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /external-channel/*
+            - /external-channels/*
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+          Order: 1
