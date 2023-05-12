@@ -20,6 +20,14 @@ Parameters:
     Type: String
     Description: 'keep track of used projects commitIds'
 
+  ConfidentialInfoAccountId:
+    Type: String
+    Default: '153517439884'
+    Description: Confidential info account ID
+
+Conditions:
+  HasConfidentialInfoAccount: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
+
 Resources:
   ###              API GATEWAY ACCOUNT-GLOBAL CONFIGURATIONS              ###
   ###########################################################################
@@ -89,7 +97,38 @@ Resources:
             Condition: 
               ArnEquals: 
                 aws:SourceArn: !Ref AlarmSNSTopic
-      
+
+  CanPublishAlarmTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowServices
+            Effect: Allow
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+                - "cloudwatch.amazonaws.com"
+            Action:
+              - 'sns:Publish'
+            Resource:
+              - !Ref AlarmSNSTopic
+          - Fn::If: 
+            - HasConfidentialInfoAccount
+            - Sid: AllowPublishFromConfinfo
+              Effect: Allow
+              Action:
+              - 'sns:Publish'
+              Principal:
+                AWS: 
+                  - !Sub arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root
+              Resource:
+                - !Ref AlarmSNSTopic
+            - !Ref AWS::NoValue
+      Topics:
+        - !Ref AlarmSNSTopic
+
   # - Connect dev alarm to slack developers channel
   # AlarmSNSTopicSlackConnection:
   #   Type: AWS::CloudFormation::Stack
