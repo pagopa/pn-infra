@@ -13,15 +13,14 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 usage() {
       cat <<EOF
-    Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] [-p <aws-profile>] [-r <aws-region>]  [-P <period>] [-c <aws-profile-confinfo>]
-    [-h]                      : this help message
-    [-v]                      : verbose mode
-    [-p <aws-profile>]        : aws cli profile (optional)
-    [-r <aws-region>]           : aws region as eu-south-1
-    [-s <start-time>]           : aws cloudwatch get metrics start time
-    [-e <end-time>]             : aws cloudwatch get metrics end time
-    [-P <period>]             : aws cloudwatch get metrics period of sampling (optional - default=60)
-    [-c <aws-profile-confinfo>] : aws cli profile for confinfo account
+    Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] [-p <aws-profile>] -r <aws-region>  [-P <period>] -c <aws-profile-confinfo> -f <k6-run-file>
+    [-h]                        : this help message
+    [-v]                        : verbose mode
+    [-p <aws-profile>]            : aws cli profile (optional)
+    -r <aws-region>             : aws region as eu-south-1
+    [-P <period>]                 : aws cloudwatch get metrics period of sampling (optional - default=60)
+    -c <aws-profile-confinfo>   : aws cli profile for confinfo account
+    -f <k6-run-file>         : local path of k6 run file with all parameters
 EOF
   exit 1
 }
@@ -32,11 +31,9 @@ parse_params() {
   work_dir=$HOME/tmp/deploy
   aws_profile=""
   aws_region="eu-south-1"
-  env_type=""
-  start_time=""
-  end_time=""
   period=""
   aws_confinfo=""
+  k6_run_file=""
 
   while :; do
     case "${1-}" in
@@ -54,20 +51,16 @@ parse_params() {
       work_dir="${2-}"
       shift
       ;;
-    -s | --start-time) 
-      start_time="${2-}"
-      shift
-      ;;
-    -e | --end-time) 
-      end_time="${2-}"
-      shift
-      ;;
     -P | --period) 
       period="${2-}"
       shift
       ;;
     -c | --profile-confinfo) 
       aws_confinfo="${2-}"
+      shift
+      ;;
+    -f | --file) 
+      k6_run_file="${2-}"
       shift
       ;;
     -?*) die "Unknown option: $1" ;;
@@ -91,10 +84,9 @@ dump_params(){
   echo "Work directory:             ${work_dir}"
   echo "AWS region:                 ${aws_region}"
   echo "AWS profile:                ${aws_profile}"
-  echo "AWS cloudwatch start time:  ${start_time}"
-  echo "AWS cloudwatch end time     ${end_time}"
   echo "AWS cloudwatch period       ${period}"
   echo "AWS confidential profile:   ${aws_confinfo}"
+  echo "K6 local run file:          ${k6_run_file}"
   }
 
 # START SCRIPT
@@ -125,6 +117,30 @@ fi
 echo ${aws_command_base_args_confinfo}
 echo ""
 
+echo "launch k6 test...."
+
+echo "remove repo pn-load-test if exist:"
+
+rm -rf pn-load-test
+
+echo "clone repo pn-load-test"
+
+git clone https://github.com/pagopa/pn-load-test.git
+
+echo "create directory for k6 test"
+
+dir=monitoring_$(date '+%Y-%m-%d-%s')
+
+mkdir -p $dir
+
+echo "change work directory"
+
+cd $dir
+
+
+source "$k6_run_file"
+
+echo "k6 test is is over.... start collection of metrics:"
 
 ## assign default value for period if not assigned:
 
@@ -132,21 +148,11 @@ echo "start script"
 
 period="${period:=60}"
 
-basedir=$(pwd)
-
-cd $basedir
+echo "take start_time and end_time from k6 output"
 
 start_time=$(head -1 http-output.json | jq | grep time | sed -E 's/"time": "//g' | sed -E 's/"//g' | sed -E 's/ //g' | sed -E 's/,//g' )
 end_time=$(tail -1 http-output.json | jq | grep time | sed -E 's/"time": "//g' | sed -E 's/"//g' | sed -E 's/ //g' )
 
-
-dir=monitoring_$(date +"%d-%m-%Y")
-
-mkdir -p $dir
-
-echo "change work directory"
-
-cd $dir
 
 echo  TIME interval is: $start_time   "<====>"    $end_time   &&  echo PERIOD of sampling is: $period 
 
@@ -260,42 +266,38 @@ aws ${aws_command_base_args} cloudwatch get-metric-statistics --metric-name $i  
 done
 echo "==> OER SLA Violations metrics done"
 
-echo "==> change to parent directory:";
-cd .. ;
 echo "==> starting aws x-ray analisys:"
 
-echo "==> converting timestamp in epoch time:"
-
-startepoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${start_time%.*}+0000" +%s)
-
-endepoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${end_time%.*}+0000" +%s)
-
-echo  TIME interval is: $startepoch  "<====>"    $endepoch
-
-aws ${aws_command_base_args} xray get-trace-summaries --start-time $startepoch --end-time $end_time > monitoring_xray.json
+ if [[ $(ls | grep http-output.json) ]]; then
+     echo "there is http-output.json file, creating directory" ;
+     mkdir -p monitoring_xray ;
+     echo "filtering http-output.json file" ;
+     cat http-output.json| jq | grep -v gzip > http_filtered-output.json ;
+     cat http_filtered-output.json | jq  -r  '.msg'  | grep -E "HTTP/2.0|X-Amzn-Requestid|X-Amzn-Trace-Id" > monitoring_xray/monitoring_xray_to_search.txt  ; cd monitoring_xray ;
+     echo "==> converting timestamp in epoch time:" ;
+     startepoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${start_time%.*}+0000" +%s) ;
+     endepoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${end_time%.*}+0000" +%s) ;
+     echo  TIME interval is: $startepoch  "<====>"    $endepoch ;
+     echo starting get-trace-summaries from AWS X-RAY: ;
+     aws ${aws_command_base_args} xray get-trace-summaries --start-time $startepoch --end-time $end_time > monitoring_xray.json ;
 
 #### VERIFICA ID X-RAY 1 AD 1, AL MOMENTO NON PRATICABILE, TROPPI ID, RACCOLOGO SOLO DATI ########
- if [[ $(ls | grep http-output.json) ]]; then
-     echo "there is http-output.json file, creating directory";
-     mkdir -p monitoring_xray;
-     echo "filtering http-output.json file";
-     cat http-output.json| jq | grep -v gzip > http_filtered-output.json ;
-     cat http_filtered-output.json | jq  -r  '.msg'  | grep -E "HTTP/2.0|X-Amzn-Requestid|X-Amzn-Trace-Id" > monitoring_xray/monitoring_xray_to_search.txt  ; cd monitoring_xray;
 #     echo "export json from AWS Xray:"
 #     for traceid in $(cat monitoring_xray_search.txt | grep X-Amzn-Trace-Id   | sed -E 's/X-Amzn-Trace-Id: Root=//g') ; do  
 #     aws ${aws_command_base_args} xray batch-get-traces --trace-ids $traceid > $traceid.json ; 
 #     echo "export json from AWS Xray for TraceID: $traceid " ;
 #     done
      cd .. ;
+     echo get-trace-summaries from AWS X-RAY finished
 #     echo "export json from AWS Xray done"
  else
      echo "no json files found, nothing to do"
  fi
 echo "==> preparing for tarball"
-echo "move files"
-mv monitoring_xray.json  monitoring_xray/
 echo "creating tarball"
-for i in $(ls | grep -v http-output.json) ; do tar cvzf "$(date '+%Y-%m-%d').tar.gz"  $i ; done
+echo "remove http-output.json"
+rm http-output.json ;
+tar cvzf "$(date '+%Y-%m-%d-%s').tar.gz"  * ; 
 echo "tarball created"
 echo "==> ALL DONE <=="
 
