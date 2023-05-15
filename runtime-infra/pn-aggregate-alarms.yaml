@@ -174,13 +174,21 @@ Resources:
       Parameters:
         MicroserviceName: 'pn-logsaver-be-confidential-info'
 
-  # Helpdesk Info
-  HelpdeskCumulativeAlarm:
+  # Helpdesk FE
+  HelpdeskFeCumulativeAlarm:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
       Parameters:
-        MicroserviceName: 'pn-helpdesk'
+        MicroserviceName: 'pn-helpdesk-fe'
+
+  # Logextractor
+  LogextractorBeCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-logextractor-be'
 
   # - Everything written to this topic is an alarm
   CompositeAlarmSNSTopic:
