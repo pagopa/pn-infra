@@ -47,6 +47,36 @@ function truncateMessage(message, limit = 30000){
   }
 }
 
+function convertLevelFromLongToString(level){
+  let levelAsString = null
+  
+  switch(level){
+    case 60:
+      levelAsString = 'FATAL'
+      break;
+    case 50:
+      levelAsString = 'ERROR'
+      break;
+    case 40:
+      levelAsString = 'WARN'
+      break;
+    case 30:
+      levelAsString = 'INFO'
+      break;
+    case 20:
+      levelAsString = 'DEBUG'
+      break;
+    case 10:
+      levelAsString = 'TRACE'
+      break;
+    default:
+      levelAsString = 'INFO'
+      break;
+  }
+  
+  return levelAsString
+}
+
 function prepareBulkBody(logs){
     let formattedLogs = []
 
@@ -65,6 +95,11 @@ function prepareBulkBody(logs){
             // fix to handle bunyan nodejs logger format
             if(jsonMessage.time && !jsonMessage['@timestamp']){
               jsonMessage['@timestamp'] = jsonMessage.time
+            }
+
+            // bunyan level is passed as long
+            if(jsonMessage.level && typeof jsonMessage.level=='number'){
+              jsonMessage.level = convertLevelFromLongToString(jsonMessage.level)
             }
             
             jsonMessage.message = truncateMessage(jsonMessage.message, 30000)
