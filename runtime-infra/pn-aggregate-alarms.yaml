@@ -190,6 +190,14 @@ Resources:
       Parameters:
         MicroserviceName: 'pn-logextractor-be'
 
+  # Logextractor
+  SpidhubCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-spidhub'
+
   # - Everything written to this topic is an alarm
   CompositeAlarmSNSTopic:
     Type: AWS::SNS::Topic

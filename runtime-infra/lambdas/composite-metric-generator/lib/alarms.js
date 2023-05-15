@@ -172,6 +172,15 @@ const confidentialInfoMapping = {
     ],
     'pn-state-machine-manager': [
         'pn-state-machine-manager-ErrorFatalLogs-Alarm'
+    ],
+    'pn-spidhub': [
+        'spidhub-${env1}-ExternalALBAlarm',
+        'spidhub-${env1}-CPUUtilization',
+        'spidhub-${env1}-EngineCPUUtilization',
+        'spidhub-${env1}-CurrentConnections',
+        'spidhub-${env1}-MemoryUsage',
+        'spidhub-${env1}-spid-ecs-cpu-utilization',
+        'spidhub-${env1}-spid-ecs-memory-utilization'
     ]
 }
 
@@ -200,7 +209,8 @@ function findMicroserviceByAlarm(alarm, envType, accountId = null){
     for (const [microservice, alarms] of Object.entries(mapping)) {
         let replacedAlarm = alarms.find((a) => {
             const replacedAlarm = replaceVariables(a, {
-                env: envType
+                env: envType,
+                env1: envType,
             })
 
             return replacedAlarm==alarm
@@ -223,11 +233,13 @@ function findAllAlarmsByMicroservice(microservice, envType, accountId = null){
         const replacedAlarms = alarms.map((a) => {
             if(envType=='prod'){
                 return replaceVariables(a, {
-                    env: ''
+                    env: '',
+                    env1: envType
                 });
             } 
             return replaceVariables(a, {
-                env: envType+'.'
+                env: envType+'.',
+                env1: envType
             });
         })
 
