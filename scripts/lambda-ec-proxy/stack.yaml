@@ -143,18 +143,6 @@ Resources:
               return false;
           }
 
-          async function forwardToExternalChannel(event){
-              const { httpMethod, path, queryStringParameters, headers, body } = event
-              
-              const url = process.env.ExternalChannelBaseUrl+path.slice(1)
-              
-              let qs = null
-              if(queryStringParameters && !isObjectEmpty(queryStringParameters)){
-                  qs = queryStringParameters
-              }
-              return forwardRequest(url, headers, httpMethod, body, qs)
-          }
-
           function isObjectEmpty(obj){
               return Object.keys(obj).length === 0;
           }
@@ -168,18 +156,6 @@ Resources:
               }
 
               return xHeaders
-          }
-
-          async function forwardToMock(event){
-              const { httpMethod, path, queryStringParameters, headers, body } = event
-              
-              const url = process.env.MockExternalChannelBaseUrl+path.slice(1)
-              
-              let qs = null
-              if(queryStringParameters && !isObjectEmpty(queryStringParameters)){
-                  qs = queryStringParameters
-              }
-              return forwardRequest(url, headers, httpMethod, body, qs)
           }
 
           async function getResponseBody(response){
@@ -219,12 +195,20 @@ Resources:
             }
           }
 
-          async function forwardRequest(url, headers = {}, method, body = null, qs = null){
+          async function forwardRequest(event, baseUrl){
+              const { httpMethod, path, queryStringParameters, headers, body } = event
               
+              const url = baseUrl+path.slice(1)
+              
+              let qs = null
+              if(queryStringParameters && !isObjectEmpty(queryStringParameters)){
+                  qs = queryStringParameters
+              }
+
               const xHeaders = filterXHeaders(headers)
               xHeaders['Content-Type'] = 'application/json'
               const fetchOptions = { 
-                  method,
+                method: httpMethod,
                 headers: xHeaders
               }
 
@@ -285,14 +269,14 @@ Resources:
                       const whitelist = await getParameterFromStore('pn-DigitalDeliveriesWhitelist')
                       console.log('Whitelist', whitelist)
                       if(isDeliveryAddressWhitelisted(deliveryAddress, whitelist)){
-                          return forwardToExternalChannel(event)
+                          return forwardRequest(event, process.env.ExternalChannelBaseUrl)
                       }
                   } else if(isPaperDeliveriesPath(path)) {
-                      return forwardToExternalChannel(event)
+                      return forwardRequest(event, process.env.ExternalChannelBaseUrl)
                   }
               } 
               
-              return forwardToMock(event)
+              return forwardRequest(event, process.env.MockExternalChannelBaseUrl)
           }
 
           exports.handler = async(event) => {
