@@ -16,11 +16,11 @@ usage() {
     Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] [-p <aws-profile>] -r <aws-region>  [-P <period>] -c <aws-profile-confinfo> -f <k6-run-file>
     [-h]                        : this help message
     [-v]                        : verbose mode
-    [-p <aws-profile>]            : aws cli profile (optional)
+    [-p <aws-profile>]          : aws cli profile (optional)
     -r <aws-region>             : aws region as eu-south-1
-    [-P <period>]                 : aws cloudwatch get metrics period of sampling (optional - default=60)
+    [-P <period>]               : aws cloudwatch get metrics period of sampling (optional - default=60)
     -c <aws-profile-confinfo>   : aws cli profile for confinfo account
-    -f <k6-run-file>         : local path of k6 run file with all parameters
+    -f <k6-run-file>            : local path of k6 run file with all parameters
 EOF
   exit 1
 }
@@ -30,7 +30,7 @@ parse_params() {
   project_name=pn
   work_dir=$HOME/tmp/deploy
   aws_profile=""
-  aws_region="eu-south-1"
+  aws_region=""
   period=""
   aws_confinfo=""
   k6_run_file=""
@@ -116,6 +116,18 @@ if ( [ ! -z "${aws_region}" ] ) then
 fi
 echo ${aws_command_base_args_confinfo}
 echo ""
+
+echo "purge DLQ queue for core account"
+for i in $(aws ${aws_command_base_args} sqs list-queues  --output text | grep DLQ | awk '{print $2}'); do
+aws ${aws_command_base_args} sqs purge-queue  --queue-url $i  ; echo "queue DLQ $i purged";
+done 
+echo "purge DLQ for core account completed"
+
+echo "purge DLQ queue for confinfo account"
+for i in $(aws ${aws_command_base_args_confinfo} sqs list-queues  --output text | grep DLQ | awk '{print $2}'); do
+aws ${aws_command_base_args_confinfo} sqs purge-queue --queue-url $i ; echo "queue DLQ $i purged";
+done
+echo "purge DLQ for confinfo account completed"
 
 echo "launch k6 test...."
 
@@ -233,11 +245,10 @@ aws ${aws_command_base_args_confinfo} cloudwatch get-metric-statistics --metric-
 for k in ${aws_sqs_sum[@]}; do
 aws ${aws_command_base_args_confinfo} cloudwatch get-metric-statistics --metric-name $k --start-time $start_time --end-time $end_time --period $period --statistics ${statistics[1]} --dimensions Name=$not_dlq --namespace AWS/SQS  >> aws_sqs_$(echo $k  | cut -d "=" -f 2)_$(echo $not_dlq  | cut -d "=" -f 2).json && echo  aws_sqs export for: $( echo $k  | cut -d "=" -f 2)_$(echo $not_dlq  | cut -d "=" -f 2); done
 done
-# in attesa di fix nome DLQ su confinfo:
-# for dlq in $(echo $aws_sqs | grep DLQ); do
-# for j in ${aws_sqs_sum[0]}; do
-# aws ${aws_command_base_args_confinfo} cloudwatch get-metric-statistics --metric-name $j --start-time $start_time --end-time $end_time --period $period --statistics ${statistics[1]} --dimensions Name=$dlq --namespace AWS/SQS  >> aws_sqs_dlq_$(echo $j  | cut -d "=" -f 2)_$(echo $dlq  | cut -d "=" -f 2).json && echo  aws_sqs_dlq export for: $( echo $j  | cut -d "=" -f 2)_$(echo $dlq  | cut -d "=" -f 2); done
-# done
+for dlq in $(echo $aws_sqs | grep DLQ); do
+for j in ${aws_sqs_sum[0]}; do
+aws ${aws_command_base_args_confinfo} cloudwatch get-metric-statistics --metric-name $j --start-time $start_time --end-time $end_time --period $period --statistics ${statistics[1]} --dimensions Name=$dlq --namespace AWS/SQS  >> aws_sqs_dlq_$(echo $j  | cut -d "=" -f 2)_$(echo $dlq  | cut -d "=" -f 2).json && echo  aws_sqs_dlq export for: $( echo $j  | cut -d "=" -f 2)_$(echo $dlq  | cut -d "=" -f 2); done
+done
 done
 echo "==> AWS/SQS metrics for confidentail account done"
 
