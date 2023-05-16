@@ -58,21 +58,21 @@ Resources:
       VpcId: !Ref VpcId
 
   # Application security groups
-  LambdaSecurityGroup:
+  LambdaProxySecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: ec-lambda-proxy-webapp-security-group
-      GroupDescription: "EC Lambda Proxy security group"
+      GroupName: pn-lambda-proxy-webapp-security-group
+      GroupDescription: "Lambda Proxy security group"
       VpcId: !Ref VpcId
 
   # Reverse proxy lambda resources
-  EcProxyFunctionLogGroup:
+  LambdaProxyFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: 14
-      LogGroupName: /aws/lambda/pn-ec-reverse-proxy
+      LogGroupName: /aws/lambda/pn-lambda-reverse-proxy
 
-  EcProxyFunctionExecutionRole:
+  LambdaProxyFunctionExecutionRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -92,7 +92,7 @@ Resources:
                 Action:
                   - logs:CreateLogGroup
                 Resource:
-                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/pn-ec-reverse-proxy*'
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/pn-lambda-reverse-proxy*'
               - Effect: Allow
                 Action:
                   - logs:CreateLogStream
@@ -109,12 +109,16 @@ Resources:
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
   
-  EcProxyFunction:
+  LambdaProxyFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: pn-ec-reverse-proxy
+      FunctionName: pn-lambda-reverse-proxy
       Code:
         ZipFile: |
+          function isExternalChannelCall(path){
+            return path.toLowerCase().indexOf('/external-channel')>=0;
+          }
+
           function isDigitalDeliveriesPath(path){
               return path.toLowerCase().indexOf('/digital-deliveries/')>0;
           }
@@ -261,22 +265,25 @@ Resources:
           async function actAsReversProxy(event){
               const { httpMethod, path } = event
               
-              if(httpMethod=='PUT'){
-                  if(isDigitalDeliveriesPath(path)){
-                      const jsonBody = JSON.parse(event.body)
-                      const deliveryAddress = extractDeliveryAddress(jsonBody)
-                      console.log('Delivery Address', deliveryAddress)
-                      const whitelist = await getParameterFromStore('pn-DigitalDeliveriesWhitelist')
-                      console.log('Whitelist', whitelist)
-                      if(isDeliveryAddressWhitelisted(deliveryAddress, whitelist)){
-                          return forwardRequest(event, process.env.ExternalChannelBaseUrl)
-                      }
-                  } else if(isPaperDeliveriesPath(path)) {
-                      return forwardRequest(event, process.env.ExternalChannelBaseUrl)
-                  }
-              } 
-              
-              return forwardRequest(event, process.env.MockExternalChannelBaseUrl)
+              if(isExternalChannelCall(path)){
+                if(httpMethod=='PUT'){
+                    if(isDigitalDeliveriesPath(path)){
+                        const jsonBody = JSON.parse(event.body)
+                        const deliveryAddress = extractDeliveryAddress(jsonBody)
+                        console.log('Delivery Address', deliveryAddress)
+                        const whitelist = await getParameterFromStore('pn-DigitalDeliveriesWhitelist')
+                        console.log('Whitelist', whitelist)
+                        if(isDeliveryAddressWhitelisted(deliveryAddress, whitelist)){
+                            return forwardRequest(event, process.env.ExternalChannelBaseUrl)
+                        }
+                    } else if(isPaperDeliveriesPath(path)) {
+                        return forwardRequest(event, process.env.ExternalChannelBaseUrl)
+                    }
+                } 
+                return forwardRequest(event, process.env.MockExternalChannelBaseUrl)
+              }
+
+              throw new Error('Unhandled event', event)            
           }
 
           exports.handler = async(event) => {
@@ -287,6 +294,7 @@ Resources:
                   const response = await actAsReversProxy(event)
                   return response
               } catch(e){
+                  console.log('error', e)
                   const response = {
                       statusCode: 500,
                       body: JSON.stringify({
@@ -308,9 +316,9 @@ Resources:
           SSM_PARAMETER_STORE_TIMEOUT_MILLIS: 5000
       VpcConfig:
         SecurityGroupIds:
-          - !GetAtt LambdaSecurityGroup.GroupId
+          - !GetAtt LambdaProxySecurityGroup.GroupId
         SubnetIds: !Ref Subnets
-      Role: !GetAtt EcProxyFunctionExecutionRole.Arn
+      Role: !GetAtt LambdaProxyFunctionExecutionRole.Arn
       Timeout: 30
       TracingConfig:
         Mode: Active
@@ -325,7 +333,7 @@ Resources:
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !GetAtt EcProxyFunction.Arn
+      FunctionName: !GetAtt LambdaProxyFunction.Arn
       Principal: elasticloadbalancing.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
 
@@ -336,7 +344,7 @@ Resources:
     Properties:
       TargetType: lambda
       Targets:
-        - Id: !GetAtt EcProxyFunction.Arn
+        - Id: !GetAtt LambdaProxyFunction.Arn
 
   # Load balancer forward rule; forward only path pattern defined with MappedPaths
   LoadBalancerRoutingRule:
