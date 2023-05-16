@@ -27,3 +27,6 @@ where:
 - period is the time between data points (optional, default is 60s)
 - aws-profile-confinfo is the AWS profile of the sharing account
 - k6-run-file is the k6 script in your local client
+
+K6 file download page:
+https://pagopa.atlassian.net/wiki/spaces/PN/pages/715424307/K6-RUN-FILE
