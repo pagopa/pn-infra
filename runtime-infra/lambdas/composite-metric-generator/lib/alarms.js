@@ -69,10 +69,19 @@ const coreMapping = {
     'pn-infra': [
         'LogsBucket-Storage-Limit-Exceeded',
         'pn-logsToOpenSearch-opensearch-ingestion-LogInvocationErrors-Alarm',
+        'pn-safestorage-logger-LogInvocationErrors-Alarm',
         'pn-logsTos3-Kinesis-Alarm',
         'pn-cdcTos3-Kinesis-Alarm',
         'pn-ECSOutOfMemory-Alarm',
-        'pn-CoreEventBus-DLQ-HasMessage'
+        'pn-CoreEventBus-DLQ-HasMessage',
+        'pn-opensearch-cluster-red',
+        'pn-opensearch-writes-blocked',
+        'pn-opensearch-low-storage',
+        'pn-opensearch-cluster-yellow',
+        'pn-core-redis-MemoryUsage',
+        'pn-core-redis-CPUUtilization',
+        'pn-core-redis-EngineCPUUtilization',
+        'pn-core-redis-CurrentConnections'
     ],
     'pn-mandate': [
         'pn-mandate-ErrorFatalLogs-Alarm',
@@ -92,17 +101,21 @@ const coreMapping = {
         'pn-delivery_push_actions-HasOldMessage',
         'pn-safestore_to_deliverypush-HasOldMessage',
         'pn-delivery_push_inputs-HasOldMessage',
-        'pn-safestore_to_deliverypush-DLQ-HasMessage'
+        'pn-safestore_to_deliverypush-DLQ-HasMessage',
+        'pn-addressmanager_to_deliverypush-DLQ-HasMessage',
+        'pn-addressmanager_to_deliverypush-HasOldMessage'
     ],
     'pn-frontend': [
-        'www.${env}.pn.pagopa.it-DistributionRequestsAlarm',
-        'www.${env}.pn.pagopa.it-DistributionErrorsAlarm',
-        'portale-login.${env}.pn.pagopa.it-DistributionRequestsAlarm',
-        'portale-login.${env}.pn.pagopa.it-DistributionErrorsAlarm',
-        'portale-pg.${env}.pn.pagopa.it-DistributionRequestsAlarm',
-        'portale-pg.${env}.pn.pagopa.it-DistributionErrorsAlarm',
-        'portale.${env}.pn.pagopa.it-DistributionErrorsAlarm',
-        'portale.${env}.pn.pagopa.it-DistributionRequestsAlarm'
+        'www.${env}notifichedigitali.it-DistributionRequestsAlarm',
+        'www.${env}notifichedigitali.it-DistributionErrorsAlarm',
+        'login.${env}notifichedigitali.it-DistributionRequestsAlarm',
+        'login.${env}notifichedigitali.it-DistributionErrorsAlarm',
+        'imprese.${env}notifichedigitali.it-DistributionRequestsAlarm',
+        'imprese.${env}notifichedigitali.it-DistributionErrorsAlarm',
+        'cittadini.${env}notifichedigitali.it-DistributionErrorsAlarm',
+        'cittadini.${env}notifichedigitali.it-DistributionRequestsAlarm',
+        'selfcare.${env}notifichedigitali.it-DistributionErrorsAlarm',
+        'selfcare.${env}notifichedigitali.it-DistributionRequestsAlarm'
     ],
     'pn-logsaver-be': [
         'pn-logsaver-be-ErrorFatalLogs-Alarm',
@@ -117,22 +130,15 @@ const coreMapping = {
     ],
     'pn-radd-fsu': [
         'pn-radd-fsu-ErrorFatalLogs-Alarm'
-    ]
-}
-
-const helpdeskMapping = {
-    'pn-helpdesk': [
-        'pn-helpdesk-low-storage',
-        'pn-helpdesk-ApiGwAlarm',
-        'pn-helpdesk-ApiGwLatencyAlarm',
-        'pn-helpdesk-Logextractor-ErrorFatalLogs-Alarm',
-        'pn-helpdesk-cluster-red',
-        'pn-helpdesk-writes-blocked',
-        'pn-helpdesk-cluster-yellow',
-        'pn-helpdesk-jvm-pressure',
-        'pn-helpdesk-cpu-usage',
-        'pn-helpdesk-jvm-pressure',
-        'pn-helpdesk-master-jvm-pressure'
+    ],
+    'pn-helpdesk-fe': [
+        'helpdesk.${env}notifichedigitali.it-DistributionErrorsAlarm',
+        'helpdesk.${env}notifichedigitali.it-DistributionRequestsAlarm'
+    ],
+    'pn-logextractor-be': [
+        'pn-logextractor-be-ErrorFatalLogs-Alarm',
+        'pn-logextractor-be-BACKOFFICE-ApiGwLatencyAlarm',
+        'pn-logextractor-be-BACKOFFICE-ApiGwAlarm'
     ]
 }
 
@@ -146,7 +152,35 @@ const confidentialInfoMapping = {
     ],
     'pn-infra-confidential-info': [
         'pn-cdcTos3-Kinesis-Alarm',
-        'pn-logsTos3-Kinesis-Alarm'
+        'pn-logsTos3-Kinesis-Alarm',
+        'pn-LambdaAllAlarmSnsPublisher-Alarm'
+    ],
+    'pn-address-manager': [
+        'pn-address-manager-ErrorFatalLogs-Alarm',
+        'pn-AddressManagerBus-DLQ-HasMessage'
+    ],
+    'pn-safe-storage': [
+        'pn-safe-storage-ErrorFatalLogs-Alarm',
+        'pn-new-safestorage-cloudtrail-file-DLQ-HasMessage',
+        'pn-ss-staging-bucket-events-queue-HasOldMessage',
+        'pn-ss-main-bucket-events-queue-HasOldMessage',
+        'pn-ss-gestore-bucket-invocation-errors-queue-HasOldMessage',
+        'pn-new-safestorage-cloudtrail-file-HasOldMessage'
+    ],
+    'pn-external-channel': [
+        'pn-external-channel-ErrorFatalLogs-Alarm'
+    ],
+    'pn-state-machine-manager': [
+        'pn-state-machine-manager-ErrorFatalLogs-Alarm'
+    ],
+    'pn-spidhub': [
+        'spidhub-${env1}-ExternalALBAlarm',
+        'spidhub-${env1}-CPUUtilization',
+        'spidhub-${env1}-EngineCPUUtilization',
+        'spidhub-${env1}-CurrentConnections',
+        'spidhub-${env1}-MemoryUsage',
+        'spidhub-${env1}-spid-ecs-cpu-utilization',
+        'spidhub-${env1}-spid-ecs-memory-utilization'
     ]
 }
 
@@ -163,10 +197,6 @@ function getMappingByAccountId(accountId = null){
         return coreMapping;
     }
 
-    if(accountId==process.env.HELPDESK_ACCOUNT_ID){
-        return helpdeskMapping;
-    } 
-
     if(accountId==process.env.CONFIDENTIAL_INFO_ACCOUNT_ID){
         return confidentialInfoMapping;
     }
@@ -179,7 +209,8 @@ function findMicroserviceByAlarm(alarm, envType, accountId = null){
     for (const [microservice, alarms] of Object.entries(mapping)) {
         let replacedAlarm = alarms.find((a) => {
             const replacedAlarm = replaceVariables(a, {
-                env: envType
+                env: envType,
+                env1: envType,
             })
 
             return replacedAlarm==alarm
@@ -200,8 +231,15 @@ function findAllAlarmsByMicroservice(microservice, envType, accountId = null){
         return  []
     } else {
         const replacedAlarms = alarms.map((a) => {
+            if(envType=='prod'){
+                return replaceVariables(a, {
+                    env: '',
+                    env1: envType
+                });
+            } 
             return replaceVariables(a, {
-                env: envType
+                env: envType+'.',
+                env1: envType
             });
         })
 
@@ -211,7 +249,6 @@ function findAllAlarmsByMicroservice(microservice, envType, accountId = null){
 
 function findAllMicroservices(){
     const coreKeys = Object.keys(coreMapping)
-    const helpdeskKeys = Object.keys(helpdeskMapping)
     const confidentialInfoKeys = Object.keys(confidentialInfoMapping)
 
     const ret = [
@@ -221,12 +258,6 @@ function findAllMicroservices(){
         }
     ]
 
-    if(process.env.HELPDESK_ACCOUNT_ID){
-        ret.push({
-            accountId: process.env.HELPDESK_ACCOUNT_ID,
-            microservices: helpdeskKeys
-        })
-    }
 
     if(process.env.CONFIDENTIAL_INFO_ACCOUNT_ID){
         ret.push({
