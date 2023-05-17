@@ -736,6 +736,10 @@ Resources:
                     - Rule4Pos4Exists
                     - Name: !Select [4, !Ref ExcludedRule4]
                     - !Ref "AWS::NoValue" 
+                  - !If
+                    - IsB2B
+                    - Name: SizeRestrictions_BODY
+                    - !Ref "AWS::NoValue" 
             VisibilityConfig:
               CloudWatchMetricsEnabled: true
               MetricName: !Join ["-", ["MetricFor", !Select [4, !Ref WAFRuleNames]]]
