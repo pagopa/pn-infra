@@ -14,6 +14,12 @@ Parameters:
   MockExternalChannelBaseUrl:
     Type: String
 
+  ConsolidatoreBaseUrl:
+    Type: String
+
+  MockConsolidatoreBaseUrl:
+    Type: String
+
 Resources:
 
   ###                       APPLICATION LOAD BALANCER                       ###
@@ -105,6 +111,7 @@ Resources:
                 Effect: Allow
                 Resource: 
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/pn-DigitalDeliveriesWhitelist"
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/pn-PaperDeliveriesWhitelist"
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
@@ -119,12 +126,20 @@ Resources:
             return path.toLowerCase().indexOf('/external-channel')>=0;
           }
 
+          function isConsolidatoreCall(path){
+            return path.toLowerCase().indexOf('/piattaforma-notifiche-ingress/')>=0;
+          }
+
           function isDigitalDeliveriesPath(path){
               return path.toLowerCase().indexOf('/digital-deliveries/')>0;
           }
 
           function isPaperDeliveriesPath(path){
-              return path.toLowerCase().indexOf('/paper-deliveries-engagements/')>0;
+              return path.toLowerCase().indexOf('/paper-deliveries-engagements')>0;
+          }
+
+          function isConsolidatoreDeliveriesPath(path){
+              return path.toLowerCase().indexOf('/paper-deliveries-engagement')>0;
           }
 
           function extractDeliveryAddress(jsonBody){
@@ -145,6 +160,54 @@ Resources:
               }
               
               return false;
+          }
+
+          function isPaperAddressPropertyMatch(prop, paperAddressProperty, whitelistedPaperAddressProperty){
+            const requestFieldNotSet = ( paperAddressProperty == null || paperAddressProperty == undefined || paperAddressProperty === '')
+            const whitelistFieldNotSet = ( whitelistedPaperAddressProperty == null || whitelistedPaperAddressProperty == undefined || whitelistedPaperAddressProperty === '' )
+            const bothFieldsNotSet = requestFieldNotSet && whitelistFieldNotSet
+
+            console.log('[CONS] Prop match', {
+              prop,
+              requestFieldNotSet: requestFieldNotSet,
+              whitelistFieldNotSet: whitelistFieldNotSet,
+              bothFieldsNotSet: bothFieldsNotSet
+            })
+            
+            if(bothFieldsNotSet || paperAddressProperty === whitelistedPaperAddressProperty){
+              return true;
+            }
+              
+            return false
+          }
+
+          function isPaperAddressMatch(paperAddress, whitelistedPaperAddress){
+            const propsToCompare = ['receiverName', 'receiverNameRow2', 'receiverAddress', 'receiverAddressRow2', 'receiverCap', 'receiverCity', 'receiverCity2', 'receiverPr', 'receiverCountry']
+
+            console.debug('[CONS]', paperAddress, whitelistedPaperAddress)
+            
+            return propsToCompare.every((p) => {
+              return isPaperAddressPropertyMatch(p, paperAddress[p], whitelistedPaperAddress[p])
+            })
+          }
+
+          function isPaperDeliveryAddressWhitelisted(paperAddress, whitelistAsString){
+            let whitelistAddresses = []
+            try {
+              whitelistAddresses = JSON.parse(whitelistAsString)
+            } catch(e){
+              console.log('invalid json addresses', whitelistAsString)
+              whitelistAddresses = []
+            }
+
+            for(let i=0; i<whitelistAddresses.length; i++){
+              const whitelistAddress = whitelistAddresses[i]
+              if(isPaperAddressMatch(paperAddress, whitelistAddress)){
+                return true
+              }           
+            }
+
+            return false
           }
 
           function isObjectEmpty(obj){
@@ -266,13 +329,15 @@ Resources:
               const { httpMethod, path } = event
               
               if(isExternalChannelCall(path)){
+                console.debug('[EC] - Call')
                 if(httpMethod=='PUT'){
+                    console.debug('[EC] - Call PUT')
                     if(isDigitalDeliveriesPath(path)){
                         const jsonBody = JSON.parse(event.body)
                         const deliveryAddress = extractDeliveryAddress(jsonBody)
-                        console.log('Delivery Address', deliveryAddress)
+                        console.log('[EC] Delivery Address', deliveryAddress)
                         const whitelist = await getParameterFromStore('pn-DigitalDeliveriesWhitelist')
-                        console.log('Whitelist', whitelist)
+                        console.log('[EC] Whitelist', whitelist)
                         if(isDeliveryAddressWhitelisted(deliveryAddress, whitelist)){
                             return forwardRequest(event, process.env.ExternalChannelBaseUrl)
                         }
@@ -281,6 +346,24 @@ Resources:
                     }
                 } 
                 return forwardRequest(event, process.env.MockExternalChannelBaseUrl)
+              } 
+
+              if(isConsolidatoreCall(path)){
+                console.debug('[CONS] - Call')
+                if(httpMethod=='POST'){
+                    console.debug('[CONS] - Call POST')
+                    if(isConsolidatoreDeliveriesPath(path)){
+                        const jsonBody = JSON.parse(event.body)
+                        const paperDeliveryAddress = jsonBody
+                        console.log('[CONS] Paper Delivery Address', paperDeliveryAddress)
+                        const whitelist = await getParameterFromStore('pn-PaperDeliveriesWhitelist')
+                        console.log('[CONS] Whitelist', whitelist)
+                        if(isPaperDeliveryAddressWhitelisted(paperDeliveryAddress, whitelist)){
+                            return forwardRequest(event, process.env.ConsolidatoreBaseUrl)
+                        }
+                    }
+                } 
+                return forwardRequest(event, process.env.MockConsolidatoreBaseUrl)
               }
 
               throw new Error('Unhandled event', event)            
@@ -307,12 +390,16 @@ Resources:
               
           };
 
+
+
       Handler: index.handler
       Runtime: nodejs18.x
       Environment:
         Variables:
           ExternalChannelBaseUrl: !Ref ExternalChannelBaseUrl
           MockExternalChannelBaseUrl: !Ref MockExternalChannelBaseUrl
+          ConsolidatoreBaseUrl: !Ref ConsolidatoreBaseUrl
+          MockConsolidatoreBaseUrl: !Ref MockConsolidatoreBaseUrl
           SSM_PARAMETER_STORE_TIMEOUT_MILLIS: 5000
       VpcConfig:
         SecurityGroupIds:
@@ -357,6 +444,7 @@ Resources:
           Values:
             - /external-channel/*
             - /external-channels/*
+            - /piattaforma-notifiche-ingress/*
       Actions:
         - Type: forward
           TargetGroupArn: !Ref LambdaProxyTargetGroup
