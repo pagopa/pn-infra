@@ -163,8 +163,8 @@ Resources:
           }
 
           function isPaperAddressPropertyMatch(prop, paperAddressProperty, whitelistedPaperAddressProperty){
-            const requestFieldNotSet = ( paperAddressProperty == null || whitelistedPaperAddressProperty == undefined )
-            const whitelistFieldNotSet = ( paperAddressProperty == null || whitelistedPaperAddressProperty == undefined )
+            const requestFieldNotSet = ( paperAddressProperty == null || paperAddressProperty == undefined || paperAddressProperty === '')
+            const whitelistFieldNotSet = ( whitelistedPaperAddressProperty == null || whitelistedPaperAddressProperty == undefined || whitelistedPaperAddressProperty === '' )
             const bothFieldsNotSet = requestFieldNotSet && whitelistFieldNotSet
 
             console.log('[CONS] Prop match', {
@@ -187,7 +187,7 @@ Resources:
             console.debug('[CONS]', paperAddress, whitelistedPaperAddress)
             
             return propsToCompare.every((p) => {
-              isPaperAddressPropertyMatch(p, paperAddress[p], whitelistedPaperAddress[p])
+              return isPaperAddressPropertyMatch(p, paperAddress[p], whitelistedPaperAddress[p])
             })
           }
 
@@ -389,6 +389,7 @@ Resources:
               }
               
           };
+
 
 
       Handler: index.handler
