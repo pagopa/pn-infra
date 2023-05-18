@@ -123,7 +123,7 @@ Resources:
       Code:
         ZipFile: |
           function isExternalChannelCall(path){
-            return path.toLowerCase().indexOf('/external-channel/')>=0;
+            return path.toLowerCase().indexOf('/external-channel')>=0;
           }
 
           function isConsolidatoreCall(path){
@@ -135,7 +135,11 @@ Resources:
           }
 
           function isPaperDeliveriesPath(path){
-              return path.toLowerCase().indexOf('/paper-deliveries-engagements/')>0;
+              return path.toLowerCase().indexOf('/paper-deliveries-engagements')>0;
+          }
+
+          function isConsolidatoreDeliveriesPath(path){
+              return path.toLowerCase().indexOf('/paper-deliveries-engagement')>0;
           }
 
           function extractDeliveryAddress(jsonBody){
@@ -158,12 +162,33 @@ Resources:
               return false;
           }
 
+          function isPaperAddressPropertyMatch(prop, paperAddressProperty, whitelistedPaperAddressProperty){
+            const requestFieldNotSet = ( paperAddressProperty == null || whitelistedPaperAddressProperty == undefined )
+            const whitelistFieldNotSet = ( paperAddressProperty == null || whitelistedPaperAddressProperty == undefined )
+            const bothFieldsNotSet = requestFieldNotSet && whitelistFieldNotSet
+
+            console.log('[CONS] Prop match', {
+              prop,
+              requestFieldNotSet: requestFieldNotSet,
+              whitelistFieldNotSet: whitelistFieldNotSet,
+              bothFieldsNotSet: bothFieldsNotSet
+            })
+            
+            if(bothFieldsNotSet || paperAddressProperty === whitelistedPaperAddressProperty){
+              return true;
+            }
+              
+            return false
+          }
+
           function isPaperAddressMatch(paperAddress, whitelistedPaperAddress){
             const propsToCompare = ['receiverName', 'receiverNameRow2', 'receiverAddress', 'receiverAddressRow2', 'receiverCap', 'receiverCity', 'receiverCity2', 'receiverPr', 'receiverCountry']
-            for(let i=0; i<propsToCompare.length; i++){
-              const p = propsToCompare[i]
-              if(( paperAddress[p] == null || paperAddress[p] == undefined ) && ( whitelistedPaperAddress[p] == null || whitelistedPaperAddress[p] == undefined )) ||  paperAddress[p] == whitelistedPaperAddress[p]
-            }
+
+            console.debug('[CONS]', paperAddress, whitelistedPaperAddress)
+            
+            return propsToCompare.every((p) => {
+              isPaperAddressPropertyMatch(p, paperAddress[p], whitelistedPaperAddress[p])
+            })
           }
 
           function isPaperDeliveryAddressWhitelisted(paperAddress, whitelistAsString){
@@ -304,13 +329,15 @@ Resources:
               const { httpMethod, path } = event
               
               if(isExternalChannelCall(path)){
+                console.debug('[EC] - Call')
                 if(httpMethod=='PUT'){
+                    console.debug('[EC] - Call PUT')
                     if(isDigitalDeliveriesPath(path)){
                         const jsonBody = JSON.parse(event.body)
                         const deliveryAddress = extractDeliveryAddress(jsonBody)
-                        console.log('Delivery Address', deliveryAddress)
+                        console.log('[EC] Delivery Address', deliveryAddress)
                         const whitelist = await getParameterFromStore('pn-DigitalDeliveriesWhitelist')
-                        console.log('Whitelist', whitelist)
+                        console.log('[EC] Whitelist', whitelist)
                         if(isDeliveryAddressWhitelisted(deliveryAddress, whitelist)){
                             return forwardRequest(event, process.env.ExternalChannelBaseUrl)
                         }
@@ -322,13 +349,15 @@ Resources:
               } 
 
               if(isConsolidatoreCall(path)){
+                console.debug('[CONS] - Call')
                 if(httpMethod=='POST'){
-                    if(isPaperDeliveriesPath(path)){
+                    console.debug('[CONS] - Call POST')
+                    if(isConsolidatoreDeliveriesPath(path)){
                         const jsonBody = JSON.parse(event.body)
                         const paperDeliveryAddress = jsonBody
-                        console.log('Paper Delivery Address', paperDeliveryAddress)
+                        console.log('[CONS] Paper Delivery Address', paperDeliveryAddress)
                         const whitelist = await getParameterFromStore('pn-PaperDeliveriesWhitelist')
-                        console.log('Whitelist', whitelist)
+                        console.log('[CONS] Whitelist', whitelist)
                         if(isPaperDeliveryAddressWhitelisted(paperDeliveryAddress, whitelist)){
                             return forwardRequest(event, process.env.ConsolidatoreBaseUrl)
                         }
@@ -360,6 +389,7 @@ Resources:
               }
               
           };
+
 
       Handler: index.handler
       Runtime: nodejs18.x
