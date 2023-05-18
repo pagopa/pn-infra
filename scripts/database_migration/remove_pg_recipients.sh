@@ -140,13 +140,15 @@ function deleteFromOneTable() {
   tableName=$1
   keySet=$2
 
+  echo "= prepare deletion commands list"
   cat "$keySet" \
     | jq -r ". | {\"DeleteRequest\": {\"Key\": . }} | tojson" \
     | jq --slurp -r ' _nwise(25) | { "'$tableName'": . } | tojson' \
     > "$work_dir/delete_list.json"
 
 
-  nrows=$(cat delete_list.json | wc -l)
+  nrows=$(cat $work_dir/delete_list.json | wc -l)
+  echo "$nrows deletions needed"
   for (( n=1; n<=${nrows}; n++ )); do
     cat "$work_dir/delete_list.json" | head -n $n | tail -1 > "$work_dir/delete_command.json"
     
