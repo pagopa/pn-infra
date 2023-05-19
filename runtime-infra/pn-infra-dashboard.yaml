@@ -85,6 +85,22 @@ Parameters:
     Default: ""
     Description: Name of the OpenSearch cluster
 
+  RedisCurrentConnectionsAlarmArn:
+    Type: String
+    Default: ""
+
+  RedisMemoryUtilizationAlarm:
+    Type: String
+    Default: ""
+
+  RedisCPUUtilizationAlarm:
+    Type: String
+    Default: ""
+
+  RedisEngineCPUAlarm:
+    Type: String
+    Default: ""
+
 Conditions:
   HasOpenSearchCluster: !Not [ !Equals [ !Ref OpenSearchClusterName, "" ] ]
 Resources:
@@ -248,7 +264,11 @@ Resources:
             - !If [ HasOpenSearchCluster, !GetAtt ClusterStatusRedAlarm.Arn, '' ]
             - !If [ HasOpenSearchCluster, !GetAtt ClusterStatusYellowAlarm.Arn, '' ]            
             - !If [ HasOpenSearchCluster, !GetAtt FreeStorageSpaceAlarm.Arn, '' ]   
-            - !If [ HasOpenSearchCluster, !GetAtt ClusterIndexWritesBlockedAlarm.Arn, '' ]            
+            - !If [ HasOpenSearchCluster, !GetAtt ClusterIndexWritesBlockedAlarm.Arn, '' ]  
+            - !Ref RedisCurrentConnectionsAlarmArn
+            - !Ref RedisMemoryUtilizationAlarm
+            - !Ref RedisCPUUtilizationAlarm
+            - !Ref RedisEngineCPUAlarm          
         LambdaArns: !Join
           - ','
           - - !Ref OpenSearchDeliveryLambdaArn

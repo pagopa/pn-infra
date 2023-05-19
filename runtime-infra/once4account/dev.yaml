@@ -15,9 +15,15 @@ Parameters:
     Type: String
     Description: 'keep track of used projects commitIds'
 
+  ConfidentialInfoAccountId:
+    Type: String
+    Description: Confidential info account ID
+
 Conditions:
   MilanRegion: 
     !Equals [!Ref 'AWS::Region', 'eu-south-1']
+
+  HasConfidentialInfoAccount: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
 
 Resources:
 
@@ -60,6 +66,8 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       DisplayName: 'dev account alarms topic: send to SQS and slack'
+      TopicName: pn-AllAlarmSnsTopic
+
   
   CanPublishAlarmTopicPolicy:
     Type: AWS::SNS::TopicPolicy
@@ -77,6 +85,18 @@ Resources:
               - 'sns:Publish'
             Resource:
               - !Ref AlarmSNSTopic
+          - Fn::If: 
+            - HasConfidentialInfoAccount
+            - Sid: AllowPublishFromConfinfo
+              Effect: Allow
+              Action:
+              - 'sns:Publish'
+              Principal:
+                AWS: 
+                  - !Sub arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root
+              Resource:
+                - !Ref AlarmSNSTopic
+            - !Ref AWS::NoValue
       Topics:
         - !Ref AlarmSNSTopic
   
@@ -127,6 +147,7 @@ Resources:
       Parameters: 
         AlarmSNSTopicName: !GetAtt  AlarmSNSTopic.TopicName
         SlackInfo: !Ref SlackInfo
+        ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
         TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/dev-slack/slack-message-enrichment.yaml"
       TimeoutInMinutes: 15

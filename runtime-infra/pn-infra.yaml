@@ -103,6 +103,10 @@ Parameters:
     Default: '-'
     Description: List of egress subnets
 
+  LogRetention:
+    Type: Number
+    Default: 14
+
   # pass-through parameters
   AlarmSNSTopicArn:
     Type: String
@@ -276,6 +280,9 @@ Outputs:
   LogsExporterPolicyArn:
     Description: Policy used by LogsExporterRoleArn Role
     Value: !GetAtt LogsExporterRole.Outputs.LogsIngestionPolicyArn
+    
+  LogRetention:
+    Value: !Ref LogRetention
     
   # pass-though parameters
   AlarmSNSTopicArn:
