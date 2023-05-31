@@ -23,8 +23,8 @@ const coreMapping = {
         'pn-authFleet-ApiKey2ErrorFatalLogsMetricAlarm',
         'pn-authFleet-TokenExchangeErrorFatalLogsMetricAlarm',
         'pn-authFleet-IoAuthorizerErrorFatalLogsMetricAlarm',
-        'pn-token-exchange-api-LatencyAlarm',
-        'pn-token-exchange-api-ErrorAlarm'
+        'pn-token-exchange-api-ErrorAlarm',
+        'pn-token-exchange-api-LatencyAlarm-Wakeup'
     ],
     'pn-paper-channel': [
         'pn-nationalregistries_to_paperchannel-HasOldMessage',
