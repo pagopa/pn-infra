@@ -602,6 +602,8 @@ Conditions:
   Secret7Exist: !Not [ !Equals [ !Ref ContainerSecret7, '' ] ]
 
   HasSecrets: !Or [ !Condition Secret1Exist, !Condition Secret2Exist, !Condition Secret3Exist, !Condition Secret4Exist, !Condition Secret5Exist, !Condition Secret6Exist ]
+
+  HasFatalLogAlarm: !Equals [ !!Ref LogAlarmStrategyV1, 'FATAL' ]
 Resources:
   
   ## Fallback log group
@@ -1335,7 +1337,7 @@ Resources:
     Condition: HasLogAlarm
     DependsOn: ErrorFatalLogsMetricFilter
     Properties:
-      AlarmName: !Sub "${MicroServiceUniqueName}-ErrorFatalLogs-Alarm"
+      AlarmName: !If [ HasFatalLogAlarm, !Sub "${MicroServiceUniqueName}-ErrorFatalLogs-Alarm-Wakeup",  !Sub "${MicroServiceUniqueName}-ErrorFatalLogs-Alarm-Wakeup" ]
       AlarmDescription: "CloudWatch alarm for when ECS LogGroup has ERROR or FATAL line."
       TreatMissingData: notBreaching
       AlarmActions: 

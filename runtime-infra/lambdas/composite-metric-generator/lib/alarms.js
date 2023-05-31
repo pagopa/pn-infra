@@ -1,20 +1,22 @@
 const coreMapping = {
     'pn-user-attributes': [
         'pn-user-attributes-ErrorFatalLogs-Alarm',
+        'pn-user-attributes-ErrorFatalLogs-Alarm-Wakeup',
         'pn-user-attributes-WEB-ApiGwAlarm',
         'pn-address-book-WEB-ApiGwAlarm',
         'pn-address-book-io-IO-ApiGwAlarm',
-        'pn-user-attributes-WEB-ApiGwLatencyAlarm',
-        'pn-address-book-WEB-ApiGwLatencyAlarm',
-        'pn-address-book-io-IO-ApiGwLatencyAlarm',
+        'pn-user-attributes-WEB-ApiGwLatencyAlarm-Wakeup',
+        'pn-address-book-WEB-ApiGwLatencyAlarm-Wakeup',
+        'pn-address-book-io-IO-ApiGwLatencyAlarm-Wakeup',
         'pn-user-attributes-actions-HasOldMessage'
     ],
     'pn-apikey-manager': [
         'pn-apikey-manager-WEB-ApiGwAlarm',
         'pn-apikey-manager-bo-BACKOFFICE-ApiGwAlarm',
         'pn-apikey-manager-ErrorFatalLogs-Alarm',
-        'pn-apikey-manager-bo-BACKOFFICE-ApiGwLatencyAlarm',
-        'pn-apikey-manager-WEB-ApiGwLatencyAlarm'
+        'pn-apikey-manager-ErrorFatalLogs-Alarm-Wakeup',
+        'pn-apikey-manager-bo-BACKOFFICE-ApiGwLatencyAlarm-Wakeup',
+        'pn-apikey-manager-WEB-ApiGwLatencyAlarm-Wakeup'
     ],
     'pn-auth-fleet-v2': [
         'pn-authFleet-JwtAuthorizerErrorFatalLogsMetricAlarm',
@@ -27,24 +29,27 @@ const coreMapping = {
     'pn-paper-channel': [
         'pn-nationalregistries_to_paperchannel-HasOldMessage',
         'pn-paper-channel-ErrorFatalLogs-Alarm',
+        'pn-paper-channel-ErrorFatalLogs-Alarm-Wakeup',
         'pn-nationalregistries_to_paperchannel-DLQ-HasMessage',
-        'pn-paper-channel-bo-BACKOFFICE-ApiGwLatencyAlarm',
+        'pn-paper-channel-bo-BACKOFFICE-ApiGwLatencyAlarm-Wakeup',
         'pn-paper-channel-bo-BACKOFFICE-ApiGwAlarm'
     ],
     'pn-external-registries': [
         'pn-external-registries-B2B-ApiGwAlarm',
         'pn-external-registries-ErrorFatalLogs-Alarm',
+        'pn-external-registries-ErrorFatalLogs-Alarm-Wakeup',
         'pn-external-registries-WEB-ApiGwAlarm',
-        'pn-external-registries-B2B-ApiGwLatencyAlarm',
-        'pn-external-registries-WEB-ApiGwLatencyAlarm'
+        'pn-external-registries-B2B-ApiGwLatencyAlarm-Wakeup',
+        'pn-external-registries-WEB-ApiGwLatencyAlarm-Wakeup'
     ],
     'pn-delivery': [
         'pn-delivery-B2B-ApiGwAlarm',
         'pn-delivery-ErrorFatalLogs-Alarm',
-        'pn-delivery-IO-ApiGwLatencyAlarm',
-        'pn-delivery-WEB-ApiGwLatencyAlarm',
+        'pn-delivery-ErrorFatalLogs-Alarm-Wakeup',
+        'pn-delivery-IO-ApiGwLatencyAlarm-Wakeup',
+        'pn-delivery-WEB-ApiGwLatencyAlarm-Wakeup',
         'pn-delivery-IO-ApiGwAlarm',
-        'pn-delivery-B2B-ApiGwLatencyAlarm',
+        'pn-delivery-B2B-ApiGwLatencyAlarm-Wakeup',
         'pn-delivery-WEB-ApiGwAlarm',
         'pn-delivery_insert_trigger_DLQ-HasMessage'
     ],
@@ -59,7 +64,8 @@ const coreMapping = {
     'pn-downtime-logs': [
         'pn-downtime-logs-WEB-ApiGwAlarm',
         'pn-downtime-logs-ErrorFatalLogs-Alarm',
-        'pn-downtime-logs-WEB-ApiGwLatencyAlarm',
+        'pn-downtime-logs-ErrorFatalLogs-Alarm-Wakeup',
+        'pn-downtime-logs-WEB-ApiGwLatencyAlarm-Wakeup',
         'pn-downtime_logs_internal_events-HasOldMessage',
         'pn-safestore_to_downtime_logs-HasOldMessage',
         'pn-composite_alarms_for_downtime-HasOldMessage',
@@ -85,11 +91,13 @@ const coreMapping = {
     ],
     'pn-mandate': [
         'pn-mandate-ErrorFatalLogs-Alarm',
+        'pn-mandate-ErrorFatalLogs-Alarm-Wakeup',
         'pn-mandate-WEB-ApiGwAlarm',
-        'pn-mandate-WEB-ApiGwLatencyAlarm'
+        'pn-mandate-WEB-ApiGwLatencyAlarm-Wakeup'
     ],
     'pn-kafka-bridge': [
         'pn-kafka-bridge-ErrorFatalLogs-Alarm',
+        'pn-kafka-bridge-ErrorFatalLogs-Alarm-Wakeup',
         'pn-kafka_bridge_onboarding-HasOldMessage',
         'pn-kafka_bridge_onboarding-DLQ-HasMessage'
     ],
@@ -97,6 +105,7 @@ const coreMapping = {
         'pn-nationalregistries_to_deliverypush-HasOldMessage',
         'pn-nationalregistries_to_deliverypush-DLQ-HasMessage',
         'pn-delivery-push-ErrorFatalLogs-Alarm',
+        'pn-delivery-push-ErrorFatalLogs-Alarm-Wakeup',
         'pn-delivery_push_actions_done-HasOldMessage',
         'pn-delivery_push_actions-HasOldMessage',
         'pn-safestore_to_deliverypush-HasOldMessage',
@@ -123,13 +132,15 @@ const coreMapping = {
     ],
     'pn-national-registries': [
         'pn-national-registries-ErrorFatalLogs-Alarm',
-        'pn-national-registries-PNPG-ApiGwLatencyAlarm',
+        'pn-national-registries-ErrorFatalLogs-Alarm-Wakeup',
+        'pn-national-registries-PNPG-ApiGwLatencyAlarm-Wakeup',
         'pn-national-registries-PNPG-ApiGwAlarm',
         'pn-national_registry_gateway_outputs-HasOldMessage',
         'pn-national_registry_gateway_outputs-DLQ-HasMessage'
     ],
     'pn-radd-fsu': [
-        'pn-radd-fsu-ErrorFatalLogs-Alarm'
+        'pn-radd-fsu-ErrorFatalLogs-Alarm',
+        'pn-radd-fsu-ErrorFatalLogs-Alarm-Wakeup'
     ],
     'pn-helpdesk-fe': [
         'helpdesk.${env}notifichedigitali.it-DistributionErrorsAlarm',
@@ -137,7 +148,8 @@ const coreMapping = {
     ],
     'pn-logextractor-be': [
         'pn-logextractor-be-ErrorFatalLogs-Alarm',
-        'pn-logextractor-be-BACKOFFICE-ApiGwLatencyAlarm',
+        'pn-logextractor-be-ErrorFatalLogs-Alarm-Wakeup',
+        'pn-logextractor-be-BACKOFFICE-ApiGwLatencyAlarm-Wakeup',
         'pn-logextractor-be-BACKOFFICE-ApiGwAlarm'
     ]
 }
@@ -145,6 +157,7 @@ const coreMapping = {
 const confidentialInfoMapping = {
     'pn-data-vault': [
         'pn-data-vault-sep-ErrorFatalLogs-Alarm',
+        'pn-data-vault-sep-ErrorFatalLogs-Alarm-Wakeup',
     ],
     'pn-logsaver-be-confidential-info': [
         'pn-logsaver-be-ErrorFatalLogs-Alarm',
@@ -157,10 +170,12 @@ const confidentialInfoMapping = {
     ],
     'pn-address-manager': [
         'pn-address-manager-ErrorFatalLogs-Alarm',
+        'pn-address-manager-ErrorFatalLogs-Alarm-Wakeup',
         'pn-AddressManagerBus-DLQ-HasMessage'
     ],
     'pn-safe-storage': [
         'pn-safe-storage-ErrorFatalLogs-Alarm',
+        'pn-safe-storage-ErrorFatalLogs-Alarm-Wakeup',
         'pn-new-safestorage-cloudtrail-file-DLQ-HasMessage',
         'pn-ss-staging-bucket-events-queue-HasOldMessage',
         'pn-ss-main-bucket-events-queue-HasOldMessage',
@@ -168,10 +183,12 @@ const confidentialInfoMapping = {
         'pn-new-safestorage-cloudtrail-file-HasOldMessage'
     ],
     'pn-external-channel': [
-        'pn-external-channel-ErrorFatalLogs-Alarm'
+        'pn-external-channel-ErrorFatalLogs-Alarm',
+        'pn-external-channel-ErrorFatalLogs-Alarm-Wakeup'
     ],
     'pn-state-machine-manager': [
-        'pn-state-machine-manager-ErrorFatalLogs-Alarm'
+        'pn-state-machine-manager-ErrorFatalLogs-Alarm',
+        'pn-state-machine-manager-ErrorFatalLogs-Alarm-Wakeup'
     ],
     'pn-spidhub': [
         'spidhub-${env1}-ExternalALBAlarm',
