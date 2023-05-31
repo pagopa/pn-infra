@@ -1337,7 +1337,7 @@ Resources:
     Condition: HasLogAlarm
     DependsOn: ErrorFatalLogsMetricFilter
     Properties:
-      AlarmName: !If [ HasFatalLogAlarm, !Sub "${MicroServiceUniqueName}-ErrorFatalLogs-Alarm-Wakeup",  !Sub "${MicroServiceUniqueName}-ErrorFatalLogs-Alarm-Wakeup" ]
+      AlarmName: !Sub "oncall-${MicroServiceUniqueName}-ErrorFatalLogs-Alarm"
       AlarmDescription: "CloudWatch alarm for when ECS LogGroup has ERROR or FATAL line."
       TreatMissingData: notBreaching
       AlarmActions: 
