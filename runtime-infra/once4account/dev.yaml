@@ -149,7 +149,31 @@ Resources:
         SlackInfo: !Ref SlackInfo
         ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
         TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
+        AlarmPrefix: 'oncall-'
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/dev-slack/slack-message-enrichment.yaml"
+      TimeoutInMinutes: 15
+
+  # - Deploy Lambda to send notifications to oncall system
+  EnrichNotificationsForOncall:
+    Condition: MilanRegion
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      Parameters: 
+        AlarmSNSTopicName: !GetAtt  AlarmSNSTopic.TopicName
+        ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/oncall/oncall-notifications.yaml"
+      TimeoutInMinutes: 15
+
+  # - All Alarms Logger
+  LogAllAlarms:
+    Condition: MilanRegion
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      Parameters: 
+        AlarmSNSTopicName: !GetAtt  AlarmSNSTopic.TopicName
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/alarm-logger/cloudwatch-logger.yaml"
       TimeoutInMinutes: 15
 
   # - Connect dev alarm to email

@@ -56,6 +56,11 @@ Parameters:
   ConfidentialInfoAccountId:
     Type: String
   
+  AlarmPrefix:
+    Type: String
+    Default: ''
+    Description: Alarm prefix to filter
+
 Resources:
   MessageEnrichmentQueue:
     Type: AWS::SQS::Queue
@@ -105,7 +110,7 @@ Resources:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
       Enabled: true
-      BatchSize: 10
+      BatchSize: 1
       EventSourceArn: !GetAtt MessageEnrichmentQueue.Arn
       FunctionName: !GetAtt MessageCustomizationLambda.Arn
 
@@ -188,19 +193,24 @@ Resources:
             data = {}
             statusCode = 0  
             body = ''
-            
+            _message=None
             if event is not None:
                 try:
                     body = json.loads(event['Records'][0]['body'])
                     region = event['Records'][0]['awsRegion']
                     sqs_message = json.loads(body['Message'])
                     SlackSNSTopic = os.environ['SlackSNSTopic']
+                    AlarmPrefix = os.environ['AlarmPrefix']
                     sns = boto3.client('sns')
                     print('########### INPUT MESSAGE #############')
                     print(sqs_message)
                                                   
                     if 'AlarmName' in sqs_message:
-                        #Message type is an Alarm message
+                      #Message type is an Alarm message
+                      if AlarmPrefix != '':
+                        if sqs_message['AlarmName'].startswith(AlarmPrefix):
+                          _message=sqs_message
+                      else:
                         _message=sqs_message
                     elif 'alarmName' in sqs_message:
                       # Message type is an Alarm State Change
@@ -301,6 +311,7 @@ Resources:
         Variables:  
           SlackSNSTopic: !Ref SNSTopicToSlack
           ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
+          AlarmPrefix: !Ref AlarmPrefix
       FunctionName: !Sub ${QueueName}-message-enrich-lambda
       Handler: index.lambda_handler
       Role: !GetAtt MessageCustomizationLambdaRole.Arn
