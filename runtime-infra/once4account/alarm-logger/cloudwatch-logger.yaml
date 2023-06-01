@@ -118,6 +118,11 @@ Resources:
             if(event.Records && event.Records.length>0){
               console.log(JSON.stringify(event.Records[0]))
             }
+
+            return {
+              status: 200,
+              message: 'Logged'
+            }
           }
       Description: AWS Lambda function to customize CloudWatch Alarm notification
       FunctionName: pn-all-alarms-log
