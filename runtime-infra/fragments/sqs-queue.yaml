@@ -240,7 +240,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "oncall-${QueueName}-HasDLQMessage"
-      AlarmDescription: "Alarm messages when the oldest message in queue is older than limit QueueOldestAgeLimit"
+      AlarmDescription: "Alarm dlq messages when the ration between number of messages received in queue and messages written to DLQ is greater than the threshold"
       DatapointsToAlarm: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 5
@@ -270,7 +270,7 @@ Resources:
             Stat: Sum
           ReturnData: False
         - Id: e1
-          Expression: !Sub IF(m1>0 AND m1/m2>${OncallDlqRatio}, 1, 0)
+          Expression: !Sub IF(m1>0 AND m2/m1>${OncallDlqRatio}, 1, 0)
           Label: !Sub "${QueueName}-HasDLQMessage-OnCall-Metric"       
       AlarmActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
