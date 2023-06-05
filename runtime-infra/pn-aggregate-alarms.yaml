@@ -190,13 +190,45 @@ Resources:
       Parameters:
         MicroserviceName: 'pn-logextractor-be'
 
-  # Logextractor
+  # Spidhub
   SpidhubCumulativeAlarm:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
       Parameters:
         MicroserviceName: 'pn-spidhub'
+
+  # Address Manager
+  AddressManagerCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-address-manager'
+
+  # Safe Storage
+  SafeStorageCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-safe-storage'
+
+  # External Channel
+  ExternalChannelCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-external-channel'
+
+  # External Channel
+  StateMachineManagerCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-state-machine-manager'
 
   # - Everything written to this topic is an alarm
   CompositeAlarmSNSTopic:

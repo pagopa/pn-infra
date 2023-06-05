@@ -67,6 +67,10 @@ Parameters:
     AllowedValues:
       - true
       - false
+  OncallDlqRatio:
+    Type: Number
+    Default: 0.1
+    Description: Wakeup alarm ratio between messages written to DLQ and messages read from queue
 
 Conditions:
   DlqHasDefaultName: !Equals [ !Ref DeadLetterQueueName, '-' ]
@@ -231,6 +235,49 @@ Resources:
       OKActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
   
+  WakeupDLQAlarm:
+    Condition: IsWithDLQ
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "oncall-${QueueName}-HasDLQMessage"
+      AlarmDescription: "Alarm dlq messages when the ration between number of messages received in queue and messages written to DLQ is greater than the threshold"
+      DatapointsToAlarm: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 5
+      Threshold: 1
+      TreatMissingData: notBreaching
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: QueueName
+                  Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
+              MetricName: NumberOfMessagesReceived
+              Namespace: AWS/SQS
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m2
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: QueueName
+                  Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ], "" ]
+              MetricName: NumberOfMessagesSent
+              Namespace: AWS/SQS
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: e1
+          Expression: !Sub IF(m1>0 AND m2/m1>${OncallDlqRatio}, 1, 0)
+          Label: !Sub "${QueueName}-HasDLQMessage-OnCall-Metric"       
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      InsufficientDataActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 Outputs:
   # Queue info
   QueueName:

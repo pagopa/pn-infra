@@ -1,50 +1,50 @@
 const coreMapping = {
     'pn-user-attributes': [
-        'pn-user-attributes-ErrorFatalLogs-Alarm',
+        'oncall-pn-user-attributes-ErrorFatalLogs-Alarm',
         'pn-user-attributes-WEB-ApiGwAlarm',
         'pn-address-book-WEB-ApiGwAlarm',
         'pn-address-book-io-IO-ApiGwAlarm',
-        'pn-user-attributes-WEB-ApiGwLatencyAlarm',
-        'pn-address-book-WEB-ApiGwLatencyAlarm',
-        'pn-address-book-io-IO-ApiGwLatencyAlarm',
+        'oncall-pn-user-attributes-WEB-ApiGwLatencyAlarm',
+        'oncall-pn-address-book-WEB-ApiGwLatencyAlarm',
+        'oncall-pn-address-book-io-IO-ApiGwLatencyAlarm',
         'pn-user-attributes-actions-HasOldMessage'
     ],
     'pn-apikey-manager': [
         'pn-apikey-manager-WEB-ApiGwAlarm',
         'pn-apikey-manager-bo-BACKOFFICE-ApiGwAlarm',
-        'pn-apikey-manager-ErrorFatalLogs-Alarm',
-        'pn-apikey-manager-bo-BACKOFFICE-ApiGwLatencyAlarm',
-        'pn-apikey-manager-WEB-ApiGwLatencyAlarm'
+        'oncall-pn-apikey-manager-ErrorFatalLogs-Alarm',
+        'oncall-pn-apikey-manager-bo-BACKOFFICE-ApiGwLatencyAlarm',
+        'oncall-pn-apikey-manager-WEB-ApiGwLatencyAlarm'
     ],
     'pn-auth-fleet-v2': [
         'pn-authFleet-JwtAuthorizerErrorFatalLogsMetricAlarm',
         'pn-authFleet-ApiKey2ErrorFatalLogsMetricAlarm',
         'pn-authFleet-TokenExchangeErrorFatalLogsMetricAlarm',
         'pn-authFleet-IoAuthorizerErrorFatalLogsMetricAlarm',
-        'pn-token-exchange-api-LatencyAlarm',
-        'pn-token-exchange-api-ErrorAlarm'
+        'pn-token-exchange-api-ErrorAlarm',
+        'oncall-pn-token-exchange-api-LatencyAlarm'
     ],
     'pn-paper-channel': [
         'pn-nationalregistries_to_paperchannel-HasOldMessage',
-        'pn-paper-channel-ErrorFatalLogs-Alarm',
+        'oncall-pn-paper-channel-ErrorFatalLogs-Alarm',
         'pn-nationalregistries_to_paperchannel-DLQ-HasMessage',
-        'pn-paper-channel-bo-BACKOFFICE-ApiGwLatencyAlarm',
+        'oncall-pn-paper-channel-bo-BACKOFFICE-ApiGwLatencyAlarm',
         'pn-paper-channel-bo-BACKOFFICE-ApiGwAlarm'
     ],
     'pn-external-registries': [
         'pn-external-registries-B2B-ApiGwAlarm',
-        'pn-external-registries-ErrorFatalLogs-Alarm',
+        'oncall-pn-external-registries-ErrorFatalLogs-Alarm',
         'pn-external-registries-WEB-ApiGwAlarm',
-        'pn-external-registries-B2B-ApiGwLatencyAlarm',
-        'pn-external-registries-WEB-ApiGwLatencyAlarm'
+        'oncall-pn-external-registries-B2B-ApiGwLatencyAlarm',
+        'oncall-pn-external-registries-WEB-ApiGwLatencyAlarm'
     ],
     'pn-delivery': [
         'pn-delivery-B2B-ApiGwAlarm',
-        'pn-delivery-ErrorFatalLogs-Alarm',
-        'pn-delivery-IO-ApiGwLatencyAlarm',
-        'pn-delivery-WEB-ApiGwLatencyAlarm',
+        'oncall-pn-delivery-ErrorFatalLogs-Alarm',
+        'oncall-pn-delivery-IO-ApiGwLatencyAlarm',
+        'oncall-pn-delivery-WEB-ApiGwLatencyAlarm',
         'pn-delivery-IO-ApiGwAlarm',
-        'pn-delivery-B2B-ApiGwLatencyAlarm',
+        'oncall-pn-delivery-B2B-ApiGwLatencyAlarm',
         'pn-delivery-WEB-ApiGwAlarm',
         'pn-delivery_insert_trigger_DLQ-HasMessage'
     ],
@@ -58,8 +58,8 @@ const coreMapping = {
     ],
     'pn-downtime-logs': [
         'pn-downtime-logs-WEB-ApiGwAlarm',
-        'pn-downtime-logs-ErrorFatalLogs-Alarm',
-        'pn-downtime-logs-WEB-ApiGwLatencyAlarm',
+        'oncall-pn-downtime-logs-ErrorFatalLogs-Alarm',
+        'oncall-pn-downtime-logs-WEB-ApiGwLatencyAlarm',
         'pn-downtime_logs_internal_events-HasOldMessage',
         'pn-safestore_to_downtime_logs-HasOldMessage',
         'pn-composite_alarms_for_downtime-HasOldMessage',
@@ -84,19 +84,19 @@ const coreMapping = {
         'pn-core-redis-CurrentConnections'
     ],
     'pn-mandate': [
-        'pn-mandate-ErrorFatalLogs-Alarm',
+        'oncall-pn-mandate-ErrorFatalLogs-Alarm',
         'pn-mandate-WEB-ApiGwAlarm',
-        'pn-mandate-WEB-ApiGwLatencyAlarm'
+        'oncall-pn-mandate-WEB-ApiGwLatencyAlarm'
     ],
     'pn-kafka-bridge': [
-        'pn-kafka-bridge-ErrorFatalLogs-Alarm',
+        'oncall-pn-kafka-bridge-ErrorFatalLogs-Alarm',
         'pn-kafka_bridge_onboarding-HasOldMessage',
         'pn-kafka_bridge_onboarding-DLQ-HasMessage'
     ],
     'pn-delivery-push': [
         'pn-nationalregistries_to_deliverypush-HasOldMessage',
         'pn-nationalregistries_to_deliverypush-DLQ-HasMessage',
-        'pn-delivery-push-ErrorFatalLogs-Alarm',
+        'oncall-pn-delivery-push-ErrorFatalLogs-Alarm',
         'pn-delivery_push_actions_done-HasOldMessage',
         'pn-delivery_push_actions-HasOldMessage',
         'pn-safestore_to_deliverypush-HasOldMessage',
@@ -122,29 +122,29 @@ const coreMapping = {
         'pn-logsaver-be-FailedInvocation-Alarm'
     ],
     'pn-national-registries': [
-        'pn-national-registries-ErrorFatalLogs-Alarm',
-        'pn-national-registries-PNPG-ApiGwLatencyAlarm',
+        'oncall-pn-national-registries-ErrorFatalLogs-Alarm',
+        'oncall-pn-national-registries-PNPG-ApiGwLatencyAlarm',
         'pn-national-registries-PNPG-ApiGwAlarm',
         'pn-national_registry_gateway_outputs-HasOldMessage',
         'pn-national_registry_gateway_outputs-DLQ-HasMessage'
     ],
     'pn-radd-fsu': [
-        'pn-radd-fsu-ErrorFatalLogs-Alarm'
+        'oncall-pn-radd-fsu-ErrorFatalLogs-Alarm'
     ],
     'pn-helpdesk-fe': [
         'helpdesk.${env}notifichedigitali.it-DistributionErrorsAlarm',
         'helpdesk.${env}notifichedigitali.it-DistributionRequestsAlarm'
     ],
     'pn-logextractor-be': [
-        'pn-logextractor-be-ErrorFatalLogs-Alarm',
-        'pn-logextractor-be-BACKOFFICE-ApiGwLatencyAlarm',
+        'oncall-pn-logextractor-be-ErrorFatalLogs-Alarm',
+        'oncall-pn-logextractor-be-BACKOFFICE-ApiGwLatencyAlarm',
         'pn-logextractor-be-BACKOFFICE-ApiGwAlarm'
     ]
 }
 
 const confidentialInfoMapping = {
     'pn-data-vault': [
-        'pn-data-vault-sep-ErrorFatalLogs-Alarm',
+        'oncall-pn-data-vault-sep-ErrorFatalLogs-Alarm',
     ],
     'pn-logsaver-be-confidential-info': [
         'pn-logsaver-be-ErrorFatalLogs-Alarm',
@@ -156,22 +156,60 @@ const confidentialInfoMapping = {
         'pn-LambdaAllAlarmSnsPublisher-Alarm'
     ],
     'pn-address-manager': [
-        'pn-address-manager-ErrorFatalLogs-Alarm',
+        'oncall-pn-address-manager-ErrorFatalLogs-Alarm',
         'pn-AddressManagerBus-DLQ-HasMessage'
     ],
     'pn-safe-storage': [
-        'pn-safe-storage-ErrorFatalLogs-Alarm',
+        'oncall-pn-safe-storage-ErrorFatalLogs-Alarm',
         'pn-new-safestorage-cloudtrail-file-DLQ-HasMessage',
-        'pn-ss-staging-bucket-events-queue-HasOldMessage',
+        'pn-new-safestorage-cloudtrail-file-HasOldMessage',
         'pn-ss-main-bucket-events-queue-HasOldMessage',
         'pn-ss-gestore-bucket-invocation-errors-queue-HasOldMessage',
-        'pn-new-safestorage-cloudtrail-file-HasOldMessage'
+        'pn-ss-forward-events-pncoreeventbus-DLQueue-HasMessage',
+        'pn-ss-main-bucket-events-queue-DLQ-HasMessage',
+        'pn-ss-staging-bucket-events-queue-HasOldMessage',
+        'pn-ss-gestore-bucket-invocation-errors-queue-DLQ-HasMessage',
+        'pn-ss-staging-bucket-events-queue-DLQ-HasMessage',
+        'pn-ss-external-notification-DEV-queue-HasMessage'
     ],
     'pn-external-channel': [
-        'pn-external-channel-ErrorFatalLogs-Alarm'
+        'oncall-pn-external-channel-ErrorFatalLogs-Alarm',
+        'pn-ec-tracker-sms-stato-queue-HasOldMessage',
+        'pn-ec-tracker-sms-stato-queue-DLQ-HasMessage',
+        'pn-ec-tracker-sms-errori-queue-DLQ-HasMessage',
+        'pn-ec-tracker-pec-stato-queue-HasOldMessage',
+        'pn-ec-tracker-pec-stato-queue-DLQ-HasMessage',
+        'pn-ec-tracker-pec-errori-queue-HasOldMessage',
+        'pn-ec-tracker-pec-errori-queue-DLQ-HasMessage',
+        'pn-ec-tracker-email-stato-queue-HasMessage',
+        'pn-ec-tracker-email-stato-queue-DLQ-HasMessage',
+        'pn-ec-tracker-email-errori-queue-HasOldMessage',
+        'pn-ec-tracker-email-errori-queue-DLQ-HasMessage',
+        'pn-ec-tracker-cartaceo-stato-queue-HasOldMessage',
+        'pn-ec-tracker-cartaceo-stato-queue-DLQ-HasMessage',
+        'pn-ec-tracker-cartaceo-errori-queue-HasOldMessage',
+        'pn-ec-tracker-cartaceo-errori-queue-DLQ-HasMessage',
+        'pn-ec-sms-interactive-queue-HasOldMessage',
+        'pn-ec-sms-interactive-queue-DLQ-HasMessage',
+        'pn-ec-sms-errori-queue-HasOldMessage',
+        'pn-ec-sms-errori-queue-DLQ-HasMessage',
+        'pn-ec-sms-batch-queue-HasOldMessage',
+        'pn-ec-sms-batch-queue-DLQ-HasMessage',
+        'pn-ec-pec-interactive-queue-HasOldMessage',
+        'pn-ec-pec-interactive-queue-DLQ-HasMessage',
+        'pn-ec-pec-errori-queue-HasOldMessage',
+        'pn-ec-pec-errori-queue-DLQ-HasMessage',
+        'pn-ec-pec-batch-queue-HasOldMessage',
+        'pn-ec-pec-batch-queue-DLQ-HasMessage',
+        'pn-ec-notifiche-esterne-piattaforma-1-queue-HasOldMessage',
+        'pn-ec-notifiche-esterne-piattaforma-1-queue-DLQ-HasMessage',
+        'pn-ec-forward-events-pncoreeventbus-DLQueue-HasMessage',
+        'pn-ec-email-interactive-queue-HasOldMessage',
+        'pn-ec-email-interactive-queue-DLQ-HasMessage',
+        'pn-ec-email-errori-queue-HasOldMessage'
     ],
     'pn-state-machine-manager': [
-        'pn-state-machine-manager-ErrorFatalLogs-Alarm'
+        'oncall-pn-state-machine-manager-ErrorFatalLogs-Alarm'
     ],
     'pn-spidhub': [
         'spidhub-${env1}-ExternalALBAlarm',
