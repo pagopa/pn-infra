@@ -85,16 +85,18 @@ Resources:
   Cluster:
     Type: "AWS::ElastiCache::ReplicationGroup"
     Properties:
-      CacheNodeType: cache.t3.small
+      CacheNodeType: !Ref NodeType
       AutoMinorVersionUpgrade: true
       AutomaticFailoverEnabled: false
       CacheSubnetGroupName: !Ref SubnetGroup
       Engine: redis
       ReplicationGroupDescription:
-        Fn::Sub: "testredis"
-      ReplicasPerNodeGroup: 1
+        Fn::Sub: "${Project}-${Environment}"
+      ReplicasPerNodeGroup: !Ref Replicas
       SecurityGroupIds:
-        - SecurityGroup
+         - "Fn::GetAtt":
+            - SecurityGroup
+            - GroupId
 
   RedisEngineCPUAlarm:
     Type: AWS::CloudWatch::Alarm
