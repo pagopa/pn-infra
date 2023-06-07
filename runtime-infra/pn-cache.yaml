@@ -83,16 +83,15 @@ Resources:
       VpcId: !Ref VpcId
 
   Cluster:
-    Type: "AWS::ElastiCache::CacheCluster"
+    Type: "AWS::ElastiCache::ReplicationGroup"
     Properties:
       CacheNodeType: !Ref NodeType
+      AutoMinorVersionUpgrade: true
       CacheSubnetGroupName: !Ref SubnetGroup
       Engine: redis
-      NumCacheCluster: !Ref Replicas
-      VpcSecurityGroupIds:
-        - "Fn::GetAtt":
-            - SecurityGroup
-            - GroupId
+      ReplicasPerNodeGroup: !Ref Replicas
+      SecurityGroupIds:
+      - Ref: SecurityGroup
 
   RedisEngineCPUAlarm:
     Type: AWS::CloudWatch::Alarm
