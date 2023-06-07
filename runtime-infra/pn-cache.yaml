@@ -85,13 +85,16 @@ Resources:
   Cluster:
     Type: "AWS::ElastiCache::ReplicationGroup"
     Properties:
-      CacheNodeType: !Ref NodeType
+      CacheNodeType: cache.t3.small
       AutoMinorVersionUpgrade: true
+      AutomaticFailoverEnabled: false
       CacheSubnetGroupName: !Ref SubnetGroup
       Engine: redis
-      ReplicasPerNodeGroup: !Ref Replicas
+      ReplicationGroupDescription:
+        Fn::Sub: "testredis"
+      ReplicasPerNodeGroup: 1
       SecurityGroupIds:
-      - Ref: SecurityGroup
+        - SecurityGroup
 
   RedisEngineCPUAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -185,10 +188,6 @@ Outputs:
   AllowedSecurityGroupId:
     Description: The id of the security group that can access the cache cluster
     Value: !GetAtt AllowedSecurityGroup.GroupId
-
-  RedisEndpoint:
-    Description: The id of the security group that can access the cache cluster
-    Value: !GetAtt Cluster.RedisEndpoint.Address
   
   RedisCurrentConnectionsAlarmArn:
     Value: !GetAtt RedisCurrentConnectionsAlarm.Arn
