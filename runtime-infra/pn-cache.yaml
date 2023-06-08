@@ -193,10 +193,7 @@ Outputs:
 
   RedisEndpoint:
     Description: The id of the security group that can access the cache cluster
-    Value:
-      Fn::GetAtt:
-      - Redis
-      - PrimaryEndPoint.Address
+    Value: !GetAtt PrimaryEndPoint.Address
 
   RedisCurrentConnectionsAlarmArn:
     Value: !GetAtt RedisCurrentConnectionsAlarm.Arn
