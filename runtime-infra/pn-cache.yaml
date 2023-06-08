@@ -91,7 +91,7 @@ Resources:
       CacheSubnetGroupName: !Ref SubnetGroup
       Engine: redis
       ReplicationGroupDescription:
-        Fn::Sub: ${ProjectName}-redis-replication
+        Fn::Sub: ${ProjectName}-redis-cluster
       ReplicasPerNodeGroup: !Ref Replicas
       SecurityGroupIds:
          - "Fn::GetAtt":
@@ -192,8 +192,11 @@ Outputs:
     Value: !GetAtt AllowedSecurityGroup.GroupId
 
   RedisEndpoint:
-    Description: The id of the security group that can access the cache cluster
-    Value: !GetAtt PrimaryEndPoint.Address
+    Description: The endpoint Address for Primary Redis cluster 
+    Value:
+      Fn::GetAtt:
+      - Cluster
+      - PrimaryEndPoint.Address
 
   RedisCurrentConnectionsAlarmArn:
     Value: !GetAtt RedisCurrentConnectionsAlarm.Arn
