@@ -120,6 +120,7 @@ Parameters:
       - Disabled
       - REST-API
       - SQS
+      - CUSTOM
     ConstraintDescription: must specify the type of Autoscaling strategy
   
   AutoscalingCheckPeriod:
@@ -518,10 +519,12 @@ Conditions:
 
   AutoscalingByRestApi: !Equals [ !Ref AutoscalingStrategy, REST-API]
   AutoscalingBySQS: !Equals [ !Ref AutoscalingStrategy, SQS]
+  AutoscalingCustom: !Equals [ !Ref AutoscalingStrategy, CUSTOM]
   AutoscalingEnabled:
     Fn::Or:
      - Condition: AutoscalingByRestApi
      - Condition: AutoscalingBySQS
+     - Condition: AutoscalingCustom
 
   ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, 'True' ] ]
   
@@ -1480,6 +1483,10 @@ Outputs:
   TaskRoleName:
     Description: Container execution role name, useful to attach custom policies
     Value: !Ref TaskRole
+
+  TargetGroupName:
+    Value: !GetAtt TargetGroup.TargetGroupFullName
+
   FatalLogsMetricAlarmArn:
     Description: ARN of the fatal logs alarm
     Value:
@@ -1487,6 +1494,19 @@ Outputs:
         - HasLogAlarm
         - !GetAtt ErrorFatalLogsMetricAlarm.Arn
         - ''
+  ScalUpPolicy:
+    Value:
+     !If
+        - AutoscalingEnabled
+        - !Ref ScaleUpPolicy
+        - ''
+  ScalDdownPolicy:
+    Value:
+     !If
+        - AutoscalingEnabled
+        - !Ref ScaleDownPolicy
+        - ''
+        
   AutoScalingAlarmArn:
     Description: ARN of the autoscaling alarm
     Value:
@@ -1495,6 +1515,9 @@ Outputs:
         - !If 
           - AutoscalingByRestApi
           - !GetAtt AlarmHighRequests.Arn
-          - !GetAtt AlarmSQS.Arn
+          - !If 
+            - AutoscalingBySQS
+            - !GetAtt AlarmSQS.Arn
+            - ''
         - ''
         
