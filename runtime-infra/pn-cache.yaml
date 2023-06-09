@@ -82,15 +82,33 @@ Resources:
           ToPort: 6379
       VpcId: !Ref VpcId
 
-  Cluster:
-    Type: "AWS::ElastiCache::CacheCluster"
+  AuthToken:
+    Type: AWS::SecretsManager::Secret
     Properties:
+      GenerateSecretString:
+        ExcludePunctuation: true
+        SecretStringTemplate: '{}'
+        GenerateStringKey: "AuthToken"
+        PasswordLength: 26
+        IncludeSpace: false
+      Name:
+        Fn::Sub: "${Project}-redis-cache"
+
+  Cluster:
+    Type: "AWS::ElastiCache::ReplicationGroup"
+    Properties:
+      AtRestEncryptionEnabled: true
+      TransitEncryptionEnabled: true
       CacheNodeType: !Ref NodeType
+      AutoMinorVersionUpgrade: true
+      AutomaticFailoverEnabled: false
       CacheSubnetGroupName: !Ref SubnetGroup
       Engine: redis
-      NumCacheNodes: !Ref Replicas
-      VpcSecurityGroupIds:
-        - "Fn::GetAtt":
+      ReplicationGroupDescription:
+        Fn::Sub: ${ProjectName}-redis-cluster
+      ReplicasPerNodeGroup: !Ref Replicas
+      SecurityGroupIds:
+         - "Fn::GetAtt":
             - SecurityGroup
             - GroupId
 
@@ -188,9 +206,12 @@ Outputs:
     Value: !GetAtt AllowedSecurityGroup.GroupId
 
   RedisEndpoint:
-    Description: The id of the security group that can access the cache cluster
-    Value: !GetAtt Cluster.RedisEndpoint.Address
-  
+    Description: The endpoint Address for Primary Redis cluster 
+    Value:
+      Fn::GetAtt:
+      - Cluster
+      - PrimaryEndPoint.Address
+
   RedisCurrentConnectionsAlarmArn:
     Value: !GetAtt RedisCurrentConnectionsAlarm.Arn
 
