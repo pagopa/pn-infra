@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Backup Plan template for AWS Backups"
+Parameters:
+
+  TagKey:
+    Type: String
+    Default: backup
+    Description: Enter the tag KEY of the AWS resource
+
+  TagValue:
+    Type: String
+    Default: daily
+    Description: Enter the tag VALUE of the AWS resource
+
+  LifecycleDeleteAfterDays:
+    Type: Number
+    Default: 180
+    Description: Specifies the number of days after creation that a recovery point is deleted. Must be greater than 90 days plus MoveToColdStorageAfterDays.
+  
+  LifecycleMoveToColdStorageAfterDays:
+    Type: Number
+    Default: 31
+    Description: Specifies the number of days after creation that a recovery point is moved to cold storage.
+
+Resources:
+  BackupVault:
+    Type: "AWS::Backup::BackupVault"
+    Properties:
+      BackupVaultName: !Sub 'BackupVault_Dynamodb_${AWS::StackName}'
+
+  BackupPlan:
+    Type: "AWS::Backup::BackupPlan"
+    Properties:
+      BackupPlan:
+        BackupPlanName: !Sub 'BackupPlan_${AWS::StackName}'
+        BackupPlanRule:
+          
+          - RuleName: "RuleForDailyBackups"
+            TargetBackupVault: !Ref BackupVault
+            ScheduleExpression: "cron(0 4 * * ? *)"
+            StartWindowMinutes: 60
+            CompletionWindowMinutes : 120
+            Lifecycle:
+              DeleteAfterDays:
+                Ref: LifecycleDeleteAfterDays
+              MoveToColdStorageAfterDays:
+                Ref: LifecycleMoveToColdStorageAfterDays
+
+    DependsOn: BackupVault  
+  BackupRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "backup.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup"
+
+  TagBasedBackupSelection:
+    Type: "AWS::Backup::BackupSelection"
+    Properties:
+      BackupSelection:
+        SelectionName: "TagBasedBackupSelection"
+        IamRoleArn: !GetAtt BackupRole.Arn
+        Resources:
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-ConfidentialObjects
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-EcRichieste
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-EcRichiesteMetadati
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-SsAnagraficaClient
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-EcAnagrafica
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/PnSsTableDocumentiStreamMetadati
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-AuditStorage
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-SsDocumenti
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-SmStates
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-SsTipologieDocumenti
+      BackupPlanId: !Ref BackupPlan
+    DependsOn: BackupPlan      
