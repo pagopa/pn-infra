@@ -82,7 +82,7 @@ Resources:
           ToPort: 6379
       VpcId: !Ref VpcId
 
-  Cluster:
+  RedisReplicationGroup:
     Type: "AWS::ElastiCache::ReplicationGroup"
     Properties:
       AtRestEncryptionEnabled: true
@@ -93,7 +93,7 @@ Resources:
       CacheSubnetGroupName: !Ref SubnetGroup
       Engine: redis
       ReplicationGroupDescription:
-        Fn::Sub: ${ProjectName}-redis-cluster
+        Fn::Sub: ${ProjectName}-redis-replication-group
       ReplicasPerNodeGroup: !Ref Replicas
       SecurityGroupIds:
          - "Fn::GetAtt":
@@ -112,7 +112,7 @@ Resources:
       DatapointsToAlarm: 1
       Dimensions: 
         - Name: CacheClusterId
-          Value: !Ref Cluster
+          Value: !Ref RedisReplicationGroup
       MetricName: EngineCPUUtilization
       Namespace: AWS/ElastiCache
       ComparisonOperator: GreaterThanOrEqualToThreshold
@@ -134,7 +134,7 @@ Resources:
       DatapointsToAlarm: 1
       Dimensions: 
         - Name: CacheClusterId
-          Value: !Ref Cluster
+          Value: !Ref RedisReplicationGroup
       MetricName: CPUUtilization
       Namespace: AWS/ElastiCache
       ComparisonOperator: GreaterThanOrEqualToThreshold
@@ -156,7 +156,7 @@ Resources:
       DatapointsToAlarm: 1
       Dimensions: 
         - Name: CacheClusterId
-          Value: !Ref Cluster
+          Value: !Ref RedisReplicationGroup
       MetricName: DatabaseMemoryUsagePercentage
       Namespace: AWS/ElastiCache
       ComparisonOperator: GreaterThanOrEqualToThreshold
@@ -178,7 +178,7 @@ Resources:
       DatapointsToAlarm: 1
       Dimensions: 
         - Name: CacheClusterId
-          Value: !Ref Cluster
+          Value: !Ref RedisReplicationGroup
       MetricName: CurrConnections
       Namespace: AWS/ElastiCache
       ComparisonOperator: GreaterThanOrEqualToThreshold
@@ -197,7 +197,7 @@ Outputs:
     Description: The endpoint Address for Primary Redis cluster 
     Value:
       Fn::GetAtt:
-      - Cluster
+      - RedisReplicationGroup
       - PrimaryEndPoint.Address
 
   RedisCurrentConnectionsAlarmArn:
