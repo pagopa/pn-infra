@@ -82,25 +82,11 @@ Resources:
           ToPort: 6379
       VpcId: !Ref VpcId
 
-  AuthToken:
-    Type: AWS::SecretsManager::Secret
-    Properties:
-      GenerateSecretString:
-        ExcludePunctuation: true
-        SecretStringTemplate: '{}'
-        GenerateStringKey: "AuthToken"
-        PasswordLength: 26
-        IncludeSpace: false
-      Name:
-        Fn::Sub: "${ProjectName}-redis-token"
-
   Cluster:
     Type: "AWS::ElastiCache::ReplicationGroup"
     Properties:
       AtRestEncryptionEnabled: true
-      AuthToken:
-        Fn::Sub: "{{resolve:secretsmanager:${AuthToken}:SecretString:AuthToken}}"
-      TransitEncryptionEnabled: true
+      TransitEncryptionEnabled: false
       CacheNodeType: !Ref NodeType
       AutoMinorVersionUpgrade: true
       AutomaticFailoverEnabled: false
@@ -206,10 +192,6 @@ Outputs:
   AllowedSecurityGroupId:
     Description: The id of the security group that can access the cache cluster
     Value: !GetAtt AllowedSecurityGroup.GroupId
-  AuthSecret:
-    Description: The ARN of Secret for Auth
-    Value:
-      Ref: AuthToken
 
   RedisEndpoint:
     Description: The endpoint Address for Primary Redis cluster 
