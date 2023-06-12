@@ -98,6 +98,8 @@ Resources:
     Type: "AWS::ElastiCache::ReplicationGroup"
     Properties:
       AtRestEncryptionEnabled: true
+      AuthToken:
+        Fn::Sub: "{{resolve:secretsmanager:${AuthToken}:SecretString:AuthToken}}"
       TransitEncryptionEnabled: true
       CacheNodeType: !Ref NodeType
       AutoMinorVersionUpgrade: true
@@ -204,6 +206,10 @@ Outputs:
   AllowedSecurityGroupId:
     Description: The id of the security group that can access the cache cluster
     Value: !GetAtt AllowedSecurityGroup.GroupId
+  AuthSecret:
+    Description: The ARN of Secret for Auth
+    Value:
+      Ref: AuthToken
 
   RedisEndpoint:
     Description: The endpoint Address for Primary Redis cluster 
