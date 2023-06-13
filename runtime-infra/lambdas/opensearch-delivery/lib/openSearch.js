@@ -112,7 +112,9 @@ function prepareBulkBody(logs){
               jsonMessage.stack_trace = truncateMessage(jsonMessage.stack_trace, 20000)
             }
             
-            formattedLogs.push(jsonMessage);
+            if(['DEBUG'].indexOf(jsonMessage.level)<0){
+              formattedLogs.push(jsonMessage);
+            }
           }
         } catch(e){
           console.log(e)
@@ -132,7 +134,8 @@ function prepareBulkBody(logs){
               logger_name: 'logs-to-opensearch-lambda'
           }
 
-          formattedLogs.push(fakeLog);
+          // skip storage of invalid message, print it for debugging purposes
+          console.debug(fakeLog)
         }
       }
     }
