@@ -2,21 +2,13 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: "Backup Plan template for AWS Backups"
 Parameters:
 
-  EnvType:
-    Type: String
-
   LifecycleDeleteAfterDays:
     Type: Number
     Default: 35
     Description: Specifies the number of days after creation that a recovery point is deleted. Must be greater than 90 days plus MoveToColdStorageAfterDays.
   
-  ProdCronExpression:
+  BackupCronExpression:
     Type: String
-    Default: "cron(0 4 * * ? *)"
-
-  OtherEnvCronExpression:
-    Type: String
-    Default: "cron(0 4 * * ? 2099)" # date in the past to not have the schedule run
 
   CompletionWindowMinutes:
     Type: Number
@@ -25,9 +17,6 @@ Parameters:
   StartWindowMinutes:
     Type: Number
     Default: 60
-
-Conditions:
-  IsProdEnv: !Equals [ !Ref EnvType, 'prod' ]
 
 Resources:
   BackupVault:
@@ -44,7 +33,7 @@ Resources:
           
           - RuleName: "RuleForDailyBackups"
             TargetBackupVault: !Ref BackupVault
-            ScheduleExpression: !If [ IsProdEnv, !Ref ProdCronExpression, !Ref OtherEnvCronExpression ] 
+            ScheduleExpression: !Ref BackupCronExpression 
             StartWindowMinutes: !Ref StartWindowMinutes
             CompletionWindowMinutes : !Ref CompletionWindowMinutes
             EnableContinuousBackup: true
