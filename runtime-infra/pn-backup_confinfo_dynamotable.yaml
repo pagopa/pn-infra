@@ -23,6 +23,10 @@ Parameters:
     Type: String
     Default: "cron(0 4 * * ? 2020)" # date in the past to not have the schedule run
 
+  CompletionWindowMinutes:
+    Type: Number
+    Default: 600
+
 Conditions:
   IsProdEnv: !Equals [ !Ref EnvType, 'prod' ]
 
@@ -42,8 +46,8 @@ Resources:
           - RuleName: "RuleForDailyBackups"
             TargetBackupVault: !Ref BackupVault
             ScheduleExpression: !If [ IsProdEnv, !Ref ProdCronExpression, !Ref OtherEnvCronExpression ] 
-            #StartWindowMinutes: 60
-            #CompletionWindowMinutes : 120
+            CompletionWindowMinutes : !Ref CompletionWindowMinutes
+            EnableContinuousBackup: true
             Lifecycle:
               DeleteAfterDays:
                 Ref: LifecycleDeleteAfterDays
