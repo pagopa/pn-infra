@@ -7,16 +7,21 @@ Parameters:
 
   LifecycleDeleteAfterDays:
     Type: Number
-    Default: 35
+    Default: 180
     Description: Specifies the number of days after creation that a recovery point is deleted. Must be greater than 90 days plus MoveToColdStorageAfterDays.
   
+  LifecycleMoveToColdStorageAfterDays:
+    Type: Number
+    Default: 31
+    Description: Specifies the number of days after creation that a recovery point is moved to cold storage.
+
   ProdCronExpression:
     Type: String
     Default: "cron(0 4 * * ? *)"
 
   OtherEnvCronExpression:
     Type: String
-    Default: "cron(0 4 * * ? 2020)" # date in the past to not have the schedule run
+    Default: "cron(0 4 * * ? 2099)" # date in the past to not have the schedule run
 
   CompletionWindowMinutes:
     Type: Number
@@ -51,6 +56,9 @@ Resources:
             Lifecycle:
               DeleteAfterDays:
                 Ref: LifecycleDeleteAfterDays
+              MoveToColdStorageAfterDays:
+                Ref: LifecycleMoveToColdStorageAfterDays
+
   BackupRole:
     Type: "AWS::IAM::Role"
     Properties:
