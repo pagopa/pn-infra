@@ -108,14 +108,20 @@ function prepareBulkBody(logs){
             jsonMessage.logGroup = doc.logGroup
             jsonMessage.logStream = doc.logStream
 
+            /*
+            // opensearch is not used for debugging purposes, the stack trace won't be helpful
             if(jsonMessage.stack_trace) {
               jsonMessage.stack_trace = truncateMessage(jsonMessage.stack_trace, 20000)
+            }*/
+            if(jsonMessage.stack_trace) {
+              delete jsonMessage.stack_trace
             }
             
-            formattedLogs.push(jsonMessage);
+            if(['DEBUG'].indexOf(jsonMessage.level)<0){
+              formattedLogs.push(jsonMessage);
+            }
           }
         } catch(e){
-          console.log(e)
           const timestamp = new Date(log.timestamp);
 
           
@@ -132,7 +138,8 @@ function prepareBulkBody(logs){
               logger_name: 'logs-to-opensearch-lambda'
           }
 
-          formattedLogs.push(fakeLog);
+          // skip storage of invalid message, print it for debugging purposes
+          console.debug(fakeLog)
         }
       }
     }
