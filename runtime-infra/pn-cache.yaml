@@ -82,15 +82,21 @@ Resources:
           ToPort: 6379
       VpcId: !Ref VpcId
 
-  Cluster:
-    Type: "AWS::ElastiCache::CacheCluster"
+  RedisReplicationGroup:
+    Type: "AWS::ElastiCache::ReplicationGroup"
     Properties:
+      AtRestEncryptionEnabled: true
+      TransitEncryptionEnabled: false
       CacheNodeType: !Ref NodeType
+      AutoMinorVersionUpgrade: true
+      AutomaticFailoverEnabled: false
       CacheSubnetGroupName: !Ref SubnetGroup
       Engine: redis
-      NumCacheNodes: !Ref Replicas
-      VpcSecurityGroupIds:
-        - "Fn::GetAtt":
+      ReplicationGroupDescription:
+        Fn::Sub: ${ProjectName}-redis-replication-group
+      ReplicasPerNodeGroup: !Ref Replicas
+      SecurityGroupIds:
+         - "Fn::GetAtt":
             - SecurityGroup
             - GroupId
 
@@ -106,7 +112,7 @@ Resources:
       DatapointsToAlarm: 1
       Dimensions: 
         - Name: CacheClusterId
-          Value: !Ref Cluster
+          Value: !Ref RedisReplicationGroup
       MetricName: EngineCPUUtilization
       Namespace: AWS/ElastiCache
       ComparisonOperator: GreaterThanOrEqualToThreshold
@@ -128,7 +134,7 @@ Resources:
       DatapointsToAlarm: 1
       Dimensions: 
         - Name: CacheClusterId
-          Value: !Ref Cluster
+          Value: !Ref RedisReplicationGroup
       MetricName: CPUUtilization
       Namespace: AWS/ElastiCache
       ComparisonOperator: GreaterThanOrEqualToThreshold
@@ -150,7 +156,7 @@ Resources:
       DatapointsToAlarm: 1
       Dimensions: 
         - Name: CacheClusterId
-          Value: !Ref Cluster
+          Value: !Ref RedisReplicationGroup
       MetricName: DatabaseMemoryUsagePercentage
       Namespace: AWS/ElastiCache
       ComparisonOperator: GreaterThanOrEqualToThreshold
@@ -172,7 +178,7 @@ Resources:
       DatapointsToAlarm: 1
       Dimensions: 
         - Name: CacheClusterId
-          Value: !Ref Cluster
+          Value: !Ref RedisReplicationGroup
       MetricName: CurrConnections
       Namespace: AWS/ElastiCache
       ComparisonOperator: GreaterThanOrEqualToThreshold
@@ -188,9 +194,12 @@ Outputs:
     Value: !GetAtt AllowedSecurityGroup.GroupId
 
   RedisEndpoint:
-    Description: The id of the security group that can access the cache cluster
-    Value: !GetAtt Cluster.RedisEndpoint.Address
-  
+    Description: The endpoint Address for Primary Redis cluster 
+    Value:
+      Fn::GetAtt:
+      - RedisReplicationGroup
+      - PrimaryEndPoint.Address
+
   RedisCurrentConnectionsAlarmArn:
     Value: !GetAtt RedisCurrentConnectionsAlarm.Arn
 
