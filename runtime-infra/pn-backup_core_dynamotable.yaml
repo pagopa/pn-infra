@@ -27,6 +27,10 @@ Parameters:
     Type: Number
     Default: 600
 
+  StartWindowMinutes:
+    Type: Number
+    Default: 60
+
 Conditions:
   IsProdEnv: !Equals [ !Ref EnvType, 'prod' ]
 
@@ -47,6 +51,7 @@ Resources:
             TargetBackupVault: !Ref BackupVault
             ScheduleExpression: !If [ IsProdEnv, !Ref ProdCronExpression, !Ref OtherEnvCronExpression ] 
             CompletionWindowMinutes : !Ref CompletionWindowMinutes
+            StartWindowMinutes: !Ref StartWindowMinutes
             EnableContinuousBackup: true
             Lifecycle:
               DeleteAfterDays:

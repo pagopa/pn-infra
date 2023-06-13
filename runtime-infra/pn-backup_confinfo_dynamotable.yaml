@@ -27,6 +27,10 @@ Parameters:
     Type: Number
     Default: 600
 
+  StartWindowMinutes:
+    Type: Number
+    Default: 60
+
 Conditions:
   IsProdEnv: !Equals [ !Ref EnvType, 'prod' ]
 
@@ -46,6 +50,7 @@ Resources:
           - RuleName: "RuleForDailyBackups"
             TargetBackupVault: !Ref BackupVault
             ScheduleExpression: !If [ IsProdEnv, !Ref ProdCronExpression, !Ref OtherEnvCronExpression ] 
+            StartWindowMinutes: !Ref StartWindowMinutes
             CompletionWindowMinutes : !Ref CompletionWindowMinutes
             EnableContinuousBackup: true
             Lifecycle:
