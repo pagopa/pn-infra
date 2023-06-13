@@ -262,6 +262,9 @@ Parameters:
   ExternalChannelBaseUrl:
     Type: String
 
+  BackupCronExpression:
+    Type: String
+
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
 
@@ -935,6 +938,7 @@ Outputs:
     Value: !Ref SafestorageLoggerLogGroupName
   ExternalChannelBaseUrl:
     Value: !Ref ExternalChannelBaseUrl
-  
+  BackupCronExpression:
+    Value: !Ref BackupCronExpression
   LogRetention:
     Value: !Ref LogRetention
