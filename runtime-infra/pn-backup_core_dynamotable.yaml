@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: "Backup Plan template for AWS Backups"
 Parameters:
 
-  EnvType:
+  EnvironmentType:
     Type: String
 
   LifecycleDeleteAfterDays:
@@ -27,7 +27,7 @@ Parameters:
     Default: 60
 
 Conditions:
-  IsProdEnv: !Equals [ !Ref EnvType, 'prod' ]
+  IsProdEnv: !Equals [ !Ref EnvironmentType, 'prod' ]
 
 Resources:
   BackupVault:
