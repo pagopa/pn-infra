@@ -119,7 +119,6 @@ function prepareBulkBody(logs){
             }
           }
         } catch(e){
-          console.log(e)
           const timestamp = new Date(log.timestamp);
 
           
