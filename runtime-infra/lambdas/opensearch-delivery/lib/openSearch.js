@@ -108,9 +108,11 @@ function prepareBulkBody(logs){
             jsonMessage.logGroup = doc.logGroup
             jsonMessage.logStream = doc.logStream
 
+            /*
+            // opensearch is not used for debugging purposes, the stack trace won't be helpful
             if(jsonMessage.stack_trace) {
               jsonMessage.stack_trace = truncateMessage(jsonMessage.stack_trace, 20000)
-            }
+            }*/
             
             if(['DEBUG'].indexOf(jsonMessage.level)<0){
               formattedLogs.push(jsonMessage);
