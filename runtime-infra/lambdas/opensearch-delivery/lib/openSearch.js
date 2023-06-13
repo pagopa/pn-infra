@@ -113,6 +113,9 @@ function prepareBulkBody(logs){
             if(jsonMessage.stack_trace) {
               jsonMessage.stack_trace = truncateMessage(jsonMessage.stack_trace, 20000)
             }*/
+            if(jsonMessage.stack_trace) {
+              delete jsonMessage.stack_trace
+            }
             
             if(['DEBUG'].indexOf(jsonMessage.level)<0){
               formattedLogs.push(jsonMessage);
