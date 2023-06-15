@@ -1304,6 +1304,8 @@ Resources:
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
           Value: 60 # default is 300
+        - Key: load_balancing.algorithm.type
+          Value: least_outstanding_requests # default is round_robin
       VpcId: !Ref VpcId
 
   # Load balancer forward rule; forward only path pattern defined with MappedPaths
