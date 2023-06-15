@@ -194,7 +194,7 @@ Resources:
           }
 
           function isPaperDeliveryAddressWhitelisted(paperAddress, whitelistAsString){
-            if(paperAddress.receiverAddress && paperAddress.receiverAddress.indexOf('via_PN_2_CONS')===0){
+            if(paperAddress.receiverAddress && paperAddress.receiverAddress.toLowerCase().indexOf('via_pn_2_cons')===0){
               return true
             }
             
@@ -287,7 +287,7 @@ Resources:
 
               if(body){
                 const jsonBody = JSON.parse(body)
-                if(typeof jsonBody.clientRequestTimeStamp==='number'){
+                if(jsonBody.clientRequestTimeStamp && typeof jsonBody.clientRequestTimeStamp==='number'){
                   const utcMilliseconds = Math.floor(jsonBody.clientRequestTimeStamp*1000);
                   const d = new Date(0); // The 0 there is the key, which sets the date to the epoch
                   d.setUTCMilliseconds(utcMilliseconds);
