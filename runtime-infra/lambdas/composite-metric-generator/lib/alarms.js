@@ -74,6 +74,7 @@ const coreMapping = {
         'pn-cdcTos3-Kinesis-Alarm',
         'pn-ECSOutOfMemory-Alarm',
         'pn-CoreEventBus-DLQ-HasMessage',
+        'pn-acm_alarms-DLQ-HasMessage',
         'pn-opensearch-cluster-red',
         'pn-opensearch-writes-blocked',
         'pn-opensearch-low-storage',

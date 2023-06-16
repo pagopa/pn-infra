@@ -185,20 +185,6 @@ Resources:
   #      Endpoint: !Ref AlarmEmailAddress
   #      Protocol: email
 
-
-  # - Event Bridge events that generate an alarm
-  # "ACM Certificate Approaching Expiration": alarm
-  CertificateExpiringIsAlarmEventRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Description: "EventRule"
-      EventPattern:
-        source: [ "aws.acm" ]
-        detail-type: [ "ACM Certificate Approaching Expiration" ]
-      Targets:
-        - Arn: !Ref AlarmSNSTopic
-          Id: "AlarmSnsTopic"
-
 Outputs:
 
   AlarmSNSTopicArn:

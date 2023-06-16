@@ -167,7 +167,7 @@ Resources:
     Condition: IsWithAlarm
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "${QueueName}-HasMessage"
+      AlarmName: !Sub "oncall-${QueueName}-HasMessage"
       AlarmDescription: "Alarm messages when we have 1 or more messages in QUEUE"
       Namespace: "AWS/SQS"
       MetricName: "ApproximateNumberOfMessagesVisible"

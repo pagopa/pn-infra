@@ -152,6 +152,14 @@ Parameters:
   AddressManagerToDeliveryPushQueueURL:
     Type: String
 
+  AcmAlarmsQueueARN:
+    Type: String
+    Description: ACM alarms queue ARN
+
+  AcmAlarmsQueueAlarmARN:
+    Type: String
+    Description: ACM DLQ alarm ARN
+
   OncallDlqRatio:
     Type: Number
     Default: 0.1
@@ -234,6 +242,7 @@ Resources:
                   - !Ref "NationalRegistries2PaperChannelQueueARN"
                   - !Ref "NationalRegistries2SelcPGQueueARN"
                   - !Ref "AddressManagerToDeliveryPushQueueARN"
+                  - !Ref "AcmAlarmsQueueARN"
   
   # Resource based policy to allow EventBridge to publish to CloudWatch Logs
   LogGroupCoreEventBusPolicy:
@@ -562,6 +571,20 @@ Resources:
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
   
+  # Send ExternalChannel Response to pn-delivery-push
+  PnCoreEventBusToACMAlarmsQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route ACM expiration events to ACM
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: default
+      EventPattern:
+        source: [ "aws.acm" ]
+        detail-type: [ "ACM Certificate Approaching Expiration" ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-DefaultEventBus-ACMAlarmsQueue'
+          Arn: !Ref AcmAlarmsQueueARN
+
   # Send ExternalChannel Response to pn-user-attributes
   PnCoreEventBusToUserAttributesQueue:
     Type: AWS::Events::Rule
@@ -877,6 +900,9 @@ Outputs:
     Description: 'Kinesis source Logs stream crypto key ARN'
     Value: !Ref LogsKinesisSourceStreamKeyArn
 
+  AcmAlarmsQueueAlarmARN:
+    Value: !Ref AcmAlarmsQueueAlarmARN
+    
   # Event Bus Alarm
   EventBusDLQHasMessagesAlarmArn:
     Description: 'Event Bus Core DLQ alarm ARN'
