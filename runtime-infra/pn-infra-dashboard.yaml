@@ -46,6 +46,10 @@ Parameters:
     Type: String
     Description: 'The ARN of Core Event Bus.'
 
+  AcmAlarmsQueueAlarmARN:
+    Type: String
+    Description: 'The ARN of ACM Alarm on DLQ.'
+
   OpenSearchDeliveryLambdaAlarmArn:
     Type: String
     Default: ''
@@ -256,6 +260,7 @@ Resources:
         AlarmArns: !Join
           - ','
           - - !Ref EventBusDLQHasMessagesAlarmArn
+            - !Ref AcmAlarmsQueueAlarmARN
             - !Ref CdcToS3KinesisDeliveryStreamAlarmArn
             - !Ref LogsToS3KinesisDeliveryStreamAlarmArn
             - !Ref OpenSearchDeliveryLambdaAlarmArn

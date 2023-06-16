@@ -262,6 +262,9 @@ Parameters:
   ExternalChannelBaseUrl:
     Type: String
 
+  BackupCronExpression:
+    Type: String
+
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
 
@@ -523,6 +526,20 @@ Resources:
         QueueName: !Sub '${ProjectName}-addressmanager_to_deliverypush'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  ### Queue that receive safe-storage notification to DOWNTIME LOGS ###
+  AcmAlarmsQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-acm_alarms-DLQ'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName   
+        HasDLQ:  "false"
+        QueueHasAlarm:  "true"
 
 Outputs:
   # Web API for browsers and B2B
@@ -795,6 +812,20 @@ Outputs:
     Value: !GetAtt AddressManagerToDeliveryPushQueue.Outputs.SqsAgeAlarmArn
     Description: Events from Address Manager to Delivery Push age alarm ARN
 
+  # ACM Alarms queue
+  AcmAlarmsQueueName:
+    Value: !GetAtt AcmAlarmsQueue.Outputs.QueueName
+    Description: ACM alarms queue name
+  AcmAlarmsQueueURL:
+    Value: !GetAtt AcmAlarmsQueue.Outputs.QueueURL
+    Description: ACM alarms queue URL
+  AcmAlarmsQueueARN:
+    Value: !GetAtt AcmAlarmsQueue.Outputs.QueueARN
+    Description: ACM alarms queue ARN
+  AcmAlarmsQueueAlarmARN:
+    Value: !GetAtt AcmAlarmsQueue.Outputs.SqsDLQAlarmArn
+    Description: ACM alarms alarm ARN
+
   # Kinesis Source Stream containing the DynamoDB Change Data Capture events
   CdcKinesisSourceStreamName:
     Description: 'Kinesis source CDC stream name'
@@ -935,6 +966,7 @@ Outputs:
     Value: !Ref SafestorageLoggerLogGroupName
   ExternalChannelBaseUrl:
     Value: !Ref ExternalChannelBaseUrl
-  
+  BackupCronExpression:
+    Value: !Ref BackupCronExpression
   LogRetention:
     Value: !Ref LogRetention

@@ -479,6 +479,10 @@ Parameters:
     Type: String
     Default: ''
     
+  LoadBalancingAlgorithm:
+    Type: String
+    Default: least_outstanding_requests
+
   # Alarm
   LogAlarmStrategyV1: # updated parameter name to allow a new default value, will be restored with task PN-4855 
     Description: Log alarm strategy, one of "-", "FATAL" or "ERROR_FATAL"
@@ -1304,6 +1308,8 @@ Resources:
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
           Value: 60 # default is 300
+        - Key: load_balancing.algorithm.type
+          Value: !Ref LoadBalancingAlgorithm
       VpcId: !Ref VpcId
 
   # Load balancer forward rule; forward only path pattern defined with MappedPaths

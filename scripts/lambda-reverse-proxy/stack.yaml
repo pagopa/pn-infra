@@ -122,6 +122,8 @@ Resources:
       FunctionName: pn-lambda-reverse-proxy
       Code:
         ZipFile: |
+          process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
           function isExternalChannelCall(path){
             return path.toLowerCase().indexOf('/external-channel')>=0;
           }
@@ -192,6 +194,10 @@ Resources:
           }
 
           function isPaperDeliveryAddressWhitelisted(paperAddress, whitelistAsString){
+            if(paperAddress.receiverAddress && paperAddress.receiverAddress.toLowerCase().indexOf('via_pn_2_cons')===0){
+              return true
+            }
+            
             let whitelistAddresses = []
             try {
               whitelistAddresses = JSON.parse(whitelistAsString)
@@ -280,12 +286,24 @@ Resources:
               }
 
               if(body){
+                const jsonBody = JSON.parse(body)
+                if(jsonBody.clientRequestTimeStamp && typeof jsonBody.clientRequestTimeStamp==='number'){
+                  const utcMilliseconds = Math.floor(jsonBody.clientRequestTimeStamp*1000);
+                  const d = new Date(0); // The 0 there is the key, which sets the date to the epoch
+                  d.setUTCMilliseconds(utcMilliseconds);
+                  jsonBody.clientRequestTimeStamp = d.toISOString()
+                  fetchOptions.body = JSON.stringify(jsonBody)
+                } else {
                   fetchOptions.body = body // stringified
+                }
+                
               }
               
               if(qs){
                   url = url+new URLSearchParams(qs)
               }
+              
+              console.log('url to fetch', url)
 
               const res = await fetch(url, fetchOptions);
               
@@ -389,7 +407,6 @@ Resources:
               }
               
           };
-
 
 
       Handler: index.handler
