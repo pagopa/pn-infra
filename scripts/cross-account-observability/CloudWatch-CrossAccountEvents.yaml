@@ -24,6 +24,21 @@ Resources:
           Id: !Sub default-${AWS::AccountId}
           RoleArn: !GetAtt EventBridgeIAMrole.Arn
 
+  AcmExpirationEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Send ACM expiration event to central account.
+      EventBusName: default
+      EventPattern:
+        source: [ "aws.acm" ]
+        detail-type: [ "ACM Certificate Approaching Expiration" ]
+      Name: !Sub ACMExpirationEvent-${AWS::AccountId}
+      State: ENABLED
+      Targets: 
+        - Arn: !Sub "arn:aws:events:${AWS::Region}:${MonitoringAccountId}:event-bus/default"
+          Id: !Sub default-${AWS::AccountId}
+          RoleArn: !GetAtt EventBridgeIAMrole.Arn
+
   EventBridgeIAMrole:
     Type: AWS::IAM::Role
     Properties:
@@ -45,4 +60,4 @@ Resources:
                   - 'events:PutEvents'
                 Resource:
                   - !Sub arn:aws:events:${AWS::Region}:${MonitoringAccountId}:event-bus/default
-      RoleName: !Sub CrossAccountEventsRole
+      RoleName: CrossAccountEventsRole
