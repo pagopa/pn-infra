@@ -1407,18 +1407,16 @@ Resources:
       PolicyType: StepScaling
       ScalingTargetId: !Ref AutoScalingTarget
       StepScalingPolicyConfiguration:
-        AdjustmentType: ChangeInCapacity
+        AdjustmentType: PercentChangeInCapacity
+        MinAdjustmentMagnitude: 1
         Cooldown: !Ref AutoscalingCheckPeriod
         MetricAggregationType: Average
         StepAdjustments:
           - MetricIntervalLowerBound: 0
-            MetricIntervalUpperBound: 100
-            ScalingAdjustment: 1
-          - MetricIntervalLowerBound: 100
-            MetricIntervalUpperBound: 200
-            ScalingAdjustment: 2
-          - MetricIntervalLowerBound: 200
-            ScalingAdjustment: 3
+            MetricIntervalUpperBound: 20
+            ScalingAdjustment: 50
+          - MetricIntervalLowerBound: 20
+            ScalingAdjustment: 100
 
   #### Scaling Down Policy
   ScaleDownPolicy:
@@ -1446,23 +1444,34 @@ Resources:
       ActionsEnabled: TRUE
       ComparisonOperator: GreaterThanThreshold
       DatapointsToAlarm: !Ref AutoscalingDataPointN
-      Dimensions:
-        - Name: TargetGroup
-          Value: !GetAtt TargetGroup.TargetGroupFullName
       EvaluationPeriods: !Ref AutoscalingDataPointM
-      MetricName: RequestCountPerTarget
-      Namespace: AWS/ApplicationELB
+      Threshold: 60
+      TreatMissingData: ignore
       AlarmActions:
         - !Ref ScaleUpPolicy
       OKActions:
         - !Ref ScaleDownPolicy
-      Period: !Ref AutoscalingCheckPeriod
-      Statistic: Sum
-      Threshold: !Ref AutoscalingThreshold
-      TreatMissingData: ignore
-      Unit: None
+      Metrics:
+        - Id: rpt
+          MetricStat:
+            Metric:
+              Namespace: AWS/ApplicationELB
+              MetricName: RequestCountPerTarget
+              Dimensions:
+                - Name: TargetGroup
+                  Value: !GetAtt TargetGroup.TargetGroupFullName
+            Period: !Ref AutoscalingCheckPeriod
+            Stat: Sum
+          ReturnData: False
+        - Id: req_per_targ
+          Expression: !Sub "(100 * rpt) / ${AutoscalingThreshold}"
+          Label: !Sub "${MicroServiceUniqueName}-api-autoscale-metric"
+      
 
-  #### Alarm for QSQ metric Autoscaling
+      
+      
+
+  #### Alarm for SQS metric Autoscaling
   AlarmSQS:
     Type: "AWS::CloudWatch::Alarm"
     Condition: AutoscalingBySQS
