@@ -472,7 +472,19 @@ Parameters:
   ContainerSecret7:
     Description: 7th container secret in the form key=secret arn
     Type: String
-    Default: ''        
+    Default: ''
+  ContainerSecret8:
+    Description: 8th container secret in the form key=secret arn
+    Type: String
+    Default: ''
+  ContainerSecret9:
+    Description: 9th container secret in the form key=secret arn
+    Type: String
+    Default: ''
+  ContainerSecret10:
+    Description: 10th container secret in the form key=secret arn
+    Type: String
+    Default: ''
 
   MicroServiceSecretPrefix:
     Description: Microservice secret name prefix
@@ -607,6 +619,9 @@ Conditions:
   Secret5Exist: !Not [ !Equals [ !Ref ContainerSecret5, '' ] ]
   Secret6Exist: !Not [ !Equals [ !Ref ContainerSecret6, '' ] ]
   Secret7Exist: !Not [ !Equals [ !Ref ContainerSecret7, '' ] ]
+  Secret8Exist: !Not [ !Equals [ !Ref ContainerSecret8, '' ] ]
+  Secret9Exist: !Not [ !Equals [ !Ref ContainerSecret9, '' ] ]
+  Secret10Exist: !Not [ !Equals [ !Ref ContainerSecret10, '' ] ]
 
   HasSecrets: !Or [ !Condition Secret1Exist, !Condition Secret2Exist, !Condition Secret3Exist, !Condition Secret4Exist, !Condition Secret5Exist, !Condition Secret6Exist ]
 
@@ -835,7 +850,25 @@ Resources:
               - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret7 ] ]
                 ValueFrom:
                   !Select [ 1, !Split [ "=", !Ref ContainerSecret7 ] ]
-              - !Ref "AWS::NoValue"              
+              - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Secret8Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret8 ] ]
+                  ValueFrom:
+                    !Select [ 1, !Split [ "=", !Ref ContainerSecret8 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Secret9Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret9 ] ]
+                  ValueFrom:
+                    !Select [ 1, !Split [ "=", !Ref ContainerSecret9 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Secret10Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret10 ] ]
+                  ValueFrom:
+                    !Select [ 1, !Split [ "=", !Ref ContainerSecret10 ] ]
+                - !Ref "AWS::NoValue"
           Environment:
             - Name: 'OTEL_RESOURCE_ATTRIBUTES'
               Value: !Sub 'service.name=${MicroServiceUniqueName}'
