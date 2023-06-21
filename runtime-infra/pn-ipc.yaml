@@ -59,6 +59,11 @@ Parameters:
     Default: ''
     Description: 'The DNS name used for BO API'
 
+  CNApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The DNS name user for CN API'
+
   AlternateWebApiDnsName:
     Type: String
     Default: ''
@@ -555,7 +560,9 @@ Outputs:
   SelcpgApiDnsName:
     Value: !If [ HasAlternateSelcpgApiDnsName, !Ref AlternateSelcpgApiDnsName, !Ref SelcpgApiDnsName ]
     Description: 'The DNS name used for B2B Selfecare PG rest API.'
-
+  CNApiDnsName:
+    Value: !Ref CNApiDnsName
+    
   # SafeStorage to DeliveryPush
   SafeStorageToDeliveryPushQueueName:
     Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueName
