@@ -175,6 +175,7 @@ const confidentialInfoMapping = {
     ],
     'pn-external-channel': [
         'oncall-pn-external-channel-ErrorFatalLogs-Alarm',
+        'oncall-pn-external-channel-alb-alarm',
         'pn-ec-tracker-sms-stato-queue-HasOldMessage',
         'pn-ec-tracker-sms-stato-queue-DLQ-HasMessage',
         'pn-ec-tracker-sms-errori-queue-DLQ-HasMessage',
