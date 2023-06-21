@@ -250,3 +250,17 @@ Resources:
           Expression: IF(m3>=10 AND (m1/m3>=0.9 OR m2/m3>=0.1), 1, 0)
           Label: !Sub "${ProjectName}-cn-api-ErrorMetric-OnCall"   
 
+  CNUsagePlan:
+    Type: 'AWS::ApiGateway::UsagePlan'
+    Properties:
+      UsagePlanName: CN_BE
+      ApiStages:
+        - ApiId: !Ref CNRestApi
+          Stage: !Ref CNRestApiStage 
+      Description: Usage Plan for CN
+      Quota:
+        Limit: 1000000
+        Period: DAY
+      Throttle:
+        BurstLimit: 200
+        RateLimit: 100
