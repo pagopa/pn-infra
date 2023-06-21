@@ -204,7 +204,7 @@ Resources:
     Condition: RequiresOncallDLQAlarm
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "oncall-${QueueName}-HasMessage"
+      AlarmName: !Sub "oncall-${QueueName}-HasMessages"
       AlarmDescription: !Sub "Alarm messages when we have ${OncallDLQLimit} or more messages in QUEUE"
       Namespace: "AWS/SQS"
       MetricName: "ApproximateNumberOfMessagesVisible"
