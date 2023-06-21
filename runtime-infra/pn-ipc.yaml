@@ -265,6 +265,10 @@ Parameters:
   BackupCronExpression:
     Type: String
 
+  ApplicationLoadBalancerMetricsDimensionName:
+    Type: String
+    Default: ''
+
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
 
@@ -971,3 +975,5 @@ Outputs:
     Value: !Ref BackupCronExpression
   LogRetention:
     Value: !Ref LogRetention
+  ApplicationLoadBalancerMetricsDimensionName:
+    Value: !Ref ApplicationLoadBalancerMetricsDimensionName
