@@ -1,0 +1,117 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Serverless patterns - SNS to SQS
+
+Resources:
+  # Define the SQS queue
+  SesSqsQueue:
+    Type: AWS::SQS::Queue
+  OrderProcessingPipeRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "pipes.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "BaseInlinePolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: "AccessToCloudWatch"
+                Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+              - Sid: "UseSqsAsSource"
+                Effect: "Allow"
+                Action:
+                  - "sqs:ReceiveMessage"
+                  - "sqs:DeleteMessage"
+                  - "sqs:GetQueueAttributes"
+                Resource: !GetAtt "SesSqsQueue.Arn"
+  SesLog:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: "14"
+      LogGroupName: "/aws/events/ses"
+
+  # Define the SNS topic
+  SesSnsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      # Subscribes the SQS queue to the SNS topic
+      Subscription:
+        - Protocol: sqs
+          Endpoint: !GetAtt SesSqsQueue.Arn
+ 
+    
+  # Policy allow SES to publish event to SNS topic:
+  TopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Sid: "Allow SES publish to SNS"
+            Effect: Allow
+            Principal:
+              Service: ses.amazonaws.com
+            Action: 'SNS:Publish'
+            Resource: !Ref  SesSnsTopic
+            Condition:
+              StringLike:
+                'AWS:SourceArn': 'arn:aws:ses:*'
+      Topics:
+        - !Ref SesSnsTopic
+
+  # Policy allows SNS to publish to this SQS queue
+  SnsToSqsPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "Allow SNS publish to SQS"
+            Effect: Allow
+            Principal: 
+              Service: "sns.amazonaws.com"
+            Resource: !GetAtt SesSqsQueue.Arn
+            Action: SQS:SendMessage
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref SesSnsTopic
+      Queues:
+        - Ref: SesSqsQueue
+
+# Eventbrige pipe to cloudwatch
+  PipeSes:
+    Type: AWS::Pipes::Pipe
+    Properties:
+      Description: Pipe on Event Bridge to send ses log to cloudwatch
+      Name: PipeSesToCloudwatch
+      RoleArn: !GetAtt "OrderProcessingPipeRole.Arn"
+      Source: !GetAtt SesSqsQueue.Arn
+      Target: !GetAtt SesLog.Arn
+      TargetParameters:
+        CloudWatchLogsParameters: 
+          LogStreamName: ses
+
+
+Outputs:
+  SesSqsQueueArn:
+    Description: SQS queue ARN
+    Value: !GetAtt SesSqsQueue.Arn
+  SesSqsQueueURL:
+    Description: SQS queue URL
+    Value: !Ref SesSqsQueue    
+  SesSqsQueueArn:
+    Description: SNS topic ARN
+    Value: !Ref SesSnsTopic
+  SesLogArn:
+    Description: Cloudwatch LogGroup ARN
+    Value: !GetAtt SesLog.Arn
+
