@@ -1446,10 +1446,16 @@ Resources:
         MetricAggregationType: Average
         StepAdjustments:
           - MetricIntervalLowerBound: 0
-            MetricIntervalUpperBound: 20
+            MetricIntervalUpperBound: 25
             ScalingAdjustment: 50
-          - MetricIntervalLowerBound: 20
+          - MetricIntervalLowerBound: 25
+            MetricIntervalUpperBound: 50
             ScalingAdjustment: 100
+          - MetricIntervalLowerBound: 50
+            MetricIntervalUpperBound: 75
+            ScalingAdjustment: 150
+          - MetricIntervalLowerBound: 75
+            ScalingAdjustment: 200
 
   #### Scaling Down Policy
   ScaleDownPolicy:
@@ -1465,7 +1471,10 @@ Resources:
         MetricAggregationType: Average
         StepAdjustments:
           - MetricIntervalUpperBound: 0
+            MetricIntervalLowerBound: -30
             ScalingAdjustment: -1
+          - MetricIntervalUpperBound: -30
+            ScalingAdjustment: -2
   
   #### Alarm for Rest-API metric Autoscaling
   AlarmHighRequests:
