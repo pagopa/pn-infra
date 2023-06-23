@@ -361,6 +361,8 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-safestore_to_deliverypush'
         DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
   ### Communication FROM SafeStorage TO pn-radd ###
@@ -398,6 +400,8 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-external_channel_outputs'
         DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
   
   ExternalChannels2UserAttributesQueue:
@@ -480,6 +484,8 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-nationalregistries_to_deliverypush'
         DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
   
   ### Communication FROM pn-national-registries TO pn-paper-channel ###
@@ -529,6 +535,8 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-addressmanager_to_deliverypush'
         DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
   ### Queue that receive safe-storage notification to DOWNTIME LOGS ###
