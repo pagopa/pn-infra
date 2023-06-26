@@ -379,7 +379,7 @@ Resources:
                 return forwardRequest(event, defaultUrl)
               } 
 
-              if(isConsolidatoreCall(path))
+              if(isConsolidatoreCall(path)) {
                 // in case of BLACKLIST, the defaultUrl is the real consolidatore system
                 const defaultUrl = routingMode==='BLACKLIST'?process.env.ConsolidatoreBaseUrl:process.env.ConsolidatoreBaseUrl
                 const allowedOnlyUrl = routingMode==='BLACKLIST'?process.env.MockConsolidatoreBaseUrl:process.env.ConsolidatoreBaseUrl
