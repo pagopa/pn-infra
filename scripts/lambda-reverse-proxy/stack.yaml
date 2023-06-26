@@ -357,6 +357,7 @@ Resources:
 
               
               if(isExternalChannelCall(path)){
+                // in case of BLACKLIST, the defaultUrl is the real external channel system
                 const defaultUrl = routingMode==='BLACKLIST'?process.env.ExternalChannelBaseUrl:process.env.MockExternalChannelBaseUrl
                 const allowedOnlyUrl = routingMode==='BLACKLIST'?process.env.MockExternalChannelBaseUrl:process.env.ExternalChannelBaseUrl
                 console.debug('[EC] - Call')
@@ -379,6 +380,7 @@ Resources:
               } 
 
               if(isConsolidatoreCall(path))
+                // in case of BLACKLIST, the defaultUrl is the real consolidatore system
                 const defaultUrl = routingMode==='BLACKLIST'?process.env.ConsolidatoreBaseUrl:process.env.ConsolidatoreBaseUrl
                 const allowedOnlyUrl = routingMode==='BLACKLIST'?process.env.MockConsolidatoreBaseUrl:process.env.ConsolidatoreBaseUrl
 
