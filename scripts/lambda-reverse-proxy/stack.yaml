@@ -357,8 +357,8 @@ Resources:
 
               
               if(isExternalChannelCall(path)){
-                const mainUrl = routingMode==='WHITELIST'?process.env.MockExternalChannelBaseUrl:process.env.ExternalChannelBaseUrl
-                const allowedOnlyUrl = routingMode==='BLACKLIST'?process.env.ExternalChannelBaseUrl:process.env.MockExternalChannelBaseUrl
+                const defaultUrl = routingMode==='BLACKLIST'?process.env.ExternalChannelBaseUrl:process.env.MockExternalChannelBaseUrl
+                const allowedOnlyUrl = routingMode==='BLACKLIST'?process.env.MockExternalChannelBaseUrl:process.env.ExternalChannelBaseUrl
                 console.debug('[EC] - Call')
                 if(httpMethod=='PUT'){
                     console.debug('[EC] - Call PUT')
@@ -375,12 +375,12 @@ Resources:
                         return forwardRequest(event, process.env.ExternalChannelBaseUrl)
                     }
                 } 
-                return forwardRequest(event, mainUrl)
+                return forwardRequest(event, defaultUrl)
               } 
 
               if(isConsolidatoreCall(path))
-                const mainUrl = routingMode==='WHITELIST'?process.env.MockConsolidatoreBaseUrl:process.env.ConsolidatoreBaseUrl
-                const allowedOnlyUrl = routingMode==='BLACKLIST'?process.env.ConsolidatoreBaseUrl:process.env.MockConsolidatoreBaseUrl
+                const defaultUrl = routingMode==='BLACKLIST'?process.env.ConsolidatoreBaseUrl:process.env.ConsolidatoreBaseUrl
+                const allowedOnlyUrl = routingMode==='BLACKLIST'?process.env.MockConsolidatoreBaseUrl:process.env.ConsolidatoreBaseUrl
 
                 console.debug('[CONS] - Call')
                 if(httpMethod=='POST'){
@@ -396,7 +396,7 @@ Resources:
                         }
                     }
                 } 
-                return forwardRequest(event, mainUrl)
+                return forwardRequest(event, defaultUrl)
               }
 
               throw new Error('Unhandled event', event)            
