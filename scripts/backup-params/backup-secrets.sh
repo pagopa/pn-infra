@@ -19,8 +19,7 @@ usage() {
     [-p] <profile>            : aws profile
     [-r] <region>             : aws region
     [-f] <prefix>             : param prefix
-    [-s] <skip-prefix>        : param skip-prefix
-        
+    [-s] <skip-prefix>             : param skip-prefix
 EOF
   exit 1
 }
@@ -51,7 +50,7 @@ parse_params() {
     -s | --skip-prefix) 
       skip_prefix="${2-}"
       shift
-      ;;            
+      ;;      
     -?*) die "Unknown option: $1" ;;
     *) break ;;
     esac
@@ -71,8 +70,8 @@ dump_params(){
   echo "##################################"
   echo "AWS Profile         ${aws_profile}"
   echo "AWS Region          ${aws_region}" 
-  echo "Prefix              ${prefix}"
-  echo "Skip Prefix         ${skip_prefix}"       
+  echo "Prefix              ${prefix}"      
+  echo "Skip Prefix              ${skip_prefix}"      
 }
 
 # START SCRIPT
@@ -93,38 +92,31 @@ fi
 echo ${aws_command_base_args}
 
 
-parameters=$(aws ${aws_command_base_args} ssm describe-parameters)
+secrets=$(aws ${aws_command_base_args} secretsmanager list-secrets)
 
-function duplicate_param() {
-  param_name=$1
-  param_tier=$2
-#  new_param_name="$3-$1"
+echo $secrets
+function duplicate_secret() {
+  secret_name=$1
+  new_secret_name="$2-$1"
 
-  if [[ "$param_name" == "/$skip_prefix"* ]]; then
-    echo "Param $param_name skipped"
+  if [[ "$secret_name" == "$skip_prefix"* ]]; then
+    echo "Secret $secret_name skipped"
     return
   fi
 
-  if [[ "$param_name" == "/"* ]]; then # if param name starts with slash just concatenate prefix and param name
-    new_param_name="/$3$1"
-  else
-    new_param_name="/$3/$1"
-  fi
+  # get secret value
+  secret=$(aws ${aws_command_base_args} secretsmanager get-secret-value --secret-id ${secret_name})
+  secret_value=$(echo $secret | jq -r '.SecretString')  
 
-
-  # get parameter value
-  param=$(aws ${aws_command_base_args} ssm get-parameter --name ${param_name})
-  param_value=$(echo $param | jq -r '.Parameter.Value')  
-
-  echo "copy $param_name to $new_param_name"
+  echo "copy $secret_name to $new_secret_name"
   
-  # create duplicate param
-  aws ${aws_command_base_args} ssm put-parameter --type String --name $new_param_name --value "${param_value}" --tier "$param_tier" --overwrite
+  # create duplicate secret
+  aws ${aws_command_base_args} secretsmanager create-secret --name $new_secret_name --secret-string "${secret_value}"
 
-  echo "copied $param_name to $new_param_name"
+  echo "copied $secret_name to $new_secret_name"
 }
 
-echo "${parameters}" | jq -r '.Parameters[] | .Name + " " + .Tier'  \
-| while read -r name tier; do
-  duplicate_param $name $tier $prefix
+echo "${secrets}" | jq -r '.SecretList[] | .Name'  \
+| while read -r name; do
+  duplicate_secret $name $prefix
 done
