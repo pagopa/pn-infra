@@ -30,6 +30,14 @@ Parameters:
     Type: Number
     Default: '2000'
 
+  EnvironmentType:
+    Type: String
+
+Conditions:
+  IsNotProd: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ]]
+  IsNotUat: !Not [ !Equals [ !Ref EnvironmentType, 'uat' ]]
+  IsCNEnabled: !Or [ !Condition IsNotProd, !Condition IsNotUat ]
+
 Resources:
 
 ###               TOKEN EXCHANGE SERVICE                ###
@@ -37,6 +45,7 @@ Resources:
   
   # API definition
   CNRestApi:
+    Condition: IsCNEnabled
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: !Sub '${ProjectName}-cn-api'
@@ -48,6 +57,7 @@ Resources:
 
   # Deployment
   CNRestApiDeployment:
+    Condition: IsCNEnabled
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - CNRequestUrlMethod
@@ -57,6 +67,7 @@ Resources:
 
   # Stage
   CNRestApiStage:
+    Condition: IsCNEnabled
     Type: AWS::ApiGateway::Stage
     Properties:
       RestApiId: !Ref CNRestApi
@@ -75,21 +86,24 @@ Resources:
 
   # Log Group
   CNApiLogGroup:
+    Condition: IsCNEnabled
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: 14
 
   # Expose API to custom domain
   APIMapping:
+    Condition: IsCNEnabled
     Type: AWS::ApiGateway::BasePathMapping
     Properties:
-      BasePath: 'token-exchange'
+      BasePath: 'cn'
       DomainName: !Ref CNApiDnsName
       RestApiId: !Ref CNRestApi
       Stage: !Ref CNRestApiStage
 
   # GET method
   CNRequestUrlMethod:
+    Condition: IsCNEnabled
     Type: AWS::ApiGateway::Method
     Properties:
       OperationName: 'Proxy to Pre Signed Url Generator Lambda'
@@ -108,6 +122,7 @@ Resources:
 
   # POST method
   CNEventUpdateMethod:
+    Condition: IsCNEnabled
     Type: AWS::ApiGateway::Method
     Properties:
       OperationName: 'Pre signed url'
@@ -126,6 +141,7 @@ Resources:
 
 
   CNAPIGatewayApiLatencyAlarm:
+    Condition: IsCNEnabled
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "oncall-${ProjectName}-cn-api-LatencyAlarm"
@@ -150,6 +166,7 @@ Resources:
       ExtendedStatistic: "p90"
 
   CNAPIGatewayApiErrorAlarm:
+    Condition: IsCNEnabled
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${ProjectName}-cn-api-ErrorAlarm"
@@ -197,6 +214,7 @@ Resources:
           Label: !Sub "${ProjectName}-cn-api-ErrorMetric"
 
   CNAPIGatewayApiErrorAlarmWakeup:
+    Condition: IsCNEnabled
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "oncall-${ProjectName}-cn-api-ErrorAlarm"
@@ -252,6 +270,7 @@ Resources:
 
   CNUsagePlan:
     Type: 'AWS::ApiGateway::UsagePlan'
+    Condition: IsCNEnabled
     Properties:
       UsagePlanName: CN_BE
       ApiStages:
