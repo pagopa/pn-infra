@@ -2,44 +2,77 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Serverless patterns - SNS to SQS
 
 Resources:
-  # Define the SQS queue
-  SesSqsQueue:
-    Type: AWS::SQS::Queue
-  OrderProcessingPipeRole:
-    Type: "AWS::IAM::Role"
+  SnsSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+          Protocol: lambda
+          Endpoint: !GetAtt LambdaFunction.Arn
+          TopicArn: !Ref SesSnsTopic
+  LambdaInvokePermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+          Action: lambda:InvokeFunction
+          Principal: sns.amazonaws.com
+          SourceArn:  !Ref SesSnsTopic
+          FunctionName: !Ref LambdaFunction
+  LambdaFunctionRole:
+    Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: "2012-10-17"
+        Version: '2012-10-17'
         Statement:
-          - Effect: "Allow"
-            Principal:
-              Service: "pipes.amazonaws.com"
-            Action: "sts:AssumeRole"
+        - Effect: Allow
+          Principal:
+            Service:
+              - lambda.amazonaws.com
+          Action:
+            - sts:AssumeRole
+      Path: "/"
       Policies:
-        - PolicyName: "BaseInlinePolicy"
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Sid: "AccessToCloudWatch"
-                Effect: "Allow"
-                Action:
-                  - "logs:CreateLogGroup"
-                  - "logs:CreateLogStream"
-                  - "logs:PutLogEvents"
-                Resource: "*"
-              - Sid: "UseSqsAsSource"
-                Effect: "Allow"
-                Action:
-                  - "sqs:ReceiveMessage"
-                  - "sqs:DeleteMessage"
-                  - "sqs:GetQueueAttributes"
-                Resource: !GetAtt "SesSqsQueue.Arn"
-  SesLog:
+      - PolicyName: LambdaFunctionPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: '*'
+  LambdaFunctionLogGroup:
     Type: AWS::Logs::LogGroup
+    DependsOn: LambdaFunction
     Properties:
-      RetentionInDays: "14"
-      LogGroupName: "/aws/events/ses"
+      RetentionInDays: 14
+      LogGroupName: !Join
+        - ""
+        - -  "/aws/lambda/"
+          - !Ref LambdaFunction
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.10
+      Timeout: 5
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaFunctionRole.Arn
+      Code:
+        ZipFile:
+          !Sub
+            - |-
+              import re
 
+              def replace_email(string):
+                  pattern = r'\b([A-Za-z0-9._%+-]+)@([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b'
+                  return re.sub(pattern, r'***@\2', string)
+
+              def lambda_handler(event, context):
+                  single_event = event['Records'][0]['Sns']['Message']
+                  single_event = replace_email(single_event)
+
+                  print(single_event)
+                  return single_event
+            -
+              lambda_function_role_arn: !Ref LambdaFunctionRole
   OrderDashboard:
     Type: AWS::CloudWatch::Dashboard
     Properties:
@@ -140,10 +173,7 @@ Resources:
   SesSnsTopic:
     Type: AWS::SNS::Topic
     Properties:
-      # Subscribes the SQS queue to the SNS topic
-      Subscription:
-        - Protocol: sqs
-          Endpoint: !GetAtt SesSqsQueue.Arn
+        TopicName: snstopicses
  
     
   # Policy allow SES to publish event to SNS topic:
@@ -164,50 +194,6 @@ Resources:
       Topics:
         - !Ref SesSnsTopic
 
-  # Policy allows SNS to publish to this SQS queue
-  SnsToSqsPolicy:
-    Type: AWS::SQS::QueuePolicy
-    Properties:
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Sid: "Allow SNS publish to SQS"
-            Effect: Allow
-            Principal: 
-              Service: "sns.amazonaws.com"
-            Resource: !GetAtt SesSqsQueue.Arn
-            Action: SQS:SendMessage
-            Condition:
-              ArnEquals:
-                aws:SourceArn: !Ref SesSnsTopic
-      Queues:
-        - Ref: SesSqsQueue
-
-# Eventbrige pipe to cloudwatch
-  PipeSes:
-    Type: AWS::Pipes::Pipe
-    Properties:
-      Description: Pipe on Event Bridge to send ses log to cloudwatch
-      Name: PipeSesToCloudwatch
-      RoleArn: !GetAtt "OrderProcessingPipeRole.Arn"
-      Source: !GetAtt SesSqsQueue.Arn
-      Target: !GetAtt SesLog.Arn
-      TargetParameters:
-        CloudWatchLogsParameters: 
-          LogStreamName: ses
-
-
 Outputs:
-  SesSqsQueueArn:
-    Description: SQS queue ARN
-    Value: !GetAtt SesSqsQueue.Arn
-  SesSqsQueueURL:
-    Description: SQS queue URL
-    Value: !Ref SesSqsQueue    
-  SesSqsQueueArn:
-    Description: SNS topic ARN
-    Value: !Ref SesSnsTopic
-  SesLogArn:
-    Description: Cloudwatch LogGroup ARN
-    Value: !GetAtt SesLog.Arn
-
+  LambdaFunctionName:
+    Value: !Ref LambdaFunction
