@@ -71,6 +71,10 @@ Parameters:
     Default: ''
     Description: Intended usage of API
 
+  LogRetentionDays:
+    Type: Number
+    Default: 5
+
 #Condition to check if the index is out of bound for the !Select function.
 #If an element exists at the index, it will allow you to create the WAF rule resource from the list
 Conditions:
@@ -816,3 +820,29 @@ Resources:
         - !Select [4, !Ref APIGatewayARNs]
         - !Ref "AWS::NoValue"
       WebACLArn: !GetAtt ApiWafWebAcl.Arn
+
+  # Create log group to store WAF logs
+  ApiWafLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub aws-waf-logs-${WAFName}
+      RetentionInDays: !Ref LogRetentionDays
+
+  # Create waf logging configuration
+  ApiWafLoggingConfiguration:
+    Type: AWS::WAFv2::LoggingConfiguration
+    Properties:
+      ResourceArn: !GetAtt ApiWafWebAcl.Arn
+      LoggingFilter:
+        DefaultBehavior: DROP
+        Filters:
+          - Behavior: KEEP
+            Conditions:
+              - ActionCondition:
+                  Action: BLOCK
+            Requirement: MEETS_ALL
+      LogDestinationConfigs:
+        - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:aws-waf-logs-${WAFName}"
+    DependsOn:
+      - ApiWafLogGroup
+
