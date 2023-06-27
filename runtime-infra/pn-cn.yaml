@@ -20,12 +20,6 @@ Parameters:
     Type: String
     Description: "An ARN of an SNS topic where to send alarm when log line includes ERROR or FATAL" 
 
-  PreSignedUrlGeneratorLambdaName:
-    Type: String
-
-  EventUpdateReceiverLambdaName:
-    Type: String
-
   CNLatencyLimit:
     Type: Number
     Default: '2000'
@@ -115,7 +109,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${ConfidentialInfoAccountId}:function:${PreSignedUrlGeneratorLambdaName}/invocations'
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${ConfidentialInfoAccountId}:function:${ProjectName}-preSignedUrlGenerator/invocations'
         PassthroughBehavior: WHEN_NO_MATCH
         ContentHandling: CONVERT_TO_TEXT
         TimeoutInMillis: 29000
@@ -134,7 +128,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${ConfidentialInfoAccountId}:function:${EventUpdateReceiverLambdaName}/invocations'
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${ConfidentialInfoAccountId}:function:${ProjectName}-eventUpdateRecevier/invocations'
         PassthroughBehavior: WHEN_NO_MATCH
         ContentHandling: CONVERT_TO_TEXT
         TimeoutInMillis: 29000
