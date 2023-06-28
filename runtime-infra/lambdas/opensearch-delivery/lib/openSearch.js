@@ -119,7 +119,7 @@ function prepareBulkBody(logs){
             
             // development logs are stored only at ERROR and FATAL level
             if(!jsonMessage.tags || jsonMessage.tags.length==0){
-              if(['ERROR', 'FATAL'].indexOf(jsonMessage.level)>=0){
+              if(['WARN', 'ERROR', 'FATAL'].indexOf(jsonMessage.level)>=0){
                 formattedLogs.push(jsonMessage);
               }
             } else { // audit logs are always stored
