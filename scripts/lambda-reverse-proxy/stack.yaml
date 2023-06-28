@@ -8,6 +8,13 @@ Parameters:
   Subnets:
     Type: List<AWS::EC2::Subnet::Id>
 
+  RoutingMode:
+    Type: String
+    Default: WHITELIST
+    AllowedValues:
+      - WHITELIST
+      - BLACKLIST 
+
   ExternalChannelBaseUrl:
     Type: String
 
@@ -346,7 +353,13 @@ Resources:
           async function actAsReversProxy(event){
               const { httpMethod, path } = event
               
+              const routingMode = process.env.RoutingMode
+
+              
               if(isExternalChannelCall(path)){
+                // in case of BLACKLIST, the defaultUrl is the real external channel system
+                const defaultUrl = routingMode==='BLACKLIST'?process.env.ExternalChannelBaseUrl:process.env.MockExternalChannelBaseUrl
+                const allowedOnlyUrl = routingMode==='BLACKLIST'?process.env.MockExternalChannelBaseUrl:process.env.ExternalChannelBaseUrl
                 console.debug('[EC] - Call')
                 if(httpMethod=='PUT'){
                     console.debug('[EC] - Call PUT')
@@ -357,16 +370,20 @@ Resources:
                         const whitelist = await getParameterFromStore('pn-DigitalDeliveriesWhitelist')
                         console.log('[EC] Whitelist', whitelist)
                         if(isDeliveryAddressWhitelisted(deliveryAddress, whitelist)){
-                            return forwardRequest(event, process.env.ExternalChannelBaseUrl)
+                            return forwardRequest(event, allowedOnlyUrl)
                         }
                     } else if(isPaperDeliveriesPath(path)) {
                         return forwardRequest(event, process.env.ExternalChannelBaseUrl)
                     }
                 } 
-                return forwardRequest(event, process.env.MockExternalChannelBaseUrl)
+                return forwardRequest(event, defaultUrl)
               } 
 
-              if(isConsolidatoreCall(path)){
+              if(isConsolidatoreCall(path)) {
+                // in case of BLACKLIST, the defaultUrl is the real consolidatore system
+                const defaultUrl = routingMode==='BLACKLIST'?process.env.ConsolidatoreBaseUrl:process.env.MockConsolidatoreBaseUrl
+                const allowedOnlyUrl = routingMode==='BLACKLIST'?process.env.MockConsolidatoreBaseUrl:process.env.ConsolidatoreBaseUrl
+
                 console.debug('[CONS] - Call')
                 if(httpMethod=='POST'){
                     console.debug('[CONS] - Call POST')
@@ -377,11 +394,11 @@ Resources:
                         const whitelist = await getParameterFromStore('pn-PaperDeliveriesWhitelist')
                         console.log('[CONS] Whitelist', whitelist)
                         if(isPaperDeliveryAddressWhitelisted(paperDeliveryAddress, whitelist)){
-                            return forwardRequest(event, process.env.ConsolidatoreBaseUrl)
+                            return forwardRequest(event, allowedOnlyUrl)
                         }
                     }
                 } 
-                return forwardRequest(event, process.env.MockConsolidatoreBaseUrl)
+                return forwardRequest(event, defaultUrl)
               }
 
               throw new Error('Unhandled event', event)            
@@ -417,6 +434,7 @@ Resources:
           MockExternalChannelBaseUrl: !Ref MockExternalChannelBaseUrl
           ConsolidatoreBaseUrl: !Ref ConsolidatoreBaseUrl
           MockConsolidatoreBaseUrl: !Ref MockConsolidatoreBaseUrl
+          RoutingMode: !Ref RoutingMode
           SSM_PARAMETER_STORE_TIMEOUT_MILLIS: 5000
       VpcConfig:
         SecurityGroupIds:
