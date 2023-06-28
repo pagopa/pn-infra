@@ -56,9 +56,7 @@ Resources:
       Handler: index.lambda_handler
       Role: !GetAtt LambdaFunctionRole.Arn
       Code:
-        ZipFile:
-          !Sub
-            - |-
+        ZipFile: |
               import re
 
               def replace_email(string):
@@ -71,8 +69,6 @@ Resources:
 
                   print(single_event)
                   return single_event
-            -
-              lambda_function_role_arn: !Ref LambdaFunctionRole
   OrderDashboard:
     Type: AWS::CloudWatch::Dashboard
     Properties:
