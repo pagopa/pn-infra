@@ -72,6 +72,16 @@ Parameters:
     Default: 0.1
     Description: Wakeup alarm ratio between messages written to DLQ and messages read from queue
 
+  OncallLimit:
+    Type: Number
+    Default: 20
+    Description: The minimum number of messages received by standard Queue to calculate the ration with dql messages before raising an oncall alarm
+
+  OncallDLQLimit:
+    Type: Number
+    Default: 0
+    Description: The minimum number of messages in DLQ to raise an oncall alarm (it applies to standalone DLQ only). When zero, the oncall alarm is not created.
+
 Conditions:
   DlqHasDefaultName: !Equals [ !Ref DeadLetterQueueName, '-' ]
   DlqHasAlarm: !Not [ !Equals [ !Ref AlarmSNSTopicName, '-' ] ]
@@ -90,6 +100,9 @@ Conditions:
     - !Condition DlqHasAlarm
     - !Condition IsWithDLQ
 
+  HasOncallDLQLimit: !Not [ !Equals [ !Ref OncallDLQLimit, '0' ] ]
+
+  RequiresOncallDLQAlarm: !And [ !Condition IsWithAlarm, !Condition HasOncallDLQLimit ]
 Resources:
 
 
@@ -167,7 +180,7 @@ Resources:
     Condition: IsWithAlarm
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "oncall-${QueueName}-HasMessage"
+      AlarmName: !Sub "${QueueName}-HasMessage"
       AlarmDescription: "Alarm messages when we have 1 or more messages in QUEUE"
       Namespace: "AWS/SQS"
       MetricName: "ApproximateNumberOfMessagesVisible"
@@ -178,6 +191,30 @@ Resources:
       Statistic: "Sum"
       Period: 60  
       Threshold: 1
+      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 1       
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      InsufficientDataActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+
+  OncallQueueHasMessagesAlarm:
+    Condition: RequiresOncallDLQAlarm
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "oncall-${QueueName}-HasMessages"
+      AlarmDescription: !Sub "Alarm messages when we have ${OncallDLQLimit} or more messages in QUEUE"
+      Namespace: "AWS/SQS"
+      MetricName: "ApproximateNumberOfMessagesVisible"
+      TreatMissingData: "notBreaching"
+      Dimensions:
+        - Name: "QueueName"
+          Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
+      Statistic: "Sum"
+      Period: 60  
+      Threshold: !Ref OncallDLQLimit
       ComparisonOperator: "GreaterThanOrEqualToThreshold" 
       EvaluationPeriods: 1       
       AlarmActions:
@@ -270,7 +307,7 @@ Resources:
             Stat: Sum
           ReturnData: False
         - Id: e1
-          Expression: !Sub IF(m1>0 AND m2/m1>${OncallDlqRatio}, 1, 0)
+          Expression: !Sub IF(m1>${OncallLimit} AND m2/m1>${OncallDlqRatio}, 1, 0)
           Label: !Sub "${QueueName}-HasDLQMessage-OnCall-Metric"       
       AlarmActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'

@@ -59,6 +59,11 @@ Parameters:
     Default: ''
     Description: 'The DNS name used for BO API'
 
+  CNApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The DNS name user for CN API'
+
   AlternateWebApiDnsName:
     Type: String
     Default: ''
@@ -265,6 +270,10 @@ Parameters:
   BackupCronExpression:
     Type: String
 
+  ApplicationLoadBalancerMetricsDimensionName:
+    Type: String
+    Default: ''
+
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
 
@@ -357,6 +366,8 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-safestore_to_deliverypush'
         DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
   ### Communication FROM SafeStorage TO pn-radd ###
@@ -394,6 +405,8 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-external_channel_outputs'
         DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
   
   ExternalChannels2UserAttributesQueue:
@@ -476,6 +489,8 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-nationalregistries_to_deliverypush'
         DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
   
   ### Communication FROM pn-national-registries TO pn-paper-channel ###
@@ -525,6 +540,8 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-addressmanager_to_deliverypush'
         DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
   ### Queue that receive safe-storage notification to DOWNTIME LOGS ###
@@ -539,6 +556,7 @@ Resources:
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName   
         HasDLQ:  "false"
+        OncallDLQLimit: '1'
         QueueHasAlarm:  "true"
 
 Outputs:
@@ -555,7 +573,9 @@ Outputs:
   SelcpgApiDnsName:
     Value: !If [ HasAlternateSelcpgApiDnsName, !Ref AlternateSelcpgApiDnsName, !Ref SelcpgApiDnsName ]
     Description: 'The DNS name used for B2B Selfecare PG rest API.'
-
+  CNApiDnsName:
+    Value: !Ref CNApiDnsName
+    
   # SafeStorage to DeliveryPush
   SafeStorageToDeliveryPushQueueName:
     Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueName
@@ -970,3 +990,5 @@ Outputs:
     Value: !Ref BackupCronExpression
   LogRetention:
     Value: !Ref LogRetention
+  ApplicationLoadBalancerMetricsDimensionName:
+    Value: !Ref ApplicationLoadBalancerMetricsDimensionName
