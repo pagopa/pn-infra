@@ -117,9 +117,15 @@ function prepareBulkBody(logs){
               delete jsonMessage.stack_trace
             }
             
-            if(['DEBUG'].indexOf(jsonMessage.level)<0){
+            // development logs are stored only at ERROR and FATAL level
+            if(!jsonMessage.tags || jsonMessage.tags.length==0){
+              if(['ERROR', 'FATAL'].indexOf(jsonMessage.level)>=0){
+                formattedLogs.push(jsonMessage);
+              }
+            } else { // audit logs are always stored
               formattedLogs.push(jsonMessage);
             }
+
           }
         } catch(e){
           const timestamp = new Date(log.timestamp);
