@@ -39,9 +39,9 @@ Resources:
               - logs:CreateLogStream
               - logs:PutLogEvents
             Resource: '*'
+            
   LambdaFunctionLogGroup:
     Type: AWS::Logs::LogGroup
-    DependsOn: LambdaFunction
     Properties:
       RetentionInDays: 14
       LogGroupName: !Join
@@ -73,7 +73,7 @@ Resources:
     Type: AWS::CloudWatch::Dashboard
     Properties:
       DashboardName: "SES_SNS"
-      DashboardBody: !Sub |
+      DashboardBody: |
         {
             "widgets": [
                 {
