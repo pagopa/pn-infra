@@ -95,6 +95,15 @@ Resources:
       RestApiId: !Ref CNRestApi
       Stage: !Ref CNRestApiStage
 
+  # /{proxy+} resource
+  PublicApiProxyResource:
+    Condition: IsCNEnabled
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref CNRestApi
+      ParentId: !GetAtt CNRestApi.RootResourceId
+      PathPart: '{proxy+}'
+
   # GET method
   CNRequestUrlMethod:
     Condition: IsCNEnabled
@@ -102,7 +111,7 @@ Resources:
     Properties:
       OperationName: 'Proxy to Pre Signed Url Generator Lambda'
       RestApiId: !Ref CNRestApi
-      ResourceId: !GetAtt CNRestApi.RootResourceId
+      ResourceId: !Ref PublicApiProxyResource
       HttpMethod: GET
       AuthorizationType: NONE
       ApiKeyRequired: true
@@ -121,7 +130,7 @@ Resources:
     Properties:
       OperationName: 'Pre signed url'
       RestApiId: !Ref CNRestApi
-      ResourceId: !GetAtt CNRestApi.RootResourceId
+      ResourceId: !Ref PublicApiProxyResource
       HttpMethod: POST
       AuthorizationType: NONE
       ApiKeyRequired: true
