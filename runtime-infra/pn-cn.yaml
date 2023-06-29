@@ -30,7 +30,7 @@ Parameters:
 Conditions:
   IsNotProd: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ]]
   IsNotUat: !Not [ !Equals [ !Ref EnvironmentType, 'uat' ]]
-  IsCNEnabled: !Or [ !Condition IsNotProd, !Condition IsNotUat ]
+  IsCNEnabled: !And [ !Condition IsNotProd, !Condition IsNotUat ]
 
 Resources:
 
