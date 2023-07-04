@@ -505,6 +505,12 @@ Parameters:
       - "ERROR_FATAL"
     Type: String
 
+
+  ErrorFatalLimit:
+    Type: Number
+    Default: '1'
+    Description: Number of error/fatal errors to happen in 1 hour in order to raise an alarm
+
 Mappings:
   ContainerMemory:
     2GB:
@@ -1394,7 +1400,7 @@ Resources:
       EvaluationPeriods: 60
       Period: 60
       Statistic: Sum
-      Threshold: 1
+      Threshold: !Ref ErrorFatalLimit
 
   ###                            Application AutoScaling                    ###
   ############################################################################
