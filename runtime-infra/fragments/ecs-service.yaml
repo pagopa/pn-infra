@@ -511,6 +511,21 @@ Parameters:
     Default: '1'
     Description: Number of error/fatal errors to happen in 1 hour in order to raise an alarm
 
+  ErrorFatalDataPointsToAlarm:
+    Type: Number
+    Default: '1'
+    Description: Data points to alarm
+
+  ErrorFatalEvaluationPeriod:
+    Type: Number
+    Default: '60'
+    Description: ErrorFatal alarm evaluation period
+
+  ErrorFatalPeriod:
+    Type: Number
+    Default: '60'
+    Description: ErrorFatal alarm sum period
+
 Mappings:
   ContainerMemory:
     2GB:
@@ -1393,12 +1408,12 @@ Resources:
       #  - !Ref AlarmSNSTopicArn
       OKActions:
         - !Ref AlarmSNSTopicArn
-      DatapointsToAlarm: 1
+      DatapointsToAlarm: !Ref ErrorFatalDataPointsToAlarm
       MetricName: !Sub "${MicroServiceUniqueName}-ErrorFatalMetric"
       Namespace: "ErrorFatalLogs"
       ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
-      Period: 60
+      EvaluationPeriods: !Ref ErrorFatalEvaluationPeriod
+      Period: !Ref ErrorFatalPeriod
       Statistic: Sum
       Threshold: !Ref ErrorFatalLimit
 
