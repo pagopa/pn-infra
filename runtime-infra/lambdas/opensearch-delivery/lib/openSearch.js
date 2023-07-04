@@ -47,66 +47,117 @@ function truncateMessage(message, limit = 30000){
   }
 }
 
+function convertLevelFromLongToString(level){
+  let levelAsString = null
+  
+  switch(level){
+    case 60:
+      levelAsString = 'FATAL'
+      break;
+    case 50:
+      levelAsString = 'ERROR'
+      break;
+    case 40:
+      levelAsString = 'WARN'
+      break;
+    case 30:
+      levelAsString = 'INFO'
+      break;
+    case 20:
+      levelAsString = 'DEBUG'
+      break;
+    case 10:
+      levelAsString = 'TRACE'
+      break;
+    default:
+      levelAsString = 'INFO'
+      break;
+  }
+  
+  return levelAsString
+}
+
 function prepareBulkBody(logs){
     let formattedLogs = []
 
-    logs.forEach((doc) => {
-        doc.logEvents.forEach((log) => {
-            try {
-                const jsonMessage = JSON.parse(log.message)
-                if(jsonMessage){
-                    if(!jsonMessage.iun){
-                      const extractedIun = extractIun(jsonMessage.message)
-                      if(extractedIun){
-                        jsonMessage.iun = extractedIun;
-                      }
-                    }
-
-                    jsonMessage.message = truncateMessage(jsonMessage.message, 30000)
-                    jsonMessage._id = log.id
-                    jsonMessage.kinesisSeqNumber = doc.kinesisSeqNumber
-                    jsonMessage.logGroup = doc.logGroup
-                    jsonMessage.logStream = doc.logStream
-
-                    if(jsonMessage.stack_trace) {
-                      jsonMessage.stack_trace = truncateMessage(jsonMessage.stack_trace, 20000)
-                    }
-                    
-                    formattedLogs.push(jsonMessage);
-                }
-            } catch(e){
-                const timestamp = new Date(log.timestamp);
-
-                
-                const fakeLog = {
-                    _id: log.id,
-                    kinesisSeqNumber: doc.kinesisSeqNumber,
-                    logGroup: doc.logGroup,
-                    logStream: doc.logStream,
-                    message: truncateMessage(log.message, 30000),
-                    '@timestamp': timestamp.toISOString(),
-                    '@version': 1,
-                    error_code: 'INVALID_JSON_MESSAGE',
-                    level: 'FATAL',
-                    logger_name: 'logs-to-opensearch-lambda'
-                }
-
-                formattedLogs.push(fakeLog);
+    for(const doc of logs) {
+      for (const log of doc.logEvents){
+        try {
+          const jsonMessage = JSON.parse(log.message)
+          if(jsonMessage){
+            if(!jsonMessage.iun){
+              const extractedIun = extractIun(jsonMessage.message)
+              if(extractedIun){
+                jsonMessage.iun = extractedIun;
+              }
             }
-        })
-    })
 
+            // fix to handle bunyan nodejs logger format
+            if(jsonMessage.time && !jsonMessage['@timestamp']){
+              jsonMessage['@timestamp'] = jsonMessage.time
+            }
+
+            // bunyan level is passed as long
+            if(jsonMessage.level && typeof jsonMessage.level=='number'){
+              jsonMessage.level = convertLevelFromLongToString(jsonMessage.level)
+            }
+            
+            jsonMessage.message = truncateMessage(jsonMessage.message, 30000)
+            jsonMessage._id = log.id
+            jsonMessage.kinesisSeqNumber = doc.kinesisSeqNumber
+            jsonMessage.logGroup = doc.logGroup
+            jsonMessage.logStream = doc.logStream
+
+            /*
+            // opensearch is not used for debugging purposes, the stack trace won't be helpful
+            if(jsonMessage.stack_trace) {
+              jsonMessage.stack_trace = truncateMessage(jsonMessage.stack_trace, 20000)
+            }*/
+            if(jsonMessage.stack_trace) {
+              delete jsonMessage.stack_trace
+            }
+            
+            // development logs are stored only at ERROR and FATAL level
+            if(!jsonMessage.tags || jsonMessage.tags.length==0){
+              if(['WARN', 'ERROR', 'FATAL'].indexOf(jsonMessage.level)>=0){
+                formattedLogs.push(jsonMessage);
+              }
+            } else { // audit logs are always stored
+              formattedLogs.push(jsonMessage);
+            }
+
+          }
+        } catch(e){
+          const timestamp = new Date(log.timestamp);
+
+          
+          const fakeLog = {
+              _id: log.id,
+              kinesisSeqNumber: doc.kinesisSeqNumber,
+              logGroup: doc.logGroup,
+              logStream: doc.logStream,
+              message: truncateMessage(log.message, 30000),
+              '@timestamp': timestamp.toISOString(),
+              '@version': 1,
+              error_code: 'INVALID_JSON_MESSAGE',
+              level: 'FATAL',
+              logger_name: 'logs-to-opensearch-lambda'
+          }
+
+          // skip storage of invalid message, print it for debugging purposes
+          console.debug(fakeLog)
+        }
+      }
+    }
+    
     if(formattedLogs.length>0){
         formattedLogs = chunk(formattedLogs, 500)
         return formattedLogs.map((formattedLogBatch) => {
-          return formattedLogBatch.flatMap((doc) => [{ index: { _index: process.env.INDEX_NAME, _id: doc._id }}, doc]
-          
-          );
+          return formattedLogBatch.flatMap((doc) => [{ index: { _index: process.env.INDEX_NAME, _id: doc._id }}, doc]);
         })
       } else {
         return [];
     }
-
 }
 
 export { prepareBulkBody, failedSeqNumbers };

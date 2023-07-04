@@ -16,7 +16,219 @@ Parameters:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
 
+  AlarmSNSTopicArn:
+    Type: String
+    Description: 'ARN of alarm SNS Topic'
+
 Resources:
+
+  # Logsaver BE
+  LogsaverBeCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-logsaver-be'
+
+  # Mandate
+  MandateCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-mandate'
+
+  # Radd Fsu
+  RaddFsuCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-radd-fsu'
+
+  # User Attributes
+  UserAttributesCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-user-attributes'
+
+  # Downtime Logs
+  DowntimeLogsCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-downtime-logs'
+
+  # Delivery Push
+  DeliveryPushCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-delivery-push'
+
+  # Apikey Manager
+  ApikeyManagerCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-apikey-manager'
+
+  # Paper Channel
+  PaperChannelCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-paper-channel'
+
+  # National Registries
+  NationalRegistriesCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-national-registries'
+
+  # Auth Fleet
+  AuthFleetCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-auth-fleet-v2'
+
+  # Kafka Bridge
+  KafkaBridgeCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-kafka-bridge'
+
+  # Progression Sensor
+  ProgressionSensorCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-progression-sensor'
+
+  # Delivery
+  DeliveryCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-delivery'
+
+  # External Registries
+  ExternalRegistriesCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-external-registries'
+
+  # Frontend
+  FrontendCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-frontend'
+
+  # Infra
+  InfraCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-infra'
+
+  # DataVault
+  DataVaultCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-data-vault'
+
+  # Infra Confidential Info
+  InfraConfidentialCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-infra-confidential-info'
+
+  # Logsaver Confidential Info
+  LogsaverBeConfidentialCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-logsaver-be-confidential-info'
+
+  # Helpdesk FE
+  HelpdeskFeCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-helpdesk-fe'
+
+  # Logextractor
+  LogextractorBeCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-logextractor-be'
+
+  # Spidhub
+  SpidhubCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-spidhub'
+
+  # Address Manager
+  AddressManagerCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-address-manager'
+
+  # Safe Storage
+  SafeStorageCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-safe-storage'
+
+  # External Channel
+  ExternalChannelCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-external-channel'
+
+  # External Channel
+  StateMachineManagerCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-state-machine-manager'
 
   # - Everything written to this topic is an alarm
   CompositeAlarmSNSTopic:
@@ -35,30 +247,41 @@ Resources:
 
   NotificationInputCompositeAlarm:
     Type: AWS::CloudWatch::CompositeAlarm
+    DependsOn:
+      - DeliveryCumulativeAlarm
+      - ExternalRegistriesCumulativeAlarm
     Properties:
       AlarmName: !Sub '${ProjectName}-CompositeAlarm-NotificationInput'
-      AlarmRule: 'FALSE'
-      AlarmActions:
-        - !Ref CompositeAlarmSNSTopic
-      OKActions:
-        - !Ref CompositeAlarmSNSTopic
+      AlarmRule: ALARM(pn-delivery-CumulativeAlarm) OR ALARM(pn-external-registries-CumulativeAlarm)
+      #AlarmActions:
+      #  - !Ref CompositeAlarmSNSTopic
+      #OKActions:
+      #  - !Ref CompositeAlarmSNSTopic
   
   NotificationOutputCompositeAlarm:
     Type: AWS::CloudWatch::CompositeAlarm
+    DependsOn:
+      - DeliveryCumulativeAlarm
+      - DeliveryPushCumulativeAlarm
+      - RaddFsuCumulativeAlarm
     Properties:
       AlarmName: !Sub '${ProjectName}-CompositeAlarm-NotificationOutput'
-      AlarmRule: 'FALSE'
-      AlarmActions:
-        - !Ref CompositeAlarmSNSTopic
-      OKActions:
-        - !Ref CompositeAlarmSNSTopic
+      AlarmRule: ALARM(pn-delivery-CumulativeAlarm) OR ALARM(pn-delivery-push-CumulativeAlarm) OR ALARM(pn-radd-fsu-CumulativeAlarm)
+      #AlarmActions:
+      #  - !Ref CompositeAlarmSNSTopic
+      #OKActions:
+      #  - !Ref CompositeAlarmSNSTopic
   
   NotificationProgressCompositeAlarm:
     Type: AWS::CloudWatch::CompositeAlarm
+    DependsOn:
+      - MandateCumulativeAlarm
+      - DeliveryPushCumulativeAlarm
+      - UserAttributesCumulativeAlarm
     Properties:
       AlarmName: !Sub '${ProjectName}-CompositeAlarm-NotificationProgress'
-      AlarmRule: 'FALSE'
-      AlarmActions:
-        - !Ref CompositeAlarmSNSTopic
-      OKActions:
-        - !Ref CompositeAlarmSNSTopic
+      AlarmRule: ALARM(pn-mandate-CumulativeAlarm) OR ALARM(pn-delivery-push-CumulativeAlarm) OR ALARM(pn-user-attributes-CumulativeAlarm)
+      #AlarmActions:
+      #  - !Ref CompositeAlarmSNSTopic
+      #OKActions:
+      #  - !Ref CompositeAlarmSNSTopic

@@ -8,6 +8,11 @@ Parameters:
     Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
       experimental environments without crash official development environment'
 
+  EnvironmentType:
+    Type: String
+    Default: ''
+    Description: Environment type
+
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
@@ -16,13 +21,53 @@ Parameters:
     Type: String
     Description: 'The DNS name used for B2B rest API.'
 
+  SandboxSafeStorageBaseUrl:
+    Type: String
+    Default: "-"
+    Description: 'safeStorage Url'
+
+  AlternateApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The alternate DNS name used for B2B rest API.'
+
   ApiCertificateArn:
     Type: String
     Description: 'The certificate used for B2B rest API.'
 
+  SelcpgApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The DNS name used for B2B Selfcare PG API.'
+
+  AlternateSelcpgApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The alternate DNS name used for B2B Selfcare PG API.'
+
+  SelcpgApiCertificateArn:
+    Type: String
+    Default: ''
+    Description: 'The certificate used for B2B Selfcare PG API.'
+
   WebApiDnsName:
     Type: String
     Description: 'The DNS name used for browser rest API.'
+
+  BoApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The DNS name used for BO API'
+
+  CNApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The DNS name user for CN API'
+
+  AlternateWebApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The alternate DNS name used for browser rest API. '
 
   WebApiCertificateArn:
     Type: String
@@ -32,6 +77,11 @@ Parameters:
     Type: String
     Description: 'The DNS name used for IO API rest'
 
+  AlternateIoApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The alternate DNS name used for IO API rest.'
+
   IoApiCertificateArn:
     Type: String
     Description: 'The certificate used for browser rest IO API.'
@@ -40,36 +90,27 @@ Parameters:
     Description: "Hosted Zone Id in which you want to add record"
     Type: String
   
-  SafeStorageAccountId:
-    Description: "SafeStorage AWS Account id. Useful to grant rights to send feedback to EventBus"
-    Type: String
-  
-  DeliveryPushExtChUser:
-    Description: "external channel user dedicated to pn-delivery-push"
-    Type: String
-
-  UserAttributesExtChUser:
-    Description: "SafeStorage AWS Account id. Useful to grant rights to send feedback to EventBus"
-    Type: String
-
-  EventBusDeadLetterQueueMaximumRetentionPeriod:
-    Type: Number
-    Description: "The number of seconds that Amazon SQS retains a message. You can specify an integer 
-      value from 60 seconds (1 minute) to 1,209,600 seconds (14 days)."
-  
-  CdcStreamRetentionHours:
-    Type: Number
-    Description: 'Change Data Capture Kinesis Data Stream retention period in hours'
-
-  LogsStreamRetentionHours:
-    Type: Number
-    Description: 'Cloudwatch Logs Kinesis Data Stream retention period in hours'
-
   Version:
     Type: String
     Description: 'keep track of used projects commitIds'
 
+  CustomDomainsRequired:
+    Type: String
+    Default: true
+    AllowedValues:
+      - true
+      - false
+
+  LogRetention:
+    Type: Number
+    Default: 14
+    Description: Default log retention in days
+
   # pass-though parameters
+  LambdasBucketName:
+    Type: String
+  LambdasBasePath:
+    Type: String
   NetworkLoadBalancerLink:
     Type: String
   ApplicationLoadBalancerListenerArn:
@@ -98,6 +139,166 @@ Parameters:
     Type: String
   LogsExporterPolicyArn:
     Type: String
+  AlbSecurityGroup:
+    Type: String
+  CognitoUserPoolArn:
+    Type: String
+    Default: ''
+  CognitoClientId:
+    Type: String
+    Default: ''
+  ConfidentialInfoAccountId:
+    Default: ''
+    Type: String
+  OpenSearchArn:
+    Default: ''
+    Type: String
+  OpenSearchEndpoint:
+    Type: String
+    Default: ''
+  HelpdeskAccountId:
+    Default: ''
+    Type: String
+  CdcKinesisStreamName:
+    Type: String
+  CdcKinesisStreamArn:
+    Type: String
+  CdcKinesisStreamKeyArn:
+    Type: String
+  LogsKinesisStreamName:
+    Type: String
+  LogsKinesisStreamArn:
+    Type: String
+  LogsKinesisStreamKeyArn:
+    Type: String
+  SafeStorageAccountId:
+    Type: String
+  ApiKeyTablesEncryptKeyId:
+    Type: String
+
+  VpcEgressSubnetsIds:
+    Type: String
+
+  ElasticacheEndpoint:
+    Type: String
+    Default: ''
+  ElasticacheSecurityGroup:
+    Type: String
+    Default: ''
+
+  CdnZoneId:
+    Type: String
+    Default: '-'  
+  PortalePaCertificateArn:
+    Type: String
+    Default: '-'
+  PortalePfCertificateArn:
+    Type: String
+    Default: '-'    
+  PortalePfLoginCertificateArn:
+    Type: String
+    Default: '-'    
+  LandingCertificateArn:
+    Type: String
+    Default: '-' 
+  PortalePgCertificateArn:
+    Type: String
+    Default: '-' 
+  PortaleStatusCertificateArn:
+    Type: String
+    Default: '-' 
+  PortaleHelpdeskCertificateArn:
+    Type: String
+    Default: '-'
+  PortalePaDomain:
+    Type: String
+    Default: '-' 
+  PortalePfDomain:
+    Type: String
+    Default: '-' 
+  PortalePfLoginDomain:
+    Type: String
+    Default: '-' 
+  LandingDomain:
+    Type: String
+    Default: '-' 
+  PortalePgDomain:
+    Type: String
+    Default: '-' 
+  PortaleStatusDomain:
+    Type: String
+    Default: '-' 
+  PortaleHelpdeskDomain:
+    Type: String
+    Default: '-'
+  HubLoginDomain: 
+    Type: String
+    Default: '-'
+  ReactAppUrlApi:
+    Type: String
+    Default: '-' 
+  TokenExchangeLambdaEnvironmentIssuer:
+    Type: String
+    Description: Session token issuer
+  TokenExchangeLambdaEnvironmentAllowedIssuer:
+    Type: String
+    Description: 'Comma separated list of external authentication token issuers 
+                  recognized by Piattaforma Notifiche (SelfCare and SpidHub)'
+  TokenExchangeLambdaEnvironmentAllowedOrigin:
+    Type: String
+    Description: 'Comma separated list of websites allowed to use "Piattaforma 
+                 Notifiche" back-ends API'
+  TokenExchangeLambdaEnvironmentJwksMapping:
+    Type: String
+    Description: 'Mapping tra issuer e jwks url non standard in formato json'
+  TokenExchangeLambdaEnvironmentAcceptedAudience:
+    Type: String
+    Description: Comma separated list of token audience accepted
+  TokenExchangeLambdaEnvironmentAudience:
+    Type: String
+    Description: Audience value for token generation
+  ApikeyAuthorizerV2PDNDAudience:
+    Type: String
+    Description: Pdnd Audience for ApikeyAuthorizerV2
+
+  SafestorageLoggerLogGroupName:
+    Type: String
+
+  ExternalChannelBaseUrl:
+    Type: String
+
+  BackupCronExpression:
+    Type: String
+
+  ApplicationLoadBalancerMetricsDimensionName:
+    Type: String
+    Default: ''
+
+Conditions:
+  RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
+
+  HasSelcpgApiDns: !Not [ !Equals [ !Ref SelcpgApiDnsName, '' ] ]
+  HasSelcpgApiCertificate: !Not [ !Equals [ !Ref SelcpgApiCertificateArn, '' ] ]  
+  HasSelcpgApi: !And [ !Condition HasSelcpgApiDns, !Condition HasSelcpgApiCertificate, !Condition RequiresCustomDomains ]
+
+  HasAlternateApiDnsName: !Not 
+    - !Equals
+      - !Ref AlternateApiDnsName
+      - ""
+  HasAlternateWebApiDnsName: !Not 
+    - !Equals
+      - !Ref AlternateWebApiDnsName
+      - ""
+
+  HasAlternateSelcpgApiDnsName: !Not 
+    - !Equals
+      - !Ref AlternateSelcpgApiDnsName
+      - ""
+
+  HasAlternateIoApiDnsName: !Not 
+    - !Equals
+      - !Ref AlternateIoApiDnsName
+      - ""
 
 Resources:
 
@@ -107,30 +308,48 @@ Resources:
   # Custom domain for B2B api
   ApiCustomDomain:
     Type: AWS::CloudFormation::Stack
+    Condition: RequiresCustomDomains
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
       Parameters:
         DnsName: !Ref ApiDnsName
+        AlternateDnsName: !Ref AlternateApiDnsName
         CertificateArn: !Ref ApiCertificateArn
+        HostedZoneId: !Ref HostedZoneId
+
+  # Custom domain for B2B api selcpg
+  SelcpgApiCustomDomain:
+    Type: AWS::CloudFormation::Stack
+    Condition: HasSelcpgApi
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
+      Parameters:
+        DnsName: !Ref SelcpgApiDnsName
+        AlternateDnsName: !Ref AlternateSelcpgApiDnsName
+        CertificateArn: !Ref SelcpgApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
 
   # Custom domain for B2B api
   WebApiCustomDomain:
     Type: AWS::CloudFormation::Stack
+    Condition: RequiresCustomDomains
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
       Parameters:
         DnsName: !Ref WebApiDnsName
+        AlternateDnsName: !Ref AlternateWebApiDnsName
         CertificateArn: !Ref WebApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
 
   # Custom domain for IO api
   IoApiCustomDomain:
     Type: AWS::CloudFormation::Stack
+    Condition: RequiresCustomDomains
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
       Parameters:
         DnsName: !Ref IoApiDnsName
+        AlternateDnsName: !Ref AlternateIoApiDnsName
         CertificateArn: !Ref IoApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
 
@@ -140,16 +359,34 @@ Resources:
   ### Communication FROM SafeStorage TO pn-delivery-push ###
   SafeStorageToDeliveryPushQueue:
     Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain  
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub '${ProjectName}-safestore_to_deliverypush'
+        DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  ### Communication FROM SafeStorage TO pn-radd ###
+  SafeStorageToRaddQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain  
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestore_to_radd'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
   ### Communication between PN-DELIVERY and PN-DELIVERY-PUSH ###
   DeliveryPushInputsQueue:
     Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain  
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
@@ -158,27 +395,24 @@ Resources:
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
         FifoQueue: true
 
-  ### Communication TO and FROM EXTERNAL-CHANNELS ###
-  ExternalChannelsInputsQueue:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
-      Parameters:
-        QueueName: !Sub '${ProjectName}-external_channel_inputs'
-        DelaySeconds: 1
-        AlarmSNSTopicName: !Ref AlarmSNSTopicName
-
+  ### Communication FROM EXTERNAL-CHANNELS ###
   ExternalChannelsOutputsQueue:
     Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain  
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub '${ProjectName}-external_channel_outputs'
         DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
   
   ExternalChannels2UserAttributesQueue:
     Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
@@ -186,10 +420,34 @@ Resources:
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
+  ExternalChannels2PaperChannelQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-external_channel_to_paper_channel'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  ### Communication FROM KAFKA-BRIDGE
+  KafkaBridgeOnboardingQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-kafka_bridge_onboarding'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
   ### Queue that receive composite alarm information for DOWNTIME LOGS ###
   CompositeAlarmQueue:
     Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
@@ -200,474 +458,124 @@ Resources:
   ### Queue that receive safe-storage notification to DOWNTIME LOGS ###
   SafeStorageToDowntimeLogsQueue:
     Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub '${ProjectName}-safestore_to_downtime_logs'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName     
-        
-
-  ###                          PN-CORE EVENT BUS                          ###
-  ###########################################################################
-  # Receive events from SafeStorage and CarrierPigeon (AKA ExternalChannel) 
-  # and redirect to the right SQS queue
-  PnCoreEventBus:
-    Type: AWS::Events::EventBus
-    Properties: 
-      Name: !Sub '${ProjectName}-CoreEventBus'
   
-  # Allow access from partner system
-  PnCoreEventBusSafeStoreAccessPolicy: 
-    Type: AWS::Events::EventBusPolicy
-    Properties: 
-      EventBusName: !Ref PnCoreEventBus
-      StatementId: "AllowEventPutBySafeStorage"
-      Statement: 
-        Effect: "Allow"
-        Principal: 
-            AWS: !Sub "arn:aws:iam::${SafeStorageAccountId}:root"
-        Action: "events:PutEvents"
-        Resource: !GetAtt "PnCoreEventBus.Arn"
-
-  # Allow event bus rules to write to queues
-  EventBusEnqueueRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service: events.amazonaws.com
-        Version: "2012-10-17"
-      Policies:
-        - PolicyName: putEventIntoQueues
-          PolicyDocument:
-            Statement:
-              - Sid: putEvents
-                Action:
-                  - sqs:ChangeMessageVisibility
-                  - sqs:ChangeMessageVisibilityBatch
-                  - sqs:GetQueueAttributes
-                  - sqs:GetQueueUrl
-                  - sqs:SendMessage
-                  - sqs:SendMessageBatch
-                Effect: Allow
-                Resource: 
-                  - !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
-                  - !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
-                  - !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
-                  - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueARN"
-  
-  # Resource based policy to allow EventBridge to publish to CloudWatch Logs
-  LogGroupCoreEventBusPolicy:
-    Type: AWS::Logs::ResourcePolicy
-    Properties:
-      PolicyName: !Sub "${ProjectName}-CoreEventBusToCWLogsPolicy"
-      PolicyDocument: !Sub |
-        {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Sid": "CoreEventBustoCWLogsCreateLogStreamPolicy",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": [
-                  "events.amazonaws.com"
-                ]
-              },
-              "Action": [
-                "logs:CreateLogStream",
-                "logs:PutLogEvents"
-              ],
-              "Resource": [
-                "${CoreEventBusEventsLogGroup.Arn}"
-              ]
-            }
-          ]
-        }
-
-  EventBusLogRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service: events.amazonaws.com
-        Version: "2012-10-17"
-      Policies:
-        - PolicyName: logEventToCloudwatch
-          PolicyDocument:
-            Statement:
-              - Sid: AllowEventBusToCreateLogs
-                Action:
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Effect: Allow
-                Resource: 
-                  - !GetAtt CoreEventBusEventsLogGroup.Arn
-
-  ExternalChannelsOutputsQueuePolicy:
-    Type: AWS::SQS::QueuePolicy
-    Properties:
-      Queues:
-        - !GetAtt "ExternalChannelsOutputsQueue.Outputs.QueueURL"
-        - !GetAtt "ExternalChannels2UserAttributesQueue.Outputs.QueueURL"
-        - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueURL"
-        - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueURL"
-      PolicyDocument:
-        Statement:
-          - Sid: "SendEventsToDLQ"
-            Effect: "Allow"
-            Principal: 
-              Service: 
-                - "events.amazonaws.com"
-            Action: 
-              - "SQS:SendMessage"
-            Resource:
-              - !GetAtt "ExternalChannelsOutputsQueue.Outputs.QueueARN"
-              - !GetAtt "ExternalChannels2UserAttributesQueue.Outputs.QueueARN"
-              - !GetAtt "SafeStorageToDeliveryPushQueue.Outputs.QueueARN"
-              - !GetAtt "SafeStorageToDowntimeLogsQueue.Outputs.QueueARN"
-
-  # Log all events
-  CoreEventBusEventsLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: /aws/events/core-event-bus-input-events
-      RetentionInDays: 14
-
-  CoreEventBusMatchedEventsLoggerFnLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: /aws/lambda/PnCoreEventBusMatchedEventLogger
-      RetentionInDays: 14
-
-  CoreEventBusEventsLogGroupSubscriptionFilter:
-    Type: AWS::Logs::SubscriptionFilter
-    Properties:
-      RoleArn:
-        Fn::GetAtt:
-          - "SubscriptionFilterServiceRole"
-          - "Arn"
-      LogGroupName: !Ref CoreEventBusEventsLogGroup
-      FilterPattern: ' '
-      DestinationArn: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamArn
-
-  CoreEventBusMatchedEventsLogGroupSubscriptionFilter:
-    Type: AWS::Logs::SubscriptionFilter
-    Properties:
-      RoleArn:
-        Fn::GetAtt:
-          - "SubscriptionFilterServiceRole"
-          - "Arn"
-      LogGroupName: !Ref CoreEventBusMatchedEventsLoggerFnLogGroup
-      FilterPattern: ' '
-      DestinationArn: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamArn
-
-  SubscriptionFilterServiceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service: logs.amazonaws.com
-        Version: "2012-10-17"
-      Path: /
-      Policies:
-        -
-          PolicyName: !Sub '${ProjectName}-core-event-bus-subscription-role'
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Action:
-                  - kinesis:PutRecord
-                Effect: Allow
-                Resource: "*"
-              - Action:
-                - "kms:Encrypt"
-                - "kms:GenerateDataKey"
-                - "kms:Decrypt"
-                Effect: Allow
-                Resource: "*"
-
-  PnCoreEventBusToLogGroup:
-    Type: AWS::Events::Rule
-    Properties: 
-      Description: Route SafeStorage Events to log group
-      RoleArn: !GetAtt "EventBusLogRole.Arn"
-      EventBusName: !Ref PnCoreEventBus
-      EventPattern:
-        source:
-          - prefix: ""
-      Targets: 
-        - Arn: !GetAtt CoreEventBusEventsLogGroup.Arn
-          Id: LogTarget
-
-  # Send Safe Storage Response to pn-delivery-push
-  PnCoreEventBusToSafeStorageResponseQueue:
-    Type: AWS::Events::Rule
-    Properties: 
-      Description: Route SafeStorage Events to pn-delivery-push
-      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
-      EventBusName: !Ref PnCoreEventBus
-      EventPattern:
-        detail-type: [ "SafeStorageOutcomeEvent" ]
-        detail:
-          documentType: [ 'PN_AAR', 'PN_NOTIFICATION_ATTACHMENTS', 'PN_LEGAL_FACTS' ]
-      Targets: 
-        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
-          Id: !Sub ${ProjectName}-Logger-SafeStore2DeliveryPush
-          InputTransformer:
-            InputPathsMap:
-              "timestamp": "$.time"
-            InputTemplate: |
-              {
-                  "timestamp": <timestamp>,
-                  "ruleArn": <aws.events.rule-arn>,
-                  "ruleName": <aws.events.rule-name>,
-                  "ingestionTime": <aws.events.event.ingestion-time>,
-                  "originalEvent": <aws.events.event.json>
-              }       
-        - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryPush'
-          Arn: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueARN
-          InputPath: $.detail
-          DeadLetterConfig: 
-            Arn: !GetAtt EventBusDeadLetterQueue.Arn
-
-  # Send Safe Storage Response to pn-downtime-logs
-  PnCoreEventBusToDowntimeLogsSafeStorageResponseQueue:
-    Type: AWS::Events::Rule
-    Properties: 
-      Description: Route SafeStorage Events to pn-downtime-logs
-      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
-      EventBusName: !Ref PnCoreEventBus
-      EventPattern:
-        detail-type: [ "SafeStorageOutcomeEvent" ]
-        detail:
-          documentType: [ 'PN_DOWNTIME_LEGAL_FACTS' ]
-      Targets: 
-        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
-          Id: !Sub ${ProjectName}-Logger-DowntimeLogs2SafeStorage
-          InputTransformer:
-            InputPathsMap:
-              "timestamp": "$.time"
-            InputTemplate: |
-              {
-                  "timestamp": <timestamp>,
-                  "ruleArn": <aws.events.rule-arn>,
-                  "ruleName": <aws.events.rule-name>,
-                  "ingestionTime": <aws.events.event.ingestion-time>,
-                  "originalEvent": <aws.events.event.json>
-              }       
-        - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DowntimeLogs'
-          Arn: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.QueueARN
-          InputPath: $.detail
-          DeadLetterConfig: 
-            Arn: !GetAtt EventBusDeadLetterQueue.Arn
-
-  # Send ExternalChannel Response to pn-delivery-push
-  PnCoreEventBusToExtChResponseQueue:
-    Type: AWS::Events::Rule
-    Properties: 
-      Description: Route ExternalChannel Events to pn-delivery-push
-      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
-      EventBusName: !Ref PnCoreEventBus
-      EventPattern:
-        detail-type: [ "ExternalChannelOutcomeEvent" ]
-        detail:
-          clientId: [ !Ref DeliveryPushExtChUser ]
-      Targets: 
-        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
-          Id: !Sub ${ProjectName}-Logger-ExtChToDeliveryPush
-          InputTransformer:
-            InputPathsMap:
-              "timestamp": "$.time"
-            InputTemplate: |
-              {
-                  "timestamp": <timestamp>,
-                  "ruleArn": <aws.events.rule-arn>,
-                  "ruleName": <aws.events.rule-name>,
-                  "ingestionTime": <aws.events.event.ingestion-time>,
-                  "originalEvent": <aws.events.event.json>
-              }       
-        - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2DeliveryPush'
-          Arn: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueARN
-          InputPath: $.detail
-          DeadLetterConfig: 
-            Arn: !GetAtt EventBusDeadLetterQueue.Arn
-  
-  # Send ExternalChannel Response to pn-user-attributes
-  PnCoreEventBusToUserAttributesQueue:
-    Type: AWS::Events::Rule
-    Properties: 
-      Description: Route ExternalChannel Events to pn-user-attributes
-      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
-      EventBusName: !Ref PnCoreEventBus
-      EventPattern:
-        detail-type: [ "ExternalChannelOutcomeEvent" ]
-        detail:
-          clientId: [ !Ref UserAttributesExtChUser ]
-      Targets: 
-        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
-          Id: !Sub ${ProjectName}-Logger-UserAttributes2ExtCh  
-          InputTransformer:
-            InputPathsMap:
-              "timestamp": "$.time"
-            InputTemplate: |
-              {
-                  "timestamp": <timestamp>,
-                  "ruleArn": <aws.events.rule-arn>,
-                  "ruleName": <aws.events.rule-name>,
-                  "ingestionTime": <aws.events.event.ingestion-time>,
-                  "originalEvent": <aws.events.event.json>
-              }       
-        - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2UserAttributes'
-          Arn: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.QueueARN
-          InputPath: $.detail
-          DeadLetterConfig: 
-            Arn: !GetAtt EventBusDeadLetterQueue.Arn
-
-  EventBridgeLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !GetAtt MatchedEventsLoggerFunction.Arn
-      Action: lambda:InvokeFunction
-      Principal: events.amazonaws.com
-      SourceArn: !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/pn-CoreEventBus/*"
-
-  MatchedEventsLoggerFunctionExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: [lambda.amazonaws.com]
-            Action: ['sts:AssumeRole']
-      Path: /
-      Policies:
-        - PolicyName: MatchedEventsLoggerPolicy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                Resource:
-                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/PnCoreEventBusMatchedEventLogger'
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource:
-                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
-  
-  MatchedEventsLoggerFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: PnCoreEventBusMatchedEventLogger
-      Code:
-        ZipFile: |
-          import json
-          def handler(event, context):
-            json_data = json.dumps(event)
-            print(json_data)
-            res = {
-                "status": 'success'
-            }
-            return res
-
-
-      Handler: index.handler
-      Runtime: python3.9
-      Role: !GetAtt MatchedEventsLoggerFunctionExecutionRole.Arn
-
-  # Standard Queue for events Dead Letter Queue
-  EventBusDeadLetterQueue:
-    Type: AWS::SQS::Queue
-    Properties:
-      MessageRetentionPeriod: !Ref EventBusDeadLetterQueueMaximumRetentionPeriod
-      QueueName: !Sub '${ProjectName}-CoreEventBus-DLQ'
-
-  # Dead Letter Queue policy 
-  EventBusDeadLetterQueuePolicy:
-    Type: AWS::SQS::QueuePolicy
-    Properties:
-      Queues:
-        - !Ref "EventBusDeadLetterQueue"
-      PolicyDocument:
-        Statement:
-          - Sid: "SendEventsToDLQ"
-            Effect: "Allow"
-            Principal: 
-              Service: 
-                - "events.amazonaws.com"
-            Action: 
-              - "SQS:SendMessage"
-            Resource:
-              - !GetAtt "EventBusDeadLetterQueue.Arn"
-  
-  # Alarm for Dead letter queue has messages
-  DLQHasMessagesAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub '${ProjectName}-CoreEventBus-DLQ-HasMessage'
-      AlarmDescription: "CloudWatch alarm for when DLQ has 1 or more messages."
-      Namespace: "AWS/SQS"
-      MetricName: "ApproximateNumberOfMessagesVisible"
-      Dimensions:
-        - Name: "QueueName"
-          Value: !Sub '${EventBusDeadLetterQueue.QueueName}'
-      Statistic: "Sum"
-      TreatMissingData: "notBreaching"
-      Period: 60
-      Threshold: 1
-      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
-      EvaluationPeriods: 1       
-      AlarmActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      InsufficientDataActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-
-  ## KINESIS SOURCE STREAM FOR Change Data Capture
-  CdcKinesisSourceStream:
+  ### Communications FROM the Gateway Service of NATIONAL-REGISTRY ###
+  NationalRegistryGatewayOutputsQueue:
     Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
     Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-stream.yaml"
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
-        StreamName: !Sub '${ProjectName}-cdc-stream'
-        StreamRetentionPeriodHours: !Ref CdcStreamRetentionHours
-  
-  ## KINESIS SOURCE STREAM FOR Logs
-  LogsKinesisSourceStream:
+        QueueName: !Sub '${ProjectName}-national_registry_gateway_outputs'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  ### Communication FROM pn-national-registries TO pn-delivery-push ###
+  NationalRegistries2DeliveryPushQueue:
     Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
     Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-stream.yaml"
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
-        StreamName: !Sub '${ProjectName}-logs-stream'
-        StreamRetentionPeriodHours: !Ref LogsStreamRetentionHours
+        QueueName: !Sub '${ProjectName}-nationalregistries_to_deliverypush'
+        DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10        
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
   
+  ### Communication FROM pn-national-registries TO pn-paper-channel ###
+  NationalRegistries2PaperChannelQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-nationalregistries_to_paperchannel'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+  
+  ### Communication FROM pn-national-registries TO Self Care PG ###
+  ### Queue to be exposed to Selfcare PG (Azure) see issue PN-3837 ###
+  NationalRegistries2SelcPGQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-nationalregistries_to_selcpg'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+  
+  ### Communication FROM pn-mandate TO pn-delivery ###
+  Mandate2DeliveryQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-mandate_to_delivery'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  ### Communication FROM pn-address-manager TO pn-delivery-push ###
+  AddressManagerToDeliveryPushQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-addressmanager_to_deliverypush'
+        DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10        
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  ### Queue that receive safe-storage notification to DOWNTIME LOGS ###
+  AcmAlarmsQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-acm_alarms-DLQ'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName   
+        HasDLQ:  "false"
+        OncallDLQLimit: '1'
+        QueueHasAlarm:  "true"
+
 Outputs:
   # Web API for browsers and B2B
   ApiDnsName:
-    Value: !Ref ApiDnsName
+    Value: !If [ HasAlternateApiDnsName, !Ref AlternateApiDnsName, !Ref ApiDnsName ]
     Description: 'The DNS name used for B2B rest API.'
   WebApiDnsName:
-    Value: !Ref WebApiDnsName
+    Value: !If [ HasAlternateWebApiDnsName, !Ref AlternateWebApiDnsName, !Ref WebApiDnsName ]
     Description: 'The DNS name used for browser rest API.'
   IoApiDnsName:
-    Value: !Ref IoApiDnsName
+    Value: !If [ HasAlternateIoApiDnsName, !Ref AlternateIoApiDnsName, !Ref IoApiDnsName ]
     Description: 'The DNS name used for browser rest API.'
-
+  SelcpgApiDnsName:
+    Value: !If [ HasAlternateSelcpgApiDnsName, !Ref AlternateSelcpgApiDnsName, !Ref SelcpgApiDnsName ]
+    Description: 'The DNS name used for B2B Selfecare PG rest API.'
+  CNApiDnsName:
+    Value: !Ref CNApiDnsName
+    
   # SafeStorage to DeliveryPush
   SafeStorageToDeliveryPushQueueName:
     Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueName
@@ -681,6 +589,26 @@ Outputs:
   SafeStorageToDeliveryPushQueueAlarmARN:
     Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.SqsDLQAlarmArn
     Description: SafeStorage-to-delivery-push queue alarm ARN
+  SafeStorageToDeliveryPushQueueAgeAlarmARN:
+    Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.SqsAgeAlarmArn
+    Description: SafeStorage-to-delivery-push queue age alarm ARN
+
+  # SafeStorage to Radd
+  SafeStorageToRaddQueueName:
+    Value: !GetAtt SafeStorageToRaddQueue.Outputs.QueueName
+    Description: SafeStorage-to-radd queue name
+  SafeStorageToRaddQueueURL:
+    Value: !GetAtt SafeStorageToRaddQueue.Outputs.QueueURL
+    Description: SafeStorage-to-radd queue URL
+  SafeStorageToRaddQueueARN:
+    Value: !GetAtt SafeStorageToRaddQueue.Outputs.QueueARN
+    Description: SafeStorage-to-radd queue ARN
+  SafeStorageToRaddQueueAlarmARN:
+    Value: !GetAtt SafeStorageToRaddQueue.Outputs.SqsDLQAlarmArn
+    Description: SafeStorage-to-radd queue alarm ARN
+  SafeStorageToRaddQueueAgeAlarmARN:
+    Value: !GetAtt SafeStorageToRaddQueue.Outputs.SqsAgeAlarmArn
+    Description: SafeStorage-to-radd queue age alarm ARN
 
   # Delivery push inputs
   DeliveryPushInputsQueueName:
@@ -695,20 +623,10 @@ Outputs:
   DeliveryPushInputsQueueAlarmARN:
     Value: !GetAtt DeliveryPushInputsQueue.Outputs.SqsDLQAlarmArn
     Description: pn-delivery-push input queue alarm ARN
+  DeliveryPushInputsQueueAgeAlarmARN:
+    Value: !GetAtt DeliveryPushInputsQueue.Outputs.SqsAgeAlarmArn
+    Description: pn-delivery-push input queue age alarm ARN
 
-  # External channels inputs
-  ExternalChannelsInputsQueueName:
-    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueName
-    Description: pn-external-channels input queue name
-  ExternalChannelsInputsQueueURL:
-    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueURL
-    Description: pn-external-channels input queue URL
-  ExternalChannelsInputsQueueARN:
-    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.QueueARN
-    Description: pn-external-channels input queue ARN
-  ExternalChannelsInputsQueueAlarmARN:
-    Value: !GetAtt ExternalChannelsInputsQueue.Outputs.SqsDLQAlarmArn
-    Description: pn-external-channels input queue alarm ARN
 
   # External channels outputs
   ExternalChannelsOutputsQueueName:
@@ -723,6 +641,9 @@ Outputs:
   ExternalChannelsOutputsQueueAlarmARN:
     Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.SqsDLQAlarmArn
     Description: pn-external-channels output queue alarm ARN
+  ExternalChannelsOutputsQueueAgeAlarmARN:
+    Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.SqsAgeAlarmArn
+    Description: pn-external-channels output queue age alarm ARN
 
   # External channels to user attribute outputs
   ExternalChannels2UserAttributesQueueName:
@@ -737,6 +658,43 @@ Outputs:
   ExternalChannels2UserAttributesQueueAlarmARN:
     Value: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.SqsDLQAlarmArn
     Description: pn-external-channels output to user-attributes queue alarm ARN
+  ExternalChannels2UserAttributesQueueAgeAlarmARN:
+    Value: !GetAtt ExternalChannels2UserAttributesQueue.Outputs.SqsAgeAlarmArn
+    Description: pn-external-channels output to user-attributes queue age alarm ARN
+
+  # External channels to pn-paper-channel
+  ExternalChannels2PaperChannelQueueName:
+    Value: !GetAtt ExternalChannels2PaperChannelQueue.Outputs.QueueName
+    Description: pn-external-channels output to pn-paper-channel queue name
+  ExternalChannels2PaperChannelQueueURL:
+    Value: !GetAtt ExternalChannels2PaperChannelQueue.Outputs.QueueURL
+    Description: pn-external-channels output to pn-paper-channel queue URL
+  ExternalChannels2PaperChannelQueueARN:
+    Value: !GetAtt ExternalChannels2PaperChannelQueue.Outputs.QueueARN
+    Description: pn-external-channels output to pn-paper-channel queue ARN
+  ExternalChannels2PaperChannelQueueAlarmARN:
+    Value: !GetAtt ExternalChannels2PaperChannelQueue.Outputs.SqsDLQAlarmArn
+    Description: pn-external-channels output to pn-paper-channel queue alarm ARN
+  ExternalChannels2PaperChannelQueueAgeAlarmARN:
+    Value: !GetAtt ExternalChannels2PaperChannelQueue.Outputs.SqsAgeAlarmArn
+    Description: pn-external-channels output to pn-paper-channel queue age alarm ARN
+
+  # Kafka bridge onboarding
+  KafkaBridgeOnboardingQueueName:
+    Value: !GetAtt KafkaBridgeOnboardingQueue.Outputs.QueueName
+    Description: pn-kafka-bridge onboarding institutes output queue name
+  KafkaBridgeOnboardingQueueURL:
+    Value: !GetAtt KafkaBridgeOnboardingQueue.Outputs.QueueURL
+    Description: pn-kafka-bridge onboarding institutes output queue URL
+  KafkaBridgeOnboardingQueueARN:
+    Value: !GetAtt KafkaBridgeOnboardingQueue.Outputs.QueueARN
+    Description: pn-kafka-bridge onboarding institutes output queue ARN
+  KafkaBridgeOnboardingQueueAlarmARN:
+    Value: !GetAtt KafkaBridgeOnboardingQueue.Outputs.SqsDLQAlarmArn
+    Description: pn-kafka-bridge onboarding institutes output queue alarm ARN
+  KafkaBridgeOnboardingQueueAgeAlarmARN:
+    Value: !GetAtt KafkaBridgeOnboardingQueue.Outputs.SqsAgeAlarmArn
+    Description: pn-kafka-bridge onboarding institutes output queue age alarm ARN
 
   # Downtime Logs composite alarm queue
   DowntimeLogsAggregateAlarmQueueName:
@@ -751,6 +709,9 @@ Outputs:
   DowntimeLogsAggregateAlarmQueueAlarmARN:
     Value: !GetAtt CompositeAlarmQueue.Outputs.SqsDLQAlarmArn
     Description: Aggregate alarm queue alarm ARN
+  DowntimeLogsAggregateAlarmQueueAgeAlarmARN:
+    Value: !GetAtt CompositeAlarmQueue.Outputs.SqsAgeAlarmArn
+    Description: Aggregate alarm queue age alarm ARN
   
   # Downtime Logs safe-storage events
   DowntimeLogsSafeStorageEventsQueueName:
@@ -765,59 +726,147 @@ Outputs:
   DowntimeLogsSafeStorageEventsQueueAlarmARN:
     Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.SqsDLQAlarmArn
     Description: Events form safe-storage to pn-downtime-logs queue alarm ARN
+  DowntimeLogsSafeStorageEventsQueueAgeAlarmARN:
+    Value: !GetAtt SafeStorageToDowntimeLogsQueue.Outputs.SqsAgeAlarmArn
+    Description: Events form safe-storage to pn-downtime-logs queue age alarm ARN
+
+  # Gateway service of NationalRegistry events
+  NationalRegistryGatewayOutputsQueueName:
+    Value: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.QueueName
+    Description: Events from the gateway service of NationalRegistry queue name
+  NationalRegistryGatewayOutputsQueueURL:
+    Value: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.QueueURL
+    Description: Events from the gateway service of NationalRegistry queue URL
+  NationalRegistryGatewayOutputsQueueARN:
+    Value: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.QueueARN
+    Description: Events from the gateway service of NationalRegistry queue ARN
+  NationalRegistryGatewayOutputsQueueAlarmARN:
+    Value: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.SqsDLQAlarmArn
+    Description: Events from the gateway service of NationalRegistry alarm ARN
+  NationalRegistryGatewayOutputsQueueAgeAlarmARN:
+    Value: !GetAtt NationalRegistryGatewayOutputsQueue.Outputs.SqsAgeAlarmArn
+    Description: Events from the gateway service of NationalRegistry age alarm ARN
+
+  # pn-national-registries TO pn-delivery-push events
+  NationalRegistries2DeliveryPushQueueName:
+    Value: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.QueueName
+    Description: Events from pn-national-registries TO pn-delivery-push queue name
+  NationalRegistries2DeliveryPushQueueURL:
+    Value: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.QueueURL
+    Description: Events from pn-national-registries TO pn-delivery-push queue URL
+  NationalRegistries2DeliveryPushQueueARN:
+    Value: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.QueueARN
+    Description: Events from pn-national-registries TO pn-delivery-push queue ARN
+  NationalRegistries2DeliveryPushQueueAlarmARN:
+    Value: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.SqsDLQAlarmArn
+    Description: Events from pn-national-registries TO pn-delivery-push alarm ARN
+  NationalRegistries2DeliveryPushQueueAgeAlarmARN:
+    Value: !GetAtt NationalRegistries2DeliveryPushQueue.Outputs.SqsAgeAlarmArn
+    Description: Events from pn-national-registries TO pn-delivery-push age alarm ARN
+  
+  # pn-national-registries TO pn-paper-channel events
+  NationalRegistries2PaperChannelQueueName:
+    Value: !GetAtt NationalRegistries2PaperChannelQueue.Outputs.QueueName
+    Description: Events from pn-national-registries TO pn-paper-channel queue name
+  NationalRegistries2PaperChannelQueueURL:
+    Value: !GetAtt NationalRegistries2PaperChannelQueue.Outputs.QueueURL
+    Description: Events from pn-national-registries TO pn-paper-channel queue URL
+  NationalRegistries2PaperChannelQueueARN:
+    Value: !GetAtt NationalRegistries2PaperChannelQueue.Outputs.QueueARN
+    Description: Events from pn-national-registries TO pn-paper-channel queue ARN
+  NationalRegistries2PaperChannelQueueAlarmARN:
+    Value: !GetAtt NationalRegistries2PaperChannelQueue.Outputs.SqsDLQAlarmArn
+    Description: Events from pn-national-registries TO pn-paper-channel alarm ARN
+  NationalRegistries2PaperChannelQueueAgeAlarmARN:
+    Value: !GetAtt NationalRegistries2PaperChannelQueue.Outputs.SqsAgeAlarmArn
+    Description: Events from pn-national-registries TO pn-paper-channel age alarm ARN
+  
+  # pn-national-registries TO Self Care PG events
+  NationalRegistries2SelcPGQueueName:
+    Value: !GetAtt NationalRegistries2SelcPGQueue.Outputs.QueueName
+    Description: Events from pn-national-registries TO Self Care PG queue name
+  NationalRegistries2SelcPGQueueURL:
+    Value: !GetAtt NationalRegistries2SelcPGQueue.Outputs.QueueURL
+    Description: Events from pn-national-registries TO Self Care PG queue URL
+  NationalRegistries2SelcPGQueueARN:
+    Value: !GetAtt NationalRegistries2SelcPGQueue.Outputs.QueueARN
+    Description: Events from pn-national-registries TO Self Care PG queue ARN
+  NationalRegistries2SelcPGQueueAlarmARN:
+    Value: !GetAtt NationalRegistries2SelcPGQueue.Outputs.SqsDLQAlarmArn
+    Description: Events from pn-national-registries TO Self Care PG alarm ARN
+  NationalRegistries2SelcPGQueueAgeAlarmARN:
+    Value: !GetAtt NationalRegistries2SelcPGQueue.Outputs.SqsAgeAlarmArn
+    Description: Events from pn-national-registries TO Self Care PG age alarm ARN
+
+  # Mandate to Delivery events
+  Mandate2DeliveryQueueName:
+    Value: !GetAtt Mandate2DeliveryQueue.Outputs.QueueName
+    Description: Events from Mandate to Delivery queue name
+  Mandate2DeliveryQueueURL:
+    Value: !GetAtt Mandate2DeliveryQueue.Outputs.QueueURL
+    Description: Events from Mandate to Delivery queue URL
+  Mandate2DeliveryQueueARN:
+    Value: !GetAtt Mandate2DeliveryQueue.Outputs.QueueARN
+    Description: Events from Mandate to Delivery queue ARN
+  Mandate2DeliveryQueueAlarmARN:
+    Value: !GetAtt Mandate2DeliveryQueue.Outputs.SqsDLQAlarmArn
+    Description: Events from Mandate to Delivery alarm ARN
+  Mandate2DeliveryQueueAgeAlarmARN:
+    Value: !GetAtt Mandate2DeliveryQueue.Outputs.SqsAgeAlarmArn
+    Description: Events from Mandate to Delivery age alarm ARN
+
+  # Address Manager to Delivery Push events
+  AddressManagerToDeliveryPushQueueName:
+    Value: !GetAtt AddressManagerToDeliveryPushQueue.Outputs.QueueName
+    Description: Events from Address Manager to Delivery Push queue name
+  AddressManagerToDeliveryPushQueueURL:
+    Value: !GetAtt AddressManagerToDeliveryPushQueue.Outputs.QueueURL
+    Description: Events from Address Manager to Delivery Push queue URL
+  AddressManagerToDeliveryPushQueueARN:
+    Value: !GetAtt AddressManagerToDeliveryPushQueue.Outputs.QueueARN
+    Description: Events from Address Manager to Delivery Push queue ARN
+  AddressManagerToDeliveryPushQueueAlarmARN:
+    Value: !GetAtt AddressManagerToDeliveryPushQueue.Outputs.SqsDLQAlarmArn
+    Description: Events from Address Manager to Delivery Push alarm ARN
+  AddressManagerToDeliveryPushQueueAgeAlarmARN:
+    Value: !GetAtt AddressManagerToDeliveryPushQueue.Outputs.SqsAgeAlarmArn
+    Description: Events from Address Manager to Delivery Push age alarm ARN
+
+  # ACM Alarms queue
+  AcmAlarmsQueueName:
+    Value: !GetAtt AcmAlarmsQueue.Outputs.QueueName
+    Description: ACM alarms queue name
+  AcmAlarmsQueueURL:
+    Value: !GetAtt AcmAlarmsQueue.Outputs.QueueURL
+    Description: ACM alarms queue URL
+  AcmAlarmsQueueARN:
+    Value: !GetAtt AcmAlarmsQueue.Outputs.QueueARN
+    Description: ACM alarms queue ARN
+  AcmAlarmsQueueAlarmARN:
+    Value: !GetAtt AcmAlarmsQueue.Outputs.SqsDLQAlarmArn
+    Description: ACM alarms alarm ARN
 
   # Kinesis Source Stream containing the DynamoDB Change Data Capture events
   CdcKinesisSourceStreamName:
     Description: 'Kinesis source CDC stream name'
-    Value: !GetAtt CdcKinesisSourceStream.Outputs.KinesisStreamName
+    Value: !Ref CdcKinesisStreamName
   CdcKinesisSourceStreamArn:
     Description: 'Kinesis source CDC stream ARN'
-    Value: !GetAtt CdcKinesisSourceStream.Outputs.KinesisStreamArn
+    Value: !Ref CdcKinesisStreamArn
   CdcKinesisSourceStreamKeyArn:
     Description: 'Kinesis source CDC stream crypto key ARN'
-    Value: !GetAtt CdcKinesisSourceStream.Outputs.KinesisStreamKeyArn
+    Value: !Ref CdcKinesisStreamKeyArn
 
   # Kinesis Source Stream containing the CloudWatch Logs
   LogsKinesisSourceStreamName:
     Description: 'Kinesis source Logs stream name'
-    Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamName
+    Value: !Ref LogsKinesisStreamName
   LogsKinesisSourceStreamArn:
     Description: 'Kinesis source Logs stream ARN'
-    Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamArn
+    Value: !Ref LogsKinesisStreamArn
   LogsKinesisSourceStreamKeyArn:
     Description: 'Kinesis source Logs stream crypto key ARN'
-    Value: !GetAtt LogsKinesisSourceStream.Outputs.KinesisStreamKeyArn
-
-  # Event Bus Alarm
-  EventBusDLQHasMessagesAlarmArn:
-    Description: 'Event Bus Core DLQ alarm ARN'
-    Value: !GetAtt DLQHasMessagesAlarm.Arn
-
-  # Event Bus Rule Arns
-  PnCoreEventBusToSafeStorageResponseQueueArn:
-    Description: 'Event bus to safe storage rule ARN'
-    Value: !GetAtt PnCoreEventBusToSafeStorageResponseQueue.Arn
-
-  PnCoreEventBusToDowntimeLogsSafeStorageResponseQueueArn:
-    Description: 'Event bus to downtime logs rule ARN'
-    Value: !GetAtt PnCoreEventBusToDowntimeLogsSafeStorageResponseQueue.Arn
-
-  PnCoreEventBusToExtChResponseQueueArn:
-    Description: 'Event bus to external channel rule ARN'
-    Value: !GetAtt PnCoreEventBusToExtChResponseQueue.Arn
-
-  PnCoreEventBusToUserAttributesQueueArn:
-    Description: 'Event bus to user attributes rule ARN'
-    Value: !GetAtt PnCoreEventBusToUserAttributesQueue.Arn
-
-  #
-  CoreEventBusEventsLogGroupArn:
-    Value: !GetAtt CoreEventBusEventsLogGroup.Arn
-    Description: Core event bus matched events log group
-
-  CoreEventBusMatchedEventsLogGroupArn:
-    Value: !GetAtt CoreEventBusMatchedEventsLoggerFnLogGroup.Arn
-    Description: Core event bus matched events log group
+    Value: !Ref LogsKinesisStreamKeyArn
 
   # pass-thought parameters
   NetworkLoadBalancerLink:
@@ -848,3 +897,98 @@ Outputs:
     Value: !Ref LogsExporterRoleArn
   LogsExporterPolicyArn:
     Value: !Ref LogsExporterPolicyArn
+  AlbSecurityGroup:
+    Value: !Ref AlbSecurityGroup
+  CognitoUserPoolArn:
+    Value: !Ref CognitoUserPoolArn
+  CognitoClientId:
+    Value: !Ref CognitoClientId
+  ConfidentialInfoAccountId:
+    Value: !Ref ConfidentialInfoAccountId
+  HelpdeskAccountId:
+    Value: !Ref HelpdeskAccountId
+  OpenSearchArn:
+    Value: !Ref OpenSearchArn
+  OpenSearchEndpoint:
+    Value: !Ref OpenSearchEndpoint
+  LambdasBucketName:
+    Value: !Ref LambdasBucketName
+  LambdasBasePath:
+    Value: !Ref LambdasBasePath
+  EnvironmentType:
+    Value: !Ref EnvironmentType
+  Version:
+    Value: !Ref Version
+  SafeStorageAccountId:
+    Value: !Ref SafeStorageAccountId
+  SandboxSafeStorageBaseUrl:
+    Value: !Ref SandboxSafeStorageBaseUrl
+  ApiKeyTablesEncryptKeyId:
+    Value: !Ref ApiKeyTablesEncryptKeyId
+  VpcEgressSubnetsIds:
+    Value: !Ref VpcEgressSubnetsIds
+  ElasticacheEndpoint:
+    Value: !Ref ElasticacheEndpoint
+  ElasticacheSecurityGroup:
+    Value: !Ref ElasticacheSecurityGroup
+
+  CdnZoneId:
+    Value: !Ref CdnZoneId
+  PortalePaCertificateArn:
+    Value: !Ref PortalePaCertificateArn
+  PortalePfCertificateArn:
+    Value: !Ref PortalePfCertificateArn
+  PortalePfLoginCertificateArn:
+    Value: !Ref PortalePfLoginCertificateArn   
+  LandingCertificateArn:
+    Value: !Ref LandingCertificateArn 
+  PortalePgCertificateArn:
+    Value: !Ref PortalePgCertificateArn
+  PortaleStatusCertificateArn:
+    Value: !Ref PortaleStatusCertificateArn 
+  PortaleHelpdeskCertificateArn:
+    Value: !Ref PortaleHelpdeskCertificateArn
+  PortalePaDomain:
+    Value: !Ref PortalePaDomain
+  PortalePfDomain:
+    Value: !Ref PortalePfDomain
+  PortalePfLoginDomain:
+    Value: !Ref PortalePfLoginDomain    
+  LandingDomain:
+    Value: !Ref LandingDomain
+  PortalePgDomain:
+    Value: !Ref PortalePgDomain
+  PortaleStatusDomain:
+    Value: !Ref PortaleStatusDomain    
+  PortaleHelpdeskDomain:
+    Value: !Ref PortaleHelpdeskDomain
+  ReactAppUrlApi:
+    Value: !Ref ReactAppUrlApi
+  BoApiDnsName: 
+    Value: !Ref BoApiDnsName
+  HubLoginDomain:
+    Value: !Ref HubLoginDomain
+  TokenExchangeLambdaEnvironmentIssuer:
+    Value: !Ref TokenExchangeLambdaEnvironmentIssuer
+  TokenExchangeLambdaEnvironmentAllowedIssuer:
+    Value: !Ref TokenExchangeLambdaEnvironmentAllowedIssuer
+  TokenExchangeLambdaEnvironmentAllowedOrigin:
+    Value: !Ref TokenExchangeLambdaEnvironmentAllowedOrigin
+  TokenExchangeLambdaEnvironmentJwksMapping:
+    Value: !Ref TokenExchangeLambdaEnvironmentJwksMapping
+  TokenExchangeLambdaEnvironmentAcceptedAudience:
+    Value: !Ref TokenExchangeLambdaEnvironmentAcceptedAudience
+  TokenExchangeLambdaEnvironmentAudience:
+    Value: !Ref TokenExchangeLambdaEnvironmentAudience
+  ApikeyAuthorizerV2PDNDAudience:
+    Value: !Ref ApikeyAuthorizerV2PDNDAudience
+  SafestorageLoggerLogGroupName:
+    Value: !Ref SafestorageLoggerLogGroupName
+  ExternalChannelBaseUrl:
+    Value: !Ref ExternalChannelBaseUrl
+  BackupCronExpression:
+    Value: !Ref BackupCronExpression
+  LogRetention:
+    Value: !Ref LogRetention
+  ApplicationLoadBalancerMetricsDimensionName:
+    Value: !Ref ApplicationLoadBalancerMetricsDimensionName

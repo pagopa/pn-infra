@@ -15,11 +15,49 @@ Parameters:
     Type: String
     Description: 'keep track of used projects commitIds'
 
+  ConfidentialInfoAccountId:
+    Type: String
+    Description: Confidential info account ID
+
 Conditions:
   MilanRegion: 
     !Equals [!Ref 'AWS::Region', 'eu-south-1']
 
+  HasConfidentialInfoAccount: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
+
 Resources:
+
+  ###              API GATEWAY ACCOUNT-GLOBAL CONFIGURATIONS              ###
+  ###########################################################################
+  ### The ApiGwAccountConfig and ApiGatewayLoggingRole resources are not  ###
+  ###        related to alarms; make sure to not delete them              ###
+  ###########################################################################
+  # - Enable API-Gateway access log capability
+  ApiGwAccountConfig:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt "ApiGatewayLoggingRole.Arn"
+
+  ###########################################################################
+  ### The ApiGwAccountConfig and ApiGatewayLoggingRole resources are not  ###
+  ###        related to alarms; make sure to not delete them              ###
+  ###########################################################################
+  # - Grant CloudWatch write access permission to AWS API-Gateway
+  ApiGatewayLoggingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "apigateway.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+
 
   ###                          DEFINE ALARM TOPIC                          ###
   ############################################################################
@@ -28,6 +66,39 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       DisplayName: 'dev account alarms topic: send to SQS and slack'
+      TopicName: pn-AllAlarmSnsTopic
+
+  
+  CanPublishAlarmTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowServices
+            Effect: Allow
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+                - "cloudwatch.amazonaws.com"
+            Action:
+              - 'sns:Publish'
+            Resource:
+              - !Ref AlarmSNSTopic
+          - Fn::If: 
+            - HasConfidentialInfoAccount
+            - Sid: AllowPublishFromConfinfo
+              Effect: Allow
+              Action:
+              - 'sns:Publish'
+              Principal:
+                AWS: 
+                  - !Sub arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root
+              Resource:
+                - !Ref AlarmSNSTopic
+            - !Ref AWS::NoValue
+      Topics:
+        - !Ref AlarmSNSTopic
   
   # - Alarm message queue
   AlarmHistoryBufferQueue:
@@ -76,8 +147,33 @@ Resources:
       Parameters: 
         AlarmSNSTopicName: !GetAtt  AlarmSNSTopic.TopicName
         SlackInfo: !Ref SlackInfo
+        ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
         TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
+        AlarmPrefix: 'oncall-'
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/dev-slack/slack-message-enrichment.yaml"
+      TimeoutInMinutes: 15
+
+  # - Deploy Lambda to send notifications to oncall system
+  EnrichNotificationsForOncall:
+    Condition: MilanRegion
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      Parameters: 
+        AlarmSNSTopicName: !GetAtt  AlarmSNSTopic.TopicName
+        ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/oncall/oncall-notifications.yaml"
+      TimeoutInMinutes: 15
+
+  # - All Alarms Logger
+  LogAllAlarms:
+    Condition: MilanRegion
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      Parameters: 
+        AlarmSNSTopicName: !GetAtt  AlarmSNSTopic.TopicName
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/alarm-logger/cloudwatch-logger.yaml"
       TimeoutInMinutes: 15
 
   # - Connect dev alarm to email
@@ -89,44 +185,6 @@ Resources:
   #      Endpoint: !Ref AlarmEmailAddress
   #      Protocol: email
 
-
-  # - Event Bridge events that generate an alarm
-  # "ACM Certificate Approaching Expiration": alarm
-  CertificateExpiringIsAlarmEventRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Description: "EventRule"
-      EventPattern:
-        source: [ "aws.acm" ]
-        detail-type: [ "ACM Certificate Approaching Expiration" ]
-      Targets:
-        - Arn: !Ref AlarmSNSTopic
-          Id: "AlarmSnsTopic"
-
-  ###              API GATEWAY ACCOUNT-GLOBAL CONFIGURATIONS              ###
-  ###########################################################################
-  # - Enable API-Gateway access log capability
-  ApiGwAccountConfig:
-    Type: AWS::ApiGateway::Account
-    Properties:
-      CloudWatchRoleArn: !GetAtt "ApiGatewayLoggingRole.Arn"
-
-  # - Grant CloudWatch write access permission to AWS API-Gateway
-  ApiGatewayLoggingRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - "apigateway.amazonaws.com"
-            Action: "sts:AssumeRole"
-      Path: "/"
-      ManagedPolicyArns:
-        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
-
 Outputs:
 
   AlarmSNSTopicArn:
@@ -136,4 +194,8 @@ Outputs:
   AlarmSNSTopicName:
     Value: !GetAtt  AlarmSNSTopic.TopicName
     Description: Name of the Alarm SNS Topic
+  
+  Version:
+    Value: !Ref Version
+    Description: Give the version string as output to avoid warnings
 

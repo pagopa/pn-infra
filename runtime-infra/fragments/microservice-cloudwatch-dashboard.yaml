@@ -51,7 +51,18 @@ Parameters:
     Type: CommaDelimitedList
     Default: ''
 
+  BucketNames:
+    Description: Comma-delimited list of Bucket Names
+    Type: CommaDelimitedList
+    Default: ''
+
+  LogGroupsNames:
+    Description: Comma-delimited list of LogGroup Names
+    Type: CommaDelimitedList
+    Default: ''
+
 Resources:
+
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard
     Properties:
@@ -70,3 +81,5 @@ Resources:
             KinesisDataArns: !Ref KinesisDataArns
             KinesisFirehoseArns: !Ref KinesisFirehoseArns
             EventRuleArns: !Ref EventRuleArns
+            BucketNames: !Ref BucketNames
+            LogGroupsNames: !Ref LogGroupsNames

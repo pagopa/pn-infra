@@ -54,12 +54,13 @@ Parameters:
   ContainerImageOtelURI:
     Type: String
     Description: Container image URI for Open telemetry
-    Default: amazon/aws-otel-collector:latest
+    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-collector:v0.23.0
 
   ContainerImageInjectorURI:
     Type: String
     Description: Container image URI for Open telemetry
-    Default: alpine
+    #Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/alpine:3.14
+    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.19.2_1
 
 # The AWS collector comes with two configs baked in for ECS:
 #
@@ -79,7 +80,7 @@ Parameters:
   CommandSidecarInjector:
     Type: List<String>
     Description: Command for download and copy xray agent for auto-instrumentation in /xray
-    Default: -O, /xray/aws-opentelemetry-agent.jar, https://github.com/aws-observability/aws-otel-java-instrumentation/releases/latest/download/aws-opentelemetry-agent.jar
+    Default: -O, /xray/aws-opentelemetry-agent.jar, https://github.com/aws-observability/aws-otel-java-instrumentation/releases/download/v1.19.2/aws-opentelemetry-agent.jar
 
   # Heath Check parameters
   HealthCheckInterval:
@@ -119,6 +120,7 @@ Parameters:
       - Disabled
       - REST-API
       - SQS
+      - CUSTOM
     ConstraintDescription: must specify the type of Autoscaling strategy
   
   AutoscalingCheckPeriod:
@@ -176,6 +178,16 @@ Parameters:
     Description: |
         Managed policy containing specific policy that allow access to resources needed by the specific 
         microservice. For example queues and dynamo tables.
+
+  AlbSecurityGroup:
+    Type: String
+    Default: ''
+    Description: Application load balancer seecurity group
+
+  EcsLogGroup:
+    Type: String
+    Default: '-'
+    Description: ECS Log group
 
   # Technical parameters
   VpcId:
@@ -355,6 +367,143 @@ Parameters:
     Description: 40th container environment entry in the form key=value
     Type: String
     Default: ''
+  ContainerEnvEntry41:
+    Description: 41th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry42:
+    Description: 42th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry43:
+    Description: 43th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry44:
+    Description: 44th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry45:
+    Description: 45th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry46:
+    Description: 46th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry47:
+    Description: 47th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry48:
+    Description: 48th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry49:
+    Description: 49th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry50:
+    Description: 50th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry51:
+    Description: 51th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry52:
+    Description: 52th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry53:
+    Description: 53th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry54:
+    Description: 54th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry55:
+    Description: 55th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry56:
+    Description: 56th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry57:
+    Description: 57th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry58:
+    Description: 58th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry59:
+    Description: 59th container environment entry in the form key=value
+    Type: String
+    Default: ''
+
+  # Secrets
+  ContainerSecret1:
+    Description: 1st container secret in the form key=secret arn
+    Type: String
+    Default: ''
+  ContainerSecret2:
+    Description: 2nd container secret in the form key=secret arn
+    Type: String
+    Default: ''
+  ContainerSecret3:
+    Description: 3rd container secret in the form key=secret arn
+    Type: String
+    Default: ''
+  ContainerSecret4:
+    Description: 4th container secret in the form key=secret arn
+    Type: String
+    Default: ''  
+  ContainerSecret5:
+    Description: 5th container secret in the form key=secret arn
+    Type: String
+    Default: ''   
+  ContainerSecret6:
+    Description: 6th container secret in the form key=secret arn
+    Type: String
+    Default: ''       
+  ContainerSecret7:
+    Description: 7th container secret in the form key=secret arn
+    Type: String
+    Default: ''
+  ContainerSecret8:
+    Description: 8th container secret in the form key=secret arn
+    Type: String
+    Default: ''
+  ContainerSecret9:
+    Description: 9th container secret in the form key=secret arn
+    Type: String
+    Default: ''
+  ContainerSecret10:
+    Description: 10th container secret in the form key=secret arn
+    Type: String
+    Default: ''
+
+  MicroServiceSecretPrefix:
+    Description: Microservice secret name prefix
+    Type: String
+    Default: ''
+    
+  LoadBalancingAlgorithm:
+    Type: String
+    Default: least_outstanding_requests
+
+  # Alarm
+  LogAlarmStrategyV1: # updated parameter name to allow a new default value, will be restored with task PN-4855 
+    Description: Log alarm strategy, one of "-", "FATAL" or "ERROR_FATAL"
+    Default: 'ERROR_FATAL'
+    AllowedValues:
+      - "-"
+      - "FATAL"
+      - "ERROR_FATAL"
+    Type: String
 
 Mappings:
   ContainerMemory:
@@ -378,20 +527,29 @@ Mappings:
 Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
   HasDefaultSecurityGroup: !Not [ !Equals [ !Ref EcsDefaultSecurityGroup, '' ] ]
+  HasAlbSecurityGroup: !Not [ !Equals [ !Ref AlbSecurityGroup, '' ] ]
+
+  LogAlarmErrorFatal: !Equals [ !Ref LogAlarmStrategyV1, 'ERROR_FATAL' ]
+  LogAlarmNotNone: !Not [ !Equals [ !Ref LogAlarmStrategyV1, '-' ] ]
+  HasLogAlarm: !And [ !Condition HasAlarmTopic, !Condition LogAlarmNotNone ]
 
   AutoscalingByRestApi: !Equals [ !Ref AutoscalingStrategy, REST-API]
   AutoscalingBySQS: !Equals [ !Ref AutoscalingStrategy, SQS]
+  AutoscalingCustom: !Equals [ !Ref AutoscalingStrategy, CUSTOM]
   AutoscalingEnabled:
     Fn::Or:
      - Condition: AutoscalingByRestApi
      - Condition: AutoscalingBySQS
+     - Condition: AutoscalingCustom
 
   ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, 'True' ] ]
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
-  SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
-
+  HasKinesisStreamArn: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
+  RequiresLogGroupCreation: !Equals [ !Ref EcsLogGroup, '-' ]
+  SendLogToKinesis: !And [ !Condition HasKinesisStreamArn, !Condition RequiresLogGroupCreation ]
+  
   HasTaskRoleManagedPolicyArn: !Not [ !Equals [ !Ref TaskRoleManagedPolicyArn, '' ] ] 
 
   Env1Exist: !Not [ !Equals [!Ref ContainerEnvEntry1, '']]
@@ -434,9 +592,132 @@ Conditions:
   Env38Exist: !Not [ !Equals [ !Ref ContainerEnvEntry38, '' ] ]
   Env39Exist: !Not [ !Equals [ !Ref ContainerEnvEntry39, '' ] ]
   Env40Exist: !Not [ !Equals [ !Ref ContainerEnvEntry40, '' ] ]
+  Env41Exist: !Not [ !Equals [ !Ref ContainerEnvEntry41, '' ] ]
+  Env42Exist: !Not [ !Equals [ !Ref ContainerEnvEntry42, '' ] ]
+  Env43Exist: !Not [ !Equals [ !Ref ContainerEnvEntry43, '' ] ]
+  Env44Exist: !Not [ !Equals [ !Ref ContainerEnvEntry44, '' ] ]
+  Env45Exist: !Not [ !Equals [ !Ref ContainerEnvEntry45, '' ] ]
+  Env46Exist: !Not [ !Equals [ !Ref ContainerEnvEntry46, '' ] ]
+  Env47Exist: !Not [ !Equals [ !Ref ContainerEnvEntry47, '' ] ]
+  Env48Exist: !Not [ !Equals [ !Ref ContainerEnvEntry48, '' ] ]
+  Env49Exist: !Not [ !Equals [ !Ref ContainerEnvEntry49, '' ] ]
+  Env50Exist: !Not [ !Equals [ !Ref ContainerEnvEntry50, '' ] ]
+  Env51Exist: !Not [ !Equals [ !Ref ContainerEnvEntry51, '' ] ]
+  Env52Exist: !Not [ !Equals [ !Ref ContainerEnvEntry52, '' ] ]
+  Env53Exist: !Not [ !Equals [ !Ref ContainerEnvEntry53, '' ] ]
+  Env54Exist: !Not [ !Equals [ !Ref ContainerEnvEntry54, '' ] ]
+  Env55Exist: !Not [ !Equals [ !Ref ContainerEnvEntry55, '' ] ]
+  Env56Exist: !Not [ !Equals [ !Ref ContainerEnvEntry56, '' ] ]
+  Env57Exist: !Not [ !Equals [ !Ref ContainerEnvEntry57, '' ] ]
+  Env58Exist: !Not [ !Equals [ !Ref ContainerEnvEntry58, '' ] ]
+  Env59Exist: !Not [ !Equals [ !Ref ContainerEnvEntry59, '' ] ]
 
+  Secret1Exist: !Not [ !Equals [ !Ref ContainerSecret1, '' ] ]
+  Secret2Exist: !Not [ !Equals [ !Ref ContainerSecret2, '' ] ]
+  Secret3Exist: !Not [ !Equals [ !Ref ContainerSecret3, '' ] ]
+  Secret4Exist: !Not [ !Equals [ !Ref ContainerSecret4, '' ] ]
+  Secret5Exist: !Not [ !Equals [ !Ref ContainerSecret5, '' ] ]
+  Secret6Exist: !Not [ !Equals [ !Ref ContainerSecret6, '' ] ]
+  Secret7Exist: !Not [ !Equals [ !Ref ContainerSecret7, '' ] ]
+  Secret8Exist: !Not [ !Equals [ !Ref ContainerSecret8, '' ] ]
+  Secret9Exist: !Not [ !Equals [ !Ref ContainerSecret9, '' ] ]
+  Secret10Exist: !Not [ !Equals [ !Ref ContainerSecret10, '' ] ]
+
+  HasSecrets: !Or [ !Condition Secret1Exist, !Condition Secret2Exist, !Condition Secret3Exist, !Condition Secret4Exist, !Condition Secret5Exist, !Condition Secret6Exist ]
 
 Resources:
+  
+  ## Fallback log group
+  # Microservice Log group
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: RequiresLogGroupCreation
+    Properties:
+      LogGroupName: !Sub '/ecs/${MicroServiceUniqueName}'
+      RetentionInDays: 14
+      KmsKeyId:
+        Fn::GetAtt:
+          - LogGroupKmsKey
+          - Arn
+
+  # KMS Key for Encrypt log data in CloudWatch Logs
+  LogGroupKmsKey:
+    Type: AWS::KMS::Key
+    Condition: RequiresLogGroupCreation
+    Properties:
+      KeyPolicy:
+        Statement:
+          - Action: kms:*
+            Effect: Allow
+            Principal:
+              AWS:
+                Fn::Join:
+                  - ""
+                  - - "arn:"
+                    - Ref: AWS::Partition
+                    - ":iam::"
+                    - Ref: AWS::AccountId
+                    - :root
+            Resource: "*"
+          - Action:
+              - kms:Encrypt*
+              - kms:Decrypt*
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:Describe*
+            Effect: Allow      
+            Principal:
+                Service: !Sub logs.${AWS::Region}.amazonaws.com
+            Resource: '*'
+            Condition:
+                ArnLike:
+                    'kms:EncryptionContext:aws:logs:arn': !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*' 
+        Version: "2012-10-17"
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
+
+  ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
+  SubscriptionFilter:
+    Condition: SendLogToKinesis
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      RoleArn:
+        Fn::GetAtt:
+          - "SubscriptionFilterServiceRole"
+          - "Arn"
+      LogGroupName: !Ref LogGroup
+      FilterPattern: !Ref CloudwatchFilterPattern
+      DestinationArn: !Ref CloudwatchLogKinesisStreamArn
+
+  ### IAM Role used by Subscription filters to allow read logs from Cloudwatch and send logs to Kinesis Firehose
+  SubscriptionFilterServiceRole:
+    Condition: SendLogToKinesis
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: logs.amazonaws.com
+        Version: "2012-10-17"
+      Path: /
+      Policies:
+        -
+          PolicyName: !Sub '${MicroServiceUniqueName}-ecs-logs-subscription-role'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - kinesis:PutRecord
+                Effect: Allow
+                Resource: "*"
+              - Action:
+                - "kms:Encrypt"
+                - "kms:GenerateDataKey"
+                - "kms:Decrypt"
+                Effect: Allow
+                Resource: "*"
 
   # ECS Service
   ECSService:
@@ -480,10 +761,17 @@ Resources:
       GroupDescription: !Sub '${MicroServiceUniqueName}-EcsSvcSecGrp'
       VpcId: !Ref VpcId
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: 0.0.0.0/0
+        - 'Fn::If':
+          - HasAlbSecurityGroup
+          - IpProtocol: tcp
+            FromPort: 8080
+            ToPort: 8080
+            SourceSecurityGroupId: !Ref AlbSecurityGroup
+          - IpProtocol: tcp
+            FromPort: 8080
+            ToPort: 8080
+            CidrIp: 0.0.0.0/0
+
 
   # ECS Task
   TaskDefinition:
@@ -520,6 +808,67 @@ Resources:
               Condition: COMPLETE
             - ContainerName: aws-collector
               Condition: START
+          Secrets:
+            - 'Fn::If':
+              - Secret1Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret1 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret1 ] ]
+              - !Ref "AWS::NoValue"
+            - 'Fn::If':
+              - Secret2Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret2 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret2 ] ]
+              - !Ref "AWS::NoValue"
+            - 'Fn::If':
+              - Secret3Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret3 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret3 ] ]
+              - !Ref "AWS::NoValue"              
+            - 'Fn::If':
+              - Secret4Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret4 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret4 ] ]
+              - !Ref "AWS::NoValue"              
+            - 'Fn::If':
+              - Secret5Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret5 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret5 ] ]
+              - !Ref "AWS::NoValue"              
+            - 'Fn::If':
+              - Secret6Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret6 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret6 ] ]
+              - !Ref "AWS::NoValue"              
+            - 'Fn::If':
+              - Secret7Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret7 ] ]
+                ValueFrom:
+                  !Select [ 1, !Split [ "=", !Ref ContainerSecret7 ] ]
+              - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Secret8Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret8 ] ]
+                  ValueFrom:
+                    !Select [ 1, !Split [ "=", !Ref ContainerSecret8 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Secret9Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret9 ] ]
+                  ValueFrom:
+                    !Select [ 1, !Split [ "=", !Ref ContainerSecret9 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Secret10Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerSecret10 ] ]
+                  ValueFrom:
+                    !Select [ 1, !Split [ "=", !Ref ContainerSecret10 ] ]
+                - !Ref "AWS::NoValue"
           Environment:
             - Name: 'OTEL_RESOURCE_ATTRIBUTES'
               Value: !Sub 'service.name=${MicroServiceUniqueName}'
@@ -740,6 +1089,101 @@ Resources:
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry40 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry40 ] ]
                 - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env41Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry41 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry41 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env42Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry42 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry42 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env43Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry43 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry43 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env44Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry44 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry44 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env45Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry45 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry45 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env46Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry46 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry46 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env47Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry47 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry47 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env48Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry48 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry48 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env49Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry49 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry49 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env50Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry50 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry50 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env51Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry51 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry51 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env52Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry52 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry52 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env53Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry53 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry53 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env54Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry54 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry54 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env55Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry55 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry55 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env56Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry56 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry56 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env57Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry57 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry57 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env58Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry58 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry58 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env59Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry59 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry59 ] ]
+                - !Ref "AWS::NoValue"
           PortMappings:
             - ContainerPort: 8080
           LinuxParameters:
@@ -749,7 +1193,7 @@ Resources:
             LogDriver: awslogs
             Options:
               awslogs-region: !Ref AWS::Region
-              awslogs-group: !Ref LogGroup
+              awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
               awslogs-stream-prefix: ecs
         - 'Fn::If':
           - ShouldEnableOtelXRay
@@ -762,7 +1206,7 @@ Resources:
               LogDriver: awslogs
               Options:
                 awslogs-create-group: 'True'
-                awslogs-group: !Ref LogGroup
+                awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
                 awslogs-region: !Ref 'AWS::Region'
                 awslogs-stream-prefix: ecs
           - !Ref "AWS::NoValue"
@@ -770,8 +1214,8 @@ Resources:
           - ShouldEnableOtelXRay
           - Name: sidecar-injector
             Image: !Ref ContainerImageInjectorURI
-            Command: !Ref CommandSidecarInjector
-            EntryPoint: [!Ref EntrypointSidecarInjector]
+            #Command: !Ref CommandSidecarInjector
+            #EntryPoint: [!Ref EntrypointSidecarInjector]
             Essential: false
             MountPoints:
               - SourceVolume: "my-vol"
@@ -782,59 +1226,12 @@ Resources:
               LogDriver: awslogs
               Options:
                 awslogs-create-group: 'True'
-                awslogs-group: !Ref LogGroup
+                awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
                 awslogs-region: !Ref 'AWS::Region'
                 awslogs-stream-prefix: ecs
           - !Ref "AWS::NoValue"
       Volumes:
         - Name: "my-vol"
-
-
-  # Microservice Log group
-  LogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub '/ecs/${MicroServiceUniqueName}'
-      RetentionInDays: 3
-      KmsKeyId:
-        Fn::GetAtt:
-          - LogGroupKmsKey
-          - Arn
-
-  # KMS Key for Encrypt log data in CloudWatch Logs
-  LogGroupKmsKey:
-    Type: AWS::KMS::Key
-    Properties:
-      KeyPolicy:
-        Statement:
-          - Action: kms:*
-            Effect: Allow
-            Principal:
-              AWS:
-                Fn::Join:
-                  - ""
-                  - - "arn:"
-                    - Ref: AWS::Partition
-                    - ":iam::"
-                    - Ref: AWS::AccountId
-                    - :root
-            Resource: "*"
-          - Action:
-              - kms:Encrypt*
-              - kms:Decrypt*
-              - kms:ReEncrypt*
-              - kms:GenerateDataKey*
-              - kms:Describe*
-            Effect: Allow      
-            Principal:
-                Service: !Sub logs.${AWS::Region}.amazonaws.com
-            Resource: '*'
-            Condition:
-                ArnLike:
-                    'kms:EncryptionContext:aws:logs:arn': !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*' 
-        Version: "2012-10-17"
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain    
 
   # A role needed by ECS
   ExecutionRole:
@@ -851,6 +1248,18 @@ Resources:
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
         - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
+      Policies:
+        Fn::If:
+          - HasSecrets
+          - - PolicyName: !Sub '${MicroServiceUniqueName}-ExecutionPolicy'
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - secretsmanager:GetSecretValue
+                    Resource:
+                      - Fn::Sub: "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${MicroServiceSecretPrefix}*"
+          - !Ref AWS::NoValue
 
   # A role for the containers
   TaskRole:
@@ -932,6 +1341,8 @@ Resources:
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
           Value: 60 # default is 300
+        - Key: load_balancing.algorithm.type
+          Value: !Ref LoadBalancingAlgorithm
       VpcId: !Ref VpcId
 
   # Load balancer forward rule; forward only path pattern defined with MappedPaths
@@ -951,11 +1362,11 @@ Resources:
 
   # CloudWatch metric to filer ERROR - FATAL lines, in Log group
   ErrorFatalLogsMetricFilter: 
-    Condition: HasAlarmTopic
+    Condition: HasLogAlarm
     Type: AWS::Logs::MetricFilter
     Properties: 
-      LogGroupName: !Ref LogGroup
-      FilterPattern: '?ERROR ?FATAL ?CRITICAL'
+      LogGroupName: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
+      FilterPattern: !If [ LogAlarmErrorFatal, '{ $.level = "ERROR" || $.level = "FATAL" || $.message = "* FATAL *" }', '{ $.level = "FATAL" || $.message = "* FATAL *" }']
       MetricTransformations: 
         - MetricValue: 1
           MetricNamespace: "ErrorFatalLogs"
@@ -964,10 +1375,10 @@ Resources:
   # Create alarm
   ErrorFatalLogsMetricAlarm:
     Type: AWS::CloudWatch::Alarm
-    Condition: HasAlarmTopic
+    Condition: HasLogAlarm
     DependsOn: ErrorFatalLogsMetricFilter
     Properties:
-      AlarmName: !Sub "${MicroServiceUniqueName}-ErrorFatalLogs-Alarm"
+      AlarmName: !Sub "oncall-${MicroServiceUniqueName}-ErrorFatalLogs-Alarm"
       AlarmDescription: "CloudWatch alarm for when ECS LogGroup has ERROR or FATAL line."
       TreatMissingData: notBreaching
       AlarmActions: 
@@ -1029,12 +1440,22 @@ Resources:
       PolicyType: StepScaling
       ScalingTargetId: !Ref AutoScalingTarget
       StepScalingPolicyConfiguration:
-        AdjustmentType: ChangeInCapacity
+        AdjustmentType: PercentChangeInCapacity
+        MinAdjustmentMagnitude: 1
         Cooldown: !Ref AutoscalingCheckPeriod
         MetricAggregationType: Average
         StepAdjustments:
           - MetricIntervalLowerBound: 0
-            ScalingAdjustment: 1
+            MetricIntervalUpperBound: 25
+            ScalingAdjustment: 50
+          - MetricIntervalLowerBound: 25
+            MetricIntervalUpperBound: 50
+            ScalingAdjustment: 100
+          - MetricIntervalLowerBound: 50
+            MetricIntervalUpperBound: 75
+            ScalingAdjustment: 150
+          - MetricIntervalLowerBound: 75
+            ScalingAdjustment: 200
 
   #### Scaling Down Policy
   ScaleDownPolicy:
@@ -1050,7 +1471,10 @@ Resources:
         MetricAggregationType: Average
         StepAdjustments:
           - MetricIntervalUpperBound: 0
+            MetricIntervalLowerBound: -30
             ScalingAdjustment: -1
+          - MetricIntervalUpperBound: -30
+            ScalingAdjustment: -2
   
   #### Alarm for Rest-API metric Autoscaling
   AlarmHighRequests:
@@ -1062,23 +1486,34 @@ Resources:
       ActionsEnabled: TRUE
       ComparisonOperator: GreaterThanThreshold
       DatapointsToAlarm: !Ref AutoscalingDataPointN
-      Dimensions:
-        - Name: TargetGroup
-          Value: !GetAtt TargetGroup.TargetGroupFullName
       EvaluationPeriods: !Ref AutoscalingDataPointM
-      MetricName: RequestCountPerTarget
-      Namespace: AWS/ApplicationELB
+      Threshold: 60
+      TreatMissingData: ignore
       AlarmActions:
         - !Ref ScaleUpPolicy
       OKActions:
         - !Ref ScaleDownPolicy
-      Period: !Ref AutoscalingCheckPeriod
-      Statistic: Sum
-      Threshold: !Ref AutoscalingThreshold
-      TreatMissingData: ignore
-      Unit: None
+      Metrics:
+        - Id: rpt
+          MetricStat:
+            Metric:
+              Namespace: AWS/ApplicationELB
+              MetricName: RequestCountPerTarget
+              Dimensions:
+                - Name: TargetGroup
+                  Value: !GetAtt TargetGroup.TargetGroupFullName
+            Period: !Ref AutoscalingCheckPeriod
+            Stat: Sum
+          ReturnData: False
+        - Id: req_per_targ
+          Expression: !Sub "(100 * rpt) / ${AutoscalingThreshold}"
+          Label: !Sub "${MicroServiceUniqueName}-api-autoscale-metric"
+      
 
-  #### Alarm for QSQ metric Autoscaling
+      
+      
+
+  #### Alarm for SQS metric Autoscaling
   AlarmSQS:
     Type: "AWS::CloudWatch::Alarm"
     Condition: AutoscalingBySQS
@@ -1101,49 +1536,6 @@ Resources:
       OKActions:
         - !Ref ScaleDownPolicy
 
-  ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
-  SubscriptionFilter:
-    Condition: SendLogToKinesis
-    Type: AWS::Logs::SubscriptionFilter
-    Properties:
-      RoleArn:
-        Fn::GetAtt:
-          - "SubscriptionFilterServiceRole"
-          - "Arn"
-      LogGroupName: !Ref LogGroup
-      FilterPattern: !Ref CloudwatchFilterPattern
-      DestinationArn: !Ref CloudwatchLogKinesisStreamArn
-
-  ### IAM Role used by Subscription filters to allow read logs from Cloudwatch and send logs to Kinesis Firehose
-  SubscriptionFilterServiceRole:
-    Condition: SendLogToKinesis
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service: logs.amazonaws.com
-        Version: "2012-10-17"
-      Path: /
-      Policies:
-        -
-          PolicyName: !Sub '${MicroServiceUniqueName}-ecs-logs-subscription-role'
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Action:
-                  - kinesis:PutRecord
-                Effect: Allow
-                Resource: "*"
-              - Action:
-                - "kms:Encrypt"
-                - "kms:GenerateDataKey"
-                - "kms:Decrypt"
-                Effect: Allow
-                Resource: "*"
-
 Outputs:
   ServiceName:
     Description: Nome del servizio di cui fare deploy
@@ -1154,13 +1546,30 @@ Outputs:
   TaskRoleName:
     Description: Container execution role name, useful to attach custom policies
     Value: !Ref TaskRole
+
+  TargetGroupName:
+    Value: !GetAtt TargetGroup.TargetGroupFullName
+
   FatalLogsMetricAlarmArn:
     Description: ARN of the fatal logs alarm
     Value:
       !If
-        - HasAlarmTopic
+        - HasLogAlarm
         - !GetAtt ErrorFatalLogsMetricAlarm.Arn
         - ''
+  ScaleUpPolicy:
+    Value:
+     !If
+        - AutoscalingEnabled
+        - !Ref ScaleUpPolicy
+        - ''
+  ScaleDownPolicy:
+    Value:
+     !If
+        - AutoscalingEnabled
+        - !Ref ScaleDownPolicy
+        - ''
+        
   AutoScalingAlarmArn:
     Description: ARN of the autoscaling alarm
     Value:
@@ -1169,5 +1578,9 @@ Outputs:
         - !If 
           - AutoscalingByRestApi
           - !GetAtt AlarmHighRequests.Arn
-          - !GetAtt AlarmSQS.Arn
+          - !If 
+            - AutoscalingBySQS
+            - !GetAtt AlarmSQS.Arn
+            - ''
         - ''
+        

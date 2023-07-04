@@ -52,13 +52,60 @@ Parameters:
     Type: String
     Default: '-'
     Description: Data lake can read logs
-  
+
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+    
   Version:
     Type: String
     Description: 'keep track of used projects commitIds'
+
+  VpcEndpointsRequired:
+    Type: String
+    Default: true
+    AllowedValues:
+      - true
+      - false
+      
+  ApplicationLoadBalancerArn: 
+    Type: String
+    Default: '-'
+    Description: Application load balancer
+
+  ApplicationLoadBalancerAwsDns: 
+    Type: String
+    Default: '-'
+    Description: Application load balancer AWS DNS
+
+  ApplicationLoadBalancerAwsDnsZoneId:
+    Type: String
+    Default: '-'
+    Description: Application load balancer AWS DNS Zone ID
+
+  ApplicationLoadBalancerListenerArn:
+    Type: String
+    Default: '-'
+    Description: Application load balancer listener ARN
+
+  NetworkLoadBalancerLink: 
+    Type: String
+    Default: '-'
+    Description: Network load balancer VpcLink (used by api-gw)
+
+  WebappSecurityGroupId: 
+    Type: String
+    Default: '-'
+    Description: ALB security group ID
+
+  VpcEgressSubnetsIds:
+    Type: String
+    Default: '-'
+    Description: List of egress subnets
+
+  LogRetention:
+    Type: Number
+    Default: 14
 
   # pass-through parameters
   AlarmSNSTopicArn:
@@ -67,8 +114,40 @@ Parameters:
     Type: String
   EcsDefaultSecurityGroup:
     Type: String
+  LogsBucketKmsKeyArn:
+    Type: String
+  LogsBucketName:
+    Type: String
+  SafeStorageAccountId:
+    Type: String
+  CdcKinesisStreamName:
+    Type: String
+  CdcKinesisStreamArn:
+    Type: String
+  CdcKinesisStreamKeyArn:
+    Type: String
+  LogsKinesisStreamName:
+    Type: String
+  LogsKinesisStreamArn:
+    Type: String
+  LogsKinesisStreamKeyArn:
+    Type: String
+  ApiKeyTablesEncryptKeyId:
+    Type: String
+  SafestorageLoggerLogGroupName:
+    Type: String
+Conditions:
+  IsAlbArnEmpty: !Equals [ !Ref ApplicationLoadBalancerArn, '-' ]
+  IsAlbArnDnsEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDns, '-' ]
+  IsAlbArnDnsZoneIdEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDnsZoneId, '-' ]
+  IsAlbListenerArnEmpty: !Equals [ !Ref ApplicationLoadBalancerListenerArn, '-' ]
+  IsNetworkLoadBalancerLinkEmpty: !Equals [ !Ref NetworkLoadBalancerLink, '-' ]
+  IsWebappSecurityGroupIdEmpty: !Equals [ !Ref WebappSecurityGroupId, '-' ]
+  RequiresAlbCreation: !Or [ !Condition IsAlbArnEmpty, !Condition IsAlbArnDnsEmpty, !Condition IsAlbArnDnsZoneIdEmpty, !Condition IsAlbListenerArnEmpty, !Condition IsNetworkLoadBalancerLinkEmpty, !Condition IsWebappSecurityGroupIdEmpty ]
+  
+  RequiresVpcEndpoints: !Equals [ !Ref VpcEndpointsRequired, true ]
 
-
+  IsEgressDefined: !Not [ !Equals [ !Ref VpcEgressSubnetsIds, '-' ] ]
 Resources:
 
   ###                       VPC BASE CONFIGURATIONS                       ###
@@ -86,6 +165,7 @@ Resources:
   # Private connection from subnets to AWS services
   VPCEndpoints:
     Type: AWS::CloudFormation::Stack
+    Condition: RequiresVpcEndpoints
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/vpc-endpoints.yaml"
       Parameters:
@@ -98,6 +178,7 @@ Resources:
   # LoadBalancer
   LoadBalancer:
     Type: AWS::CloudFormation::Stack
+    Condition: RequiresAlbCreation
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/load-balancer.yaml"
       Parameters:
@@ -108,9 +189,10 @@ Resources:
         RaddApiDnsName: !Ref RaddApiDnsName
         HostedZoneId: !Ref HostedZoneId
         InternalNlbIps: !Ref InternalNlbIps
-  
+
   # Load balancer private fixed DNS
   Route53RecordSetGroup:
+    Condition: RequiresAlbCreation
     Type: AWS::Route53::RecordSet
     Properties:
       Name: !Sub 'alb.core.${ProjectName}.internal'
@@ -126,26 +208,12 @@ Resources:
 
   # The cluster
   ECSCluster:
-    DependsOn: LoadBalancer
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-cluster.yaml"
       Parameters:
         MacroServiceName: !Sub '${ProjectName}-core'
   
-  ###                       LOGS STREAMS PREPARATION                      ###
-  ###########################################################################
-  # Logs bucket
-  LogsBucket:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-bucket.yaml"
-      Parameters:
-        ProjectName: !Ref ProjectName
-        BucketSuffix: !Ref BucketSuffix
-        DataLakeAccountId1: !Ref DataLakeAccountId1
-        DataLakeAccountId2: !Ref DataLakeAccountId2
-
   # Exporter role
   LogsExporterRole:
     Type: AWS::CloudFormation::Stack
@@ -153,9 +221,12 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-bucket-access-role.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
-        LogsBucketName: !GetAtt LogsBucket.Outputs.LogsBucketName
-        LogsAccountId: !Ref AWS::AccountId
-
+        LogsBucketName: !Ref LogsBucketName
+        LogsBucketKmsKeyArn: !Ref LogsBucketKmsKeyArn
+        DataLakeAccountId1: !Ref DataLakeAccountId1
+        DataLakeAccountId2: !Ref DataLakeAccountId2
+        SafeStorageAccountId: !Ref SafeStorageAccountId
+        BucketSuffix: !Ref BucketSuffix 
   
   ###                       CLOUDFORMATION TRANSFORM LAMBDAS              ###
   ###########################################################################
@@ -181,19 +252,21 @@ Outputs:
     Value: !Ref VpcSubnets
     Description: Subnets
 
-
   # Load balancers outputs
   NetworkLoadBalancerLink:
-    Value: !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink
+    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink, !Ref NetworkLoadBalancerLink ]
     Description: Used by API-Gw to connect into VPC
 
   ApplicationLoadBalancerListenerArn:
-    Value: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerListenerArn
+    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerListenerArn, !Ref ApplicationLoadBalancerListenerArn ]
     Description: Application Load Balancerlistener Arn
 
   ApplicationLoadBalancerDomain:
-    Value: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain
+    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain, !Ref ApplicationLoadBalancerAwsDns ]
     Description: Application Load Balancer Domain to use for http URL
+
+  AlbSecurityGroup:
+    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.AlbSecurityGroup, !Ref WebappSecurityGroupId ]
 
   # ECS Cluster
   ECSClusterName:
@@ -201,9 +274,6 @@ Outputs:
     Description: ECS cluster name
   
   # Log exports outputs
-  LogsBucketName:
-    Description: The name of the bucket where logs must be exported
-    Value: !GetAtt LogsBucket.Outputs.LogsBucketName
   LogsExporterRoleArn:
     Description: Role used to export logs to external bucket
     Value: !GetAtt LogsExporterRole.Outputs.LogsIngestionRoleArn
@@ -211,7 +281,9 @@ Outputs:
     Description: Policy used by LogsExporterRoleArn Role
     Value: !GetAtt LogsExporterRole.Outputs.LogsIngestionPolicyArn
     
-
+  LogRetention:
+    Value: !Ref LogRetention
+    
   # pass-though parameters
   AlarmSNSTopicArn:
     Value: !Ref AlarmSNSTopicArn
@@ -219,3 +291,27 @@ Outputs:
     Value: !Ref AlarmSNSTopicName
   EcsDefaultSecurityGroup:
     Value: !Ref EcsDefaultSecurityGroup
+  SafeStorageAccountId:
+    Value: !Ref SafeStorageAccountId
+  LogsBucketKmsKeyArn:
+    Value: !Ref LogsBucketKmsKeyArn
+  LogsBucketName:
+    Value: !Ref LogsBucketName
+  CdcKinesisStreamName:
+    Value: !Ref CdcKinesisStreamName
+  CdcKinesisStreamArn:
+    Value: !Ref CdcKinesisStreamArn
+  CdcKinesisStreamKeyArn:
+    Value: !Ref CdcKinesisStreamKeyArn
+  LogsKinesisStreamName:
+    Value: !Ref LogsKinesisStreamName
+  LogsKinesisStreamArn:
+    Value: !Ref LogsKinesisStreamArn
+  LogsKinesisStreamKeyArn:
+    Value: !Ref LogsKinesisStreamKeyArn
+  ApiKeyTablesEncryptKeyId:
+    Value: !Ref ApiKeyTablesEncryptKeyId
+  SafestorageLoggerLogGroupName:
+    Value: !Ref SafestorageLoggerLogGroupName
+  VpcEgressSubnetsIds:
+    Value: !If [ IsEgressDefined, !Ref VpcEgressSubnetsIds, !Ref VpcSubnets ]

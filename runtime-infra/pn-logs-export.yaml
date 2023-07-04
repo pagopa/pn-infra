@@ -44,16 +44,35 @@ Parameters:
   OpenSearchSecretArn:
     Type: String
     Description: The ARN of the secret containing OpenSearch credentials
-  
-  OpenSearchDeliveryLambdaS3Bucket:
+
+  OpenSearchLambdaMemory:
+    Type: Number
+    Default: 512
+    MinValue: 256
+    MaxValue: 10240
+    Description: OpenSearch logs ingestion lambda memory
+
+  OpenSearchKinesisBatchSize:
+    Type: Number
+    Default: 100
+    Description: Kinesis logs batch size
+
+  OpenSearchKinesisWindow:
+    Type: Number
+    Default: 300
+    Description: Kinesis logs window size in seconds
+
+  OpenSearchParallelizationFactor:
+    Type: Number
+    Default: 1
+    Description: The number of batches to process concurrently from each shard
+
+  LambdasBucketName:
     Type: String
     Description: s3 bucket name of the lambda used to delivery events to opensearch
-  OpenSearchDeliveryLambdaS3Key:
+  LambdasBasePath:
     Type: String
     Description: s3 object key of the lambda used to delivery events to opensearch
-  OpenSearchDeliveryLambdaS3ObjectVersion:
-    Type: String
-    Description: s3 object version of the lambda used to delivery events to opensearch
   
   TemplateBucketBaseUrl:
     Type: String
@@ -62,8 +81,28 @@ Parameters:
     Type: String
     Description: ARN of the SNS topic for alarms
 
+  SafeStorageAccountId: 
+    Type: String
+    Default: '-'
+    
+  SafestorageLoggerLogGroupName:
+    Type: String
+
+  SafestorageLoggerLambdaMemory:
+    Type: Number
+    Default: 512
+    MinValue: 256
+    MaxValue: 10240
+    Description: Safestorage logger lambda memory
+
+  SafestorageLoggerBatchSize:
+    Type: Number
+    Default: 1
+    Description: Safestorage logger batch size
+
 Conditions:
   HasOpenSearchExport: !Not [ !Equals [ !Ref OpenSearchClusterEndpoint, "" ] ]
+  HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, "-" ] ]
 
 Resources:
 
@@ -81,6 +120,7 @@ Resources:
         LogsExporterRoleArn: !Ref LogsExporterRoleArn
         StreamNamePrefix: 'cdcTos3'
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        StreamContent: DYNAMO_CDC
 
   ###             Export CloudWatch Logs to Log saving bucket             ###
   ###########################################################################
@@ -96,6 +136,7 @@ Resources:
         LogsExporterRoleArn: !Ref LogsExporterRoleArn
         StreamNamePrefix: 'logsTos3'
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        StreamContent: CLOUDWATCH_LOGS
 
   ###                   Export dynamo CDC to OpenSearch                   ###
   ###########################################################################
@@ -129,6 +170,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/logs-delivery-opensearch.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
         StreamNamePrefix: logsToOpenSearch
         KinesisStreamArn: !Ref LogsKinesisSourceStreamArn
         KinesisStreamKMSKeyArn: !Ref LogsKinesisSourceStreamKeyArn
@@ -137,9 +179,31 @@ Resources:
         OpenSearchDeliveryVpcId: !Ref VpcId
         OpenSearchDeliverySubnetIds: !Join [",", !Ref SubnetsIds]
         OpenSearchSecretArn: !Ref OpenSearchSecretArn
-        OpenSearchDeliveryLambdaS3Bucket: !Ref OpenSearchDeliveryLambdaS3Bucket
-        OpenSearchDeliveryLambdaS3Key: !Ref OpenSearchDeliveryLambdaS3Key
-        OpenSearchDeliveryLambdaS3ObjectVersion: !Ref OpenSearchDeliveryLambdaS3ObjectVersion
+        OpenSearchDeliveryLambdaS3Bucket: !Ref LambdasBucketName
+        OpenSearchDeliveryLambdaS3Key: !Sub "${LambdasBasePath}/opensearch-delivery.zip"
+        OpenSearchLambdaMemory: !Ref OpenSearchLambdaMemory
+        OpenSearchKinesisBatchSize: !Ref OpenSearchKinesisBatchSize
+        OpenSearchKinesisWindow: !Ref OpenSearchKinesisWindow
+        OpenSearchParallelizationFactor: !Ref OpenSearchParallelizationFactor
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+ 
+  ###             Safestorage logger                                      ###
+  ###########################################################################
+  SafestorageLogger:
+    Type: AWS::CloudFormation::Stack
+    Condition: HasStorageStorageAccountId
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/safestorage-logger.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
+        LambdaS3Bucket: !Ref LambdasBucketName
+        LambdaS3Key: !Sub "${LambdasBasePath}/safestorage-logger.zip"
+        LambdaMemory: !Ref SafestorageLoggerLambdaMemory
+        BatchSize: !Ref SafestorageLoggerBatchSize
+        SafeStorageAccountId: !Ref SafeStorageAccountId
+        LambdaName: !Ref SafestorageLoggerLogGroupName
+        QueueName: !Sub '${ProjectName}-new-safestorage-cloudtrail-file'
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 Outputs:
@@ -164,7 +228,7 @@ Outputs:
     Value:
       !If
       - HasOpenSearchExport
-      - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaAlarmArn
+      - !GetAtt LogsToOpenSearch.Outputs.DeliveryLambdaInvocationErrorLogsMetricAlarm
       - ''
 
   OpenSearchDeliveryLambdaArn:

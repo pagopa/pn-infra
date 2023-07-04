@@ -8,6 +8,10 @@ Parameters:
     Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
       experimental environments without crash official development environment'
 
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
   StreamNamePrefix:
     Type: String
     Description: to distinguish different log groups streams
@@ -42,20 +46,39 @@ Parameters:
   OpenSearchDeliveryLambdaS3Key:
     Type: String
     Description: s3 object key of the lambda used to delivery events to opensearch
-  OpenSearchDeliveryLambdaS3ObjectVersion:
-    Type: String
-    Description: s3 object version of the lambda used to delivery events to opensearch
   
   OpenSearchSecretArn:
     Type: String
     Description: ARN of the secret containing the credentials to access the OpenSearch cluster
 
+  OpenSearchLambdaMemory:
+    Type: Number
+    Default: 512
+    MinValue: 256
+    MaxValue: 10240
+    Description: OpenSearch logs ingestion lambda memory
+
+  OpenSearchKinesisBatchSize:
+    Type: Number
+    Default: 100
+    Description: Kinesis logs batch size
+
+  OpenSearchKinesisWindow:
+    Type: Number
+    Default: 300
+    Description: Kinesis logs window size in seconds
+
+  OpenSearchParallelizationFactor:
+    Type: Number
+    Default: 1
+
   AlarmSNSTopicArn:
     Type: String
     Description: ARN of the SNS topic for alarms
 
-Conditions:
-  IsSNSTopicPresent: !Not [!Equals [!Ref AlarmSNSTopicArn, '']]
+  LogRetention:
+    Type: Number
+    Default: 14
 
 Resources:
   DeliveryLambdaRole:
@@ -108,15 +131,23 @@ Resources:
       GroupDescription: !Sub '${ProjectName}-${StreamNamePrefix}-lambda-opensearch'
       VpcId: !Ref OpenSearchDeliveryVpcId
 
+  DeliveryLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${DeliveryLambda}"
+      RetentionInDays: !Ref LogRetention
+
   DeliveryLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${ProjectName}-${StreamNamePrefix}-opensearch-delivery'
+      FunctionName: !Sub '${ProjectName}-${StreamNamePrefix}-opensearch-ingestion'
       Runtime: nodejs16.x
       Role: !GetAtt DeliveryLambdaRole.Arn
       Handler: index.handler
-      MemorySize: 256
+      MemorySize: !Ref OpenSearchLambdaMemory
       Timeout: 900 # 15 minutes
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"      
       Environment:
         Variables:
           CLUSTER_ENDPOINT : !Ref OpenSearchClusterEndpoint
@@ -129,47 +160,32 @@ Resources:
       Code:
         S3Bucket: !Ref OpenSearchDeliveryLambdaS3Bucket
         S3Key: !Ref OpenSearchDeliveryLambdaS3Key
-        S3ObjectVersion: !Ref OpenSearchDeliveryLambdaS3ObjectVersion
 
   DeliveryLambdaKinesisSource:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
-      BatchSize: 100
+      BatchSize: !Ref OpenSearchKinesisBatchSize
       BisectBatchOnFunctionError: true
       EventSourceArn: !Ref KinesisStreamArn
       FunctionName: !Ref DeliveryLambda
       FunctionResponseTypes:
         - ReportBatchItemFailures
-      MaximumBatchingWindowInSeconds: 300 # 5 minutes
+      MaximumBatchingWindowInSeconds: !Ref OpenSearchKinesisWindow # 5 minutes
+      ParallelizationFactor: !Ref OpenSearchParallelizationFactor
       StartingPosition: LATEST
 
-  DeliveryLambdaErrorsAlarm:
-    Type: AWS::CloudWatch::Alarm
+  DeliveryLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
     Properties:
-      AlarmName: !Sub '${ProjectName}-${StreamNamePrefix}-opensearch-delivery-errors'
-      AlarmActions:
-        !If
-          - IsSNSTopicPresent
-          - 
-            - !Ref AlarmSNSTopicArn
-          - !Ref AWS::NoValue
-      Namespace: AWS/Lambda
-      MetricName: Errors
-      Dimensions:
-      - Name: FunctionName
-        Value: !Ref DeliveryLambda
-      Statistic: Sum
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      Threshold: 1
-      DatapointsToAlarm: 1
-      EvaluationPeriods: 1
-      Period: 3600 # 1 hour
-      TreatMissingData: notBreaching
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref DeliveryLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 Outputs:
-  DeliveryLambdaAlarmArn:
+  DeliveryLambdaInvocationErrorLogsMetricAlarm:
     Description: 'Delivery lambda alarm ARN'
-    Value: !GetAtt DeliveryLambdaErrorsAlarm.Arn
+    Value: !GetAtt DeliveryLambdaAlarms.Outputs.LambdaInvocationErrorLogsMetricAlarm
 
   DeliveryLambdaArn:
     Description: 'Delivery lambda ARN'

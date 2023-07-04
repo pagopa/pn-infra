@@ -53,6 +53,34 @@ Parameters:
     Type: String
     Default: 'false'
     Description: 'For this queue, set if there is an alarm to create'
+  QueueOldestAgeLimit:
+    Type: Number
+    Default: '21600'
+    Description: 'Oldest job age (in seconds) before raising an alarm'
+  VisibilityTimeout:
+    Type: Number
+    Default: 30
+    Description: 'The length of time during which a message will be unavailable after a message is delivered from the queue'  
+  SqsManagedSseEnabled:
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+  OncallDlqRatio:
+    Type: Number
+    Default: 0.1
+    Description: Wakeup alarm ratio between messages written to DLQ and messages read from queue
+
+  OncallLimit:
+    Type: Number
+    Default: 20
+    Description: The minimum number of messages received by standard Queue to calculate the ration with dql messages before raising an oncall alarm
+
+  OncallDLQLimit:
+    Type: Number
+    Default: 0
+    Description: The minimum number of messages in DLQ to raise an oncall alarm (it applies to standalone DLQ only). When zero, the oncall alarm is not created.
 
 Conditions:
   DlqHasDefaultName: !Equals [ !Ref DeadLetterQueueName, '-' ]
@@ -72,12 +100,17 @@ Conditions:
     - !Condition DlqHasAlarm
     - !Condition IsWithDLQ
 
+  HasOncallDLQLimit: !Not [ !Equals [ !Ref OncallDLQLimit, '0' ] ]
+
+  RequiresOncallDLQAlarm: !And [ !Condition IsWithAlarm, !Condition HasOncallDLQLimit ]
 Resources:
 
 
   Queue:
     Condition: IsNotFifo
     Type: AWS::SQS::Queue
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
     Properties:
       QueueName: !Ref QueueName
       RedrivePolicy:
@@ -88,11 +121,15 @@ Resources:
             maxReceiveCount: !Ref MaxReceiveCount
           - !Ref AWS::NoValue
       DelaySeconds: !Ref DelaySeconds
+      VisibilityTimeout: !Ref VisibilityTimeout
       MessageRetentionPeriod: !Ref MessageRetentionPeriod
+      SqsManagedSseEnabled: !Ref SqsManagedSseEnabled
 
   QueueFifo:
     Condition: IsFifo
     Type: AWS::SQS::Queue
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
     Properties:
       QueueName: !Sub "${QueueName}.fifo"
       RedrivePolicy:
@@ -105,12 +142,16 @@ Resources:
       DelaySeconds: !Ref DelaySeconds
       MessageRetentionPeriod: !Ref MessageRetentionPeriod
       FifoQueue: true
+      VisibilityTimeout: !Ref VisibilityTimeout
       ContentBasedDeduplication: !If [IsContentBasedDeduplication, true, false]
       DeduplicationScope: !Ref DeduplicationScope
+      SqsManagedSseEnabled: !Ref SqsManagedSseEnabled
 
   DeadLetterQueue:
     Condition: IsNotFifoWithDLQ
     Type: AWS::SQS::Queue
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
     Properties:
       QueueName:
         Fn::If:
@@ -118,10 +159,13 @@ Resources:
           - !Sub "${QueueName}-DLQ"
           - !Ref DeadLetterQueueName
       MessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
+      SqsManagedSseEnabled: !Ref SqsManagedSseEnabled
 
   DeadLetterQueueFifo:
     Condition: IsFifoWithDLQ
     Type: AWS::SQS::Queue
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
     Properties:
       QueueName:
         Fn::If:
@@ -130,6 +174,7 @@ Resources:
           - !Ref DeadLetterQueueName
       MessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
       FifoQueue: true
+      SqsManagedSseEnabled: !Ref SqsManagedSseEnabled
 
   QueueHasMessagesAlarm:
     Condition: IsWithAlarm
@@ -139,12 +184,37 @@ Resources:
       AlarmDescription: "Alarm messages when we have 1 or more messages in QUEUE"
       Namespace: "AWS/SQS"
       MetricName: "ApproximateNumberOfMessagesVisible"
+      TreatMissingData: "notBreaching"
       Dimensions:
         - Name: "QueueName"
           Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
       Statistic: "Sum"
       Period: 60  
       Threshold: 1
+      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 1       
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      InsufficientDataActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+
+  OncallQueueHasMessagesAlarm:
+    Condition: RequiresOncallDLQAlarm
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "oncall-${QueueName}-HasMessages"
+      AlarmDescription: !Sub "Alarm messages when we have ${OncallDLQLimit} or more messages in QUEUE"
+      Namespace: "AWS/SQS"
+      MetricName: "ApproximateNumberOfMessagesVisible"
+      TreatMissingData: "notBreaching"
+      Dimensions:
+        - Name: "QueueName"
+          Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
+      Statistic: "Sum"
+      Period: 60  
+      Threshold: !Ref OncallDLQLimit
       ComparisonOperator: "GreaterThanOrEqualToThreshold" 
       EvaluationPeriods: 1       
       AlarmActions:
@@ -178,7 +248,73 @@ Resources:
       OKActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
-
+  QueueHasOldMessagesAlarm:
+    Condition: IsWithDLQ
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${QueueName}-HasOldMessage"
+      AlarmDescription: "Alarm messages when the oldest message in queue is older than limit QueueOldestAgeLimit"
+      Namespace: "AWS/SQS"
+      MetricName: "ApproximateAgeOfOldestMessage"
+      TreatMissingData: "notBreaching"
+      Dimensions:
+        - Name: "QueueName"
+          Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
+      Statistic: "Maximum"
+      Period: 60  
+      Threshold: !Ref QueueOldestAgeLimit
+      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 1       
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      InsufficientDataActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+  
+  WakeupDLQAlarm:
+    Condition: IsWithDLQ
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "oncall-${QueueName}-HasDLQMessage"
+      AlarmDescription: "Alarm dlq messages when the ration between number of messages received in queue and messages written to DLQ is greater than the threshold"
+      DatapointsToAlarm: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 5
+      Threshold: 1
+      TreatMissingData: notBreaching
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: QueueName
+                  Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
+              MetricName: NumberOfMessagesReceived
+              Namespace: AWS/SQS
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m2
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: QueueName
+                  Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ], "" ]
+              MetricName: NumberOfMessagesReceived
+              Namespace: AWS/SQS
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: e1
+          Expression: !Sub IF(m1>${OncallLimit} AND m2/m1>${OncallDlqRatio}, 1, 0)
+          Label: !Sub "${QueueName}-HasDLQMessage-OnCall-Metric"       
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      InsufficientDataActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 Outputs:
   # Queue info
   QueueName:
@@ -212,3 +348,11 @@ Outputs:
         - IsWithAlarm
         - !GetAtt QueueHasMessagesAlarm.Arn
         - ''
+
+  SqsAgeAlarmArn:
+    Description: ARN of the SQS Age alarm
+    Value:
+      !If
+      - IsWithDLQ
+      - !GetAtt QueueHasOldMessagesAlarm.Arn
+      - ''

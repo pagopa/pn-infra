@@ -66,9 +66,29 @@ Parameters:
     Description: The limit on requests per 5-minute period for a single originating IP address.
     Default: 0
 
+  IntendedUsage:
+    Type: String
+    Default: ''
+    Description: Intended usage of API
+
+  LogRetentionDays:
+    Type: Number
+    Default: 5
+
 #Condition to check if the index is out of bound for the !Select function.
 #If an element exists at the index, it will allow you to create the WAF rule resource from the list
 Conditions:
+
+  IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
+  IsBackoffice: !Equals [ !Ref IntendedUsage, 'BACKOFFICE' ]
+  IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
+  IsIO: !Equals [ !Ref IntendedUsage, 'IO' ]
+  IsPNPG: !Equals [ !Ref IntendedUsage, 'PNPG' ]
+
+  IsServerToServer: !Or [ !Condition IsB2B,  !Condition IsIO, !Condition IsPNPG ]
+  IsEndUser: !Or [ !Condition IsWeb,  !Condition IsBackoffice ]
+  HasIntendedUsage: !Not [ !Equals [ !Ref IntendedUsage, '' ] ]
+
   AddRateRuleCondition: !Not [ !Equals [!Ref 'Limit', '0']]
 
   WAFRule0Exists: 
@@ -511,12 +531,46 @@ Resources:
       Description: Web Application Firewall for Rest API Gateway 
       Name: !Ref WAFName
       Rules: 
+        - Name: AWSManagedRulesAmazonIpReputationList
+          OverrideAction: 
+            None: {}
+          Priority: 1
+          Statement: 
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesAmazonIpReputationList
+          VisibilityConfig: 
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSManagedRulesAmazonIpReputationList
+            SampledRequestsEnabled: true
+        - !If 
+          - HasIntendedUsage
+          - Name: AWSManagedRulesAnonymousIpList
+            OverrideAction: 
+              None: {}
+            Priority: 2
+            Statement: 
+              ManagedRuleGroupStatement:
+                VendorName: AWS
+                Name: AWSManagedRulesAnonymousIpList
+                RuleActionOverrides:
+                  'Fn::If':
+                    - IsEndUser
+                    - !Ref "AWS::NoValue"
+                    - - ActionToUse:
+                          Allow: {}
+                        Name: HostingProviderIPList
+            VisibilityConfig: 
+              CloudWatchMetricsEnabled: true
+              MetricName: AWSManagedRulesAnonymousIpList
+              SampledRequestsEnabled: true
+          - !Ref "AWS::NoValue"
         - !If 
           - WAFRule0Exists
           - Name: !Join ["-", [!Select [0, !Ref WAFRuleVendors], !Select [0, !Ref WAFRuleNames]]]
             OverrideAction: 
               None: {}
-            Priority: 0
+            Priority: 3
             Statement: 
               ManagedRuleGroupStatement:
                 VendorName: !Select [0, !Ref WAFRuleVendors]
@@ -552,7 +606,7 @@ Resources:
           - Name: !Join ["-", [!Select [1, !Ref WAFRuleVendors], !Select [1, !Ref WAFRuleNames]]]
             OverrideAction:
               None: {}
-            Priority: 1
+            Priority: 4
             Statement:
               ManagedRuleGroupStatement:
                 VendorName: !Select [1, !Ref WAFRuleVendors]
@@ -588,7 +642,7 @@ Resources:
           - Name: !Join ["-", [!Select [2, !Ref WAFRuleVendors], !Select [2, !Ref WAFRuleNames]]]
             OverrideAction:
               None: {}
-            Priority: 2
+            Priority: 5
             Statement:
               ManagedRuleGroupStatement:
                 VendorName: !Select [2, !Ref WAFRuleVendors]
@@ -624,7 +678,7 @@ Resources:
           - Name: !Join ["-", [!Select [3, !Ref WAFRuleVendors], !Select [3, !Ref WAFRuleNames]]]
             OverrideAction:
               None: {}
-            Priority: 3
+            Priority: 6
             Statement:
               ManagedRuleGroupStatement:
                 VendorName: !Select [3, !Ref WAFRuleVendors]
@@ -660,7 +714,7 @@ Resources:
           - Name: !Join ["-", [!Select [4, !Ref WAFRuleVendors], !Select [4, !Ref WAFRuleNames]]]
             OverrideAction:
               None: {}
-            Priority: 4
+            Priority: 7
             Statement:
               ManagedRuleGroupStatement:
                 VendorName: !Select [4, !Ref WAFRuleVendors]
@@ -694,7 +748,7 @@ Resources:
         - !If 
           - AddRateRuleCondition
           - Name: "Rate-based_Rule"
-            Priority: 5
+            Priority: 8
             Action: 
               Block: {}
             Statement: 
@@ -766,3 +820,29 @@ Resources:
         - !Select [4, !Ref APIGatewayARNs]
         - !Ref "AWS::NoValue"
       WebACLArn: !GetAtt ApiWafWebAcl.Arn
+
+  # Create log group to store WAF logs
+  ApiWafLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub aws-waf-logs-${WAFName}
+      RetentionInDays: !Ref LogRetentionDays
+
+  # Create waf logging configuration
+  ApiWafLoggingConfiguration:
+    Type: AWS::WAFv2::LoggingConfiguration
+    Properties:
+      ResourceArn: !GetAtt ApiWafWebAcl.Arn
+      LoggingFilter:
+        DefaultBehavior: DROP
+        Filters:
+          - Behavior: KEEP
+            Conditions:
+              - ActionCondition:
+                  Action: BLOCK
+            Requirement: MEETS_ALL
+      LogDestinationConfigs:
+        - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:aws-waf-logs-${WAFName}"
+    DependsOn:
+      - ApiWafLogGroup
+

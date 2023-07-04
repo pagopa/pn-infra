@@ -12,14 +12,157 @@ Parameters:
     Type: String 
     Description: Name of the destination bucket
   
-  LogsAccountId:
-    Type: String 
-    Description: Account id of the log receiver bucket
+  LogsBucketKmsKeyArn:
+    Type: String
+    Description: Log bucket key ARN
+
+  DataLakeAccountId1:
+    Type: String
+    Default: '-'
+    Description: Data lake can read logs
   
+  DataLakeAccountId2:
+    Type: String
+    Default: '-'
+    Description: Data lake can read logs
+  
+  SafeStorageAccountId:
+    Type: String
+    Default: '-'
+    Description: Safestorage Account ID
+
+  BucketSuffix:
+    Type: String
+    Description: Bucket suffix
+  
+  MoreBucketResourcePolicyStatements:
+    Type: String
+    Default: ''
+    Description: Log bucket resource policy custom statements
+    
 Conditions:
+
   ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
+  ActivateDataLakeRead1Condition: !Not [ !Equals [ !Ref DataLakeAccountId1, '-' ]]
+  ActivateDataLakeRead2Condition: !Not [ !Equals [ !Ref DataLakeAccountId2, '-' ]]
+  ActivateDataLakeReadAnyCondition: 
+    Fn::Or: 
+      - !Not [ !Equals [ !Ref DataLakeAccountId1, '-' ]] 
+      - !Not [ !Equals [ !Ref DataLakeAccountId2, '-' ]] 
+
+  HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
 
 Resources:
+
+  LogsBucketKmsAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/${ProjectName}-logs-bucket-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}-key-alias'
+      TargetKeyId: !Ref LogsBucketKmsKeyArn
+
+  ### - IAM role assumed by data lake
+  ###########################################
+  LogBucketReadOnlyRole:
+    Condition: ActivateDataLakeReadAnyCondition
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: "Allow"
+            Action: "sts:AssumeRole"
+            Principal:
+              AWS: 
+                - Fn::If: 
+                  - ActivateDataLakeRead1Condition
+                  - !Sub arn:aws:iam::${DataLakeAccountId1}:root
+                  - !Ref AWS::NoValue
+                - Fn::If: 
+                  - ActivateDataLakeRead2Condition
+                  - !Sub arn:aws:iam::${DataLakeAccountId2}:root
+                  - !Ref AWS::NoValue
+            Condition:
+              StringEquals:
+                "sts:ExternalId": !Sub "{{resolve:secretsmanager:${ProjectName}-logs-data-lake-role-access:SecretString:ExternalId}}"
+      Path: "/"
+      Policies:
+        - PolicyName: ReadLogBucketPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            # Allow data lake to read the bucket items
+            - Effect: Allow
+              Action:
+                - "s3:Get*"
+                - "s3:List*"
+                - "s3-object-lambda:Get*"
+                - "s3-object-lambda:List*"
+              Resource: 
+                - !Sub "arn:aws:s3:::${LogsBucketName}"
+                - !Sub "arn:aws:s3:::${LogsBucketName}/*"
+            # Allow the use of encryption key
+            - Effect: Allow
+              Action:
+                - kms:Encrypt
+                - kms:Decrypt
+                - kms:ReEncrypt*
+                - kms:GenerateDataKey*
+                - kms:DescribeKey
+              Resource: 
+                - !Sub "${LogsBucketKmsKeyArn}"
+
+  CloudTrailDestinationBucketResourcePolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: HasStorageStorageAccountId
+    Properties: 
+      Bucket: !Ref LogsBucketName
+      PolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AWSCloudTrailWriteAclCheck",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudtrail.amazonaws.com"
+              },
+              "Action": [
+                "s3:GetBucketAcl"
+              ],
+              "Resource": [
+                "arn:${AWS::Partition}:s3:::${LogsBucketName}"
+              ],
+              "Condition":{
+                "StringLike":{
+                  "aws:SourceArn": [ 
+                    "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                  ]
+                }
+              }
+            },
+            {
+              "Sid": "AWSCloudTrailWrite",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudtrail.amazonaws.com"
+              },
+              "Action": [
+                "s3:PutObject"
+              ],
+              "Resource": [
+                "arn:${AWS::Partition}:s3:::${LogsBucketName}/safeStorageObjectPutAndGetTracing/*"
+              ],
+              "Condition":{
+                "StringLike":{
+                  "aws:SourceArn": [ 
+                    "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                  ]                  
+                }
+              }
+            }
+            ${MoreBucketResourcePolicyStatements}
+          ]
+        }
 
   LogsIngestionRole:
     Condition: ExportLogs
@@ -64,15 +207,14 @@ Resources:
               - "logs:PutLogEvents"
             Effect: "Allow"
             Resource:
-              - !Sub 'arn:aws:logs:${AWS::Region}:${LogsAccountId}:log-group:pn-logs-export-*:*'
+              - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:pn-logs-export-*:*'
           - Action:
               - "kms:Encrypt"
               - "kms:GenerateDataKey"
               - "kms:Decrypt"
             Effect: "Allow"
             Resource:
-              - !Sub 'arn:aws:kms:${AWS::Region}:${LogsAccountId}:alias/${LogsBucketName}-key-alias'
-              - !Sub 'arn:aws:kms:${AWS::Region}:${LogsAccountId}:key/*'
+              - !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*'
             Condition:
               StringEquals:
                 "kms:ViaService": !Sub s3.${AWS::Region}.amazonaws.com
@@ -90,4 +232,11 @@ Outputs:
       Fn::If:
         - ExportLogs
         - !Ref LogsIngestionPolicy
+        - ''
+
+  LogsBucketReadOnlyRoleArn:
+    Value: 
+      Fn::If:
+        - ActivateDataLakeReadAnyCondition
+        - !GetAtt LogBucketReadOnlyRole.Arn
         - ''

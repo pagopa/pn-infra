@@ -20,7 +20,45 @@ Parameters:
     Type: String
     Description: 'keep track of used projects commitIds'
 
+  ConfidentialInfoAccountId:
+    Type: String
+    Default: '153517439884'
+    Description: Confidential info account ID
+
+Conditions:
+  HasConfidentialInfoAccount: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
+
 Resources:
+  ###              API GATEWAY ACCOUNT-GLOBAL CONFIGURATIONS              ###
+  ###########################################################################
+  ### The ApiGwAccountConfig and ApiGatewayLoggingRole resources are not  ###
+  ###        related to alarms; make sure to not delete them              ###
+  ###########################################################################
+  # - Enable API-Gateway access log capability
+  ApiGwAccountConfig:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt "ApiGatewayLoggingRole.Arn"
+
+  ###########################################################################
+  ### The ApiGwAccountConfig and ApiGatewayLoggingRole resources are not  ###
+  ###        related to alarms; make sure to not delete them              ###
+  ###########################################################################
+  # - Grant CloudWatch write access permission to AWS API-Gateway
+  ApiGatewayLoggingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "apigateway.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
 
   ###                          DEFINE ALARM TOPIC                          ###
   ############################################################################
@@ -59,7 +97,38 @@ Resources:
             Condition: 
               ArnEquals: 
                 aws:SourceArn: !Ref AlarmSNSTopic
-      
+
+  CanPublishAlarmTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowServices
+            Effect: Allow
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+                - "cloudwatch.amazonaws.com"
+            Action:
+              - 'sns:Publish'
+            Resource:
+              - !Ref AlarmSNSTopic
+          - Fn::If: 
+            - HasConfidentialInfoAccount
+            - Sid: AllowPublishFromConfinfo
+              Effect: Allow
+              Action:
+              - 'sns:Publish'
+              Principal:
+                AWS: 
+                  - !Sub arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root
+              Resource:
+                - !Ref AlarmSNSTopic
+            - !Ref AWS::NoValue
+      Topics:
+        - !Ref AlarmSNSTopic
+
   # - Connect dev alarm to slack developers channel
   # AlarmSNSTopicSlackConnection:
   #   Type: AWS::CloudFormation::Stack
@@ -78,44 +147,6 @@ Resources:
        TopicArn: !Ref AlarmSNSTopic
        Endpoint: !Ref AlarmEmailAddress
        Protocol: email
-
-
-  # - Event Bridge events that generate an alarm
-  # "ACM Certificate Approaching Expiration": alarm
-  CertificateExpiringIsAlarmEventRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Description: "EventRule"
-      EventPattern:
-        source: [ "aws.acm" ]
-        detail-type: [ "ACM Certificate Approaching Expiration" ]
-      Targets:
-        - Arn: !Ref AlarmSNSTopic
-          Id: "AlarmSnsTopic"
-
-  ###              API GATEWAY ACCOUNT-GLOBAL CONFIGURATIONS              ###
-  ###########################################################################
-  # - Enable API-Gateway access log capability
-  ApiGwAccountConfig:
-    Type: AWS::ApiGateway::Account
-    Properties:
-      CloudWatchRoleArn: !GetAtt "ApiGatewayLoggingRole.Arn"
-
-  # - Grant CloudWatch write access permission to AWS API-Gateway
-  ApiGatewayLoggingRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - "apigateway.amazonaws.com"
-            Action: "sts:AssumeRole"
-      Path: "/"
-      ManagedPolicyArns:
-        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
 
 Outputs:
 
