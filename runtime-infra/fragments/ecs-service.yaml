@@ -526,6 +526,10 @@ Parameters:
     Default: '60'
     Description: ErrorFatal alarm sum period
 
+  LoggingLevel:
+    Type: String
+    Default: 'DEBUG'    
+
 Mappings:
   ContainerMemory:
     2GB:
@@ -897,6 +901,8 @@ Resources:
               Value: 10000
             - Name: 'OTEL_METRICS_EXPORTER'
               Value: 'none'
+            - Name: 'LOGGING_LEVEL_IT_PAGOPA_PN'
+              Value: !Ref LoggingLevel
             - 'Fn::If':
               - ShouldEnableOtelXRay
               - 'Fn::If':
