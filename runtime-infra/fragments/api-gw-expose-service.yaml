@@ -92,6 +92,8 @@ Conditions:
   HasOpenApiSpecs: !And [ !Condition HasOpenApiBucketName, !Condition HasOpenApiBucketKey ]
   IsWebOrBackoffice: !Or [ !Condition IsWeb, !Condition IsBackoffice ]
   AlarmOn4xxEnabled: !Equals [ !Ref AlarmOn4xx, 'true' ]
+  IsNotBackoffice: !Not [ !Condition IsBackoffice ]
+
 Resources:
 
   # API definition
@@ -474,6 +476,7 @@ Resources:
 
   APIGatewayApiErrorAlarmWakeup:
     Type: AWS::CloudWatch::Alarm
+    Condition: IsNotBackoffice
     Properties:
       AlarmName: !Sub "oncall-${MicroServiceUniqueName}-${IntendedUsage}-ApiGwAlarm"
       AlarmDescription: "CloudWatch alarm for when API Gateway has 4xx or 5xx error."
