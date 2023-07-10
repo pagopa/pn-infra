@@ -758,9 +758,9 @@ Resources:
       AlarmName: !Sub 'oncall-${ProjectName}-CoreEventBus-DLQ-HasMessage'
       AlarmDescription: "CloudWatch alarm for when DLQ has 1 or more messages."
       TreatMissingData: "notBreaching"
-      Threshold: 1
+      Threshold: 10
       ComparisonOperator: "GreaterThanOrEqualToThreshold" 
-      EvaluationPeriods: 5      
+      EvaluationPeriods: 60      
       Metrics:
         - Id: m1
           MetricStat:
