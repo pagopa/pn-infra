@@ -57,6 +57,10 @@ Parameters:
     Type: Number
     Default: '21600'
     Description: 'Oldest job age (in seconds) before raising an alarm'
+  OncallQueueOldestAgeLimit:
+    Type: Number
+    Default: '43000'
+    Description: 'Oldest job age (in seconds) before raising an oncall alarm'
   VisibilityTimeout:
     Type: Number
     Default: 30
@@ -74,7 +78,7 @@ Parameters:
 
   OncallLimit:
     Type: Number
-    Default: 20
+    Default: 5
     Description: The minimum number of messages received by standard Queue to calculate the ration with dql messages before raising an oncall alarm
 
   OncallDLQLimit:
@@ -272,15 +276,40 @@ Resources:
       OKActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
   
+  OncallQueueHasOldMessagesAlarm:
+    Condition: IsWithDLQ
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "oncall-${QueueName}-HasOldMessage"
+      AlarmDescription: "Alarm messages when the oldest message in queue is older than limit QueueOldestAgeLimit"
+      Namespace: "AWS/SQS"
+      MetricName: "ApproximateAgeOfOldestMessage"
+      TreatMissingData: "notBreaching"
+      Dimensions:
+        - Name: "QueueName"
+          Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
+      Statistic: "Maximum"
+      Period: 60  
+      Threshold: !Ref OncallQueueOldestAgeLimit
+      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 5
+      DatapointsToAlarm: 2
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      InsufficientDataActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+
   WakeupDLQAlarm:
     Condition: IsWithDLQ
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "oncall-${QueueName}-HasDLQMessage"
       AlarmDescription: "Alarm dlq messages when the ration between number of messages received in queue and messages written to DLQ is greater than the threshold"
-      DatapointsToAlarm: 10
+      DatapointsToAlarm: 5
       ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
+      EvaluationPeriods: 30
       Threshold: 1
       TreatMissingData: notBreaching
       Metrics:
