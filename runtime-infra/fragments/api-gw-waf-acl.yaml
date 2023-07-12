@@ -76,7 +76,7 @@ Parameters:
     Default: 5
   
   AllowedCidrs:
-    Type: CommaDelimitedList
+    Type: String
     Default: ''
     Description: Allowed of cidrs
 
@@ -96,7 +96,7 @@ Conditions:
 
   AddRateRuleCondition: !Not [ !Equals [!Ref 'Limit', '0']]
 
-  HasAllowedCidrs: !Not [!Equals [!Join ['', !Ref AllowedCidrs], '']]
+  HasAllowedCidrs: !Not [!Equals [!Ref AllowedCidrs, '']]
 
   WAFRule0Exists: 
     !Not 
@@ -883,4 +883,4 @@ Resources:
       Name: AllowedIPSet
       Scope: REGIONAL
       IPAddressVersion: IPV4
-      Addresses: !Ref AllowedCidrs
+      Addresses: !Split [ ",", !Ref AllowedCidrs ]
