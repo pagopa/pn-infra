@@ -28,9 +28,9 @@ Parameters:
     Type: String
 
 Conditions:
-  IsNotProd: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ]]
-  IsNotUat: !Not [ !Equals [ !Ref EnvironmentType, 'uat' ]]
-  IsCNEnabled: !And [ !Condition IsNotProd, !Condition IsNotUat ]
+  IsDev: !Equals [ !Ref EnvironmentType, 'dev' ]
+  IsTest: !Equals [ !Ref EnvironmentType, 'test' ]
+  IsCNEnabled: !Or [ !Condition IsDev, !Condition IsTest ]
 
 Resources:
 
