@@ -880,7 +880,7 @@ Resources:
     Type: 'AWS::WAFv2::IPSet'
     Condition: HasAllowedCidrs
     Properties:
-      Name: AllowedIPSet
+      Name: !Sub ${WAFName}-AllowedIPSet
       Scope: REGIONAL
       IPAddressVersion: IPV4
       Addresses: !Split [ ",", !Ref AllowedCidrs ]
