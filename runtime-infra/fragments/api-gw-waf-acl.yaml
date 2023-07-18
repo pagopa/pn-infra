@@ -74,6 +74,11 @@ Parameters:
   LogRetentionDays:
     Type: Number
     Default: 5
+  
+  AllowedCidrs:
+    Type: String
+    Default: ''
+    Description: Allowed of cidrs
 
 #Condition to check if the index is out of bound for the !Select function.
 #If an element exists at the index, it will allow you to create the WAF rule resource from the list
@@ -90,6 +95,8 @@ Conditions:
   HasIntendedUsage: !Not [ !Equals [ !Ref IntendedUsage, '' ] ]
 
   AddRateRuleCondition: !Not [ !Equals [!Ref 'Limit', '0']]
+
+  HasAllowedCidrs: !Not [!Equals [!Ref AllowedCidrs, '']]
 
   WAFRule0Exists: 
     !Not 
@@ -526,245 +533,268 @@ Resources:
   ApiWafWebAcl:
     Type: AWS::WAFv2::WebACL
     Properties: 
-      DefaultAction: 
-        Allow: {}
-      Description: Web Application Firewall for Rest API Gateway 
-      Name: !Ref WAFName
-      Rules: 
-        - Name: AWSManagedRulesAmazonIpReputationList
-          OverrideAction: 
-            None: {}
-          Priority: 1
-          Statement: 
-            ManagedRuleGroupStatement:
-              VendorName: AWS
-              Name: AWSManagedRulesAmazonIpReputationList
+      Fn::If:
+        - HasAllowedCidrs
+        - DefaultAction: 
+            Block: {}
+          Description: Web Application Firewall for Rest API Gateway 
+          Name: !Ref WAFName
+          Scope: REGIONAL
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Join ["-", [MetricFor, !Ref WAFName]]
+          Rules:
+            - Name: ip-whitelist
+              Priority: 0
+              Action:
+                Allow: { }
+              VisibilityConfig:
+                SampledRequestsEnabled: true
+                CloudWatchMetricsEnabled: true
+                MetricName: !Join ["-", [MetricFor, !Ref WAFName, 'IPWhitelist']]
+              Statement:
+                IPSetReferenceStatement:
+                  Arn: !GetAtt AllowedIPSet.Arn
+        - DefaultAction: 
+            Allow: {}
+          Description: Web Application Firewall for Rest API Gateway 
+          Name: !Ref WAFName
+          Rules: 
+            - Name: AWSManagedRulesAmazonIpReputationList
+              OverrideAction: 
+                None: {}
+              Priority: 1
+              Statement: 
+                ManagedRuleGroupStatement:
+                  VendorName: AWS
+                  Name: AWSManagedRulesAmazonIpReputationList
+              VisibilityConfig: 
+                CloudWatchMetricsEnabled: true
+                MetricName: AWSManagedRulesAmazonIpReputationList
+                SampledRequestsEnabled: true
+            - !If 
+              - HasIntendedUsage
+              - Name: AWSManagedRulesAnonymousIpList
+                OverrideAction: 
+                  None: {}
+                Priority: 2
+                Statement: 
+                  ManagedRuleGroupStatement:
+                    VendorName: AWS
+                    Name: AWSManagedRulesAnonymousIpList
+                    RuleActionOverrides:
+                      'Fn::If':
+                        - IsEndUser
+                        - !Ref "AWS::NoValue"
+                        - - ActionToUse:
+                              Allow: {}
+                            Name: HostingProviderIPList
+                VisibilityConfig: 
+                  CloudWatchMetricsEnabled: true
+                  MetricName: AWSManagedRulesAnonymousIpList
+                  SampledRequestsEnabled: true
+              - !Ref "AWS::NoValue"
+            - !If 
+              - WAFRule0Exists
+              - Name: !Join ["-", [!Select [0, !Ref WAFRuleVendors], !Select [0, !Ref WAFRuleNames]]]
+                OverrideAction: 
+                  None: {}
+                Priority: 3
+                Statement: 
+                  ManagedRuleGroupStatement:
+                    VendorName: !Select [0, !Ref WAFRuleVendors]
+                    Name: !Select [0, !Ref WAFRuleNames]
+                    ExcludedRules:  
+                      - !If
+                        - Rule0Pos0Exists
+                        - Name: !Select [0, !Ref ExcludedRule0]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule0Pos1Exists
+                        - Name: !Select [1, !Ref ExcludedRule0]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule0Pos2Exists
+                        - Name: !Select [2, !Ref ExcludedRule0]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule0Pos3Exists
+                        - Name: !Select [3, !Ref ExcludedRule0]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule0Pos4Exists
+                        - Name: !Select [4, !Ref ExcludedRule0]
+                        - !Ref "AWS::NoValue"
+                VisibilityConfig: 
+                  CloudWatchMetricsEnabled: true
+                  MetricName: !Join ["-", ["MetricFor", !Select [0, !Ref WAFRuleNames]]]
+                  SampledRequestsEnabled: true
+              - !Ref "AWS::NoValue"
+            - !If
+              - WAFRule1Exists
+              - Name: !Join ["-", [!Select [1, !Ref WAFRuleVendors], !Select [1, !Ref WAFRuleNames]]]
+                OverrideAction:
+                  None: {}
+                Priority: 4
+                Statement:
+                  ManagedRuleGroupStatement:
+                    VendorName: !Select [1, !Ref WAFRuleVendors]
+                    Name: !Select [1, !Ref WAFRuleNames]
+                    ExcludedRules: 
+                      - !If
+                        - Rule1Pos0Exists
+                        - Name: !Select [0, !Ref ExcludedRule1]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule1Pos1Exists
+                        - Name: !Select [1, !Ref ExcludedRule1]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule1Pos2Exists
+                        - Name: !Select [2, !Ref ExcludedRule1]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule1Pos3Exists
+                        - Name: !Select [3, !Ref ExcludedRule1]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule1Pos4Exists
+                        - Name: !Select [4, !Ref ExcludedRule1]
+                        - !Ref "AWS::NoValue"
+                VisibilityConfig:
+                  CloudWatchMetricsEnabled: true
+                  MetricName: !Join ["-", ["MetricFor", !Select [1, !Ref WAFRuleNames]]]
+                  SampledRequestsEnabled: true
+              - !Ref "AWS::NoValue"
+            - !If
+              - WAFRule2Exists
+              - Name: !Join ["-", [!Select [2, !Ref WAFRuleVendors], !Select [2, !Ref WAFRuleNames]]]
+                OverrideAction:
+                  None: {}
+                Priority: 5
+                Statement:
+                  ManagedRuleGroupStatement:
+                    VendorName: !Select [2, !Ref WAFRuleVendors]
+                    Name: !Select [2, !Ref WAFRuleNames]
+                    ExcludedRules: 
+                      - !If
+                        - Rule2Pos0Exists
+                        - Name: !Select [0, !Ref ExcludedRule2]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule2Pos1Exists
+                        - Name: !Select [1, !Ref ExcludedRule2]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule2Pos2Exists
+                        - Name: !Select [2, !Ref ExcludedRule2]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule2Pos3Exists
+                        - Name: !Select [3, !Ref ExcludedRule2]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule2Pos4Exists
+                        - Name: !Select [4, !Ref ExcludedRule2]
+                        - !Ref "AWS::NoValue"
+                VisibilityConfig:
+                  CloudWatchMetricsEnabled: true
+                  MetricName: !Join ["-", ["MetricFor", !Select [2, !Ref WAFRuleNames]]]
+                  SampledRequestsEnabled: true
+              - !Ref "AWS::NoValue"
+            - !If
+              - WAFRule3Exists
+              - Name: !Join ["-", [!Select [3, !Ref WAFRuleVendors], !Select [3, !Ref WAFRuleNames]]]
+                OverrideAction:
+                  None: {}
+                Priority: 6
+                Statement:
+                  ManagedRuleGroupStatement:
+                    VendorName: !Select [3, !Ref WAFRuleVendors]
+                    Name: !Select [3, !Ref WAFRuleNames]
+                    ExcludedRules: 
+                      - !If
+                        - Rule3Pos0Exists
+                        - Name: !Select [0, !Ref ExcludedRule3]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule3Pos1Exists
+                        - Name: !Select [1, !Ref ExcludedRule3]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule3Pos2Exists
+                        - Name: !Select [2, !Ref ExcludedRule3]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule3Pos3Exists
+                        - Name: !Select [3, !Ref ExcludedRule3]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule3Pos4Exists
+                        - Name: !Select [4, !Ref ExcludedRule3]
+                        - !Ref "AWS::NoValue"
+                VisibilityConfig:
+                  CloudWatchMetricsEnabled: true
+                  MetricName: !Join ["-", ["MetricFor", !Select [3, !Ref WAFRuleNames]]]
+                  SampledRequestsEnabled: true
+              - !Ref "AWS::NoValue"
+            - !If
+              - WAFRule4Exists
+              - Name: !Join ["-", [!Select [4, !Ref WAFRuleVendors], !Select [4, !Ref WAFRuleNames]]]
+                OverrideAction:
+                  None: {}
+                Priority: 7
+                Statement:
+                  ManagedRuleGroupStatement:
+                    VendorName: !Select [4, !Ref WAFRuleVendors]
+                    Name: !Select [4, !Ref WAFRuleNames]
+                    ExcludedRules:
+                      - !If
+                        - Rule4Pos0Exists
+                        - Name: !Select [0, !Ref ExcludedRule4]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule4Pos1Exists
+                        - Name: !Select [1, !Ref ExcludedRule4]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule4Pos2Exists
+                        - Name: !Select [2, !Ref ExcludedRule4]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule4Pos3Exists
+                        - Name: !Select [3, !Ref ExcludedRule4]
+                        - !Ref "AWS::NoValue"
+                      - !If
+                        - Rule4Pos4Exists
+                        - Name: !Select [4, !Ref ExcludedRule4]
+                        - !Ref "AWS::NoValue" 
+                VisibilityConfig:
+                  CloudWatchMetricsEnabled: true
+                  MetricName: !Join ["-", ["MetricFor", !Select [4, !Ref WAFRuleNames]]]
+                  SampledRequestsEnabled: true
+              - !Ref "AWS::NoValue"
+            - !If 
+              - AddRateRuleCondition
+              - Name: "Rate-based_Rule"
+                Priority: 8
+                Action: 
+                  Block: {}
+                Statement: 
+                  RateBasedStatement: 
+                    Limit: !Ref Limit
+                    AggregateKeyType: !Ref AggregateKeyType
+                VisibilityConfig: 
+                  SampledRequestsEnabled: true
+                  CloudWatchMetricsEnabled: true
+                  MetricName: "MetricForRateBasedRule"
+              - !Ref "AWS::NoValue"
+          Scope: "REGIONAL"
           VisibilityConfig: 
             CloudWatchMetricsEnabled: true
-            MetricName: AWSManagedRulesAmazonIpReputationList
+            MetricName: !Join ["-", [MetricFor, !Ref WAFName]]
             SampledRequestsEnabled: true
-        - !If 
-          - HasIntendedUsage
-          - Name: AWSManagedRulesAnonymousIpList
-            OverrideAction: 
-              None: {}
-            Priority: 2
-            Statement: 
-              ManagedRuleGroupStatement:
-                VendorName: AWS
-                Name: AWSManagedRulesAnonymousIpList
-                RuleActionOverrides:
-                  'Fn::If':
-                    - IsEndUser
-                    - !Ref "AWS::NoValue"
-                    - - ActionToUse:
-                          Allow: {}
-                        Name: HostingProviderIPList
-            VisibilityConfig: 
-              CloudWatchMetricsEnabled: true
-              MetricName: AWSManagedRulesAnonymousIpList
-              SampledRequestsEnabled: true
-          - !Ref "AWS::NoValue"
-        - !If 
-          - WAFRule0Exists
-          - Name: !Join ["-", [!Select [0, !Ref WAFRuleVendors], !Select [0, !Ref WAFRuleNames]]]
-            OverrideAction: 
-              None: {}
-            Priority: 3
-            Statement: 
-              ManagedRuleGroupStatement:
-                VendorName: !Select [0, !Ref WAFRuleVendors]
-                Name: !Select [0, !Ref WAFRuleNames]
-                ExcludedRules:  
-                  - !If
-                    - Rule0Pos0Exists
-                    - Name: !Select [0, !Ref ExcludedRule0]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule0Pos1Exists
-                    - Name: !Select [1, !Ref ExcludedRule0]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule0Pos2Exists
-                    - Name: !Select [2, !Ref ExcludedRule0]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule0Pos3Exists
-                    - Name: !Select [3, !Ref ExcludedRule0]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule0Pos4Exists
-                    - Name: !Select [4, !Ref ExcludedRule0]
-                    - !Ref "AWS::NoValue"
-            VisibilityConfig: 
-              CloudWatchMetricsEnabled: true
-              MetricName: !Join ["-", ["MetricFor", !Select [0, !Ref WAFRuleNames]]]
-              SampledRequestsEnabled: true
-          - !Ref "AWS::NoValue"
-        - !If
-          - WAFRule1Exists
-          - Name: !Join ["-", [!Select [1, !Ref WAFRuleVendors], !Select [1, !Ref WAFRuleNames]]]
-            OverrideAction:
-              None: {}
-            Priority: 4
-            Statement:
-              ManagedRuleGroupStatement:
-                VendorName: !Select [1, !Ref WAFRuleVendors]
-                Name: !Select [1, !Ref WAFRuleNames]
-                ExcludedRules: 
-                  - !If
-                    - Rule1Pos0Exists
-                    - Name: !Select [0, !Ref ExcludedRule1]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule1Pos1Exists
-                    - Name: !Select [1, !Ref ExcludedRule1]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule1Pos2Exists
-                    - Name: !Select [2, !Ref ExcludedRule1]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule1Pos3Exists
-                    - Name: !Select [3, !Ref ExcludedRule1]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule1Pos4Exists
-                    - Name: !Select [4, !Ref ExcludedRule1]
-                    - !Ref "AWS::NoValue"
-            VisibilityConfig:
-              CloudWatchMetricsEnabled: true
-              MetricName: !Join ["-", ["MetricFor", !Select [1, !Ref WAFRuleNames]]]
-              SampledRequestsEnabled: true
-          - !Ref "AWS::NoValue"
-        - !If
-          - WAFRule2Exists
-          - Name: !Join ["-", [!Select [2, !Ref WAFRuleVendors], !Select [2, !Ref WAFRuleNames]]]
-            OverrideAction:
-              None: {}
-            Priority: 5
-            Statement:
-              ManagedRuleGroupStatement:
-                VendorName: !Select [2, !Ref WAFRuleVendors]
-                Name: !Select [2, !Ref WAFRuleNames]
-                ExcludedRules: 
-                  - !If
-                    - Rule2Pos0Exists
-                    - Name: !Select [0, !Ref ExcludedRule2]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule2Pos1Exists
-                    - Name: !Select [1, !Ref ExcludedRule2]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule2Pos2Exists
-                    - Name: !Select [2, !Ref ExcludedRule2]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule2Pos3Exists
-                    - Name: !Select [3, !Ref ExcludedRule2]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule2Pos4Exists
-                    - Name: !Select [4, !Ref ExcludedRule2]
-                    - !Ref "AWS::NoValue"
-            VisibilityConfig:
-              CloudWatchMetricsEnabled: true
-              MetricName: !Join ["-", ["MetricFor", !Select [2, !Ref WAFRuleNames]]]
-              SampledRequestsEnabled: true
-          - !Ref "AWS::NoValue"
-        - !If
-          - WAFRule3Exists
-          - Name: !Join ["-", [!Select [3, !Ref WAFRuleVendors], !Select [3, !Ref WAFRuleNames]]]
-            OverrideAction:
-              None: {}
-            Priority: 6
-            Statement:
-              ManagedRuleGroupStatement:
-                VendorName: !Select [3, !Ref WAFRuleVendors]
-                Name: !Select [3, !Ref WAFRuleNames]
-                ExcludedRules: 
-                  - !If
-                    - Rule3Pos0Exists
-                    - Name: !Select [0, !Ref ExcludedRule3]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule3Pos1Exists
-                    - Name: !Select [1, !Ref ExcludedRule3]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule3Pos2Exists
-                    - Name: !Select [2, !Ref ExcludedRule3]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule3Pos3Exists
-                    - Name: !Select [3, !Ref ExcludedRule3]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule3Pos4Exists
-                    - Name: !Select [4, !Ref ExcludedRule3]
-                    - !Ref "AWS::NoValue"
-            VisibilityConfig:
-              CloudWatchMetricsEnabled: true
-              MetricName: !Join ["-", ["MetricFor", !Select [3, !Ref WAFRuleNames]]]
-              SampledRequestsEnabled: true
-          - !Ref "AWS::NoValue"
-        - !If
-          - WAFRule4Exists
-          - Name: !Join ["-", [!Select [4, !Ref WAFRuleVendors], !Select [4, !Ref WAFRuleNames]]]
-            OverrideAction:
-              None: {}
-            Priority: 7
-            Statement:
-              ManagedRuleGroupStatement:
-                VendorName: !Select [4, !Ref WAFRuleVendors]
-                Name: !Select [4, !Ref WAFRuleNames]
-                ExcludedRules:
-                  - !If
-                    - Rule4Pos0Exists
-                    - Name: !Select [0, !Ref ExcludedRule4]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule4Pos1Exists
-                    - Name: !Select [1, !Ref ExcludedRule4]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule4Pos2Exists
-                    - Name: !Select [2, !Ref ExcludedRule4]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule4Pos3Exists
-                    - Name: !Select [3, !Ref ExcludedRule4]
-                    - !Ref "AWS::NoValue"
-                  - !If
-                    - Rule4Pos4Exists
-                    - Name: !Select [4, !Ref ExcludedRule4]
-                    - !Ref "AWS::NoValue" 
-            VisibilityConfig:
-              CloudWatchMetricsEnabled: true
-              MetricName: !Join ["-", ["MetricFor", !Select [4, !Ref WAFRuleNames]]]
-              SampledRequestsEnabled: true
-          - !Ref "AWS::NoValue"
-        - !If 
-          - AddRateRuleCondition
-          - Name: "Rate-based_Rule"
-            Priority: 8
-            Action: 
-              Block: {}
-            Statement: 
-              RateBasedStatement: 
-                Limit: !Ref Limit
-                AggregateKeyType: !Ref AggregateKeyType
-            VisibilityConfig: 
-              SampledRequestsEnabled: true
-              CloudWatchMetricsEnabled: true
-              MetricName: "MetricForRateBasedRule"
-          - !Ref "AWS::NoValue"
-      Scope: "REGIONAL"
-      VisibilityConfig: 
-        CloudWatchMetricsEnabled: true
-        MetricName: !Join ["-", [MetricFor, !Ref WAFName]]
-        SampledRequestsEnabled: true
 
   # Associate Web ACLs with Rest API
   ApiWafWebAclAssociation0:
@@ -846,3 +876,11 @@ Resources:
     DependsOn:
       - ApiWafLogGroup
 
+  AllowedIPSet:
+    Type: 'AWS::WAFv2::IPSet'
+    Condition: HasAllowedCidrs
+    Properties:
+      Name: AllowedIPSet
+      Scope: REGIONAL
+      IPAddressVersion: IPV4
+      Addresses: !Split [ ",", !Ref AllowedCidrs ]
