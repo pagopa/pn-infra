@@ -80,6 +80,11 @@ Parameters:
     Default: ''
     Description: Allowed of cidrs
 
+  AlarmSNSTopicArn:
+    Type: String
+    Default: ''
+    Description: Alarm SNS Topic ARN
+
 #Condition to check if the index is out of bound for the !Select function.
 #If an element exists at the index, it will allow you to create the WAF rule resource from the list
 Conditions:
@@ -98,6 +103,9 @@ Conditions:
 
   HasAllowedCidrs: !Not [!Equals [!Ref AllowedCidrs, '']]
 
+  HasAlarmTopic: !Not [!Equals [!Ref AlarmSNSTopicArn, '']]
+
+  RequirestLimitAlarm: !And [ !Condition HasAlarmTopic, !Condition AddRateRuleCondition ]
   WAFRule0Exists: 
     !Not 
       - !Equals
@@ -788,7 +796,7 @@ Resources:
                 VisibilityConfig: 
                   SampledRequestsEnabled: true
                   CloudWatchMetricsEnabled: true
-                  MetricName: "MetricForRateBasedRule"
+                  MetricName: !Join ["-", ["MetricForRateBasedRule", !Ref WAFName]]
               - !Ref "AWS::NoValue"
           Scope: "REGIONAL"
           VisibilityConfig: 
@@ -884,3 +892,75 @@ Resources:
       Scope: REGIONAL
       IPAddressVersion: IPV4
       Addresses: !Split [ ",", !Ref AllowedCidrs ]
+
+
+  WebLimitBlockRequestAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: RequirestLimitAlarm
+    Properties:
+      AlarmName: !Sub '${WAFName}-WebLimitBlockRequestAlarm'
+      AlarmDescription: "CloudWatch alarm for when one request is blocked due to limit rate for 20 on 30 minutes"
+      Namespace: "AWS/WAFV2"
+      MetricName: "BlockedRequests"
+      Dimensions:
+        - Name: "WebACL"
+          Value: !Ref WAFName
+        - Name: "Rule"
+          Value: !Join ["-", ["MetricForRateBasedRule", !Ref WAFName]]
+      Statistic: "Sum"
+      TreatMissingData: "notBreaching"
+      Period: 60
+      Threshold: 1
+      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 20
+      DatapointsToAlarm: 15
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+
+  OncallWebLimitBlockRequestAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: RequirestLimitAlarm
+    Properties:
+      AlarmName: !Sub 'oncall-${WAFName}-WebLimitBlockRequestAlarm'
+      AlarmDescription: "CloudWatch alarm for when 20% of requests is blocked due to limit rate for 20 on 30 minutes"
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: "WebACL"
+                  Value: !Ref WAFName
+                - Name: "Rule"
+                  Value: !Join ["-", ["MetricForRateBasedRule", !Ref WAFName]]
+              MetricName: "BlockedRequests"
+              Namespace: "AWS/WAFV2"
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m2
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: "WebACL"
+                  Value: !Ref WAFName
+                - Name: "Rule"
+                  Value: !Join ["-", ["MetricFor", !Ref WAFName]]
+              MetricName: AllowedRequests
+              Namespace: "AWS/WAFV2"
+            Period: 60
+            Stat: Sum
+          ReturnData: False          
+        - Id: e1
+          Expression: IF(m1>10000 AND m1/(m1+m2)>=0.2, 1, 0)
+          Label: !Sub "oncall-${WAFName}-WebLimitBlockRequestAlarm-Metric"
+      TreatMissingData: "notBreaching"
+      Threshold: 1
+      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 20
+      DatapointsToAlarm: 15
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn        
