@@ -271,7 +271,8 @@ Resources:
               return data.Parameter.Value;
             } catch (err) {
               console.error("Error in get parameter ", err);
-              throw new Error("Error in get parameter "+parameterName);
+              return ''; // fallback to empty string
+              // throw new Error("Error in get parameter "+parameterName);
             }
           }
 
@@ -446,7 +447,7 @@ Resources:
         Mode: Active
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
-        - !Sub "arn:aws:lambda:${AWS::Region}:325218067255:layer:AWS-Parameters-and-Secrets-Lambda-Extension:2"         
+        - !Sub "arn:aws:lambda:${AWS::Region}:325218067255:layer:AWS-Parameters-and-Secrets-Lambda-Extension:4"         
 
 
   # Load balancer target group

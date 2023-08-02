@@ -274,6 +274,11 @@ Parameters:
     Type: String
     Default: ''
 
+  IOBackendCidrs:
+    Type: CommaDelimitedList
+    Description: comma separated list of IO Backend CIDRs
+    Default: ''
+
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
 
@@ -992,3 +997,5 @@ Outputs:
     Value: !Ref LogRetention
   ApplicationLoadBalancerMetricsDimensionName:
     Value: !Ref ApplicationLoadBalancerMetricsDimensionName
+  IOBackendCidrs:
+    Value: !Join [ ",", !Ref IOBackendCidrs ]

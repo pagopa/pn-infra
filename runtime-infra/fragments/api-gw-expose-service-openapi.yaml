@@ -87,6 +87,8 @@ Conditions:
   HasOpenApiBucketKey: !Not [ !Equals [ !Ref OpenApiBucketKey, '' ] ]
   HasOpenApiSpecs: !And [ !Condition HasOpenApiBucketName, !Condition HasOpenApiBucketKey ]
   AlarmOn4xxEnabled: !Equals [ !Ref AlarmOn4xx, 'true' ]
+  IsNotBackoffice: !Not [ !Condition IsBackoffice ]
+
 Resources:
 
   # API definition
@@ -301,6 +303,7 @@ Resources:
 
   APIGatewayApiErrorAlarmWakeup:
     Type: AWS::CloudWatch::Alarm
+    Condition: IsNotBackoffice
     Properties:
       AlarmName: !Sub "oncall-${MicroServiceUniqueName}-${IntendedUsage}-ApiGwAlarm"
       AlarmDescription: "CloudWatch alarm for when API Gateway has 4xx or 5xx error."
@@ -310,9 +313,9 @@ Resources:
         - !Ref AlarmSNSTopicArn
       OKActions:
         - !Ref AlarmSNSTopicArn
-      DatapointsToAlarm: 1
+      DatapointsToAlarm: 20
       ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 5
+      EvaluationPeriods: 60
       Threshold: 1
       TreatMissingData: notBreaching
       Metrics:
