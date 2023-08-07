@@ -27,14 +27,20 @@ Parameters:
   EnvironmentType:
     Type: String
 
+  CNBackendCidrs:
+    Type: String
+    Default: ''
+
 Conditions:
   IsDev: !Equals [ !Ref EnvironmentType, 'dev' ]
   IsTest: !Equals [ !Ref EnvironmentType, 'test' ]
+  IsProd: !Equals [ !Ref EnvironmentType, 'prod' ]
   IsCNEnabled: !Or [ !Condition IsDev, !Condition IsTest ]
+#  IsCNEnabled: !Or [ !Condition IsDev, !Condition IsTest, !Condition IsProd ] # uncomment before going live
 
 Resources:
 
-###               TOKEN EXCHANGE SERVICE                ###
+  ###               TOKEN EXCHANGE SERVICE                ###
   ###########################################################
   
   # API definition
