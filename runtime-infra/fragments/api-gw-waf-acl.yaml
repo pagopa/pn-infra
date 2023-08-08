@@ -582,28 +582,6 @@ Resources:
                 MetricName: AWSManagedRulesAmazonIpReputationList
                 SampledRequestsEnabled: true
             - !If 
-              - HasIntendedUsage
-              - Name: AWSManagedRulesAnonymousIpList
-                OverrideAction: 
-                  None: {}
-                Priority: 2
-                Statement: 
-                  ManagedRuleGroupStatement:
-                    VendorName: AWS
-                    Name: AWSManagedRulesAnonymousIpList
-                    RuleActionOverrides:
-                      'Fn::If':
-                        - IsEndUser
-                        - !Ref "AWS::NoValue"
-                        - - ActionToUse:
-                              Allow: {}
-                            Name: HostingProviderIPList
-                VisibilityConfig: 
-                  CloudWatchMetricsEnabled: true
-                  MetricName: AWSManagedRulesAnonymousIpList
-                  SampledRequestsEnabled: true
-              - !Ref "AWS::NoValue"
-            - !If 
               - WAFRule0Exists
               - Name: !Join ["-", [!Select [0, !Ref WAFRuleVendors], !Select [0, !Ref WAFRuleNames]]]
                 OverrideAction: 
