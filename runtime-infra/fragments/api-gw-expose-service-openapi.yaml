@@ -82,6 +82,13 @@ Parameters:
     Type: String
     Default: ''
 
+  OpenApiMode:
+    Type: String
+    Default: 'S3'
+    AllowedValues:
+      - S3
+      - INCLUDE
+
 Conditions:
   IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
   IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
@@ -95,7 +102,8 @@ Conditions:
   AlarmOn4xxEnabled: !Equals [ !Ref AlarmOn4xx, 'true' ]
   IsNotBackoffice: !Not [ !Condition IsBackoffice ]
   HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
-  
+  IsIncludeMode: !Equals [ !Ref OpenApiMode, 'INCLUDE' ]
+
 Resources:
 
   # API definition
@@ -122,9 +130,21 @@ Resources:
       Mode: overwrite
       DisableExecuteApiEndpoint: true      
       ApiKeySourceType: !If [ IsB2B, AUTHORIZER, HEADER ]
+      Body:
+        Fn::If:
+          - IsIncludeMode
+          - Body:
+              Fn::Transform:
+                Name: AWS::Include
+                Parameters:
+                  Location: !Sub s3://${OpenApiBucketName}/${OpenApiBucketKey}
+          - !Ref AWS::NoValue
       BodyS3Location:
-        Bucket: !Ref OpenApiBucketName
-        Key: !Ref OpenApiBucketKey
+        Fn::If:
+          - IsIncludeMode
+          - !Ref AWS::NoValue
+          - Bucket: !Ref OpenApiBucketName
+            Key: !Ref OpenApiBucketKey
       EndpointConfiguration:
         Types:
           - REGIONAL

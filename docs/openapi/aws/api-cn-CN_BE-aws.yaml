@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: >-
     ${stageVariables.ProjectName}-${stageVariables.MicroServiceUniqueName}-${stageVariables.IntendedUsage}
-  version: Muzs+ciMQO4hQ9xf57+gH74UMS7uoAN+iMZ4NWC745k=
+  version: GMn/uOqIN9GvbIyVRAkmFmT3MGiYTyw1p4LT2RaOScA=
 servers:
   - url: https://${stageVariables.DnsName}/{basePath}
     variables:
@@ -12,8 +12,6 @@ servers:
       disableExecuteApiEndpoint: true
 paths:
   /v1/files/{fileKey}:
-    parameters:
-      - $ref: '#/components/parameters/fileKey'
     get:
       operationId: getFileForLegalConservation
       x-pagopa-lambda-name: pn-preSignedUrlGenerator
@@ -38,6 +36,7 @@ paths:
         invocazioni di questa API generano un solo evento per client. <br/> Il
         file rimane hot per ```stayHotTime````.
       parameters:
+        - $ref: '#/components/parameters/fileKey'
         - name: metadataOnly
           in: query
           description: >-
@@ -90,8 +89,8 @@ paths:
       security:
         - api_key_openapi: []
       x-amazon-apigateway-integration:
-        uri: >-
-          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${stageVariables.ConfidentialInfoAccountId}:function:pn-preSignedUrlGenerator/invocations
+        uri: 
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${ConfidentialInfoAccountId}:function:pn-preSignedUrlGenerator/invocations
         httpMethod: ANY
         requestParameters:
           integration.request.header.x-pagopa-pn-cx-id: context.authorizer.cx_id
@@ -107,19 +106,6 @@ paths:
         contentHandling: CONVERT_TO_TEXT
         timeoutInMillis: 29000
         type: aws_proxy
-    options:
-      operationId: Options for /v1/files/{fileKey} API CORS
-      x-amazon-apigateway-integration:
-        uri: >-
-          http://${stageVariables.ApplicationLoadBalancerDomain}:8080/${stageVariables.ServiceApiPath}/v1/files/{fileKey}
-        connectionId: ${stageVariables.NetworkLoadBalancerLink}
-        httpMethod: ANY
-        requestParameters:
-          integration.request.path.fileKey: method.request.path.fileKey
-        passthroughBehavior: when_no_match
-        connectionType: VPC_LINK
-        timeoutInMillis: 29000
-        type: http_proxy
   /v1/events:
     post:
       operationId: updateLegalConservationEvents
@@ -146,8 +132,8 @@ paths:
       security:
         - api_key_openapi: []
       x-amazon-apigateway-integration:
-        uri: >-
-          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${stageVariables.ConfidentialInfoAccountId}:function:pn-eventUpdateRecevier/invocations
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${ConfidentialInfoAccountId}:function:pn-eventUpdateRecevier/invocations
         httpMethod: ANY
         requestParameters:
           integration.request.header.x-pagopa-pn-cx-id: context.authorizer.cx_id
