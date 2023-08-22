@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: >-
     ${stageVariables.ProjectName}-${stageVariables.MicroServiceUniqueName}-${stageVariables.IntendedUsage}
-  version: Ra5ULKlLNZ2/xsqcP5wPNwURPa2r1zllEH25SRJSJrI=
+  version: Muzs+ciMQO4hQ9xf57+gH74UMS7uoAN+iMZ4NWC745k=
 servers:
   - url: https://${stageVariables.DnsName}/{basePath}
     variables:
@@ -104,7 +104,7 @@ paths:
           integration.request.header.x-pagopa-pn-src-ch-details: context.authorizer.sourceChannelDetails
           integration.request.path.fileKey: method.request.path.fileKey
         passthroughBehavior: when_no_match
-        connectionType: VPC_LINK
+        contentHandling: CONVERT_TO_TEXT
         timeoutInMillis: 29000
         type: aws_proxy
     options:
@@ -159,7 +159,7 @@ paths:
           integration.request.header.x-pagopa-pn-cx-groups: context.authorizer.cx_groups
           integration.request.header.x-pagopa-pn-src-ch-details: context.authorizer.sourceChannelDetails
         passthroughBehavior: when_no_match
-        connectionType: VPC_LINK
+        contentHandling: CONVERT_TO_TEXT
         timeoutInMillis: 29000
         type: aws_proxy
       parameters: []
