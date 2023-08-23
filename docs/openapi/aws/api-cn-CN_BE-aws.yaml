@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: >-
     ${stageVariables.ProjectName}-${stageVariables.MicroServiceUniqueName}-${stageVariables.IntendedUsage}
-  version: GMn/uOqIN9GvbIyVRAkmFmT3MGiYTyw1p4LT2RaOScA=
+  version: ux3yk9f9mHafVwaDwhdqQetX6Ax5dokQ1q/zIXRXQIU=
 servers:
   - url: https://${stageVariables.DnsName}/{basePath}
     variables:
@@ -89,8 +89,9 @@ paths:
       security:
         - api_key_openapi: []
       x-amazon-apigateway-integration:
-        uri: 
-          'Fn::Sub': arn:aws:apigateway:${AWS::AccountId}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::AccountId}:${ConfidentialInfoAccountId}:function:pn-preSignedUrlGenerator/invocations
+        uri:
+          Fn::Sub: >-
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${ConfidentialInfoAccountId}:function:pn-preSignedUrlGenerator/invocations
         httpMethod: ANY
         requestParameters:
           integration.request.header.x-pagopa-pn-cx-id: context.authorizer.cx_id
@@ -132,8 +133,9 @@ paths:
       security:
         - api_key_openapi: []
       x-amazon-apigateway-integration:
-        uri: 
-          'Fn::Sub': arn:aws:apigateway:${AWS::AccountId}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::AccountId}:${ConfidentialInfoAccountId}:function:pn-eventUpdateRecevier/invocations
+        uri:
+          Fn::Sub: >-
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${ConfidentialInfoAccountId}:function:pn-eventUpdateRecevier/invocations
         httpMethod: ANY
         requestParameters:
           integration.request.header.x-pagopa-pn-cx-id: context.authorizer.cx_id
