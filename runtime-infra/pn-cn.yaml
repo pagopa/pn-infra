@@ -78,6 +78,7 @@ Resources:
 
   CNPublicApiWaf:
     Type: AWS::CloudFormation::Stack
+    Condition: IsCNEnabled
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-waf-acl.yaml"
       Parameters:

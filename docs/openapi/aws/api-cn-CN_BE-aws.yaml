@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: >-
     ${stageVariables.ProjectName}-${stageVariables.MicroServiceUniqueName}-${stageVariables.IntendedUsage}
-  version: ux3yk9f9mHafVwaDwhdqQetX6Ax5dokQ1q/zIXRXQIU=
+  version: CZuBkdoXXI9YveLdbaOIqf/BJ+oJ8wk6faBHGQ6aXqU=
 servers:
   - url: https://${stageVariables.DnsName}/{basePath}
     variables:
@@ -92,7 +92,7 @@ paths:
         uri:
           Fn::Sub: >-
             arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${ConfidentialInfoAccountId}:function:pn-preSignedUrlGenerator/invocations
-        httpMethod: ANY
+        httpMethod: POST
         requestParameters:
           integration.request.header.x-pagopa-pn-cx-id: context.authorizer.cx_id
           integration.request.header.x-pagopa-pn-cx-role: context.authorizer.cx_role
@@ -136,7 +136,7 @@ paths:
         uri:
           Fn::Sub: >-
             arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${ConfidentialInfoAccountId}:function:pn-eventUpdateRecevier/invocations
-        httpMethod: ANY
+        httpMethod: POST
         requestParameters:
           integration.request.header.x-pagopa-pn-cx-id: context.authorizer.cx_id
           integration.request.header.x-pagopa-pn-cx-role: context.authorizer.cx_role
