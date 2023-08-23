@@ -76,6 +76,17 @@ Resources:
         OpenApiBucketKey: !Sub ${BucketBasePath}/docs/openapi/aws/api-cn-CN_BE-aws.yaml
         OpenApiMode: 'INCLUDE'
 
+  CNPublicApiWaf:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-waf-acl.yaml"
+      Parameters:
+        WAFName: !Sub '${ProjectName}-cn'
+        IntendedUsage: CN_BE
+        APIGatewayARNs: !GetAtt CNPublicAPI.Outputs.APIGatewayARN
+        Limit: 0 # disable IP limit based rule
+        AllowedCidrs: !Ref CNBackendCidrs
+
   CNUsagePlan:
     Type: 'AWS::ApiGateway::UsagePlan'
     Condition: IsCNEnabled
