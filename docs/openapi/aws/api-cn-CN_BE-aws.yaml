@@ -90,7 +90,7 @@ paths:
         - api_key_openapi: []
       x-amazon-apigateway-integration:
         uri: 
-          'Fn::Sub': arn:aws:apigateway:eu-south-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-south-1:${ConfidentialInfoAccountId}:function:pn-preSignedUrlGenerator/invocations
+          'Fn::Sub': arn:aws:apigateway:${AWS::AccountId}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::AccountId}:${ConfidentialInfoAccountId}:function:pn-preSignedUrlGenerator/invocations
         httpMethod: ANY
         requestParameters:
           integration.request.header.x-pagopa-pn-cx-id: context.authorizer.cx_id
@@ -133,7 +133,7 @@ paths:
         - api_key_openapi: []
       x-amazon-apigateway-integration:
         uri: 
-          'Fn::Sub': arn:aws:apigateway:eu-south-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-south-1:${ConfidentialInfoAccountId}:function:pn-eventUpdateRecevier/invocations
+          'Fn::Sub': arn:aws:apigateway:${AWS::AccountId}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::AccountId}:${ConfidentialInfoAccountId}:function:pn-eventUpdateRecevier/invocations
         httpMethod: ANY
         requestParameters:
           integration.request.header.x-pagopa-pn-cx-id: context.authorizer.cx_id
