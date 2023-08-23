@@ -133,11 +133,10 @@ Resources:
       Body:
         Fn::If:
           - IsIncludeMode
-          - Body:
-              Fn::Transform:
-                Name: AWS::Include
-                Parameters:
-                  Location: !Sub s3://${OpenApiBucketName}/${OpenApiBucketKey}
+          - Fn::Transform:
+              Name: AWS::Include
+              Parameters:
+                Location: !Sub s3://${OpenApiBucketName}/${OpenApiBucketKey}
           - !Ref AWS::NoValue
       BodyS3Location:
         Fn::If:
