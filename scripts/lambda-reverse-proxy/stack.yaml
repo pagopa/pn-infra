@@ -279,7 +279,7 @@ Resources:
           async function forwardRequest(event, baseUrl){
               const { httpMethod, path, queryStringParameters, headers, body } = event
               
-              const url = baseUrl+path.slice(1)
+              let url = baseUrl+path.slice(1)
               
               let qs = null
               if(queryStringParameters && !isObjectEmpty(queryStringParameters)){
@@ -308,7 +308,7 @@ Resources:
               }
               
               if(qs){
-                  url = url+new URLSearchParams(qs)
+                  url = url+'?'+new URLSearchParams(qs)
               }
               
               console.log('url to fetch', url)
