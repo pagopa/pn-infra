@@ -110,45 +110,64 @@ Resources:
   PublicRestApiOpenapi:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Tags:
-        - Key: "PN_APIGW_TYPE"
-          Value: !Ref IntendedUsage
-        - Fn::If:
-          - HasOpenApiSpecs
-          - Key: "PN_OPENAPI_BUCKET_NAME"
-            Value: !Ref OpenApiBucketName
-          - !Ref AWS::NoValue
-        - Fn::If:
-          - HasOpenApiSpecs
-          - Key: "PN_OPENAPI_BUCKET_KEY"
-            Value: !Ref OpenApiBucketKey   
-          - !Ref AWS::NoValue
-        - Key: "PN_SERVICE_PATH"
-          Value: !Ref ServiceApiPath
-      Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
-      FailOnWarnings: true
-      Mode: overwrite
-      DisableExecuteApiEndpoint: true      
-      ApiKeySourceType: !If [ IsB2B, AUTHORIZER, HEADER ]
-      Body:
-        Fn::If:
-          - IsIncludeMode
-          - Fn::Transform:
+      Fn::If:
+        - IsIncludeMode
+        - Tags:
+            - Key: "PN_APIGW_TYPE"
+              Value: !Ref IntendedUsage
+            - Fn::If:
+              - HasOpenApiSpecs
+              - Key: "PN_OPENAPI_BUCKET_NAME"
+                Value: !Ref OpenApiBucketName
+              - !Ref AWS::NoValue
+            - Fn::If:
+              - HasOpenApiSpecs
+              - Key: "PN_OPENAPI_BUCKET_KEY"
+                Value: !Ref OpenApiBucketKey   
+              - !Ref AWS::NoValue
+            - Key: "PN_SERVICE_PATH"
+              Value: !Ref ServiceApiPath
+          Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
+          FailOnWarnings: true
+          Mode: overwrite
+          DisableExecuteApiEndpoint: true      
+          ApiKeySourceType: !If [ IsB2B, AUTHORIZER, HEADER ]
+          Body:
+            Fn::Transform:
               Name: AWS::Include
               Parameters:
                 Location: !Sub s3://${OpenApiBucketName}/${OpenApiBucketKey}
-          - !Ref AWS::NoValue
-      BodyS3Location:
-        Fn::If:
-          - IsIncludeMode
-          - !Ref AWS::NoValue
-          - Bucket: !Ref OpenApiBucketName
+          EndpointConfiguration:
+            Types:
+              - REGIONAL
+        - Tags:
+            - Key: "PN_APIGW_TYPE"
+              Value: !Ref IntendedUsage
+            - Fn::If:
+              - HasOpenApiSpecs
+              - Key: "PN_OPENAPI_BUCKET_NAME"
+                Value: !Ref OpenApiBucketName
+              - !Ref AWS::NoValue
+            - Fn::If:
+              - HasOpenApiSpecs
+              - Key: "PN_OPENAPI_BUCKET_KEY"
+                Value: !Ref OpenApiBucketKey   
+              - !Ref AWS::NoValue
+            - Key: "PN_SERVICE_PATH"
+              Value: !Ref ServiceApiPath
+          Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
+          FailOnWarnings: true
+          Mode: overwrite
+          DisableExecuteApiEndpoint: true      
+          ApiKeySourceType: !If [ IsB2B, AUTHORIZER, HEADER ]
+          BodyS3Location:
+            Bucket: !Ref OpenApiBucketName
             Key: !Ref OpenApiBucketKey
-      EndpointConfiguration:
-        Types:
-          - REGIONAL
+          EndpointConfiguration:
+            Types:
+              - REGIONAL
   
-  
+
   # Deployment
   PublicRestApiDeploymentPnPlaceholderEpochSeconds:
     Type: AWS::ApiGateway::Deployment
