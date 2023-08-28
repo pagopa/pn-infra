@@ -28,6 +28,12 @@ Parameters:
     Type: String
 
 Resources:
+  ## Mock SQS
+  PnCnMockQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      DelaySeconds: 60
+      QueueName: pn-cn-mock-requests
 
   ###                       APPLICATION LOAD BALANCER                       ###
   #############################################################################
@@ -450,6 +456,130 @@ Resources:
         - !Sub "arn:aws:lambda:${AWS::Region}:325218067255:layer:AWS-Parameters-and-Secrets-Lambda-Extension:4"         
 
 
+  # Lambda CN mock
+  CnLambdaMockFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 14
+      LogGroupName: /aws/lambda/pn-lambda-cn-mock
+
+  CnLambdaMockFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: CnMockFunctionPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/pn-lambda-cn-mock*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
+              - Sid: WriteOnQueue
+                Effect: Allow
+                Action:
+                  - sqs:ChangeMessageVisibility
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:SendMessage
+                Resource:
+                  - !GetAtt PnCnMockQueue.Arn
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+  CnLambdaMockFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: pn-lambda-cn-mock
+      Code:
+        ZipFile: |
+          const crypto = require('crypto');
+          const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs"); // CommonJS import
+
+          const client = new SQSClient({ region: process.env.REGION });
+
+          async function sendLegalConservationRequestMessageInQueue(message){
+
+              const input = { // SendMessageRequest
+                QueueUrl: process.env.SqsQueueUrl,
+                MessageBody: JSON.stringify(message),
+                DelaySeconds: 60
+              };
+              const command = new SendMessageCommand(input);  
+              const response = await client.send(command);
+              console.log('response', response);  
+              return response;  
+          }
+
+          async function mockIngestion(body){
+            const jsonBody = JSON.parse(body)
+            const generateRandomId = 'MOCK##'+crypto.randomUUID()
+            
+            const queueMessage = {
+                id: generateRandomId,
+                documentKey: jsonBody.externalDocumentKey
+            }
+            
+            await sendLegalConservationRequestMessageInQueue(queueMessage)
+            return {
+              id: generateRandomId
+            }
+          }
+
+          exports.handler = async(event) => {
+
+              console.log(JSON.stringify(event))
+
+              try {
+                  const response = await mockIngestion(event.body)
+                  return response
+              } catch(e){
+                  console.log('error', e)
+                  const response = {
+                      statusCode: 500,
+                      body: JSON.stringify({
+                          message: e.message
+                      })
+                  }
+                  
+                  return response
+              }
+              
+          };
+
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          SqsQueueUrl: !GetAtt PnCnMockQueue.QueueUrl
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt LambdaProxySecurityGroup.GroupId
+        SubnetIds: !Ref Subnets
+      Role: !GetAtt CnLambdaMockFunctionExecutionRole.Arn
+      Timeout: 30
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+
   # Load balancer target group
 
   AlbLambdaPermission:
@@ -469,6 +599,23 @@ Resources:
       Targets:
         - Id: !GetAtt LambdaProxyFunction.Arn
 
+  CnLambdaMockTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn:
+      - AlbLambdaPermission
+    Properties:
+      TargetType: lambda
+      Targets:
+        - Id: !GetAtt CnLambdaMockFunction.Arn
+
+  AlbCnLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt CnLambdaMockFunction.Arn
+      Principal: elasticloadbalancing.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
   # Load balancer forward rule; forward only path pattern defined with MappedPaths
   LambdaProxyLoadBalancerRoutingRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
@@ -484,4 +631,18 @@ Resources:
       Actions:
         - Type: forward
           TargetGroupArn: !Ref LambdaProxyTargetGroup
+          Order: 1
+
+  CnLambdaProxyLoadBalancerRoutingRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref ApplicationLoadBalancerListener
+      Priority: 20
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /api/v1/uploads/remote
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref CnLambdaMockTargetGroup
           Order: 1
