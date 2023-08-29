@@ -27,13 +27,21 @@ Parameters:
   MockConsolidatoreBaseUrl:
     Type: String
 
+  CnApiBaseUrl:
+    Type: String
+
+  TemplateBucketBaseUrl:
+    Type: String
+
 Resources:
   ## Mock SQS
-  PnCnMockQueue:
-    Type: AWS::SQS::Queue
+  PnCnMockRequestsQueue:
+    Type: AWS::CloudFormation::Stack
     Properties:
-      DelaySeconds: 60
-      QueueName: pn-cn-mock-requests
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: pn-cn-mock-requests-queue
+        DelaySeconds: 60
 
   ###                       APPLICATION LOAD BALANCER                       ###
   #############################################################################
@@ -498,7 +506,7 @@ Resources:
                   - sqs:GetQueueUrl
                   - sqs:SendMessage
                 Resource:
-                  - !GetAtt PnCnMockQueue.Arn
+                  - !GetAtt PnCnMockRequestsQueue.Outputs.QueueARN
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
@@ -531,9 +539,13 @@ Resources:
             const jsonBody = JSON.parse(body)
             const generateRandomId = 'MOCK##'+crypto.randomUUID()
             
+            const date = new Date()
             const queueMessage = {
                 id: generateRandomId,
-                documentKey: jsonBody.externalDocumentKey
+                documentKey: jsonBody.externalDocumentKey,
+                statusDate: date.toISOString(),
+                status: "OK",
+                isFinal: true
             }
             
             await sendLegalConservationRequestMessageInQueue(queueMessage)
@@ -547,6 +559,15 @@ Resources:
               console.log(JSON.stringify(event))
 
               try {
+                  if(event.httpMethod!=='POST'){
+                    return {
+                        statusCode: 405,
+                        body: JSON.stringify({
+                            message: 'Wrong method'
+                        })
+                    }
+                  }
+
                   const response = await mockIngestion(event.body)
                   return response
               } catch(e){
@@ -568,7 +589,7 @@ Resources:
       Environment:
         Variables:
           REGION: !Sub ${AWS::Region}
-          SqsQueueUrl: !GetAtt PnCnMockQueue.QueueUrl
+          SqsQueueUrl: !GetAtt PnCnMockRequestsQueue.Outputs.QueueURL
       VpcConfig:
         SecurityGroupIds:
           - !GetAtt LambdaProxySecurityGroup.GroupId
@@ -646,3 +667,76 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref CnLambdaMockTargetGroup
           Order: 1
+
+  ## Pipe SQS to eventUpdate 
+
+  CnApiConnection:
+    Type: AWS::Events::Connection
+    Properties:
+      AuthorizationType: API_KEY
+      Description: Connection to CN Api event update
+      AuthParameters:
+        ApiKeyAuthParameters:
+          ApiKeyName: x-api-key
+          ApiKeyValue: '{{resolve:secretsmanager:pn-cn-api:SecretString:api-key}}'
+        
+  CnApiDestination:
+    Type: AWS::Events::ApiDestination
+    Properties:
+      ConnectionArn: !GetAtt CnApiConnection.Arn
+      Description: API Destination to send legal conservation updates to CN API
+      HttpMethod: POST
+      InvocationEndpoint: !Sub ${CnApiBaseUrl}/cn/v1/events
+
+  CnMockToApiPipeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - pipes.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: pn-cn-mock-to-api-pipe-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'sqs:ReceiveMessage'
+                  - 'sqs:DeleteMessage'
+                  - 'sqs:GetQueueAttributes'
+                Resource: !GetAtt PnCnMockRequestsQueue.Outputs.QueueARN
+        - PolicyName: pn-cn-mock-to-api-pipe-target-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'events:InvokeApiDestination'
+                Resource: 
+                  - !GetAtt CnApiDestination.Arn
+
+  CnMockToApiPipe:
+    Type: AWS::Pipes::Pipe
+    Properties:
+      Name: pn-cn-mock-to-update-api-pipe
+      Description: 'Pipe from CN Mock Queue to API'
+      RoleArn: !GetAtt CnMockToApiPipeRole.Arn
+      Source: !GetAtt PnCnMockRequestsQueue.Outputs.QueueARN
+      Target: !GetAtt CnApiDestination.Arn
+      TargetParameters:
+        InputTemplate: |
+              {
+                "events": [{
+                  "fileKey": "<$.body.documentKey>",
+                  "externalId": "<$.body.id>",
+                  "statusDate": "<$.body.statusDate>",
+                  "status": "<$.body.status>",                  
+                  "isFinal": <$.body.isFinal>
+                }]
+              }
