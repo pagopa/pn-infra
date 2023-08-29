@@ -33,10 +33,19 @@ Parameters:
   TemplateBucketBaseUrl:
     Type: String
 
+  CnMockEnabled:
+    Type: String
+    Default: false
+    AllowedValues: [ true, false ]
+
+Conditions:
+  IsCnMockEnabled: !Equals [ !Ref CnMockEnabled, true ]
+
 Resources:
   ## Mock SQS
   PnCnMockRequestsQueue:
     Type: AWS::CloudFormation::Stack
+    Condition: IsCnMockEnabled
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
@@ -467,12 +476,14 @@ Resources:
   # Lambda CN mock
   CnLambdaMockFunctionLogGroup:
     Type: AWS::Logs::LogGroup
+    Condition: IsCnMockEnabled
     Properties:
       RetentionInDays: 14
       LogGroupName: /aws/lambda/pn-lambda-cn-mock
 
   CnLambdaMockFunctionExecutionRole:
     Type: AWS::IAM::Role
+    Condition: IsCnMockEnabled
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -513,6 +524,7 @@ Resources:
 
   CnLambdaMockFunction:
     Type: AWS::Lambda::Function
+    Condition: IsCnMockEnabled
     Properties:
       FunctionName: pn-lambda-cn-mock
       Code:
@@ -625,6 +637,7 @@ Resources:
 
   CnLambdaMockTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Condition: IsCnMockEnabled
     DependsOn:
       - AlbLambdaPermission
     Properties:
@@ -634,6 +647,7 @@ Resources:
 
   AlbCnLambdaPermission:
     Type: AWS::Lambda::Permission
+    Condition: IsCnMockEnabled
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt CnLambdaMockFunction.Arn
@@ -659,6 +673,7 @@ Resources:
 
   CnLambdaProxyLoadBalancerRoutingRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Condition: IsCnMockEnabled
     Properties:
       ListenerArn: !Ref ApplicationLoadBalancerListener
       Priority: 20
@@ -672,9 +687,9 @@ Resources:
           Order: 1
 
   ## Pipe SQS to eventUpdate 
-
   CnApiConnection:
     Type: AWS::Events::Connection
+    Condition: IsCnMockEnabled
     Properties:
       AuthorizationType: API_KEY
       Description: Connection to CN Api event update
@@ -685,6 +700,7 @@ Resources:
         
   CnApiDestination:
     Type: AWS::Events::ApiDestination
+    Condition: IsCnMockEnabled
     Properties:
       ConnectionArn: !GetAtt CnApiConnection.Arn
       Description: API Destination to send legal conservation updates to CN API
@@ -693,6 +709,7 @@ Resources:
 
   CnMockToApiPipeRole:
     Type: AWS::IAM::Role
+    Condition: IsCnMockEnabled
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -726,6 +743,7 @@ Resources:
 
   CnMockToApiPipe:
     Type: AWS::Pipes::Pipe
+    Condition: IsCnMockEnabled
     Properties:
       Name: pn-cn-mock-to-update-api-pipe
       Description: 'Pipe from CN Mock Queue to API'
