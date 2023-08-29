@@ -569,7 +569,10 @@ Resources:
                   }
 
                   const response = await mockIngestion(event.body)
-                  return response
+                  return {
+                    statusCode: 200,
+                    body: JSON.stringify(response)
+                  }
               } catch(e){
                   console.log('error', e)
                   const response = {
