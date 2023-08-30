@@ -27,7 +27,30 @@ Parameters:
   MockConsolidatoreBaseUrl:
     Type: String
 
+  CnApiBaseUrl:
+    Type: String
+
+  TemplateBucketBaseUrl:
+    Type: String
+
+  CnMockEnabled:
+    Type: String
+    Default: false
+    AllowedValues: [ true, false ]
+
+Conditions:
+  IsCnMockEnabled: !Equals [ !Ref CnMockEnabled, true ]
+
 Resources:
+  ## Mock SQS
+  PnCnMockRequestsQueue:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCnMockEnabled
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: pn-cn-mock-requests-queue
+        DelaySeconds: 60
 
   ###                       APPLICATION LOAD BALANCER                       ###
   #############################################################################
@@ -279,7 +302,7 @@ Resources:
           async function forwardRequest(event, baseUrl){
               const { httpMethod, path, queryStringParameters, headers, body } = event
               
-              const url = baseUrl+path.slice(1)
+              let url = baseUrl+path.slice(1)
               
               let qs = null
               if(queryStringParameters && !isObjectEmpty(queryStringParameters)){
@@ -308,7 +331,7 @@ Resources:
               }
               
               if(qs){
-                  url = url+new URLSearchParams(qs)
+                  url = url+'?'+new URLSearchParams(qs)
               }
               
               console.log('url to fetch', url)
@@ -450,6 +473,149 @@ Resources:
         - !Sub "arn:aws:lambda:${AWS::Region}:325218067255:layer:AWS-Parameters-and-Secrets-Lambda-Extension:4"         
 
 
+  # Lambda CN mock
+  CnLambdaMockFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: IsCnMockEnabled
+    Properties:
+      RetentionInDays: 14
+      LogGroupName: /aws/lambda/pn-lambda-cn-mock
+
+  CnLambdaMockFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Condition: IsCnMockEnabled
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: CnMockFunctionPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/pn-lambda-cn-mock*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
+              - Sid: WriteOnQueue
+                Effect: Allow
+                Action:
+                  - sqs:ChangeMessageVisibility
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:SendMessage
+                Resource:
+                  - !GetAtt PnCnMockRequestsQueue.Outputs.QueueARN
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+  CnLambdaMockFunction:
+    Type: AWS::Lambda::Function
+    Condition: IsCnMockEnabled
+    Properties:
+      FunctionName: pn-lambda-cn-mock
+      Code:
+        ZipFile: |
+          const crypto = require('crypto');
+          const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs"); // CommonJS import
+
+          const client = new SQSClient({ region: process.env.REGION });
+
+          async function sendLegalConservationRequestMessageInQueue(message){
+
+              const input = { // SendMessageRequest
+                QueueUrl: process.env.SqsQueueUrl,
+                MessageBody: JSON.stringify(message),
+                DelaySeconds: 60
+              };
+              const command = new SendMessageCommand(input);  
+              const response = await client.send(command);
+              console.log('response', response);  
+              return response;  
+          }
+
+          async function mockIngestion(body){
+            const jsonBody = JSON.parse(body)
+            const generateRandomId = 'MOCK##'+crypto.randomUUID()
+            
+            const date = new Date()
+            const queueMessage = {
+                id: generateRandomId,
+                documentKey: jsonBody.externalDocumentKey,
+                statusDate: date.toISOString(),
+                status: "OK",
+                isFinal: true
+            }
+            
+            await sendLegalConservationRequestMessageInQueue(queueMessage)
+            return {
+              id: generateRandomId
+            }
+          }
+
+          exports.handler = async(event) => {
+
+              console.log(JSON.stringify(event))
+
+              try {
+                  if(event.httpMethod!=='POST'){
+                    return {
+                        statusCode: 405,
+                        body: JSON.stringify({
+                            message: 'Wrong method'
+                        })
+                    }
+                  }
+
+                  const response = await mockIngestion(event.body)
+                  return {
+                    statusCode: 200,
+                    body: JSON.stringify(response)
+                  }
+              } catch(e){
+                  console.log('error', e)
+                  const response = {
+                      statusCode: 500,
+                      body: JSON.stringify({
+                          message: e.message
+                      })
+                  }
+                  
+                  return response
+              }
+              
+          };
+
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          SqsQueueUrl: !GetAtt PnCnMockRequestsQueue.Outputs.QueueURL
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt LambdaProxySecurityGroup.GroupId
+        SubnetIds: !Ref Subnets
+      Role: !GetAtt CnLambdaMockFunctionExecutionRole.Arn
+      Timeout: 30
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+
   # Load balancer target group
 
   AlbLambdaPermission:
@@ -469,6 +635,25 @@ Resources:
       Targets:
         - Id: !GetAtt LambdaProxyFunction.Arn
 
+  CnLambdaMockTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Condition: IsCnMockEnabled
+    DependsOn:
+      - AlbLambdaPermission
+    Properties:
+      TargetType: lambda
+      Targets:
+        - Id: !GetAtt CnLambdaMockFunction.Arn
+
+  AlbCnLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Condition: IsCnMockEnabled
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt CnLambdaMockFunction.Arn
+      Principal: elasticloadbalancing.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
   # Load balancer forward rule; forward only path pattern defined with MappedPaths
   LambdaProxyLoadBalancerRoutingRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
@@ -485,3 +670,94 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref LambdaProxyTargetGroup
           Order: 1
+
+  CnLambdaProxyLoadBalancerRoutingRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Condition: IsCnMockEnabled
+    Properties:
+      ListenerArn: !Ref ApplicationLoadBalancerListener
+      Priority: 20
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /api/v1/uploads/remote
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref CnLambdaMockTargetGroup
+          Order: 1
+
+  ## Pipe SQS to eventUpdate 
+  CnApiConnection:
+    Type: AWS::Events::Connection
+    Condition: IsCnMockEnabled
+    Properties:
+      AuthorizationType: API_KEY
+      Description: Connection to CN Api event update
+      AuthParameters:
+        ApiKeyAuthParameters:
+          ApiKeyName: x-api-key
+          ApiKeyValue: '{{resolve:secretsmanager:pn-cn-api:SecretString:api-key}}'
+        
+  CnApiDestination:
+    Type: AWS::Events::ApiDestination
+    Condition: IsCnMockEnabled
+    Properties:
+      ConnectionArn: !GetAtt CnApiConnection.Arn
+      Description: API Destination to send legal conservation updates to CN API
+      HttpMethod: POST
+      InvocationEndpoint: !Sub ${CnApiBaseUrl}/cn/v1/events
+
+  CnMockToApiPipeRole:
+    Type: AWS::IAM::Role
+    Condition: IsCnMockEnabled
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - pipes.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: pn-cn-mock-to-api-pipe-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'sqs:ReceiveMessage'
+                  - 'sqs:DeleteMessage'
+                  - 'sqs:GetQueueAttributes'
+                Resource: !GetAtt PnCnMockRequestsQueue.Outputs.QueueARN
+        - PolicyName: pn-cn-mock-to-api-pipe-target-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'events:InvokeApiDestination'
+                Resource: 
+                  - !GetAtt CnApiDestination.Arn
+
+  CnMockToApiPipe:
+    Type: AWS::Pipes::Pipe
+    Condition: IsCnMockEnabled
+    Properties:
+      Name: pn-cn-mock-to-update-api-pipe
+      Description: 'Pipe from CN Mock Queue to API'
+      RoleArn: !GetAtt CnMockToApiPipeRole.Arn
+      Source: !GetAtt PnCnMockRequestsQueue.Outputs.QueueARN
+      Target: !GetAtt CnApiDestination.Arn
+      TargetParameters:
+        InputTemplate: |
+              {
+                "events": [{
+                  "fileKey": "<$.body.documentKey>",
+                  "externalId": "<$.body.id>",
+                  "statusDate": "<$.body.statusDate>",
+                  "status": "<$.body.status>",                  
+                  "isFinal": <$.body.isFinal>
+                }]
+              }

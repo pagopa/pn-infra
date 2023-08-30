@@ -279,6 +279,11 @@ Parameters:
     Description: comma separated list of IO Backend CIDRs
     Default: ''
 
+  CNBackendCidrs:
+    Type: CommaDelimitedList
+    Description: comma separated list of Conservazione Sostitutiva backend CIDRs
+    Default: ''
+
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
 
@@ -999,3 +1004,5 @@ Outputs:
     Value: !Ref ApplicationLoadBalancerMetricsDimensionName
   IOBackendCidrs:
     Value: !Join [ ",", !Ref IOBackendCidrs ]
+  CNBackendCidrs:
+    Value: !Join [ ",", !Ref CNBackendCidrs ]
