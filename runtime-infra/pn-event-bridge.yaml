@@ -87,6 +87,13 @@ Parameters:
   SafeStorageToRaddQueueURL:
     Type: String
 
+  # SafeStorage to ServiceDesk
+  SafeStorageToServiceDeskQueueARN:
+    Type: String
+
+  SafeStorageToServiceDeskQueueURL:
+    Type: String
+
   # External channels outputs
   ExternalChannelsOutputsQueueARN:
     Type: String
@@ -237,6 +244,7 @@ Resources:
                   - !Ref ExternalChannels2UserAttributesQueueARN
                   - !Ref SafeStorageToDeliveryPushQueueARN
                   - !Ref SafeStorageToRaddQueueARN
+                  - !Ref SafeStorageToServiceDeskQueueARN
                   - !Ref "DowntimeLogsSafeStorageEventsQueueARN"
                   - !Ref "NationalRegistries2DeliveryPushQueueARN"
                   - !Ref "NationalRegistries2PaperChannelQueueARN"
@@ -303,6 +311,7 @@ Resources:
         - !Ref "ExternalChannels2PaperChannelQueueURL"
         - !Ref "SafeStorageToDeliveryPushQueueURL"
         - !Ref "SafeStorageToRaddQueueURL"
+        - !Ref "SafeStorageToServiceDeskQueueURL"
         - !Ref "DowntimeLogsSafeStorageEventsQueueURL"
         - !Ref "NationalRegistries2DeliveryPushQueueURL"
         - !Ref "NationalRegistries2PaperChannelQueueURL"
@@ -323,6 +332,7 @@ Resources:
               - !Ref "ExternalChannels2PaperChannelQueueARN"
               - !Ref "SafeStorageToDeliveryPushQueueARN"
               - !Ref "SafeStorageToRaddQueueARN"
+              - !Ref "SafeStorageToServiceDeskQueueARN"
               - !Ref "DowntimeLogsSafeStorageEventsQueueARN"
               - !Ref "NationalRegistries2DeliveryPushQueueARN"
               - !Ref "NationalRegistries2PaperChannelQueueARN"
@@ -505,6 +515,37 @@ Resources:
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2Radd'
           Arn: !Ref SafeStorageToRaddQueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+            
+  # Send Safe Storage Response to servicedesk
+  PnCoreEventBusToServiceDeskSafeStorageResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route SafeStorage Events to pn-servicedesk
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "SafeStorageOutcomeEvent" ]
+        detail:
+          documentType: [ 'PN_SERVICEDESK_RECORDING' ]
+      Targets: 
+        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
+          Id: !Sub ${ProjectName}-Logger-SafeStore2ServiceDesk
+          InputTransformer:
+            InputPathsMap:
+              "timestamp": "$.time"
+            InputTemplate: |
+              {
+                  "timestamp": <timestamp>,
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }       
+        - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2ServiceDesk'
+          Arn: !Ref SafeStorageToServiceDeskQueueARN
           InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
