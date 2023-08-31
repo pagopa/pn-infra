@@ -100,6 +100,12 @@ Resources:
               Resource: 
                 - !Sub "arn:aws:s3:::${LogsBucketName}"
                 - !Sub "arn:aws:s3:::${LogsBucketName}/*"
+            # Allow data lake to write into specific bucket path
+            - Effect: Allow
+              Action:
+                - "s3:PutObject"
+              Resource: 
+                - !Sub "arn:aws:s3:::${LogsBucketName}/report_attivita_pn_from_datalake/*"                
             # Allow the use of encryption key
             - Effect: Allow
               Action:
