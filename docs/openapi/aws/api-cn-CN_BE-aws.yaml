@@ -1,0 +1,349 @@
+openapi: 3.0.1
+info:
+  title: >-
+    ${stageVariables.ProjectName}-${stageVariables.MicroServiceUniqueName}-${stageVariables.IntendedUsage}
+  version: 6tJXuzaslTWFb+tSbei/UhAaXQ5AXO9kI2bkm9ERe6k=
+servers:
+  - url: https://${stageVariables.DnsName}/{basePath}
+    variables:
+      basePath:
+        default: /${stageVariables.ServiceApiPath}
+    x-amazon-apigateway-endpoint-configuration:
+      disableExecuteApiEndpoint: true
+paths:
+  /v1/files/{fileKey}:
+    get:
+      operationId: getFileForLegalConservation
+      x-pagopa-lambda-name: pn-preSignedUrlGenerator
+      x-pagopa-lambda-account: confinfo
+      tags:
+        - fileDownload
+      summary: ottieni metadati e contenuto di un file.
+      description: >-
+        Con questa API si ottengono i metadati riguardanti un file caricato in
+        precedenza. <br/> E' anche possibile ottenere le informazioni necessarie
+        al download del contenuto del file; tali informazioni sono contenute nel
+        campo _download_. <br/>
+          - _url_: se il contenuto del file è immediatamente disponibile questo campo viene 
+            valorizzato con un URL da invocare in GET per ottenere il contenuto del file. <br/>
+          - _retryAfter_: valorizzato se il contenuto del file è stato archiviato in glacier. 
+            Indica una stima del tempo necessario per recuperare il file. <br/>
+
+        Se il file non è pronto al momento dell'invocazione il campo
+        _download.url_ della risposta verrà valorizzato ```null```; in un
+        secondo momento, quando il contenuto del file sarà  pronto verrà
+        comunicato un evento al client che ha invocato la chiamata. Molteplici 
+        invocazioni di questa API generano un solo evento per client. <br/> Il
+        file rimane hot per ```stayHotTime````.
+      parameters:
+        - $ref: '#/components/parameters/fileKey'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileDownloadResponse'
+              examples:
+                hotFile:
+                  summary: File pronto per il download
+                  value:
+                    key: random/path/of/the/file
+                    versionId: 3Z9SdhZ50PBeIj617KEMrztNKDMJj8FZ
+                    contentType: application/pdf
+                    contentLength: 30438
+                    checksum: >-
+                      91375e9e5a9510087606894437a6a382fa5bc74950f932e2b85a788303cf5ba0
+                    retentionUntil: '2032-04-12T12:32:04.000Z'
+                    documentType: PN_LEGALFACT
+                    documentStatus: SAVED
+                    download:
+                      url: https://presignedurldemo.s3.eu-west-2.amazonaws.com/...
+                coldFile:
+                  summary: File su glacier.
+                  description: Il file è stato archiviato. Verrà recuperato in 24 ore.
+                  value:
+                    key: random/path/of/the/file
+                    versionId: 3Z9SdhZ50PBeIj617KEMrztNKDMJj8FZ
+                    contentType: application/pdf
+                    contentLength: 30438
+                    checksum: >-
+                      91375e9e5a9510087606894437a6a382fa5bc74950f932e2b85a788303cf5ba0
+                    retentionUntil: '2032-04-12T12:32:04.000Z'
+                    documentType: PN_LEGALFACT
+                    documentStatus: SAVED
+                    download:
+                      retryAfter: 86400
+        '404':
+          description: >-
+            Non trovato. Restituito se: <br/> - se il file identificato da
+            fileKey non è ancora stato salvato; <br/>
+      security:
+        - api_key_openapi: []
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: >-
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${ConfidentialInfoAccountId}:function:pn-preSignedUrlGenerator/invocations
+        httpMethod: POST
+        requestParameters:
+          integration.request.header.x-pagopa-pn-cx-id: context.authorizer.cx_id
+          integration.request.header.x-pagopa-pn-cx-role: context.authorizer.cx_role
+          integration.request.header.x-pagopa-pn-uid: context.authorizer.uid
+          integration.request.header.x-pagopa-pn-jti: context.authorizer.cx_jti
+          integration.request.header.x-pagopa-pn-src-ch: '''CN_BE'''
+          integration.request.header.x-pagopa-pn-cx-type: context.authorizer.cx_type
+          integration.request.header.x-pagopa-pn-cx-groups: context.authorizer.cx_groups
+          integration.request.header.x-pagopa-pn-src-ch-details: context.authorizer.sourceChannelDetails
+          integration.request.path.fileKey: method.request.path.fileKey
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+        timeoutInMillis: 29000
+        type: aws_proxy
+  /v1/events:
+    post:
+      operationId: updateLegalConservationEvents
+      x-pagopa-lambda-name: pn-eventUpdateRecevier
+      x-pagopa-lambda-account: confinfo
+      tags:
+        - eventsUpdate
+      summary: Modifica lo stato di deposito in conservazione per uno o più documenti
+      description: >-
+        Consente di aggiornare i dati di conservazione massivamente fornendo uno
+        o più documenti.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConservationEventsUpdateRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationResultCodeResponse'
+      security:
+        - api_key_openapi: []
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: >-
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${ConfidentialInfoAccountId}:function:pn-eventUpdateRecevier/invocations
+        httpMethod: POST
+        requestParameters:
+          integration.request.header.x-pagopa-pn-cx-id: context.authorizer.cx_id
+          integration.request.header.x-pagopa-pn-cx-role: context.authorizer.cx_role
+          integration.request.header.x-pagopa-pn-uid: context.authorizer.uid
+          integration.request.header.x-pagopa-pn-jti: context.authorizer.cx_jti
+          integration.request.header.x-pagopa-pn-src-ch: '''CN_BE'''
+          integration.request.header.x-pagopa-pn-cx-type: context.authorizer.cx_type
+          integration.request.header.x-pagopa-pn-cx-groups: context.authorizer.cx_groups
+          integration.request.header.x-pagopa-pn-src-ch-details: context.authorizer.sourceChannelDetails
+        passthroughBehavior: when_no_match
+        contentHandling: CONVERT_TO_TEXT
+        timeoutInMillis: 29000
+        type: aws_proxy
+      parameters: []
+components:
+  parameters:
+    fileKey:
+      name: fileKey
+      description: >-
+        La chiave definita per il file al momento della richiesta di
+        prenotazione di un upload
+      in: path
+      required: true
+      schema:
+        type: string
+      example: 8F7E/9A3B/1234/AB87
+  schemas:
+    FileDownloadResponse:
+      description: Informazioni necessarie al download del contenuto di un file
+      allOf:
+        - $ref: '#/components/schemas/FileCreatedDto'
+        - type: object
+          properties:
+            download:
+              $ref: '#/components/schemas/FileDownloadInfo'
+    FileCreatedDto:
+      description: >-
+        Evento generato quando il contenuto di un file è stato caricato,
+        elaborato da  _SafeStorage_, ed è pronto all'uso.
+      type: object
+      required:
+        - key
+        - versionId
+        - contentType
+        - contentLength
+        - checksum
+        - documentType
+        - documentStatus
+        - retentionUntil
+      properties:
+        key:
+          type: string
+          description: la chiave da utilizzare per il recupero del file
+          example: 8F7E/9A3B/1234/AB87
+        versionId:
+          type: string
+          description: __discutibile__. La versione del file su S3
+          example: 3Z9SdhZ50PBeIj617KEMrztNKDMJj8FZ
+        documentType:
+          type: string
+          description: Il tipo del documento
+          example: PN_NOTIFICATION_ATTACHMENTS
+        documentStatus:
+          type: string
+          description: Lo stato del documento
+          example: ATTACHED
+        contentType:
+          type: string
+          example: application/pdf
+        contentLength:
+          type: number
+          example: 54092
+          description: dmensione, in byte, del contenuto.
+        checksum:
+          type: string
+          description: >-
+            SHA256 o MD5 del contenuto del file. Il tipo di checksum cambia a
+            seconda del  documentType.
+        retentionUntil:
+          type: string
+          format: date-time
+          description: >-
+            data e ora fino a cui il documento sarà garantito all'interno di
+            _SafeStorage_. <br/> Può essere ritardata nel tempo, mai anticipata.
+            Formattata con timezone secondo l'rfc 3339
+
+                  
+    FileDownloadInfo:
+      type: object
+      properties:
+        url:
+          type: string
+          description: >-
+            URL preautorizzato a cui effettuare una richiesta GET per ottenere
+            il  contenuto del documento. Presente solo se il documento è pronto
+            per il download.
+        retryAfter:
+          type: number
+          description: >-
+            Stima del numero di secondi da aspettare prima che il contenuto del 
+            documento sia scaricabile.
+    ConservationEventsUpdateRequest:
+      type: object
+      properties:
+        events:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ConservationEventUpdate'
+    ConservationEventUpdate:
+      type: object
+      required:
+        - externalId
+        - status
+        - fileKey
+        - statusDate
+      properties:
+        externalId:
+          type: string
+          description: ID del documento nel sistema di conservazione a norma
+        status:
+          type: string
+          description: Lo stato della conservazione a norma
+          example: OK
+        errorCode:
+          type: string
+          description: Codice di errore
+          example: OK
+        fileKey:
+          type: string
+          description: La chiave del documento in PN
+          example: 8F7E/9A3B/1234/AB87
+        statusDate:
+          type: string
+          format: date-time
+          description: >-
+            data e ora di aggiornamento dello stato di conservazione. <br/>
+            Formattata con timezone secondo l'rfc 3339
+        isFinal:
+          type: boolean
+          description: >-
+            True se lo stato è finale e non sono possibili ulteriore
+            aggiornamenti sullo stesso documento
+    OperationResultCodeResponse:
+      required:
+        - resultCode
+        - resultDescription
+      type: object
+      properties:
+        resultCode:
+          type: string
+          example: '400.00'
+          description: >-
+            Codice a 5 cifre separate da punto che indica l’esito della
+            richiesta.  LE prime tre sono ripetizione del codice HTTP<br/> Per
+            convenzione, la sequenza 2000 indicherà OK. <br /> - '200.00' OK <br
+            /> - '400.01' Errore di validazione sintattica del messaggio <br />
+            - '400.02' Errore di validazione regole semantiche <br /> - '404.00'
+            requestId mai ricevuto <br /> - '409.00' requestId già utilizzato
+            <br /> - '500.xy' Errori interni al server <br /> - .... Altri
+            errori previsti dalla specifica implementazione <br />
+        resultDescription:
+          type: string
+          example: Request validation errors
+          description: >-
+            Descrizione dell’Esito dell’operazione, sempre valorizzato, anche in
+            caso di esito positivo. <br /> In caso di errore dovrà contenere
+            info utili al chiamante per indirizzare le azioni correttive
+            necessarie. <br /> In nessun caso conterrà dettagli tecnici e/o
+            stack trace. <br />
+        errorList:
+          type: array
+          items:
+            type: string
+            example: retentionDate cannot be anticipated
+          description: Elenco degli errori di validazione, se presenti.
+  responses: {}
+  securitySchemes:
+    api_key_openapi:
+      type: apiKey
+      name: x-api-key
+      in: header
+tags:
+  - name: fileDownload
+    description: Lettura file
+  - name: eventsUpdate
+    description: Aggiornamento dati di conservazione
+x-amazon-apigateway-gateway-responses:
+  DEFAULT_5XX:
+    responseParameters:
+      gatewayresponse.header.Access-Control-Allow-Origin: '''*'''
+  DEFAULT_4XX:
+    responseParameters:
+      gatewayresponse.header.Access-Control-Allow-Origin: '''*'''
+  BAD_REQUEST_PARAMETERS:
+    responseParameters:
+      gatewayresponse.header.Access-Control-Allow-Origin: '''*'''
+    responseTemplates:
+      application/json: >-
+        {"status": 400, "title": "VALIDATION ERROR", "traceId":
+        "$context.xrayTraceId", "errors": [ { "code": "PN_INVALID_PARAMETERS",
+        "detail": "Validation errors: $context.error.validationErrorString" } ]}
+  BAD_REQUEST_BODY:
+    responseParameters:
+      gatewayresponse.header.Access-Control-Allow-Origin: '''*'''
+    responseTemplates:
+      application/json: >-
+        {"status": 400, "title": "VALIDATION ERROR", "traceId":
+        "$context.xrayTraceId", "errors": [ { "code": "PN_INVALID_BODY",
+        "detail": "Validation errors: $context.error.validationErrorString" } ]}
+x-amazon-apigateway-request-validators:
+  basic:
+    validateRequestBody: true
+    validateRequestParameters: true
+  params-only:
+    validateRequestBody: false
+    validateRequestParameters: true
+x-amazon-apigateway-request-validator: basic
