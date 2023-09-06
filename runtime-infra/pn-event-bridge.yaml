@@ -25,6 +25,10 @@ Parameters:
     Description: "SafeStorage AWS Account id. Useful to grant rights to send feedback to EventBus"
     Type: String
 
+  ServiceDeskExtChUser:
+    Description: "PaperChannel user dedicatet to ServiceDesk"
+    Type: String
+
   EventBusDeadLetterQueueMaximumRetentionPeriod:
     Type: Number
     Description: "The number of seconds that Amazon SQS retains a message. You can specify an integer 
@@ -167,6 +171,14 @@ Parameters:
     Type: String
     Description: ACM DLQ alarm ARN
 
+  # PaperChannel to ServiceDesk
+  PaperChannelToServiceDeskQueueARN:
+    Type: String
+
+  PaperChannelToServiceDeskQueueURL:
+    Type: String
+
+
   OncallDlqRatio:
     Type: Number
     Default: 0.1
@@ -251,6 +263,7 @@ Resources:
                   - !Ref "NationalRegistries2SelcPGQueueARN"
                   - !Ref "AddressManagerToDeliveryPushQueueARN"
                   - !Ref "AcmAlarmsQueueARN"
+                  - !Ref "PaperChannelToServiceDeskQueueARN"
   
   # Resource based policy to allow EventBridge to publish to CloudWatch Logs
   LogGroupCoreEventBusPolicy:
@@ -317,6 +330,7 @@ Resources:
         - !Ref "NationalRegistries2PaperChannelQueueURL"
         - !Ref "NationalRegistries2SelcPGQueueURL"  
         - !Ref "AddressManagerToDeliveryPushQueueURL"  
+        - !Ref "PaperChannelToServiceDeskQueueURL"
       PolicyDocument:
         Statement:
           - Sid: "SendEventsToDLQ"
@@ -337,7 +351,8 @@ Resources:
               - !Ref "NationalRegistries2DeliveryPushQueueARN"
               - !Ref "NationalRegistries2PaperChannelQueueARN"
               - !Ref "NationalRegistries2SelcPGQueueARN"        
-              - !Ref "AddressManagerToDeliveryPushQueueARN"        
+              - !Ref "AddressManagerToDeliveryPushQueueARN"   
+              - !Ref "PaperChannelToServiceDeskQueueARN"
 
   # Log all events
   CoreEventBusEventsLogGroup:
@@ -684,6 +699,37 @@ Resources:
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2PaperChannel'
           Arn: !Ref ExternalChannels2PaperChannelQueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
+  # Send PaperChannel Response to servicedesk
+  PnCoreEventBusToServiceDeskPaperChannelResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route PaperChannel Events to pn-servicedesk
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "PaperChannelOutcomeEvent" ]
+        detail:
+          clientId: [ !Ref ServiceDeskExtChUser ]
+      Targets: 
+        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
+          Id: !Sub ${ProjectName}-Logger-PaperChannel2ServiceDesk
+          InputTransformer:
+            InputPathsMap:
+              "timestamp": "$.time"
+            InputTemplate: |
+              {
+                  "timestamp": <timestamp>,
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }       
+        - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2ServiceDesk'
+          Arn: !Ref PaperChannelToServiceDeskQueueARN
           InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
