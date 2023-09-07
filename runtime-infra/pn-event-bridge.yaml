@@ -25,7 +25,7 @@ Parameters:
     Description: "SafeStorage AWS Account id. Useful to grant rights to send feedback to EventBus"
     Type: String
 
-  ServiceDeskExtChUser:
+  ServiceDeskPaperChannelUser:
     Description: "PaperChannel user dedicatet to ServiceDesk"
     Type: String
 
@@ -713,7 +713,7 @@ Resources:
       EventPattern:
         detail-type: [ "PaperChannelOutcomeEvent" ]
         detail:
-          clientId: [ !Ref ServiceDeskExtChUser ]
+          clientId: [ !Ref ServiceDeskPaperChannelUser ]
       Targets: 
         - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
           Id: !Sub ${ProjectName}-Logger-PaperChannel2ServiceDesk
