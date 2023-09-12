@@ -95,9 +95,8 @@ Conditions:
   IsIO: !Equals [ !Ref IntendedUsage, 'IO' ]
   IsPNPG: !Equals [ !Ref IntendedUsage, 'PNPG' ]
   IsCNBE: !Equals [ !Ref IntendedUsage, 'CN_BE' ]
-  IsServicedesk: !Equals [ !Ref IntendedUsage, 'SERVICEDESK' ]
 
-  IsServerToServer: !Or [ !Condition IsB2B,  !Condition IsIO, !Condition IsPNPG, !Condition IsCNBE, !Condition IsServicedesk ]
+  IsServerToServer: !Or [ !Condition IsB2B,  !Condition IsIO, !Condition IsPNPG, !Condition IsCNBE ]
   IsEndUser: !Or [ !Condition IsWeb,  !Condition IsBackoffice ]
   HasIntendedUsage: !Not [ !Equals [ !Ref IntendedUsage, '' ] ]
 

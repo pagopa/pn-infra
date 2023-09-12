@@ -28,7 +28,6 @@ Parameters:
       - BACKOFFICE
       - PNPG
       - CN_BE
-      - SERVICEDESK
     Description: B2B, WEB, BACKOFFICE, PNPG or IO usage. Used from other back-end system or used from a browser
 
   ServiceApiPath:
@@ -95,7 +94,6 @@ Conditions:
   IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
   IsIO: !Equals [ !Ref IntendedUsage, 'IO' ]
   IsBackoffice: !Equals [ !Ref IntendedUsage, 'BACKOFFICE' ]
-  IsServicedesk: !Equals [ !Ref IntendedUsage, 'SERVICEDESK' ]
   IsCNBE: !Equals [ !Ref IntendedUsage, 'CN_BE' ]
   SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
   HasOpenApiBucketName: !Not [ !Equals [ !Ref OpenApiBucketName, '' ] ]
@@ -224,17 +222,6 @@ Resources:
     DependsOn: PublicRestApiOpenapi
     Properties:
       FunctionName: !Sub '${ProjectName}-backofficeAuthorizerLambda'
-      Action: lambda:InvokeFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
-
-  # SERVICEDESK Authorizer
-  ServicedeskLambdaPermission:
-    Condition: IsServicedesk
-    Type: AWS::Lambda::Permission
-    DependsOn: PublicRestApiOpenapi
-    Properties:
-      FunctionName: !Sub '${ProjectName}-servicedeskAuthorizerLambda'
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
