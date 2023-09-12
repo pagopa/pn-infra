@@ -64,6 +64,10 @@ Parameters:
     Default: ''
     Description: 'The DNS name user for CN API'
 
+  ServicedeskApiDnsName:
+    Type: String
+    Description: 'The DNS name used for service desk API.'
+
   AlternateWebApiDnsName:
     Type: String
     Default: ''
@@ -611,7 +615,8 @@ Outputs:
     Description: 'The DNS name used for B2B Selfecare PG rest API.'
   CNApiDnsName:
     Value: !Ref CNApiDnsName
-    
+  ServicedeskApiDnsName:
+    Value: !Ref ServicedeskApiDnsName
   # SafeStorage to DeliveryPush
   SafeStorageToDeliveryPushQueueName:
     Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueName
