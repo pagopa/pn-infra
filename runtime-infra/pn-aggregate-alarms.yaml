@@ -190,6 +190,14 @@ Resources:
       Parameters:
         MicroserviceName: 'pn-logextractor-be'
 
+  # Service Desk
+  ServiceDeskCumulativeAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/microservice-alarm.yaml"
+      Parameters:
+        MicroserviceName: 'pn-service-desk'
+
   # Spidhub
   SpidhubCumulativeAlarm:
     Type: AWS::CloudFormation::Stack
