@@ -237,10 +237,6 @@ Resources:
         PerformanceMode: generalPurpose
         Encrypted: true
         ThroughputMode: bursting
-        FileSystemTags: 
-          - 
-            Key: Name
-            Value: Fargate-EFS
 
   # create each mountpoint for internal subnet:
   MountFargateEfsTarget1:
@@ -302,9 +298,6 @@ Resources:
           IpProtocol: tcp
           FromPort: 2049
           ToPort: 2049
-      Tags:
-        - Key: Name
-          Value: sg-efs-fargate
 
   EfsFargateAccessPoint:
     Type: AWS::EFS::AccessPoint
