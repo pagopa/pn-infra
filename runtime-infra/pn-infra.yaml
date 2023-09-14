@@ -249,7 +249,7 @@ Resources:
           FileSystemId: !Ref FargateEFSFileSystem
           SecurityGroups: 
             - !Ref EFSSecurityGroup
-          SubnetId: !Select [ 0, !Ref SubnetsIds ]
+          SubnetId: !Select [0, !Split [",", !Ref SubnetIds]] 
 
   MountFargateEfsTarget2:
       Type: AWS::EFS::MountTarget
@@ -257,7 +257,7 @@ Resources:
           FileSystemId: !Ref FargateEFSFileSystem
           SecurityGroups: 
             - !Ref EFSSecurityGroup
-          SubnetId: !Select [ 1, !Ref SubnetsIds ]
+          SubnetId: !Select [1, !Split [",", !Ref SubnetIds]] 
 
   MountFargateEfsTarget3:
       Type: AWS::EFS::MountTarget
@@ -265,7 +265,7 @@ Resources:
           FileSystemId: !Ref FargateEFSFileSystem
           SecurityGroups: 
             - !Ref EFSSecurityGroup
-          SubnetId: !Select [ 2, !Ref SubnetsIds ]
+          SubnetId: !Select [2, !Split [",", !Ref SubnetIds]] 
 
   MountFargateEfsTarget4:
       Type: AWS::EFS::MountTarget
@@ -273,7 +273,7 @@ Resources:
           FileSystemId: !Ref FargateEFSFileSystem
           SecurityGroups: 
             - !Ref EFSSecurityGroup
-          SubnetId: !Select [ 0, !Ref VpcEgressSubnetsIds ]
+          SubnetId: !Select [0, !Split [",", !Ref VpcEgressSubnetsIds]]
 
   MountFargateEfsTarget5:
       Type: AWS::EFS::MountTarget
@@ -281,7 +281,7 @@ Resources:
           FileSystemId: !Ref FargateEFSFileSystem
           SecurityGroups: 
             - !Ref EFSSecurityGroup
-          SubnetId: !Select [ 1, !Ref VpcEgressSubnetsIds ]
+          SubnetId: !Select [1, !Split [",", !Ref VpcEgressSubnetsIds]]
 
   MountFargateEfsTarget6:
       Type: AWS::EFS::MountTarget
@@ -289,7 +289,7 @@ Resources:
           FileSystemId: !Ref FargateEFSFileSystem
           SecurityGroups: 
             - !Ref EFSSecurityGroup
-          SubnetId: !Select [ 2, !Ref VpcEgressSubnetsIds ]
+          SubnetId: !Select [2, !Split [",", !Ref VpcEgressSubnetsIds]]
 
   EFSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
