@@ -1,0 +1,245 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Lambda logger stack'
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+
+  FunctionName:
+    Type: String
+
+  LogRetention:
+    Type: Number
+    Default: 14
+
+  MappedPaths:
+    Type: List<String>
+    Description: Comma separated list of application load balancer listener rule path pattern
+
+  RoutingHeader:
+    Type: String
+
+  LoadBalancerListenerArn:
+    Type: String
+
+  LoadbalancerRulePriority:
+    Type: Number
+Resources:
+
+  # Application security groups
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${FunctionName}-webapp-security-group
+      GroupDescription: !Sub "${FunctionName} security group"
+      VpcId: !Ref VpcId
+
+  # Lambda log group
+  LambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: !Ref LogRetention
+      LogGroupName: !Sub /aws/lambda/${FunctionName}
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: LoggerFunctionPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/${FunctionName}*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+  
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref FunctionName
+      Code:
+        ZipFile: |
+          process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
+          function isObjectEmpty(obj){
+              return Object.keys(obj).length === 0;
+          }
+
+          async function getResponseBody(response){
+              if(!response.body){
+                  return null;
+              }
+              const contentType = response.headers.get("content-type");
+              console.log('Content Type', contentType)
+              if (contentType && contentType.toLowerCase().indexOf("application/json") !== -1) {
+                  const data = await response.json()   
+                  return JSON.stringify(data)
+              }
+              
+              const data = await response.text()
+              return data
+          }
+
+          async function forwardRequest(event, routingHeader){
+              const { httpMethod, path, host, queryStringParameters, headers, body } = event
+              
+              const baseUrl = headers['host']
+              let url = baseUrl+path.slice(1)
+              
+              let qs = null
+              if(queryStringParameters && !isObjectEmpty(queryStringParameters)){
+                  qs = queryStringParameters
+              }
+
+              headers[routingHeader] = true // add routing header
+              // headers['Content-Type'] = 'application/json'
+              const fetchOptions = { 
+                method: httpMethod,
+                headers: xHeaders
+              }
+
+              if(body){
+                fetchOptions.body = body // stringified
+              }
+              
+              if(qs){
+                  url = url+'?'+new URLSearchParams(qs)
+              }
+              
+              console.log('url to fetch', url)
+
+              const res = await fetch(url, fetchOptions);
+              
+              console.log('url', url)
+              console.log('fetchOptions', fetchOptions)
+              console.log('res', res)
+              console.log('headers', Object.fromEntries(res.headers))
+              
+              if (res.ok) {
+                const data = await getResponseBody(res)
+                console.log('ok data', data)
+                const response = {
+                  statusCode: res.status,
+                  headers: Object.fromEntries(res.headers)
+                };
+                
+                if(data){
+                    response.body = data
+                }
+                
+                console.log('Lambda ok response', response)
+                return response
+              } else {
+                const data = await getResponseBody(res)
+                console.log('nok data', data)
+                const response = {
+                  statusCode: res.status,
+                  headers: Object.fromEntries(res.headers)
+                };
+
+                if(data){
+                    response.body = data
+                }
+
+                console.log('Lambda nok response', response)      
+                return response
+              }
+          }
+
+          async function logAndForward(event){
+              console.log(JSON.stringify(event))
+
+              const routingHeader = process.env.RoutingHeader
+              
+              return forwardRequest(event, routingHeader)
+          }
+
+          exports.handler = async(event) => {
+
+              try {
+                  const response = await logAndForward(event)
+                  return response
+              } catch(e){
+                  console.log('error', e)
+                  const response = {
+                      statusCode: 500,
+                      body: JSON.stringify({
+                          message: e.message
+                      })
+                  }
+                  
+                  return response
+              }
+              
+          };
+
+
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Environment:
+        Variables:
+          RoutingHeader: !Ref RoutingHeader
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt LambdaSecurityGroup.GroupId
+        SubnetIds: !Ref Subnets
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+
+  # Load balancer target group
+  AlbLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt LambdaFunction.Arn
+      Principal: elasticloadbalancing.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
+  LambdaTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn:
+      - AlbLambdaPermission
+    Properties:
+      TargetType: lambda
+      Targets:
+        - Id: !GetAtt LambdaFunction.Arn
+
+  # Load balancer forward rule; forward only path pattern defined with MappedPaths
+  LoadBalancerRoutingRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref LoadBalancerListenerArn
+      Priority: !Ref LoadbalancerRulePriority
+      Conditions:
+        - Field: path-pattern
+          Values: !Ref MappedPaths
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref LambdaTargetGroup
+          Order: 1

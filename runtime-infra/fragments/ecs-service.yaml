@@ -566,6 +566,12 @@ Parameters:
     Default: '60'
     Description: ErrorFatal alarm sum period
 
+  # Routing based on header
+  RoutingHeader:
+    Type: String
+    Default: ''
+    Description: Specify the name of the routing header to use in the Listener Rule
+
 Mappings:
   ContainerMemory:
     2GB:
@@ -594,6 +600,7 @@ Conditions:
   LogAlarmNotNone: !Not [ !Equals [ !Ref LogAlarmStrategyV1, '-' ] ]
   HasLogAlarm: !And [ !Condition HasAlarmTopic, !Condition LogAlarmNotNone ]
 
+  HasRoutingHeader: !Not [ !Equals [ !Ref RoutingHeader, '' ] ]
   AutoscalingByRestApi: !Equals [ !Ref AutoscalingStrategy, REST-API]
   AutoscalingBySQS: !Equals [ !Ref AutoscalingStrategy, SQS]
   AutoscalingCustom: !Equals [ !Ref AutoscalingStrategy, CUSTOM]
@@ -1475,11 +1482,18 @@ Resources:
       Conditions:
         - Field: path-pattern
           Values: !Ref MappedPaths
+        - Fn::If:
+          - HasRoutingHeader
+          - Field: http-header
+            HttpHeaderConfig: 
+              HttpHeaderName: !Ref RoutingHeader
+              Values:
+                - true
+          - !Ref AWS::NoValue 
       Actions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
           Order: 1
-
 
   # CloudWatch metric to filer ERROR - FATAL lines, in Log group
   ErrorFatalLogsMetricFilter: 
