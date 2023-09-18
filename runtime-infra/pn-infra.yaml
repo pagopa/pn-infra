@@ -228,88 +228,6 @@ Resources:
         SafeStorageAccountId: !Ref SafeStorageAccountId
         BucketSuffix: !Ref BucketSuffix 
 
-  ###                             ELASTIC FILE SYSTEM                     ###
-  ###########################################################################
-
-  FargateEFSFileSystem:
-    Type: AWS::EFS::FileSystem
-    Properties:
-        PerformanceMode: generalPurpose
-        Encrypted: true
-        ThroughputMode: bursting
-
-  # create each mountpoint for internal subnet:
-  MountFargateEfsTarget1:
-      Type: AWS::EFS::MountTarget
-      Properties: 
-          FileSystemId: !Ref FargateEFSFileSystem
-          SecurityGroups: 
-            - !Ref EFSSecurityGroup
-          SubnetId: !Select [0, !Split [",", !Ref VpcSubnets]] 
-
-  MountFargateEfsTarget2:
-      Type: AWS::EFS::MountTarget
-      Properties: 
-          FileSystemId: !Ref FargateEFSFileSystem
-          SecurityGroups: 
-            - !Ref EFSSecurityGroup
-          SubnetId: !Select [1, !Split [",", !Ref VpcSubnets]] 
-
-  MountFargateEfsTarget3:
-      Type: AWS::EFS::MountTarget
-      Properties: 
-          FileSystemId: !Ref FargateEFSFileSystem
-          SecurityGroups: 
-            - !Ref EFSSecurityGroup
-          SubnetId: !Select [2, !Split [",", !Ref VpcSubnets]] 
-
-  # MountFargateEfsTarget4:
-  #     Type: AWS::EFS::MountTarget
-  #     Properties: 
-  #         FileSystemId: !Ref FargateEFSFileSystem
-  #         SecurityGroups: 
-  #           - !Ref EFSSecurityGroup
-  #         SubnetId: !Select [0, !Split [",", !Ref VpcEgressSubnetsIds]]
-
-  # MountFargateEfsTarget5:
-  #     Type: AWS::EFS::MountTarget
-  #     Properties: 
-  #         FileSystemId: !Ref FargateEFSFileSystem
-  #         SecurityGroups: 
-  #           - !Ref EFSSecurityGroup
-  #         SubnetId: !Select [1, !Split [",", !Ref VpcEgressSubnetsIds]]
-
-  # MountFargateEfsTarget6:
-  #     Type: AWS::EFS::MountTarget
-  #     Properties: 
-  #         FileSystemId: !Ref FargateEFSFileSystem
-  #         SecurityGroups: 
-  #           - !Ref EFSSecurityGroup
-  #         SubnetId: !Select [2, !Split [",", !Ref VpcEgressSubnetsIds]]
-
-  EFSSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      VpcId: !Ref VpcId
-      GroupDescription: EFS Security Group
-      SecurityGroupIngress:
-        # All Subnet can mount EFS:
-        - CidrIp: 0.0.0.0/0
-          IpProtocol: tcp
-          FromPort: 2049
-          ToPort: 2049
-
-  EfsFargateAccessPoint:
-    Type: AWS::EFS::AccessPoint
-    Properties:
-      FileSystemId: !Ref FargateEFSFileSystem
-      RootDirectory:
-        CreationInfo:
-          OwnerGid: "1000"
-          OwnerUid: "1000"
-          Permissions: "0755"
-        Path: /ecs
-  
   ###                       CLOUDFORMATION TRANSFORM LAMBDAS              ###
   ###########################################################################
 
@@ -354,7 +272,7 @@ Outputs:
   ECSClusterName:
     Value: !GetAtt ECSCluster.Outputs.ClusterName
     Description: ECS cluster name
-  
+
   # Log exports outputs
   LogsExporterRoleArn:
     Description: Role used to export logs to external bucket
