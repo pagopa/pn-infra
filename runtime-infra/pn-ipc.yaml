@@ -279,6 +279,11 @@ Parameters:
     Description: comma separated list of IO Backend CIDRs
     Default: ''
 
+  CNBackendCidrs:
+    Type: CommaDelimitedList
+    Description: comma separated list of Conservazione Sostitutiva backend CIDRs
+    Default: ''
+
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
 
@@ -384,6 +389,18 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub '${ProjectName}-safestore_to_radd'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  ### Communication FROM SafeStorage TO pn-service-desk ###
+  SafeStorageToServiceDeskQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain  
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestore_to_servicedesk'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
@@ -564,6 +581,20 @@ Resources:
         OncallDLQLimit: '1'
         QueueHasAlarm:  "true"
 
+  ### Communication FROM pn-paper-channel TO pn-service-desk ###
+  PaperChannelToServiceDeskQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-paperchannel_to_servicedesk'
+        DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10        
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
 Outputs:
   # Web API for browsers and B2B
   ApiDnsName:
@@ -580,7 +611,6 @@ Outputs:
     Description: 'The DNS name used for B2B Selfecare PG rest API.'
   CNApiDnsName:
     Value: !Ref CNApiDnsName
-    
   # SafeStorage to DeliveryPush
   SafeStorageToDeliveryPushQueueName:
     Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueName
@@ -614,6 +644,23 @@ Outputs:
   SafeStorageToRaddQueueAgeAlarmARN:
     Value: !GetAtt SafeStorageToRaddQueue.Outputs.SqsAgeAlarmArn
     Description: SafeStorage-to-radd queue age alarm ARN
+
+  # SafeStorage to ServiceDesk
+  SafeStorageToServiceDeskQueueName:
+    Value: !GetAtt SafeStorageToServiceDeskQueue.Outputs.QueueName
+    Description: SafeStorage-to-servicedesk queue name
+  SafeStorageToServiceDeskQueueURL:
+    Value: !GetAtt SafeStorageToServiceDeskQueue.Outputs.QueueURL
+    Description: SafeStorage-to-servicedesk queue URL
+  SafeStorageToServiceDeskQueueARN:
+    Value: !GetAtt SafeStorageToServiceDeskQueue.Outputs.QueueARN
+    Description: SafeStorage-to-servicedesk queue ARN
+  SafeStorageToServiceDeskQueueAlarmARN:
+    Value: !GetAtt SafeStorageToServiceDeskQueue.Outputs.SqsDLQAlarmArn
+    Description: SafeStorage-to-servicedesk queue alarm ARN
+  SafeStorageToServiceDeskQueueAgeAlarmARN:
+    Value: !GetAtt SafeStorageToServiceDeskQueue.Outputs.SqsAgeAlarmArn
+    Description: SafeStorage-to-servicedesk queue age alarm ARN
 
   # Delivery push inputs
   DeliveryPushInputsQueueName:
@@ -851,6 +898,23 @@ Outputs:
     Value: !GetAtt AcmAlarmsQueue.Outputs.SqsDLQAlarmArn
     Description: ACM alarms alarm ARN
 
+  # PaperChannel to ServiceDesk events
+  PaperChannelToServiceDeskQueueName:
+    Value: !GetAtt PaperChannelToServiceDeskQueue.Outputs.QueueName
+    Description: paperchannel-to-servicedesk queue name
+  PaperChannelToServiceDeskQueueURL:
+    Value: !GetAtt PaperChannelToServiceDeskQueue.Outputs.QueueURL
+    Description: paperchannel-to-servicedesk queue URL
+  PaperChannelToServiceDeskQueueARN:
+    Value: !GetAtt PaperChannelToServiceDeskQueue.Outputs.QueueARN
+    Description: paperchannel-to-servicedesk queue ARN
+  PaperChannelToServiceDeskQueueAlarmARN:
+    Value: !GetAtt PaperChannelToServiceDeskQueue.Outputs.SqsDLQAlarmArn
+    Description: paperchannel-to-servicedesk queue alarm ARN
+  PaperChannelToServiceDeskQueueAgeAlarmARN:
+    Value: !GetAtt PaperChannelToServiceDeskQueue.Outputs.SqsAgeAlarmArn
+    Description: paperchannel-to-servicedesk queue age alarm ARN
+
   # Kinesis Source Stream containing the DynamoDB Change Data Capture events
   CdcKinesisSourceStreamName:
     Description: 'Kinesis source CDC stream name'
@@ -999,3 +1063,5 @@ Outputs:
     Value: !Ref ApplicationLoadBalancerMetricsDimensionName
   IOBackendCidrs:
     Value: !Join [ ",", !Ref IOBackendCidrs ]
+  CNBackendCidrs:
+    Value: !Join [ ",", !Ref CNBackendCidrs ]
