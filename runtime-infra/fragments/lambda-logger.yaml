@@ -8,33 +8,22 @@ Parameters:
   Subnets:
     Type: List<AWS::EC2::Subnet::Id>
 
-  FunctionName:
-    Type: String
-
   LogRetention:
     Type: Number
     Default: 14
 
-  MappedPaths:
-    Type: List<String>
-    Description: Comma separated list of application load balancer listener rule path pattern
-
   RoutingHeader:
     Type: String
+    Default: 'x-pagopa-pn-direct-to-destination'
 
-  LoadBalancerListenerArn:
-    Type: String
-
-  LoadbalancerRulePriority:
-    Type: Number
 Resources:
 
   # Application security groups
   LambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Sub ${FunctionName}-webapp-security-group
-      GroupDescription: !Sub "${FunctionName} security group"
+      GroupName: pn-lambda-logger-webapp-security-group
+      GroupDescription: "pn-lambda-logger security group"
       VpcId: !Ref VpcId
 
   # Lambda log group
@@ -42,7 +31,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: !Ref LogRetention
-      LogGroupName: !Sub /aws/lambda/${FunctionName}
+      LogGroupName: /aws/lambda/pn-lambda-logger
 
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -64,7 +53,7 @@ Resources:
                 Action:
                   - logs:CreateLogGroup
                 Resource:
-                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/${FunctionName}*'
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/pn-lambda-logger*'
               - Effect: Allow
                 Action:
                   - logs:CreateLogStream
@@ -78,10 +67,31 @@ Resources:
   LambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Ref FunctionName
+      FunctionName: pn-lambda-logger
       Code:
         ZipFile: |
           process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
+          function getServiceNameFromEvent(event){
+            const { path } = event;
+
+            const mapping = {
+              '/consolidatore-ingress/': 'pn-ec'
+            }
+
+            const keys = Object.keys(mapping)
+            for(let key in keys){
+              if(path.indexOf(key)===0){
+                return mapping[key]
+              }
+            }
+
+            return 'UNDEFINED'
+          }
+
+          function logJSON(serviceName, data){
+            console.log('%s\t%j', serviceName, data)
+          }
 
           function isObjectEmpty(obj){
               return Object.keys(obj).length === 0;
@@ -92,7 +102,6 @@ Resources:
                   return null;
               }
               const contentType = response.headers.get("content-type");
-              console.log('Content Type', contentType)
               if (contentType && contentType.toLowerCase().indexOf("application/json") !== -1) {
                   const data = await response.json()   
                   return JSON.stringify(data)
@@ -106,7 +115,7 @@ Resources:
               const { httpMethod, path, host, queryStringParameters, headers, body } = event
               
               const baseUrl = headers['host']
-              let url = baseUrl+path.slice(1)
+              let url = 'http://'+baseUrl+'/'+path.slice(1)
               
               let qs = null
               if(queryStringParameters && !isObjectEmpty(queryStringParameters)){
@@ -117,7 +126,7 @@ Resources:
               // headers['Content-Type'] = 'application/json'
               const fetchOptions = { 
                 method: httpMethod,
-                headers: xHeaders
+                headers: headers
               }
 
               if(body){
@@ -168,8 +177,8 @@ Resources:
               }
           }
 
-          async function logAndForward(event){
-              console.log(JSON.stringify(event))
+          async function logAndForward(event, serviceName){
+              logJSON(serviceName, event)
 
               const routingHeader = process.env.RoutingHeader
               
@@ -178,11 +187,12 @@ Resources:
 
           exports.handler = async(event) => {
 
+              const serviceName = getServiceNameFromEvent(event)
               try {
-                  const response = await logAndForward(event)
+                  const response = await logAndForward(event, serviceName)
                   return response
               } catch(e){
-                  console.log('error', e)
+                  logJSON(serviceName, e)
                   const response = {
                       statusCode: 500,
                       body: JSON.stringify({
@@ -194,7 +204,6 @@ Resources:
               }
               
           };
-
 
       Handler: index.handler
       Runtime: nodejs18.x
@@ -220,26 +229,7 @@ Resources:
       FunctionName: !GetAtt LambdaFunction.Arn
       Principal: elasticloadbalancing.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
-
-  LambdaTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    DependsOn:
-      - AlbLambdaPermission
-    Properties:
-      TargetType: lambda
-      Targets:
-        - Id: !GetAtt LambdaFunction.Arn
-
-  # Load balancer forward rule; forward only path pattern defined with MappedPaths
-  LoadBalancerRoutingRule:
-    Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    Properties:
-      ListenerArn: !Ref LoadBalancerListenerArn
-      Priority: !Ref LoadbalancerRulePriority
-      Conditions:
-        - Field: path-pattern
-          Values: !Ref MappedPaths
-      Actions:
-        - Type: forward
-          TargetGroupArn: !Ref LambdaTargetGroup
-          Order: 1
+      
+Outputs:
+  LambdaLoggerName:
+    Value: !Ref LambdaFunction
