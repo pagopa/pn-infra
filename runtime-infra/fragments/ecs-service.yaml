@@ -881,9 +881,9 @@ Resources:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
             - 'Fn::If':
-               - HasEfsFilesystem
-               - SourceVolume: "efs-volume"
-                 ContainerPath: "/mnt/"
+              - HasEfsFilesystem
+              - SourceVolume: "efs-volume"
+                ContainerPath: "/mnt/"
           DependsOn:
             - ContainerName: sidecar-injector
               Condition: COMPLETE
