@@ -884,6 +884,7 @@ Resources:
               - HasEfsFilesystem
               - SourceVolume: "efs-volume"
                 ContainerPath: "/mnt/"
+              - !Ref AWS::NoValue
           DependsOn:
             - ContainerName: sidecar-injector
               Condition: COMPLETE
@@ -1370,6 +1371,7 @@ Resources:
               FilesystemId: !Ref EfsFilesystem
               RootDirectory: /
               TransitEncryption: ENABLED
+          - !Ref AWS::NoValue
 
   # A role needed by ECS
   ExecutionRole:
