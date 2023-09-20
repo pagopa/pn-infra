@@ -62,6 +62,10 @@ Parameters:
     #Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/alpine:3.14
     Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.19.2_1
 
+  EfsFilesystem:
+    Type: String
+    Default: "-"
+
 # The AWS collector comes with two configs baked in for ECS:
 #
 #  To consume OTPL metrics/traces and X-Ray SDK traces (custom application metrics/traces): --config=/etc/ecs/ecs-default-config.yaml
@@ -590,6 +594,8 @@ Conditions:
   HasDefaultSecurityGroup: !Not [ !Equals [ !Ref EcsDefaultSecurityGroup, '' ] ]
   HasAlbSecurityGroup: !Not [ !Equals [ !Ref AlbSecurityGroup, '' ] ]
 
+  HasEfsFilesystem: !Not [ !Equals [ !Ref EfsFilesystem, '' ] ]
+
   LogAlarmErrorFatal: !Equals [ !Ref LogAlarmStrategyV1, 'ERROR_FATAL' ]
   LogAlarmNotNone: !Not [ !Equals [ !Ref LogAlarmStrategyV1, '-' ] ]
   HasLogAlarm: !And [ !Condition HasAlarmTopic, !Condition LogAlarmNotNone ]
@@ -874,6 +880,10 @@ Resources:
           MountPoints:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
+            - 'Fn::If':
+               - HasEfsFilesystem
+               - SourceVolume: "efs-volume"
+                 ContainerPath: "/mnt/"
           DependsOn:
             - ContainerName: sidecar-injector
               Condition: COMPLETE
@@ -1353,6 +1363,13 @@ Resources:
           - !Ref "AWS::NoValue"
       Volumes:
         - Name: "my-vol"
+        - 'Fn::If':
+          - HasEfsFilesystem
+          - Name: efs-volume
+            EFSVolumeConfiguration:
+              FilesystemId: !Ref EfsFilesystem
+              RootDirectory: /
+              TransitEncryption: ENABLED
 
   # A role needed by ECS
   ExecutionRole:
@@ -1492,6 +1509,8 @@ Resources:
         - MetricValue: 1
           MetricNamespace: "ErrorFatalLogs"
           MetricName: !Sub "${MicroServiceUniqueName}-ErrorFatalMetric"
+
+  
   
   # Create alarm
   ErrorFatalLogsMetricAlarm:
