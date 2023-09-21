@@ -50,8 +50,7 @@ Conditions:
   IsDev: !Equals [ !Ref EnvironmentType, 'dev' ]
   IsTest: !Equals [ !Ref EnvironmentType, 'test' ]
   IsProd: !Equals [ !Ref EnvironmentType, 'prod' ]
-  IsCNEnabled: !Or [ !Condition IsDev, !Condition IsTest ]
-#  IsCNEnabled: !Or [ !Condition IsDev, !Condition IsTest, !Condition IsProd ] # uncomment before going live
+  IsCNEnabled: !Or [ !Condition IsDev, !Condition IsTest, !Condition IsProd ]
 
 Resources:
 
