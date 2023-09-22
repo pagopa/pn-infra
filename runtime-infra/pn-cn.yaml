@@ -24,13 +24,6 @@ Parameters:
     Type: String
     Description: "An ARN of an SNS topic where to send alarm when log line includes ERROR or FATAL" 
 
-  CNLatencyLimit:
-    Type: Number
-    Default: '2000'
-
-  EnvironmentType:
-    Type: String
-
   CNBackendCidrs:
     Type: String
     Default: ''
@@ -41,23 +34,15 @@ Parameters:
   BucketBasePath:
     Type: String
 
-
   LogsKinesisSourceStreamArn:
     Type: String
     Description: 'Kinesis stream that receive logs'
-
-Conditions:
-  IsDev: !Equals [ !Ref EnvironmentType, 'dev' ]
-  IsTest: !Equals [ !Ref EnvironmentType, 'test' ]
-  IsProd: !Equals [ !Ref EnvironmentType, 'prod' ]
-  IsCNEnabled: !Or [ !Condition IsDev, !Condition IsTest, !Condition IsProd ]
 
 Resources:
 
   # Expose PN-Delivery microservice public API with API-GW for B2B usage
   CNPublicAPI:
     Type: AWS::CloudFormation::Stack
-    Condition: IsCNEnabled
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-expose-service-openapi.yaml"
       Parameters:
@@ -77,7 +62,6 @@ Resources:
 
   CNPublicApiWaf:
     Type: AWS::CloudFormation::Stack
-    Condition: IsCNEnabled
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-waf-acl.yaml"
       Parameters:
@@ -89,7 +73,6 @@ Resources:
 
   CNUsagePlan:
     Type: 'AWS::ApiGateway::UsagePlan'
-    Condition: IsCNEnabled
     Properties:
       UsagePlanName: CN_BE
       ApiStages:
