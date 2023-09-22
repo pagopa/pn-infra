@@ -849,6 +849,17 @@ Resources:
             ToPort: 8080
             CidrIp: 0.0.0.0/0
 
+  EfsFargateAccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Condition: HasEfsFilesystem
+    Properties:
+      FileSystemId: !Ref EfsFilesystem
+      RootDirectory:
+        CreationInfo:
+          OwnerGid: "1000"
+          OwnerUid: "1000"
+          Permissions: "0755"
+        Path: !Sub /ecs/${MicroServiceUniqueName}
 
   # ECS Task
   TaskDefinition:
@@ -1369,8 +1380,10 @@ Resources:
           - Name: efs-volume
             EFSVolumeConfiguration:
               FilesystemId: !Ref EfsFilesystem
-              RootDirectory: /
               TransitEncryption: ENABLED
+              AuthorizationConfig: 
+                  AccessPointId: !Ref EfsFargateAccessPoint
+                  IAM: ENABLED
           - !Ref AWS::NoValue
 
   # A role needed by ECS
