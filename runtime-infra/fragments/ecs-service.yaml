@@ -66,6 +66,13 @@ Parameters:
     Type: String
     Default: "-"
 
+  MountEfs:
+    Type: String
+    Default: false
+    AllowedValues:
+         - "true"
+         - "false"
+
 # The AWS collector comes with two configs baked in for ECS:
 #
 #  To consume OTPL metrics/traces and X-Ray SDK traces (custom application metrics/traces): --config=/etc/ecs/ecs-default-config.yaml
@@ -595,6 +602,8 @@ Conditions:
   HasAlbSecurityGroup: !Not [ !Equals [ !Ref AlbSecurityGroup, '' ] ]
 
   HasEfsFilesystem: !Not [ !Equals [ !Ref EfsFilesystem, '-' ] ]
+  IsEfsMount: !Equals [ !Ref MountEfs, 'true' ]
+  RequiresEfsMount: !And [ !Condition IsEfsMount, !Condition HasEfsFilesystem ]
 
   LogAlarmErrorFatal: !Equals [ !Ref LogAlarmStrategyV1, 'ERROR_FATAL' ]
   LogAlarmNotNone: !Not [ !Equals [ !Ref LogAlarmStrategyV1, '-' ] ]
@@ -892,7 +901,7 @@ Resources:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
             - 'Fn::If':
-              - HasEfsFilesystem
+              - RequiresEfsMount
               - SourceVolume: "efs-volume"
                 ContainerPath: "/mnt/efs"
               - !Ref AWS::NoValue
@@ -1376,7 +1385,7 @@ Resources:
       Volumes:
         - Name: "my-vol"
         - 'Fn::If':
-          - HasEfsFilesystem
+          - RequiresEfsMount
           - Name: efs-volume
             EFSVolumeConfiguration:
               FilesystemId: !Ref EfsFilesystem
