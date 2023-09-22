@@ -62,6 +62,17 @@ Parameters:
     #Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/alpine:3.14
     Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.19.2_1
 
+  EfsFilesystem:
+    Type: String
+    Default: "-"
+
+  MountEfs:
+    Type: String
+    Default: false
+    AllowedValues:
+         - "true"
+         - "false"
+
 # The AWS collector comes with two configs baked in for ECS:
 #
 #  To consume OTPL metrics/traces and X-Ray SDK traces (custom application metrics/traces): --config=/etc/ecs/ecs-default-config.yaml
@@ -590,6 +601,10 @@ Conditions:
   HasDefaultSecurityGroup: !Not [ !Equals [ !Ref EcsDefaultSecurityGroup, '' ] ]
   HasAlbSecurityGroup: !Not [ !Equals [ !Ref AlbSecurityGroup, '' ] ]
 
+  HasEfsFilesystem: !Not [ !Equals [ !Ref EfsFilesystem, '-' ] ]
+  IsEfsMount: !Equals [ !Ref MountEfs, 'true' ]
+  RequiresEfsMount: !And [ !Condition IsEfsMount, !Condition HasEfsFilesystem ]
+
   LogAlarmErrorFatal: !Equals [ !Ref LogAlarmStrategyV1, 'ERROR_FATAL' ]
   LogAlarmNotNone: !Not [ !Equals [ !Ref LogAlarmStrategyV1, '-' ] ]
   HasLogAlarm: !And [ !Condition HasAlarmTopic, !Condition LogAlarmNotNone ]
@@ -843,6 +858,17 @@ Resources:
             ToPort: 8080
             CidrIp: 0.0.0.0/0
 
+  EfsFargateAccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Condition: HasEfsFilesystem
+    Properties:
+      FileSystemId: !Ref EfsFilesystem
+      RootDirectory:
+        CreationInfo:
+          OwnerGid: "1000"
+          OwnerUid: "1000"
+          Permissions: "0755"
+        Path: !Sub /ecs/${MicroServiceUniqueName}
 
   # ECS Task
   TaskDefinition:
@@ -874,6 +900,11 @@ Resources:
           MountPoints:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
+            - 'Fn::If':
+              - RequiresEfsMount
+              - SourceVolume: "efs-volume"
+                ContainerPath: "/mnt/efs"
+              - !Ref AWS::NoValue
           DependsOn:
             - ContainerName: sidecar-injector
               Condition: COMPLETE
@@ -1353,6 +1384,16 @@ Resources:
           - !Ref "AWS::NoValue"
       Volumes:
         - Name: "my-vol"
+        - 'Fn::If':
+          - RequiresEfsMount
+          - Name: efs-volume
+            EFSVolumeConfiguration:
+              FilesystemId: !Ref EfsFilesystem
+              TransitEncryption: ENABLED
+              AuthorizationConfig: 
+                  AccessPointId: !Ref EfsFargateAccessPoint
+                  IAM: ENABLED
+          - !Ref AWS::NoValue
 
   # A role needed by ECS
   ExecutionRole:
@@ -1492,6 +1533,8 @@ Resources:
         - MetricValue: 1
           MetricNamespace: "ErrorFatalLogs"
           MetricName: !Sub "${MicroServiceUniqueName}-ErrorFatalMetric"
+
+  
   
   # Create alarm
   ErrorFatalLogsMetricAlarm:
