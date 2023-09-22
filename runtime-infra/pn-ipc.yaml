@@ -594,6 +594,57 @@ Resources:
         VisibilityTimeout: 60
         MaxReceiveCount: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      
+  ###                             ELASTIC FILE SYSTEM                     ###
+  ###########################################################################
+
+  FargateEFSFileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+        PerformanceMode: generalPurpose
+        Encrypted: true
+        ThroughputMode: bursting
+        FileSystemTags: 
+          - 
+            Key: Name
+            Value: Fargate-EFS
+
+  # create each mountpoint for internal subnet:
+  MountFargateEfsTarget1:
+      Type: AWS::EFS::MountTarget
+      Properties: 
+          FileSystemId: !Ref FargateEFSFileSystem
+          SecurityGroups: 
+            - !Ref EFSSecurityGroup
+          SubnetId: !Select [0, !Split [",", !Ref SubnetsIds]] 
+
+  MountFargateEfsTarget2:
+      Type: AWS::EFS::MountTarget
+      Properties: 
+          FileSystemId: !Ref FargateEFSFileSystem
+          SecurityGroups: 
+            - !Ref EFSSecurityGroup
+          SubnetId: !Select [1, !Split [",", !Ref SubnetsIds]] 
+
+  MountFargateEfsTarget3:
+      Type: AWS::EFS::MountTarget
+      Properties: 
+          FileSystemId: !Ref FargateEFSFileSystem
+          SecurityGroups: 
+            - !Ref EFSSecurityGroup
+          SubnetId: !Select [2, !Split [",", !Ref SubnetsIds]] 
+
+  EFSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VpcId
+      GroupDescription: EFS Security Group
+      SecurityGroupIngress:
+        # All Subnet can mount EFS:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
 
 Outputs:
   # Web API for browsers and B2B
@@ -954,6 +1005,8 @@ Outputs:
     Value: !Ref SubnetsIds
   ECSClusterName:
     Value: !Ref ECSClusterName
+  FargateEFSFileSystemID:
+    Value: !Ref FargateEFSFileSystem
   CorsAllowedDomains:
     Value: !Ref CorsAllowedDomains
   EcsDefaultSecurityGroup:
