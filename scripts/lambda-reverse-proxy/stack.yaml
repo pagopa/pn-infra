@@ -38,6 +38,12 @@ Parameters:
     Default: false
     AllowedValues: [ true, false ]
 
+  MockNationalRegistriesBaseUrl:
+    Type: String
+  
+  InfocamereBaseUrl:
+    Type: String
+
 Conditions:
   IsCnMockEnabled: !Equals [ !Ref CnMockEnabled, true ]
 
@@ -142,6 +148,7 @@ Resources:
                 Resource: 
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/pn-DigitalDeliveriesWhitelist"
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/pn-PaperDeliveriesWhitelist"
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/pn-NationalRegistriesWhitelist"
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
@@ -162,6 +169,14 @@ Resources:
             return path.toLowerCase().indexOf('/piattaforma-notifiche-ingress/')>=0;
           }
 
+          function isInfocamerePath(path){
+            return path.indexOf('/ic/ce/wspa/wspa/rest')>=0
+          }
+
+          function isLegaleRappresentantePath(path){
+            return path.indexOf('ic/ce/wspa/wspa/rest/listaLegaleRappresentante')>=0
+          }
+
           function isDigitalDeliveriesPath(path){
               return path.toLowerCase().indexOf('/digital-deliveries/')>0;
           }
@@ -180,6 +195,19 @@ Resources:
               }
               
               return null;
+          }
+
+          function extractLegalRappresentateTaxIdFromPath(path){
+            return path.substring(path.lastIndexOf("/") + 1, path.length);
+          }
+
+          function isNationalRegistriesWhitelisted(value, whitelistAsString, section){
+            const whitelistAsJson = JSON.parse(whitelistAsString)
+            if(!whitelistAsJson || !whitelistAsJson[section]){
+              return false
+            }
+
+            return whitelistAsJson[section].indexOf(value)>=0
           }
 
           function isDeliveryAddressWhitelisted(recipient, whitelistAsString){
@@ -425,6 +453,27 @@ Resources:
                 return forwardRequest(event, defaultUrl)
               }
 
+              if(isInfocamerePath(path)){
+                // in case of BLACKLIST, the defaultUrl is the real infocamere
+                const infocamereMockUrl = process.env.MockNationalRegistries
+                const defaultUrl = routingMode==='BLACKLIST'?process.env.InfocamereBaseUrl:infocamereMockUrl
+                const allowedOnlyUrl = routingMode==='BLACKLIST'?infocamereMockUrl:process.env.InfocamereBaseUrl
+                console.debug('[INFOCAMERE] - Call')
+                if(httpMethod=='POST'){
+                    console.debug('[INFOCAMERE] - Call POST')
+                    if(isLegaleRappresentantePath(path)){
+                        const legaleRappresentanteTaxId = extractLegalRappresentateTaxIdFromPath(path)
+                        console.log('[INFOCAMERE] Legale rappresentante Tax ID', legaleRappresentanteTaxId)
+                        const whitelist = await getParameterFromStore('pn-NationalRegistriesWhitelist')
+                        console.log('[INFOCAMERE] Whitelist', whitelist)
+                        if(isNationalRegistriesWhitelisted(legaleRappresentanteTaxId, whitelist, 'legaleRappresentante')){
+                            return forwardRequest(event, allowedOnlyUrl)
+                        }
+                    }
+                } 
+                return forwardRequest(event, defaultUrl)
+              }
+
               throw new Error('Unhandled event', event)            
           }
 
@@ -458,6 +507,8 @@ Resources:
           MockExternalChannelBaseUrl: !Ref MockExternalChannelBaseUrl
           ConsolidatoreBaseUrl: !Ref ConsolidatoreBaseUrl
           MockConsolidatoreBaseUrl: !Ref MockConsolidatoreBaseUrl
+          InfocamereBaseUrl: !Ref InfocamereBaseUrl
+          MockNationalRegistriesBaseUrl: !Ref MockNationalRegistriesBaseUrl
           RoutingMode: !Ref RoutingMode
           SSM_PARAMETER_STORE_TIMEOUT_MILLIS: 5000
       VpcConfig:
