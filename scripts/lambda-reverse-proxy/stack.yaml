@@ -169,12 +169,16 @@ Resources:
             return path.toLowerCase().indexOf('/piattaforma-notifiche-ingress/')>=0;
           }
 
+          function isNationalRegistriesProxyPath(path){
+            return path.indexOf('/national-registries-proxy')>=0;
+          }
+
           function isInfocamerePath(path){
             return path.indexOf('/ic/ce/wspa/wspa/rest')>=0
           }
 
           function isLegaleRappresentantePath(path){
-            return path.indexOf('ic/ce/wspa/wspa/rest/listaLegaleRappresentante')>=0
+            return path.indexOf('/ic/ce/wspa/wspa/rest/listaLegaleRappresentante')>=0
           }
 
           function isDigitalDeliveriesPath(path){
@@ -327,7 +331,7 @@ Resources:
             }
           }
 
-          async function forwardRequest(event, baseUrl){
+          async function forwardRequest(event, baseUrl, shouldFilterXHeaders = true){
               const { httpMethod, path, queryStringParameters, headers, body } = event
               
               let url = baseUrl+path.slice(1)
@@ -337,7 +341,8 @@ Resources:
                   qs = queryStringParameters
               }
 
-              const xHeaders = filterXHeaders(headers)
+              const xHeaders = shouldFilterXHeaders?filterXHeaders(headers):headers
+              
               xHeaders['Content-Type'] = 'application/json'
               const fetchOptions = { 
                 method: httpMethod,
@@ -453,27 +458,34 @@ Resources:
                 return forwardRequest(event, defaultUrl)
               }
 
-              if(isInfocamerePath(path)){
-                // in case of BLACKLIST, the defaultUrl is the real infocamere
-                const infocamereMockUrl = process.env.MockNationalRegistries
-                const defaultUrl = routingMode==='BLACKLIST'?process.env.InfocamereBaseUrl:infocamereMockUrl
-                const allowedOnlyUrl = routingMode==='BLACKLIST'?infocamereMockUrl:process.env.InfocamereBaseUrl
-                console.debug('[INFOCAMERE] - Call')
-                if(httpMethod=='POST'){
-                    console.debug('[INFOCAMERE] - Call POST')
-                    if(isLegaleRappresentantePath(path)){
-                        const legaleRappresentanteTaxId = extractLegalRappresentateTaxIdFromPath(path)
-                        console.log('[INFOCAMERE] Legale rappresentante Tax ID', legaleRappresentanteTaxId)
-                        const whitelist = await getParameterFromStore('pn-NationalRegistriesWhitelist')
-                        console.log('[INFOCAMERE] Whitelist', whitelist)
-                        if(isNationalRegistriesWhitelisted(legaleRappresentanteTaxId, whitelist, 'legaleRappresentante')){
-                            return forwardRequest(event, allowedOnlyUrl)
-                        }
-                    }
-                } 
-                return forwardRequest(event, defaultUrl)
-              }
+              if(isNationalRegistriesProxyPath(path)){
+                if(isInfocamerePath(path)){
+                  // in case of BLACKLIST, the defaultUrl is the real infocamere
+                  const infocamereMockUrl = process.env.MockNationalRegistriesBaseUrl
+                  const defaultUrl = routingMode==='BLACKLIST'?process.env.InfocamereBaseUrl:infocamereMockUrl
+                  const allowedOnlyUrl = routingMode==='BLACKLIST'?infocamereMockUrl:process.env.InfocamereBaseUrl
+                  console.debug('[INFOCAMERE] - Call', allowedOnlyUrl)
 
+                  event.path = event.path.replace('national-registries-proxy/', '') // removed proxy path part
+                  
+                  if(httpMethod=='GET'){
+                      console.debug('[INFOCAMERE] - Call GET')
+                      if(isLegaleRappresentantePath(path)){
+                          const legaleRappresentanteTaxId = extractLegalRappresentateTaxIdFromPath(path)
+                          console.log('[INFOCAMERE] Legale rappresentante Tax ID', legaleRappresentanteTaxId)
+                          const whitelist = await getParameterFromStore('pn-NationalRegistriesWhitelist')
+                          console.log('[INFOCAMERE] Whitelist', whitelist)
+                          if(isNationalRegistriesWhitelisted(legaleRappresentanteTaxId, whitelist, 'legaleRappresentante')){
+                              console.log('[INFOCAMERE] forward W to '+allowedOnlyUrl)
+                              return forwardRequest(event, allowedOnlyUrl, false)
+                          }
+                      }
+                  } 
+                  console.log('[INFOCAMERE] forward to '+defaultUrl)
+                  return forwardRequest(event, defaultUrl, false)
+                }
+              }
+              
               throw new Error('Unhandled event', event)            
           }
 
@@ -717,6 +729,7 @@ Resources:
             - /external-channel/*
             - /external-channels/*
             - /piattaforma-notifiche-ingress/*
+            - /national-registries-proxy/*
       Actions:
         - Type: forward
           TargetGroupArn: !Ref LambdaProxyTargetGroup
