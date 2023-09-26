@@ -178,7 +178,34 @@ Parameters:
   PaperChannelToServiceDeskQueueURL:
     Type: String
 
+  # F24 to PaperChannel
+  F24ToPaperChannelQueueURL:
+    Type: String
 
+  F24ToPaperChannelQueueARN:
+    Type: String
+
+  # F24 to DeliveryPush
+  F24ToDeliveryPushQueueURL:
+    Type: String
+
+  F24ToDeliveryPushQueueARN:
+    Type: String
+
+  # SafeStorage to F24
+  SafeStorageToF24QueueURL:
+    Type: String
+
+  SafeStorageToF24QueueARN:
+    Type: String
+
+  # F24 client Ids
+  F24DeliveryPushUser:
+    Type: String
+
+  F24PaperChannelUser:
+    Type: String
+    
   OncallDlqRatio:
     Type: Number
     Default: 0.1
@@ -264,6 +291,9 @@ Resources:
                   - !Ref "AddressManagerToDeliveryPushQueueARN"
                   - !Ref "AcmAlarmsQueueARN"
                   - !Ref "PaperChannelToServiceDeskQueueARN"
+                  - !Ref "SafeStorageToF24QueueARN"
+                  - !Ref "F24ToPaperChannelQueueARN"
+                  - !Ref "F24ToDeliveryPushQueueARN"
   
   # Resource based policy to allow EventBridge to publish to CloudWatch Logs
   LogGroupCoreEventBusPolicy:
@@ -331,6 +361,9 @@ Resources:
         - !Ref "NationalRegistries2SelcPGQueueURL"  
         - !Ref "AddressManagerToDeliveryPushQueueURL"  
         - !Ref "PaperChannelToServiceDeskQueueURL"
+        - !Ref "F24ToPaperChannelQueueURL"
+        - !Ref "F24ToDeliveryPushQueueURL"
+        - !Ref "SafeStorageToF24QueueURL"
       PolicyDocument:
         Statement:
           - Sid: "SendEventsToDLQ"
@@ -353,6 +386,9 @@ Resources:
               - !Ref "NationalRegistries2SelcPGQueueARN"        
               - !Ref "AddressManagerToDeliveryPushQueueARN"   
               - !Ref "PaperChannelToServiceDeskQueueARN"
+              - !Ref "F24ToPaperChannelQueueARN"
+              - !Ref "F24ToDeliveryPushQueueARN"
+              - !Ref "SafeStorageToF24QueueARN"
 
   # Log all events
   CoreEventBusEventsLogGroup:
@@ -730,6 +766,99 @@ Resources:
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2ServiceDesk'
           Arn: !Ref PaperChannelToServiceDeskQueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
+  # Send Safe Storage Response to f24
+  PnCoreEventBusToF24SafeStorageResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route SafeStorage Events to pn-f24
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "SafeStorageOutcomeEvent" ]
+        detail:
+          documentType: [ 'PN_F24' ]
+      Targets: 
+        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
+          Id: !Sub ${ProjectName}-Logger-SafeStore2F24
+          InputTransformer:
+            InputPathsMap:
+              "timestamp": "$.time"
+            InputTemplate: |
+              {
+                  "timestamp": <timestamp>,
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }       
+        - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2F24'
+          Arn: !Ref SafeStorageToF24QueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
+  # Send f24 to paper channel
+  PnCoreEventBusToPaperChannelF24ResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route F24 Events to pn-paper-channel
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "PaperChannelOutcomeEvent" ]
+        detail:
+          clientId: [ !Ref F24PaperChannelUser ]
+      Targets: 
+        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
+          Id: !Sub ${ProjectName}-Logger-F24_to_PaperChannel
+          InputTransformer:
+            InputPathsMap:
+              "timestamp": "$.time"
+            InputTemplate: |
+              {
+                  "timestamp": <timestamp>,
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }       
+        - Id: !Sub '${ProjectName}-CoreEventBus-F24ToPaperChannel'
+          Arn: !Ref F24ToPaperChannelQueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
+  # Send f24 to delivery push
+  PnCoreEventBusToDeliveryPushF24ResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route F24 Events to pn-delivery-push
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "DeliveryPushOutcomeEvent" ]
+        detail:
+          clientId: [ !Ref F24DeliveryPushUser ]
+      Targets: 
+        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
+          Id: !Sub ${ProjectName}-Logger-F24_to_DeliveryPush
+          InputTransformer:
+            InputPathsMap:
+              "timestamp": "$.time"
+            InputTemplate: |
+              {
+                  "timestamp": <timestamp>,
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }       
+        - Id: !Sub '${ProjectName}-CoreEventBus-F24ToDeliveryPush'
+          Arn: !Ref F24ToDeliveryPushQueueARN
           InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
