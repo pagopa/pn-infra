@@ -140,6 +140,16 @@ const coreMapping = {
         'oncall-pn-logextractor-be-ErrorFatalLogs-Alarm',
         'oncall-pn-logextractor-be-BACKOFFICE-ApiGwLatencyAlarm',
         'pn-logextractor-be-BACKOFFICE-ApiGwAlarm'
+    ],
+    'pn-service-desk': [
+        'oncall-pn-service-desk-ErrorFatalLogs-Alarm',
+        'oncall-pn-service-desk-alb-alarm',
+        'pn-paperchannel_to_servicedesk-DLQ-HasMessage',
+        'pn-paperchannel_to_servicedesk-HasOldMessage',
+        'pn-safestore_to_servicedesk-HasOldMessage',
+        'pn-safestore_to_servicedesk-DLQ-HasMessage',
+        'pn-service_desk_requests-DLQ-HasMessage',
+        'pn-service_desk_requests-HasOldMessage'
     ]
 }
 
