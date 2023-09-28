@@ -284,6 +284,13 @@ Parameters:
     Description: comma separated list of Conservazione Sostitutiva backend CIDRs
     Default: ''
 
+  # F24 client Ids
+  F24DeliveryPushUser:
+    Type: String
+
+  F24PaperChannelUser:
+    Type: String    
+
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
 
@@ -1211,3 +1218,8 @@ Outputs:
     Value: !Join [ ",", !Ref IOBackendCidrs ]
   CNBackendCidrs:
     Value: !Join [ ",", !Ref CNBackendCidrs ]
+  # F24 client Ids
+  F24DeliveryPushUser:
+    Value: !Ref F24DeliveryPushUser
+  F24PaperChannelUser:
+    Value: !Ref F24PaperChannelUser
