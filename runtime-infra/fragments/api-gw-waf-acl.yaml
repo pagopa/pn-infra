@@ -583,6 +583,36 @@ Resources:
                 MetricName: AWSManagedRulesAmazonIpReputationList
                 SampledRequestsEnabled: true
             - !If 
+              - IsWeb
+              - Name: AWSManagedRulesKnownBadInputsRuleSet
+                Priority: 2
+                OverrideAction: 
+                  Count: {} # override to Count, update to "None" when ready to activate blocking rule
+                Statement: 
+                  ManagedRuleGroupStatement:
+                    VendorName: AWS
+                    Name: AWSManagedRulesKnownBadInputsRuleSet
+                VisibilityConfig: 
+                  CloudWatchMetricsEnabled: true
+                  MetricName: AWSManagedRulesKnownBadInputsRuleSet
+                  SampledRequestsEnabled: true
+              - !Ref "AWS::NoValue"                
+            - !If 
+              - IsWeb
+              - Name: AWSManagedRulesSQLiRuleSet
+                Priority: 2
+                OverrideAction: 
+                  Count: {} # override to Count, update to "None" when ready to activate blocking rule
+                Statement: 
+                  ManagedRuleGroupStatement:
+                    VendorName: AWS
+                    Name: AWSManagedRulesSQLiRuleSet
+                VisibilityConfig: 
+                  CloudWatchMetricsEnabled: true
+                  MetricName: AWSManagedRulesSQLiRuleSet
+                  SampledRequestsEnabled: true
+              - !Ref "AWS::NoValue"
+            - !If 
               - WAFRule0Exists
               - Name: !Join ["-", [!Select [0, !Ref WAFRuleVendors], !Select [0, !Ref WAFRuleNames]]]
                 OverrideAction: 
