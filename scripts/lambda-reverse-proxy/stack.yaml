@@ -343,24 +343,16 @@ Resources:
 
               const xHeaders = shouldFilterXHeaders?filterXHeaders(headers):headers
               
-              xHeaders['Content-Type'] = 'application/json'
+              if(shouldFilterXHeaders){
+                xHeaders['Content-Type'] = 'application/json'
+              }
               const fetchOptions = { 
                 method: httpMethod,
                 headers: xHeaders
               }
 
               if(body){
-                const jsonBody = JSON.parse(body)
-                if(jsonBody.clientRequestTimeStamp && typeof jsonBody.clientRequestTimeStamp==='number'){
-                  const utcMilliseconds = Math.floor(jsonBody.clientRequestTimeStamp*1000);
-                  const d = new Date(0); // The 0 there is the key, which sets the date to the epoch
-                  d.setUTCMilliseconds(utcMilliseconds);
-                  jsonBody.clientRequestTimeStamp = d.toISOString()
-                  fetchOptions.body = JSON.stringify(jsonBody)
-                } else {
                   fetchOptions.body = body // stringified
-                }
-                
               }
               
               if(qs){
@@ -462,10 +454,12 @@ Resources:
                 if(isInfocamerePath(path)){
                   // in case of BLACKLIST, the defaultUrl is the real infocamere
                   const infocamereMockUrl = process.env.MockNationalRegistriesBaseUrl
-                  const defaultUrl = routingMode==='BLACKLIST'?process.env.InfocamereBaseUrl:infocamereMockUrl
-                  const allowedOnlyUrl = routingMode==='BLACKLIST'?infocamereMockUrl:process.env.InfocamereBaseUrl
+                  const allowedOnlyUrl = routingMode==='BLACKLIST'?process.env.InfocamereBaseUrl:infocamereMockUrl
+                  const defaultUrl = routingMode==='BLACKLIST'?infocamereMockUrl:process.env.InfocamereBaseUrl
                   console.debug('[INFOCAMERE] - Call', allowedOnlyUrl)
-
+                  console.debug('[INFOCAMERE] - Default url', defaultUrl)
+                  console.log('routingMode' +routingMode)
+                  
                   event.path = event.path.replace('national-registries-proxy/', '') // removed proxy path part
                   
                   if(httpMethod=='GET'){
@@ -509,7 +503,6 @@ Resources:
               }
               
           };
-
 
       Handler: index.handler
       Runtime: nodejs18.x
