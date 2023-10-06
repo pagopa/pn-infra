@@ -595,11 +595,14 @@ Resources:
                 MetricName: AWSManagedRulesAmazonIpReputationList
                 SampledRequestsEnabled: true
             - !If 
-              - IsEnhancedWebSecurityEnabled
+              - IsWeb
               - Name: AWSManagedRulesKnownBadInputsRuleSet
                 Priority: 2
                 OverrideAction: 
-                  Count: {} # override to Count, update to "None" when ready to activate blocking rule
+                  !If
+                  - IsEnhancedWebSecurityEnabled
+                  - None: {} #
+                  - Count: {}
                 Statement: 
                   ManagedRuleGroupStatement:
                     VendorName: AWS
@@ -610,11 +613,14 @@ Resources:
                   SampledRequestsEnabled: true
               - !Ref "AWS::NoValue"                
             - !If 
-              - IsEnhancedWebSecurityEnabled
+              - IsWeb
               - Name: AWSManagedRulesSQLiRuleSet
                 Priority: 2
                 OverrideAction: 
-                  Count: {} # override to Count, update to "None" when ready to activate blocking rule
+                  !If
+                    - IsEnhancedWebSecurityEnabled
+                    - None: {} #
+                    - Count: {}
                 Statement: 
                   ManagedRuleGroupStatement:
                     VendorName: AWS
