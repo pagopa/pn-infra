@@ -284,6 +284,15 @@ Parameters:
     Description: comma separated list of Conservazione Sostitutiva backend CIDRs
     Default: ''
 
+  # F24 client Ids
+  F24DeliveryPushUser:
+    Type: String
+    Default: 'pn-delivery-push-f24'
+
+  F24PaperChannelUser:
+    Type: String    
+    Default: 'pn-paper-channel-f24'
+
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
 
@@ -561,6 +570,48 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub '${ProjectName}-addressmanager_to_deliverypush'
+        DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10        
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  ### Communication FROM pn-safe-storage TO pn-f24 ###
+  SafeStorageToF24Queue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestorage_to_f24'
+        DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10        
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  ### Communication FROM pn-f24 TO pn-delivery-push ###
+  F24ToDeliveryPushQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-f24_to_deliverypush'
+        DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10        
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  ### Communication FROM pn-f24 TO pn-paper-channel ###
+  F24ToPaperChannelQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-f24_to_paperchannel'
         DelaySeconds: 1
         VisibilityTimeout: 60
         MaxReceiveCount: 10        
@@ -966,6 +1017,57 @@ Outputs:
     Value: !GetAtt PaperChannelToServiceDeskQueue.Outputs.SqsAgeAlarmArn
     Description: paperchannel-to-servicedesk queue age alarm ARN
 
+  # SafeStorage to F24 events
+  SafeStorageToF24QueueName:
+    Value: !GetAtt SafeStorageToF24Queue.Outputs.QueueName
+    Description: safestorage-to-f24 queue name
+  SafeStorageToF24QueueURL:
+    Value: !GetAtt SafeStorageToF24Queue.Outputs.QueueURL
+    Description: safestorage-to-f24 queue URL
+  SafeStorageToF24QueueARN:
+    Value: !GetAtt SafeStorageToF24Queue.Outputs.QueueARN
+    Description: safestorage-to-f24 queue ARN
+  SafeStorageToF24QueueAlarmARN:
+    Value: !GetAtt SafeStorageToF24Queue.Outputs.SqsDLQAlarmArn
+    Description: safestorage-to-f24 queue alarm ARN
+  SafeStorageToF24QueueAgeAlarmARN:
+    Value: !GetAtt SafeStorageToF24Queue.Outputs.SqsAgeAlarmArn
+    Description: safestorage-to-f24 queue age alarm ARN
+
+  # F24 to Delivery Push events
+  F24ToDeliveryPushQueueName:
+    Value: !GetAtt F24ToDeliveryPushQueue.Outputs.QueueName
+    Description: f24-to-deliverypush queue name
+  F24ToDeliveryPushQueueURL:
+    Value: !GetAtt F24ToDeliveryPushQueue.Outputs.QueueURL
+    Description: f24-to-deliverypush queue URL
+  F24ToDeliveryPushQueueARN:
+    Value: !GetAtt F24ToDeliveryPushQueue.Outputs.QueueARN
+    Description: f24-to-deliverypush queue ARN
+  F24ToDeliveryPushQueueAlarmARN:
+    Value: !GetAtt F24ToDeliveryPushQueue.Outputs.SqsDLQAlarmArn
+    Description: f24-to-deliverypush queue alarm ARN
+  F24ToDeliveryPushQueueAgeAlarmARN:
+    Value: !GetAtt F24ToDeliveryPushQueue.Outputs.SqsAgeAlarmArn
+    Description: f24-to-deliverypush queue age alarm ARN
+
+  # F24 to Paper Channel events
+  F24ToPaperChannelQueueName:
+    Value: !GetAtt F24ToPaperChannelQueue.Outputs.QueueName
+    Description: f24-to-paperchannel queue name
+  F24ToPaperChannelQueueURL:
+    Value: !GetAtt F24ToPaperChannelQueue.Outputs.QueueURL
+    Description: f24-to-paperchannel queue URL
+  F24ToPaperChannelQueueARN:
+    Value: !GetAtt F24ToPaperChannelQueue.Outputs.QueueARN
+    Description: f24-to-paperchannel queue ARN
+  F24ToPaperChannelQueueAlarmARN:
+    Value: !GetAtt F24ToPaperChannelQueue.Outputs.SqsDLQAlarmArn
+    Description: f24-to-paperchannel queue alarm ARN
+  F24ToPaperChannelQueueAgeAlarmARN:
+    Value: !GetAtt F24ToPaperChannelQueue.Outputs.SqsAgeAlarmArn
+    Description: f24-to-paperchannel queue age alarm ARN
+
   # Kinesis Source Stream containing the DynamoDB Change Data Capture events
   CdcKinesisSourceStreamName:
     Description: 'Kinesis source CDC stream name'
@@ -1118,3 +1220,9 @@ Outputs:
     Value: !Join [ ",", !Ref IOBackendCidrs ]
   CNBackendCidrs:
     Value: !Join [ ",", !Ref CNBackendCidrs ]
+
+  # F24 client Ids
+  F24DeliveryPushUser:
+    Value: !Ref F24DeliveryPushUser
+  F24PaperChannelUser:
+    Value: !Ref F24PaperChannelUser
