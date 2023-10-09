@@ -594,7 +594,19 @@ Resources:
         VisibilityTimeout: 60
         MaxReceiveCount: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
-      
+
+  ### Communication FROM pn-delivery-push TO pn-external-registries ###
+  DeliveryPushToExternalRegistriesQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain      
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-deliverypush_to_externalregistries'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
   ###                             ELASTIC FILE SYSTEM                     ###
   ###########################################################################
 
@@ -964,6 +976,23 @@ Outputs:
     Description: paperchannel-to-servicedesk queue alarm ARN
   PaperChannelToServiceDeskQueueAgeAlarmARN:
     Value: !GetAtt PaperChannelToServiceDeskQueue.Outputs.SqsAgeAlarmArn
+    Description: paperchannel-to-servicedesk queue age alarm ARN
+
+  # DeliveryPush to ExternalRegistries events
+  DeliveryPushToExternalRegistriesQueueName:
+    Value: !GetAtt DeliveryPushToExternalRegistriesQueue.Outputs.QueueName
+    Description: paperchannel-to-servicedesk queue name
+  DeliveryPushToExternalRegistriesQueueURL:
+    Value: !GetAtt DeliveryPushToExternalRegistriesQueue.Outputs.QueueURL
+    Description: paperchannel-to-servicedesk queue URL
+  DeliveryPushToExternalRegistriesQueueARN:
+    Value: !GetAtt DeliveryPushToExternalRegistriesQueue.Outputs.QueueARN
+    Description: paperchannel-to-servicedesk queue ARN
+  DeliveryPushToExternalRegistriesQueueAlarmARN:
+    Value: !GetAtt DeliveryPushToExternalRegistriesQueue.Outputs.SqsDLQAlarmArn
+    Description: paperchannel-to-servicedesk queue alarm ARN
+  DeliveryPushToExternalRegistriesQueueAgeAlarmARN:
+    Value: !GetAtt DeliveryPushToExternalRegistriesQueue.Outputs.SqsAgeAlarmArn
     Description: paperchannel-to-servicedesk queue age alarm ARN
 
   # Kinesis Source Stream containing the DynamoDB Change Data Capture events
