@@ -85,6 +85,14 @@ Parameters:
     Default: ''
     Description: Alarm SNS Topic ARN
 
+  EnhancedWebSecurityEnabled:
+    Type: String
+    Default: false
+    Description: Enable additional WAF Web rules
+    AllowedValues:
+      - true
+      - false
+
 #Condition to check if the index is out of bound for the !Select function.
 #If an element exists at the index, it will allow you to create the WAF rule resource from the list
 Conditions:
@@ -107,6 +115,10 @@ Conditions:
   HasAlarmTopic: !Not [!Equals [!Ref AlarmSNSTopicArn, '']]
 
   RequirestLimitAlarm: !And [ !Condition HasAlarmTopic, !Condition AddRateRuleCondition ]
+
+  IsEnhancedWebSecurityEnabled: !Equals [ !Ref EnhancedWebSecurityEnabled, true ]
+
+
   WAFRule0Exists: 
     !Not 
       - !Equals
@@ -582,6 +594,42 @@ Resources:
                 CloudWatchMetricsEnabled: true
                 MetricName: AWSManagedRulesAmazonIpReputationList
                 SampledRequestsEnabled: true
+            - !If 
+              - IsWeb
+              - Name: AWSManagedRulesKnownBadInputsRuleSet
+                Priority: 2
+                OverrideAction: 
+                  !If
+                  - IsEnhancedWebSecurityEnabled
+                  - None: {} # block
+                  - Count: {} # count
+                Statement: 
+                  ManagedRuleGroupStatement:
+                    VendorName: AWS
+                    Name: AWSManagedRulesKnownBadInputsRuleSet
+                VisibilityConfig: 
+                  CloudWatchMetricsEnabled: true
+                  MetricName: AWSManagedRulesKnownBadInputsRuleSet
+                  SampledRequestsEnabled: true
+              - !Ref "AWS::NoValue"                
+            - !If 
+              - IsWeb
+              - Name: AWSManagedRulesSQLiRuleSet
+                Priority: 2
+                OverrideAction: 
+                  !If
+                    - IsEnhancedWebSecurityEnabled
+                    - None: {} # block
+                    - Count: {} # count
+                Statement: 
+                  ManagedRuleGroupStatement:
+                    VendorName: AWS
+                    Name: AWSManagedRulesSQLiRuleSet
+                VisibilityConfig: 
+                  CloudWatchMetricsEnabled: true
+                  MetricName: AWSManagedRulesSQLiRuleSet
+                  SampledRequestsEnabled: true
+              - !Ref "AWS::NoValue"
             - !If 
               - WAFRule0Exists
               - Name: !Join ["-", [!Select [0, !Ref WAFRuleVendors], !Select [0, !Ref WAFRuleNames]]]
