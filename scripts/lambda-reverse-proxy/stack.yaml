@@ -27,6 +27,12 @@ Parameters:
   MockConsolidatoreBaseUrl:
     Type: String
 
+  NormalizzatoreBaseUrl:
+    Type: String
+
+  MockNormalizzatoreBaseUrl:
+    Type: String
+
   CnApiBaseUrl:
     Type: String
 
@@ -169,6 +175,10 @@ Resources:
             return path.toLowerCase().indexOf('/piattaforma-notifiche-ingress/')>=0;
           }
 
+          function isNormalizzatoreCall(path){
+            return path.toLowerCase().indexOf('/send-normalizzatore-ingress/')>=0;
+          }
+
           function isNationalRegistriesProxyPath(path){
             return path.indexOf('/national-registries-proxy')>=0;
           }
@@ -205,6 +215,15 @@ Resources:
             return path.substring(path.lastIndexOf("/") + 1, path.length);
           }
 
+          function isNormalizzatoreEnabled(whitelistAsString){
+            const whitelistAsJson = JSON.parse(whitelistAsString)
+            if(whitelistAsJson && whitelistAsJson.enabled===true){
+              return true
+            }  
+
+            return false
+          }
+          
           function isNationalRegistriesWhitelisted(value, whitelistAsString, section){
             const whitelistAsJson = JSON.parse(whitelistAsString)
             if(!whitelistAsJson || !whitelistAsJson[section]){
@@ -480,6 +499,24 @@ Resources:
                 }
               }
               
+              if(isNormalizzatoreCall(path)){
+                // in case of BLACKLIST, the defaultUrl is the real consolidatore system
+                const defaultUrl = routingMode==='BLACKLIST'?process.env.NormalizzatoreBaseUrl:process.env.MockNormalizzatoreBaseUrl
+                const allowedOnlyUrl = routingMode==='BLACKLIST'?process.env.MockNormalizzatoreBaseUrl:process.env.NormalizzatoreBaseUrl
+
+                console.debug('[NORM] - Call')
+                if(httpMethod=='POST'){
+                  console.debug('[NORM] - Call POST')
+                  if(isConsolidatoreDeliveriesPath(path)){
+                    const whitelist = await getParameterFromStore('pn-NormalizzatoreWhitelist')
+                    console.log('[NORM] Whitelist', whitelist)
+                    if(isNormalizzatoreEnabled(whitelist)){
+                        return forwardRequest(event, allowedOnlyUrl)
+                    }
+                  }
+                } 
+                return forwardRequest(event, defaultUrl)
+              }
               throw new Error('Unhandled event', event)            
           }
 
@@ -512,6 +549,8 @@ Resources:
           MockExternalChannelBaseUrl: !Ref MockExternalChannelBaseUrl
           ConsolidatoreBaseUrl: !Ref ConsolidatoreBaseUrl
           MockConsolidatoreBaseUrl: !Ref MockConsolidatoreBaseUrl
+          NormalizzatoreBaseUrl: !Ref NormalizzatoreBaseUrl
+          MockNormalizzatoreBaseUrl: !Ref MockNormalizzatoreBaseUrl
           InfocamereBaseUrl: !Ref InfocamereBaseUrl
           MockNationalRegistriesBaseUrl: !Ref MockNationalRegistriesBaseUrl
           RoutingMode: !Ref RoutingMode
@@ -723,6 +762,7 @@ Resources:
             - /external-channels/*
             - /piattaforma-notifiche-ingress/*
             - /national-registries-proxy/*
+            - /send-normalizzatore-ingress/*
       Actions:
         - Type: forward
           TargetGroupArn: !Ref LambdaProxyTargetGroup
