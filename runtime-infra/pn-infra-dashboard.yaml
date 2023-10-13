@@ -126,6 +126,7 @@ Resources:
       Statistic: Maximum
       MetricName: "ClusterStatus.red"
       ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: ignore    
       Threshold: 1
       Period: 60
       EvaluationPeriods: 1
@@ -150,6 +151,7 @@ Resources:
       Statistic: Maximum
       MetricName: "ClusterStatus.yellow"
       ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: ignore    
       Threshold: 1
       Period: 60
       EvaluationPeriods: 1
@@ -198,6 +200,7 @@ Resources:
           Label: !Sub "${ProjectName}-avg free space"
       ComparisonOperator: LessThanOrEqualToThreshold
       Threshold: 30
+      TreatMissingData: ignore    
       EvaluationPeriods: 1
       OKActions:
         - !Ref AlarmSNSTopicArn
@@ -220,6 +223,7 @@ Resources:
       Statistic: Maximum
       MetricName: "ClusterIndexWritesBlocked"
       ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: ignore    
       Threshold: 1
       Period: 300
       EvaluationPeriods: 1
