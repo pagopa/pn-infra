@@ -155,6 +155,7 @@ Resources:
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/pn-DigitalDeliveriesWhitelist"
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/pn-PaperDeliveriesWhitelist"
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/pn-NationalRegistriesWhitelist"
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/pn-NormalizzatoreWhitelist"
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
@@ -507,12 +508,10 @@ Resources:
                 console.debug('[NORM] - Call')
                 if(httpMethod=='POST'){
                   console.debug('[NORM] - Call POST')
-                  if(isConsolidatoreDeliveriesPath(path)){
-                    const whitelist = await getParameterFromStore('pn-NormalizzatoreWhitelist')
-                    console.log('[NORM] Whitelist', whitelist)
-                    if(isNormalizzatoreEnabled(whitelist)){
-                        return forwardRequest(event, allowedOnlyUrl)
-                    }
+                  const whitelist = await getParameterFromStore('pn-NormalizzatoreWhitelist')
+                  console.log('[NORM] Whitelist', whitelist)
+                  if(isNormalizzatoreEnabled(whitelist)){
+                      return forwardRequest(event, allowedOnlyUrl)
                   }
                 } 
                 return forwardRequest(event, defaultUrl)
