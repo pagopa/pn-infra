@@ -177,7 +177,15 @@ Resources:
           }
 
           function isNormalizzatoreCall(path){
-            return path.toLowerCase().indexOf('/send-normalizzatore-ingress/')>=0;
+            return path.toLowerCase().indexOf('/lambda-normalizzatore-ingress/')>=0;
+          }
+
+          function isDeduplica(path){
+            return path.toLowerCase().indexOf('/send-normalizzatore-ingress/v1/deduplica')>=0;
+          }
+
+          function isNormalizzazione(path){
+            return path.toLowerCase().indexOf('/send-normalizzatore-ingress/v1/normalizzazione')>=0;
           }
 
           function isNationalRegistriesProxyPath(path){
@@ -216,9 +224,9 @@ Resources:
             return path.substring(path.lastIndexOf("/") + 1, path.length);
           }
 
-          function isNormalizzatoreEnabled(whitelistAsString){
+          function isNormalizzatoreEnabled(whitelistAsString, service){
             const whitelistAsJson = JSON.parse(whitelistAsString)
-            if(whitelistAsJson && whitelistAsJson.enabled===true){
+            if(whitelistAsJson && whitelistAsJson[service]===true){
               return true
             }  
 
@@ -507,13 +515,27 @@ Resources:
 
                 console.debug('[NORM] - Call')
                 if(httpMethod=='POST'){
-                  console.debug('[NORM] - Call POST')
+
                   const whitelist = await getParameterFromStore('pn-NormalizzatoreWhitelist')
-                  console.log('[NORM] Whitelist', whitelist)
-                  if(isNormalizzatoreEnabled(whitelist)){
+
+                  // if deduplica
+                  if(isDeduplica(path)){
+                    // else if normalizzazione
+                    console.log('[NORM] Whitelist', whitelist)
+                    if(isNormalizzatoreEnabled(whitelist, 'deduplica')){
+                      event.path = path.replace('lambda-normalizzatore-ingress', 'PagoPaDeduplica')                    
                       return forwardRequest(event, allowedOnlyUrl)
+                    }
+                  } else if(isNormalizzazione(path)){
+                    // else if normalizzazione
+                    console.log('[NORM] Whitelist', whitelist)
+                    if(isNormalizzatoreEnabled(whitelist, 'normalizzazione')){
+                        event.path = path.replace('lambda-normalizzatore-ingress', 'SINIHelper')
+                        return forwardRequest(event, allowedOnlyUrl)
+                    }
                   }
                 } 
+                event.path = path.replace('lambda-normalizzatore-ingress/', '')
                 return forwardRequest(event, defaultUrl)
               }
               throw new Error('Unhandled event', event)            
@@ -761,7 +783,7 @@ Resources:
             - /external-channels/*
             - /piattaforma-notifiche-ingress/*
             - /national-registries-proxy/*
-            - /send-normalizzatore-ingress/*
+            - /lambda-normalizzatore-ingress/*
       Actions:
         - Type: forward
           TargetGroupArn: !Ref LambdaProxyTargetGroup
