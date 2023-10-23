@@ -10,6 +10,14 @@ Parameters:
     Type: String
     Description: Lambda function name
 
+  DataPointsToAlarm:
+    Type: Number
+    Default: 1
+
+  EvaluationPeriods:
+    Type: Number
+    Default: 60
+
 Resources:
   # CloudWatch metric to filer ERROR in log group
   LambdaErrorLogsMetricFilter: 
@@ -34,9 +42,9 @@ Resources:
         - !Ref AlarmSNSTopicArn
       OKActions:
         - !Ref AlarmSNSTopicArn
-      DatapointsToAlarm: 1
+      DatapointsToAlarm: !Ref DataPointsToAlarm
       ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
+      EvaluationPeriods: !Ref EvaluationPeriods
       Threshold: 1
       Metrics:
         - Id: m1

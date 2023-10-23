@@ -78,6 +78,18 @@ Parameters:
       - 'true'
       - 'false'
 
+  ApiErrorDataPointsToAlarm:
+    Type: Number
+    Default: 1
+
+  ApiErrorEvaluationPeriods:
+    Type: Number
+    Default: 5
+
+  ApiErrorThreshold:
+    Type: Number
+    Default: 1
+
   ConfidentialInfoAccountId:
     Type: String
     Default: ''
@@ -277,10 +289,10 @@ Resources:
         - !Ref AlarmSNSTopicArn
       OKActions:
         - !Ref AlarmSNSTopicArn
-      DatapointsToAlarm: 1
+      DatapointsToAlarm: !Ref ApiErrorDataPointsToAlarm
       ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 5
-      Threshold: 1
+      EvaluationPeriods: !Ref ApiErrorEvaluationPeriods
+      Threshold: !Ref ApiErrorThreshold
       TreatMissingData: notBreaching
       Metrics:
         - Id: m1

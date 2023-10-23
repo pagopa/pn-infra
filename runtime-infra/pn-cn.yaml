@@ -38,6 +38,14 @@ Parameters:
     Type: String
     Description: 'Kinesis stream that receive logs'
 
+  ApiErrorDataPointsToAlarm:
+    Type: Number
+    Default: 10
+
+  ApiErrorEvaluationPeriods:
+    Type: Number
+    Default: 30
+
 Resources:
 
   # Expose PN-Delivery microservice public API with API-GW for B2B usage
@@ -59,6 +67,8 @@ Resources:
         OpenApiBucketName: !Ref BucketName
         OpenApiBucketKey: !Sub ${BucketBasePath}/docs/openapi/aws/api-cn-CN_BE-aws.yaml
         OpenApiMode: 'INCLUDE'
+        ApiErrorDataPointsToAlarm: !Ref ApiErrorDataPointsToAlarm
+        ApiErrorEvaluationPeriods: !Ref ApiErrorEvaluationPeriods
 
   CNPublicApiWaf:
     Type: AWS::CloudFormation::Stack
@@ -80,8 +90,8 @@ Resources:
           Stage: unique # it is hardocded in api-gw-expose-service-openapi.yaml stack as well
       Description: Usage Plan for CN
       Quota:
-        Limit: 1000000
+        Limit: 10000000
         Period: DAY
       Throttle:
-        BurstLimit: 200
-        RateLimit: 100
+        BurstLimit: 2000
+        RateLimit: 1000
