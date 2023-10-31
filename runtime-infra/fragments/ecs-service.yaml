@@ -70,8 +70,8 @@ Parameters:
     Type: String
     Default: false
     AllowedValues:
-         - "true"
-         - "false"
+         - true
+         - false
 
   WireTapLogActivation:
     Type: String
@@ -609,7 +609,7 @@ Conditions:
   HasDefaultSecurityGroup: !Not [ !Equals [ !Ref EcsDefaultSecurityGroup, '' ] ]
   HasAlbSecurityGroup: !Not [ !Equals [ !Ref AlbSecurityGroup, '' ] ]
 
-  HasEfsFilesystem: !Not [ !Equals [ !Ref EfsFilesystem, '-' ] ]
+  #HasEfsFilesystem: !Not [ !Equals [ !Ref EfsFilesystem, '-' ] ]
   IsEfsMount: !Or [!Equals [ !Ref MountEfs, 'true' ], !Equals [ !Ref WireTapLogActivation, 'true' ]]
   RequiresEfsMount: !And [ !Condition IsEfsMount, !Condition HasEfsFilesystem ]
 
@@ -1395,7 +1395,7 @@ Resources:
 
   EfsFargateAccessPoint:
     Type: AWS::EFS::AccessPoint
-    Condition: HasEfsFilesystem
+    Condition: RequiresEfsMount
     Properties:
       FileSystemId: !Ref EfsFilesystem
       RootDirectory:
@@ -1757,4 +1757,8 @@ Outputs:
             - !GetAtt AlarmSQS.Arn
             - ''
         - ''
+
+  EfsFargateAccessPointID:
+    Value: !!Ref EfsFargateAccessPoint
+  
         
