@@ -610,7 +610,7 @@ Conditions:
   HasAlbSecurityGroup: !Not [ !Equals [ !Ref AlbSecurityGroup, '' ] ]
 
   HasEfsFilesystem: !Not [ !Equals [ !Ref EfsFilesystem, '-' ] ]
-  IsEfsMount: !Or [!Equals [ !Ref MountEfs, 'true' ], !Equals [ !Ref WireTapLogActivation, 'true' ]]
+  IsEfsMount: !Equals [ !Ref MountEfs, 'true' ]
   RequiresEfsMount: !And [ !Condition IsEfsMount, !Condition HasEfsFilesystem ]
 
   LogAlarmErrorFatal: !Equals [ !Ref LogAlarmStrategyV1, 'ERROR_FATAL' ]
