@@ -866,18 +866,6 @@ Resources:
             ToPort: 8080
             CidrIp: 0.0.0.0/0
 
-  EfsFargateAccessPoint:
-    Type: AWS::EFS::AccessPoint
-    Condition: RequiresEfsMount
-    Properties:
-      FileSystemId: !Ref EfsFilesystem
-      RootDirectory:
-        CreationInfo:
-          OwnerGid: "1000"
-          OwnerUid: "1000"
-          Permissions: "0755"
-        Path: !Sub /ecs/${MicroServiceUniqueName}
-
   # ECS Task
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -1405,6 +1393,18 @@ Resources:
                   IAM: ENABLED
           - !Ref AWS::NoValue
 
+  EfsFargateAccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Condition: RequiresEfsMount
+    Properties:
+      FileSystemId: !Ref EfsFilesystem
+      RootDirectory:
+        CreationInfo:
+          OwnerGid: "1000"
+          OwnerUid: "1000"
+          Permissions: "0755"
+        Path: !Sub /ecs/${MicroServiceUniqueName}
+        
   # A role needed by ECS
   ExecutionRole:
     Type: AWS::IAM::Role
