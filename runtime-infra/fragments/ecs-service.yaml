@@ -1395,7 +1395,7 @@ Resources:
 
   EfsFargateAccessPoint:
     Type: AWS::EFS::AccessPoint
-    Condition: RequiresEfsMount
+    Condition: HasEfsFilesystem
     Properties:
       FileSystemId: !Ref EfsFilesystem
       RootDirectory:
@@ -1404,7 +1404,7 @@ Resources:
           OwnerUid: "1000"
           Permissions: "0755"
         Path: !Sub /ecs/${MicroServiceUniqueName}
-        
+
   # A role needed by ECS
   ExecutionRole:
     Type: AWS::IAM::Role
