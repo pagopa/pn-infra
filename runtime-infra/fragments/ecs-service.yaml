@@ -611,7 +611,7 @@ Conditions:
 
   HasEfsFilesystem: !Not [ !Equals [ !Ref EfsFilesystem, '-' ] ]
   IsEfsMount: !Or [!Equals [ !Ref MountEfs, 'true' ], !Equals [ !Ref WireTapLogActivation, 'true' ]]
-  RequiresEfsMount: !And [ !Condition IsEfsMount, !Condition HasEfsFilesystem ]
+  #RequiresEfsMount: !And [ !Condition IsEfsMount, !Condition HasEfsFilesystem ]
 
   LogAlarmErrorFatal: !Equals [ !Ref LogAlarmStrategyV1, 'ERROR_FATAL' ]
   LogAlarmNotNone: !Not [ !Equals [ !Ref LogAlarmStrategyV1, '-' ] ]
@@ -897,7 +897,7 @@ Resources:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
             - 'Fn::If':
-              - RequiresEfsMount
+              - IsEfsMount
               - SourceVolume: "efs-volume"
                 ContainerPath: "/mnt/efs"
               - !Ref AWS::NoValue
@@ -1383,7 +1383,7 @@ Resources:
       Volumes:
         - Name: "my-vol"
         - 'Fn::If':
-          - RequiresEfsMount
+          - IsEfsMount
           - Name: efs-volume
             EFSVolumeConfiguration:
               FilesystemId: !Ref EfsFilesystem
@@ -1395,7 +1395,7 @@ Resources:
 
   EfsFargateAccessPoint:
     Type: AWS::EFS::AccessPoint
-    Condition: RequiresEfsMount
+    Condition: IsEfsMount
     Properties:
       FileSystemId: !Ref EfsFilesystem
       RootDirectory:
