@@ -13,7 +13,7 @@ CLUSTER=$(echo "${TASK_DETAILS}" | jq -r '.Cluster' | awk -F '/' '{print $NF}')
 SERVICE_NAME=$(echo "${TASK_DETAILS}" | jq -r '.ServiceName')
 FAMILY=$(echo "${TASK_DETAILS}" | jq -r '.Family')
 TASK_ID=$(echo "${TASK_DETAILS}" | jq -r '.TaskARN' | awk -F '/' '{print $NF}')
-
+SYNCHRONIZATION=1
 # Log prints
 printf "[STARTING] ----- %s\n" "$(date)"
 printf "Task details - %s : %s : %s\n" "$CLUSTER" "$SERVICE_NAME" "$TASK_ID"
@@ -26,6 +26,11 @@ printf "Clock synchronisation status - %s\n" "$CLOCK_SYNCHRONIZATION_STATUS"
 #
 # NOTE - For now 'ServiceName' is not available in Fargate, hence it is not possible to generate a
 # Service namespace. This is kept for further use.
+if [ "$CLOCK_SYNCHRONIZATION_STATUS" != "SYNCHRONIZED" ]; then
+    SYNCHRONIZATION=0
+fi
+
+echo ${SYNCHRONIZATION}
 
 if [ -z "$SERVICE_NAME" ] || [ "$SERVICE_NAME" = "null" ]; then
 
@@ -34,6 +39,10 @@ if [ -z "$SERVICE_NAME" ] || [ "$SERVICE_NAME" = "null" ]; then
                                    --dimensions ClusterName="${CLUSTER}",Family="${FAMILY}",TaskID="${TASK_ID}" \
                                    --namespace "ECS/ContainerInsights" \
                                    --value "${CLOCK_ERROR_BOUND}"
+    aws cloudwatch put-metric-data --metric-name Synchronization \
+                                   --dimensions ClusterName="${CLUSTER}",Family="${FAMILY}",TaskID="${TASK_ID}" \
+                                   --namespace "ECS/ContainerInsights" \
+                                   --value "${SYNCHRONIZATION}"
 
 else
 
@@ -42,7 +51,10 @@ else
                                    --dimensions ClusterName="${CLUSTER}",ServiceName="${SERVICE_NAME}",TaskID="${TASK_ID}" \
                                    --namespace "ECS/ContainerInsights" \
                                    --value "${CLOCK_ERROR_BOUND}"
-
+    aws cloudwatch put-metric-data --metric-name Synchronization \
+                                --dimensions ClusterName="${CLUSTER}",Family="${FAMILY}",TaskID="${TASK_ID}" \
+                                --namespace "ECS/ContainerInsights" \
+                                --value "${SYNCHRONIZATION}"
 fi
 
 printf "[DONE] - %s" "$(date)\n"
