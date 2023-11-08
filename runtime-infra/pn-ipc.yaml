@@ -297,9 +297,17 @@ Parameters:
     Type: Number
     Description: 'MaxAgeInMilliseconds for Kinesis Logs GetRecords'
 
+  LogsKinesisMaxAgeInMillisecondsOncall:
+    Type: Number
+    Description: 'MaxAgeInMilliseconds for Kinesis Logs GetRecords (oncall alarm)'
+
   CdcKinesisMaxAgeInMilliseconds:
     Type: Number
     Description: 'MaxAgeInMilliseconds for Kinesis Cdc GetRecords'
+
+  CdcKinesisMaxAgeInMillisecondsOncall:
+    Type: Number
+    Description: 'MaxAgeInMilliseconds for Kinesis Cdc GetRecords (oncall alarm)'
 
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
@@ -1119,6 +1127,8 @@ Outputs:
     Value: !Ref CdcKinesisStreamKeyArn
   CdcKinesisMaxAgeInMilliseconds:
     Value: !Ref CdcKinesisMaxAgeInMilliseconds    
+  CdcKinesisMaxAgeInMillisecondsOncall:
+    Value: !Ref CdcKinesisMaxAgeInMillisecondsOncall    
 
   # Kinesis Source Stream containing the CloudWatch Logs
   LogsKinesisSourceStreamName:
@@ -1132,6 +1142,8 @@ Outputs:
     Value: !Ref LogsKinesisStreamKeyArn
   LogsKinesisMaxAgeInMilliseconds:
     Value: !Ref LogsKinesisMaxAgeInMilliseconds
+  LogsKinesisMaxAgeInMillisecondsOncall:
+    Value: !Ref LogsKinesisMaxAgeInMillisecondsOncall
 
   # pass-thought parameters
   NetworkLoadBalancerLink:
