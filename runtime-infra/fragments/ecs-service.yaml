@@ -51,6 +51,11 @@ Parameters:
     AllowedValues: [True, '']
     Default: ''
 
+  ContainerImageClockdriftURI:
+    Type: String
+    Description: Container image URI for Clockdrift
+    Default: 911845998067.dkr.ecr.eu-central-1.amazonaws.com/clockdrift:v1.0.0
+
   ContainerImageOtelURI:
     Type: String
     Description: Container image URI for Open telemetry
@@ -590,19 +595,23 @@ Mappings:
     2GB:
       awsCollector: 512
       sidecarInjector: 512
-      microservice: 1536
+      clockdrift: 256
+      microservice: 1280
     4GB:
       awsCollector: 512
       sidecarInjector: 512
-      microservice: 3584
+      clockdrift: 256
+      microservice: 3328
     6GB:
       awsCollector: 512
       sidecarInjector: 512
-      microservice: 5632
+      clockdrift: 256
+      microservice: 5376
     8GB:
       awsCollector: 512
       sidecarInjector: 512
-      microservice: 7680
+      clockdrift: 256
+      microservice: 7424
 
 Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
@@ -1382,7 +1391,7 @@ Resources:
             MountPoints:
               - SourceVolume: "my-vol"
                 ContainerPath: "/xray/"
-            Cpu: '256'
+            Cpu: '128'
             Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
             LogConfiguration:
               LogDriver: awslogs
@@ -1392,6 +1401,19 @@ Resources:
                 awslogs-region: !Ref 'AWS::Region'
                 awslogs-stream-prefix: ecs
           - !Ref "AWS::NoValue"
+        - Name: clockdrift
+          Image: !Ref ContainerImageClockdriftUri
+          Essential: false
+          Cpu: '128'
+          Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, clockdrift ]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-create-group: 'True'
+              awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: ecs
+        
       Volumes:
         - Name: "my-vol"
         - 'Fn::If':
