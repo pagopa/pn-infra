@@ -136,6 +136,27 @@ Parameters:
     Type: String
   SafestorageLoggerLogGroupName:
     Type: String
+
+  LogsKinesisMaxAgeInMilliseconds:
+    Type: Number
+    Default: 36000000 # 10 hours
+    Description: 'MaxAgeInMilliseconds for Kinesis Logs GetRecords'
+
+  LogsKinesisMaxAgeInMillisecondsOncall:
+    Type: Number
+    Default: 216000000 # 60 hours
+    Description: 'MaxAgeInMilliseconds for Kinesis Logs GetRecords'
+
+  CdcKinesisMaxAgeInMilliseconds:
+    Type: Number
+    Default: 3600000 # 1 hour
+    Description: 'MaxAgeInMilliseconds for Kinesis Cdc GetRecords'
+
+  CdcKinesisMaxAgeInMillisecondsOncall:
+    Type: Number
+    Default: 43200000 # 12 hours
+    Description: 'MaxAgeInMilliseconds for Kinesis Cdc GetRecords'
+
 Conditions:
   IsAlbArnEmpty: !Equals [ !Ref ApplicationLoadBalancerArn, '-' ]
   IsAlbArnDnsEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDns, '-' ]
@@ -299,12 +320,20 @@ Outputs:
     Value: !Ref LogsBucketName
   CdcKinesisStreamName:
     Value: !Ref CdcKinesisStreamName
+  CdcKinesisMaxAgeInMilliseconds:
+    Value: !Ref CdcKinesisMaxAgeInMilliseconds    
+  CdcKinesisMaxAgeInMillisecondsOncall:
+    Value: !Ref CdcKinesisMaxAgeInMillisecondsOncall    
   CdcKinesisStreamArn:
     Value: !Ref CdcKinesisStreamArn
   CdcKinesisStreamKeyArn:
     Value: !Ref CdcKinesisStreamKeyArn
   LogsKinesisStreamName:
     Value: !Ref LogsKinesisStreamName
+  LogsKinesisMaxAgeInMilliseconds:
+    Value: !Ref LogsKinesisMaxAgeInMilliseconds
+  LogsKinesisMaxAgeInMillisecondsOncall:
+    Value: !Ref LogsKinesisMaxAgeInMillisecondsOncall
   LogsKinesisStreamArn:
     Value: !Ref LogsKinesisStreamArn
   LogsKinesisStreamKeyArn:
