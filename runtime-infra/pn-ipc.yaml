@@ -293,6 +293,14 @@ Parameters:
     Type: String    
     Default: 'pn-paper-channel-f24'
 
+  LogsKinesisMaxAgeInMilliseconds:
+    Type: Number
+    Description: 'MaxAgeInMilliseconds for Kinesis Logs GetRecords'
+
+  CdcKinesisMaxAgeInMilliseconds:
+    Type: Number
+    Description: 'MaxAgeInMilliseconds for Kinesis Cdc GetRecords'
+
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
 
@@ -1107,6 +1115,8 @@ Outputs:
   CdcKinesisSourceStreamKeyArn:
     Description: 'Kinesis source CDC stream crypto key ARN'
     Value: !Ref CdcKinesisStreamKeyArn
+  CdcKinesisMaxAgeInMilliseconds:
+    Value: !Ref CdcKinesisMaxAgeInMilliseconds    
 
   # Kinesis Source Stream containing the CloudWatch Logs
   LogsKinesisSourceStreamName:
@@ -1118,6 +1128,8 @@ Outputs:
   LogsKinesisSourceStreamKeyArn:
     Description: 'Kinesis source Logs stream crypto key ARN'
     Value: !Ref LogsKinesisStreamKeyArn
+  LogsKinesisMaxAgeInMilliseconds:
+    Value: !Ref LogsKinesisMaxAgeInMilliseconds
 
   # pass-thought parameters
   NetworkLoadBalancerLink:
