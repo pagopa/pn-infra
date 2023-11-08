@@ -52,9 +52,9 @@ else
                                    --namespace "ECS/ContainerInsights" \
                                    --value "${CLOCK_ERROR_BOUND}"
     aws cloudwatch put-metric-data --metric-name Synchronization \
-                                --dimensions ClusterName="${CLUSTER}",Family="${FAMILY}",TaskID="${TASK_ID}" \
-                                --namespace "ECS/ContainerInsights" \
-                                --value "${SYNCHRONIZATION}"
+                                   --dimensions ClusterName="${CLUSTER}",ServiceName="${SERVICE_NAME}",TaskID="${TASK_ID}" \
+                                   --namespace "ECS/ContainerInsights" \
+                                   --value "${SYNCHRONIZATION}"
 fi
 
 printf "[DONE] - %s" "$(date)\n"
