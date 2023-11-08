@@ -367,8 +367,8 @@ Resources:
         FunctionName: !Ref CompositeMetricGenerator
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
-  # Logs Kinesis GetRecords.MaxAgeInSeconds alarm
-  LogsKinesisGetRecordsMaxAgeInSecondsAlarm:
+  # Logs Kinesis GetRecords.IteratorAgeMilliseconds alarm
+  LogsKinesisGetRecordsIteratorAgeAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${ProjectName}-LogsKinesis-IteratorAge-Alarm"
@@ -388,8 +388,8 @@ Resources:
       Statistic: Maximum
       Threshold: !Ref LogsKinesisMaxAgeInMilliseconds
 
-  # Cdc Kinesis GetRecords.MaxAgeInSeconds alarm
-  CdcKinesisGetRecordsMaxAgeInSecondsAlarm:
+  # Cdc Kinesis GetRecords.IteratorAgeMilliseconds alarm
+  CdcKinesisGetRecordsIteratorAgeAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${ProjectName}-CdcKinesis-IteratorAge-Alarm"
@@ -413,6 +413,12 @@ Outputs:
   OOMAlarmArn:
     Value: !GetAtt CloudWatchAlarmOOM.Arn
     Description: 'ARN of cloudwatch out of memory alarm'
+
+  LogsKinesisGetRecordsIteratorAgeAlarmArn:
+    Value: !GetAtt LogsKinesisGetRecordsIteratorAgeAlarm.Arn
+
+  CdcKinesisGetRecordsIteratorAgeAlarmArn:
+    Value: !GetAtt CdcKinesisGetRecordsIteratorAgeAlarm.Arn
 
   CompositeMetricGeneratorAlarmArn: 
     Value: !GetAtt CompositeMetricGeneratorAlarm.Outputs.LambdaInvocationErrorLogsMetricAlarm
