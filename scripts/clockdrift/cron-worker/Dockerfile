@@ -20,7 +20,7 @@ RUN chmod +x /opt/customscripts/clockcheck.sh
 #        -c DIR  Cron dir. Default:/var/spool/cron/crontabs
 
 # Setup our cron job
-RUN crontab -l | { cat ; echo "*/5 * * * * /opt/customscripts/clockcheck.sh" ; } | crontab -
+RUN crontab -l | { cat ; echo "*/10 * * * * /opt/customscripts/clockcheck.sh" ; } | crontab -
 
 # Run cron daemon in foreground with loglevel 2
 CMD [ "crond", "-l", "2", "-f" ]
