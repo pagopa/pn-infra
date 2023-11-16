@@ -36,7 +36,9 @@ const coreMapping = {
         'oncall-pn-external-registries-ErrorFatalLogs-Alarm',
         'pn-external-registries-WEB-ApiGwAlarm',
         'oncall-pn-external-registries-B2B-ApiGwLatencyAlarm',
-        'oncall-pn-external-registries-WEB-ApiGwLatencyAlarm'
+        'oncall-pn-external-registries-WEB-ApiGwLatencyAlarm',
+        'pn-deliverypush_to_externalregistries_DLQ-HasMessage',
+        'pn-deliverypush_to_externalregistries-HasOldMessage'
     ],
     'pn-delivery': [
         'pn-delivery-B2B-ApiGwAlarm',
