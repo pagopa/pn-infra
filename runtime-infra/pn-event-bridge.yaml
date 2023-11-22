@@ -48,6 +48,10 @@ Parameters:
     Default: 2
     Description: events batch size of national registries pipe (sqs to sqs)
 
+  LogRetention:
+    Type: Number
+    Default: 14
+
   # pass-though parameters
   AlarmSNSTopicArn:
     Type: String
@@ -395,13 +399,13 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: /aws/events/core-event-bus-input-events
-      RetentionInDays: 14
+      RetentionInDays: !Ref LogRetention
 
   CoreEventBusMatchedEventsLoggerFnLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: /aws/lambda/PnCoreEventBusMatchedEventLogger
-      RetentionInDays: 14
+      RetentionInDays: !Ref LogRetention
 
   PnCoreEventBusToLogGroup:
     Type: AWS::Events::Rule
