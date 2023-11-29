@@ -847,6 +847,11 @@ Resources:
         - ContainerName: !Sub '${MicroServiceUniqueName}'
           ContainerPort: 8080
           TargetGroupArn: !Ref TargetGroup
+      Tags:
+        - Key: "pn-eni-related"
+          Value: "true"
+        - Key: "pn-eni-related-groupName-regexp"
+          Value: !Sub "^${MicroServiceUniqueName}-microsvc-.*$"
 
   # ECS Service security group
   EcsServiceSecurityGroup:
