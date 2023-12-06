@@ -101,6 +101,33 @@ Resources:
         - Arn: !GetAtt LogGroupOOMEvents.Arn
           Id: LogTarget
     
+  StoppedTaskEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${ProjectName}-StoppedTasksEventRule"
+      Description: Triggered when an Amazon ECS Task is stopped
+      EventPattern:
+        source:
+          - aws.ecs
+        detail-type:
+          - ECS Task State Change
+        detail:
+          desiredStatus:
+            - STOPPED
+          lastStatus:
+            - STOPPED
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LogGroupTaskStoppedEvents.Arn
+          Id: LogTarget
+
+  # Creating a log group for monitoring the OOM events
+  LogGroupTaskStoppedEvents:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/events/${ProjectName}-ecs-stopped-events"
+      RetentionInDays: 90
+
   # Creating a log group for monitoring the OOM events
   LogGroupOOMEvents:
     Type: AWS::Logs::LogGroup
@@ -129,7 +156,8 @@ Resources:
                 "logs:CreateLogStream"
               ],
               "Resource": [
-                "${LogGroupOOMEvents.Arn}"
+                "${LogGroupOOMEvents.Arn}",
+                "${LogGroupTaskStoppedEvents.Arn}"
               ]
             },
             {
@@ -144,7 +172,8 @@ Resources:
                 "logs:PutLogEvents"
               ],
               "Resource": [
-                "${LogGroupOOMEvents.Arn}"
+                "${LogGroupOOMEvents.Arn}",
+                "${LogGroupTaskStoppedEvents.Arn}"
               ],
               "Condition": {
                 "ArnEquals": {"AWS:SourceArn": "${EventRule.Arn}"}
