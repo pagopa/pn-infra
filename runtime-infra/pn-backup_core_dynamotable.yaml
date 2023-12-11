@@ -5,7 +5,7 @@ Parameters:
     Type: Number
     Default: 35
     Description: Specifies the number of days after creation that a recovery point is deleted. Must be greater than 90 days plus MoveToColdStorageAfterDays.
-  
+
   BackupCronExpression:
     Type: String
 
@@ -29,10 +29,10 @@ Resources:
       BackupPlan:
         BackupPlanName: !Sub 'BackupPlan_${AWS::StackName}'
         BackupPlanRule:
-          
+
           - RuleName: "RuleForDailyBackups"
             TargetBackupVault: !Ref BackupVault
-            ScheduleExpression: !Ref BackupCronExpression 
+            ScheduleExpression: !Ref BackupCronExpression
             CompletionWindowMinutes : !Ref CompletionWindowMinutes
             StartWindowMinutes: !Ref StartWindowMinutes
             EnableContinuousBackup: true
@@ -75,9 +75,7 @@ Resources:
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-Notifications
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-NotificationsMetadata
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-NotificationsCost
-          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-pn-NotificationsQR
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-OnboardInstitutions
-          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-OptInSent
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperCap
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperCost
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperDeliveryDriver
@@ -88,7 +86,6 @@ Resources:
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperRequestError
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperTender
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperZone
-          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PnEstimate
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-ProgressionSensorData
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-Timelines
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-TimelinesCounters
@@ -105,4 +102,18 @@ Resources:
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-paAggregations
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperAddress
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-Action
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-Clients
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-CostComponents
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-CostUpdateResult
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-ExtChannels
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-F24File
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-F24MetadataSet
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-Mandate
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-NotificationsQR
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PnDeliveryPushShedLock
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PnServiceDeskAddress
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PnServiceDeskClient
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PnServiceDeskOperationFileKey
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PnServiceDeskOperations
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-VerificationCode2
       BackupPlanId: !Ref BackupPlan
