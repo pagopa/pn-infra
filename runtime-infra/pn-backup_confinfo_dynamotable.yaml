@@ -1,94 +1,84 @@
-AWSTemplateFormatVersion: 2010-09-09
-Description: Backup Plan template for AWS Backups
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Backup Plan template for AWS Backups"
 Parameters:
+
   LifecycleDeleteAfterDays:
     Type: Number
     Default: 35
-    Description: >-
-      Specifies the number of days after creation that a recovery point is
-      deleted. Must be greater than 90 days plus MoveToColdStorageAfterDays.
+    Description: Specifies the number of days after creation that a recovery point is deleted. Must be greater than 90 days plus MoveToColdStorageAfterDays.
+
   BackupCronExpression:
     Type: String
+
   CompletionWindowMinutes:
     Type: Number
     Default: 600
+
   StartWindowMinutes:
     Type: Number
     Default: 60
+
 Resources:
   BackupVault:
-    Type: AWS::Backup::BackupVault
+    Type: "AWS::Backup::BackupVault"
     Properties:
-      BackupVaultName: !Sub BackupVault_Dynamodb_${AWS::StackName}
+      BackupVaultName: !Sub 'BackupVault_Dynamodb_${AWS::StackName}'
+
   BackupPlan:
-    Type: AWS::Backup::BackupPlan
+    Type: "AWS::Backup::BackupPlan"
     Properties:
       BackupPlan:
-        BackupPlanName: !Sub BackupPlan_${AWS::StackName}
+        BackupPlanName: !Sub 'BackupPlan_${AWS::StackName}'
         BackupPlanRule:
-          - RuleName: RuleForDailyBackups
+
+          - RuleName: "RuleForDailyBackups"
             TargetBackupVault: !Ref BackupVault
             ScheduleExpression: !Ref BackupCronExpression
             StartWindowMinutes: !Ref StartWindowMinutes
-            CompletionWindowMinutes: !Ref CompletionWindowMinutes
+            CompletionWindowMinutes : !Ref CompletionWindowMinutes
             EnableContinuousBackup: true
             Lifecycle:
-              DeleteAfterDays: !Ref LifecycleDeleteAfterDays
+              DeleteAfterDays:
+                Ref: LifecycleDeleteAfterDays
+
   BackupRole:
-    Type: AWS::IAM::Role
+    Type: "AWS::IAM::Role"
     Properties:
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: "2012-10-17"
         Statement:
-          - Effect: Allow
+          - Effect: "Allow"
             Principal:
               Service:
-                - backup.amazonaws.com
+                - "backup.amazonaws.com"
             Action:
-              - sts:AssumeRole
+              - "sts:AssumeRole"
       ManagedPolicyArns:
-        - >-
-          arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup
+        - "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup"
+
   TagBasedBackupSelection:
-    Type: AWS::Backup::BackupSelection
+    Type: "AWS::Backup::BackupSelection"
     Properties:
       BackupSelection:
-        SelectionName: TagBasedBackupSelection
+        SelectionName: "TagBasedBackupSelection"
         IamRoleArn: !GetAtt BackupRole.Arn
         Resources:
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/PnSsTableDocumentiStreamMetadati
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-AuditStorage
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-ConfidentialObjects
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-EcAnagrafica
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-EcRichieste
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-EcRichiesteMetadati
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/PnSsTableDocumentiStreamMetadati
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-AuditStorage
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-ConfidentialObjects
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-EcAnagrafica
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-EcRichieste
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-EcRichiesteMetadati
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-SmStates
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-SsAnagraficaClient
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-SsDocumenti
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-SsTipologieDocumenti
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-AnagraficaClient
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-Cap
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-Country
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-NormalizzatoreBatch
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-PNRequest
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-ShedLock
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-legal-conservation-request
-          - !Sub >-
-            arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-legal-conservation-request-history
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-SsAnagraficaClient
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-SsDocumenti
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-SsTipologieDocumenti
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-AnagraficaClient
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-Cap
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-Country
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-NormalizzatoreBatch
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-PNRequest
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-ShedLock
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-legal-conservation-request
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-legal-conservation-request-history
       BackupPlanId: !Ref BackupPlan
