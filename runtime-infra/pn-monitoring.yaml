@@ -101,6 +101,33 @@ Resources:
         - Arn: !GetAtt LogGroupOOMEvents.Arn
           Id: LogTarget
     
+  StoppedTaskEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${ProjectName}-StoppedTasksEventRule"
+      Description: Triggered when an Amazon ECS Task is stopped
+      EventPattern:
+        source:
+          - aws.ecs
+        detail-type:
+          - ECS Task State Change
+        detail:
+          desiredStatus:
+            - STOPPED
+          lastStatus:
+            - STOPPED
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LogGroupTaskStoppedEvents.Arn
+          Id: LogTarget
+
+  # Creating a log group for monitoring the OOM events
+  LogGroupTaskStoppedEvents:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/events/${ProjectName}-ecs-stopped-events"
+      RetentionInDays: 90
+
   # Creating a log group for monitoring the OOM events
   LogGroupOOMEvents:
     Type: AWS::Logs::LogGroup
@@ -129,7 +156,8 @@ Resources:
                 "logs:CreateLogStream"
               ],
               "Resource": [
-                "${LogGroupOOMEvents.Arn}"
+                "${LogGroupOOMEvents.Arn}",
+                "${LogGroupTaskStoppedEvents.Arn}"
               ]
             },
             {
@@ -144,7 +172,8 @@ Resources:
                 "logs:PutLogEvents"
               ],
               "Resource": [
-                "${LogGroupOOMEvents.Arn}"
+                "${LogGroupOOMEvents.Arn}",
+                "${LogGroupTaskStoppedEvents.Arn}"
               ],
               "Condition": {
                 "ArnEquals": {"AWS:SourceArn": "${EventRule.Arn}"}
@@ -454,6 +483,44 @@ Resources:
       MetricName: GetRecords.IteratorAgeMilliseconds
       Statistic: Maximum
       Threshold: !Ref CdcKinesisMaxAgeInMillisecondsOncall
+
+  ClockErrorBoundAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: "pn-Clock-Error-Bound-Alarm"
+      AlarmDescription: "CloudWatch Alarm for Clock Error Bound limit over threshold"
+      TreatMissingData: notBreaching       
+      Metrics:
+        - Id: q1
+          Expression: "SELECT MAX(ClockErrorBound) FROM SCHEMA(\"ECS/ContainerInsights\", ClusterName,Family,TaskID) WHERE ClusterName = 'pn-core-ecs-cluster' GROUP BY ClusterName"
+          Period: 600
+          ReturnData: False
+        - Id: e2
+          Expression: "IF(MAX(q1) < 100, 0, 1)"
+          Period: 600
+      DatapointsToAlarm: 2           
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 2
+      Threshold: 1
+  
+  SynchronizationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: "pn-Synchronization-Alarm"
+      AlarmDescription: "CloudWatch Alarm for Synchronization value different by Synchronized"
+      TreatMissingData: notBreaching       
+      Metrics:
+        - Id: q1
+          Expression: "SELECT MAX(Synchronization) FROM SCHEMA(\"ECS/ContainerInsights\", ClusterName,Family,TaskID) WHERE ClusterName = 'pn-core-ecs-cluster' GROUP BY ClusterName"
+          Period: 600
+          ReturnData: False
+        - Id: e2
+          Expression: "IF(MAX(q1) < 1, 0, 1)"
+          Period: 600
+      DatapointsToAlarm: 2           
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 2
+      Threshold: 1
 
 Outputs:
   OOMAlarmArn:

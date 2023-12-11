@@ -6,7 +6,7 @@ Parameters:
     Type: Number
     Default: 35
     Description: Specifies the number of days after creation that a recovery point is deleted. Must be greater than 90 days plus MoveToColdStorageAfterDays.
-  
+
   BackupCronExpression:
     Type: String
 
@@ -30,10 +30,10 @@ Resources:
       BackupPlan:
         BackupPlanName: !Sub 'BackupPlan_${AWS::StackName}'
         BackupPlanRule:
-          
+
           - RuleName: "RuleForDailyBackups"
             TargetBackupVault: !Ref BackupVault
-            ScheduleExpression: !Ref BackupCronExpression 
+            ScheduleExpression: !Ref BackupCronExpression
             StartWindowMinutes: !Ref StartWindowMinutes
             CompletionWindowMinutes : !Ref CompletionWindowMinutes
             EnableContinuousBackup: true
@@ -73,4 +73,12 @@ Resources:
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-SsDocumenti
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-SmStates
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-SsTipologieDocumenti
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-AnagraficaClient
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-Cap
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-Country
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-NormalizzatoreBatch
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-PNRequest
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-ShedLock
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-legal-conservation-request
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-legal-conservation-request-history
       BackupPlanId: !Ref BackupPlan
