@@ -17,6 +17,10 @@ Parameters:
   EvaluationPeriods:
     Type: Number
     Default: 60
+  
+  FilterPattern:
+    Type: String
+    Default: "ERROR"
 
 Resources:
   # CloudWatch metric to filer ERROR in log group
@@ -24,7 +28,7 @@ Resources:
     Type: AWS::Logs::MetricFilter
     Properties: 
       LogGroupName: !Sub /aws/lambda/${FunctionName}
-      FilterPattern: '[w1, w2, w3="ERROR", w4]'
+      FilterPattern: !Sub '[w1, w2, w3="${FilterPattern}", w4]'
       MetricTransformations: 
         - MetricValue: 1
           MetricNamespace: "ErrorFatalLogs"
