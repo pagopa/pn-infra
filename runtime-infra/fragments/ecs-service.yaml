@@ -51,6 +51,11 @@ Parameters:
     AllowedValues: [True, '']
     Default: ''
 
+  ContainerImageClockdriftURI:
+    Type: String
+    Description: Container image URI for Clockdrift
+    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/clockdrift:v1.0.0
+
   ContainerImageOtelURI:
     Type: String
     Description: Container image URI for Open telemetry
@@ -589,19 +594,23 @@ Mappings:
   ContainerMemory:
     2GB:
       awsCollector: 512
-      sidecarInjector: 512
+      sidecarInjector: 256
+      clockdrift: 256
       microservice: 1536
     4GB:
       awsCollector: 512
-      sidecarInjector: 512
+      sidecarInjector: 256
+      clockdrift: 256
       microservice: 3584
     6GB:
       awsCollector: 512
-      sidecarInjector: 512
+      sidecarInjector: 256
+      clockdrift: 256
       microservice: 5632
     8GB:
       awsCollector: 512
-      sidecarInjector: 512
+      sidecarInjector: 256
+      clockdrift: 256
       microservice: 7680
 
 Conditions:
@@ -1387,7 +1396,7 @@ Resources:
             MountPoints:
               - SourceVolume: "my-vol"
                 ContainerPath: "/xray/"
-            Cpu: '256'
+            Cpu: '128'
             Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
             LogConfiguration:
               LogDriver: awslogs
@@ -1397,6 +1406,19 @@ Resources:
                 awslogs-region: !Ref 'AWS::Region'
                 awslogs-stream-prefix: ecs
           - !Ref "AWS::NoValue"
+        - Name: clockdrift
+          Image: !Ref ContainerImageClockdriftURI
+          Essential: false
+          Cpu: '128'
+          Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, clockdrift ]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-create-group: 'True'
+              awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: ecs
+        
       Volumes:
         - Name: "my-vol"
         - 'Fn::If':
@@ -1496,7 +1518,13 @@ Resources:
               - 'xray:GetSamplingTargets'
               - 'xray:GetSamplingStatisticSummaries'
               - 'ssm:GetParameters'
-            Resource: '*'
+            Resource:
+              - "*"
+          - Effect: Allow
+            Action:
+              - cloudwatch:PutMetricData
+            Resource:
+              - "*"
 
   # Load balancer target group
   TargetGroup:
