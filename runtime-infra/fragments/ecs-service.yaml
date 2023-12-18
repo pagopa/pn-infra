@@ -860,8 +860,13 @@ Resources:
         - Key: "pn-eni-related"
           Value: "true"
         - Key: "pn-eni-related-groupName-regexp"
-          Value: !Sub "^${MicroServiceUniqueName}-microsvc-.*$"
-
+          Value: # base64 and sub value
+            !Base64
+              'Fn::Sub':
+                - |
+                  ^${MicroServiceUniqueName}-microsvc-.*$
+                - MicroServiceUniqueName: !Ref MicroServiceUniqueName
+          
   # ECS Service security group
   EcsServiceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
