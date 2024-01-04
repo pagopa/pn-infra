@@ -856,7 +856,17 @@ Resources:
         - ContainerName: !Sub '${MicroServiceUniqueName}'
           ContainerPort: 8080
           TargetGroupArn: !Ref TargetGroup
-
+      Tags:
+        - Key: "pn-eni-related"
+          Value: "true"
+        - Key: "pn-eni-related-groupName-regexp"
+          Value: # base64 and sub value
+            !Base64
+              'Fn::Sub':
+                - |
+                  ^${MicroServiceUniqueName}-microsvc-.*$
+                - MicroServiceUniqueName: !Ref MicroServiceUniqueName
+          
   # ECS Service security group
   EcsServiceSecurityGroup:
     Type: AWS::EC2::SecurityGroup

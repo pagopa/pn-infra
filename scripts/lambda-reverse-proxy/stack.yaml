@@ -76,6 +76,11 @@ Resources:
       Subnets: !Ref Subnets
       SecurityGroups:
         - !Ref ReversProxyAlbWebappSecurityGroup
+      Tags:
+        - Key: "pn-eni-related"
+          Value: "true"
+        - Key: "pn-eni-related-groupName-regexp"
+          Value: !Base64 "^lambda-proxy-webapp-security-group.*$"
 
   # Application load balancer listener
   ApplicationLoadBalancerListener:
@@ -586,7 +591,12 @@ Resources:
         Mode: Active
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
-        - !Sub "arn:aws:lambda:${AWS::Region}:325218067255:layer:AWS-Parameters-and-Secrets-Lambda-Extension:4"         
+        - !Sub "arn:aws:lambda:${AWS::Region}:325218067255:layer:AWS-Parameters-and-Secrets-Lambda-Extension:4"     
+      Tags:
+        - Key: "pn-eni-related"
+          Value: "true"
+        - Key: "pn-eni-related-groupName-regexp"
+          Value: !Base64 "^pn-lambda-proxy-webapp-security-group.*$"
 
 
   # Lambda CN mock

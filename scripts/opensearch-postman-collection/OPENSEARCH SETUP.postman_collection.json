@@ -31,7 +31,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n  \"processors\": [\r\n{\r\n        \"script\" : {\r\n          \"source\" : \"         if ( ctx.tags != null && ctx.tags.size() > 0) {          for( String tag : ctx.tags ) {            if (tag.equals('AUDIT5Y')) {              ctx._index='pn-logs5y';            } else if (tag.equals('AUDIT10Y')) {              ctx._index='pn-logs10y';            } else {              ctx._index='pn-logs120d'            }          }         } else {            ctx._index='pn-logs120d'         }        \"\r\n        }\r\n      }\r\n    ]\r\n}",
+							"raw": "{\r\n  \"processors\": [\r\n{\r\n        \"script\" : {\r\n          \"source\" : \"         if ( ctx.tags != null && ctx.tags.size() > 0) {          for( String tag : ctx.tags ) {            if (tag.equals('AUDIT5Y')) {              ctx._index='pn-logs5y';            } else if (tag.equals('AUDIT10Y')) {              ctx._index='pn-logs10y';            } else if (tag.equals('AUDIT2Y')) {              ctx._index='pn-logs2y';            } else {              ctx._index='pn-logs120d'            }          }         } else {            ctx._index='pn-logs120d'         }        \"\r\n        }\r\n      }\r\n    ]\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -135,6 +135,49 @@
 							"path": [
 								"_index_template",
 								"ism_rollover120d"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "BOOTSTRAP INDEX  TEMPLATE 2Y",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{MASTER}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "master",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"index_patterns\": [\r\n    \"pn-logs2y*\"\r\n  ],\r\n  \"template\": {\r\n    \"settings\": {\r\n      \"index\": {\r\n        \"final_pipeline\": \"import\",\r\n        \"opendistro\": {\r\n          \"index_state_management\": {\r\n            \"rollover_alias\": \"pn-logs2y\"\r\n          }\r\n        },\r\n        \"number_of_shards\": \"1\",\r\n        \"number_of_replicas\": \"1\"\r\n      }\r\n    },\r\n    \"mappings\":{\r\n      \"dynamic_templates\":[\r\n         {\r\n           \"strings_as_keyword\":{\r\n             \"match_mapping_type\":\"string\",\r\n             \"mapping\":{\r\n               \"type\":\"keyword\"\r\n             }\r\n           }\r\n         }\r\n        ],\r\n        \"properties\":{\r\n            \"@timestamp\":{\r\n                \"type\":\"date\"\r\n            }\r\n        }\r\n        \r\n    },\r\n    \"aliases\": {\r\n      \"pn-logs\": {}\r\n    }\r\n  },\r\n  \"composed_of\": []\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{OPENSEARCH-DOMAIN-URL}}:{{PORT}}/_index_template/ism_rollover2y",
+							"host": [
+								"{{OPENSEARCH-DOMAIN-URL}}"
+							],
+							"port": "{{PORT}}",
+							"path": [
+								"_index_template",
+								"ism_rollover2y"
 							]
 						}
 					},
@@ -266,6 +309,51 @@
 								"_ism",
 								"policies",
 								"rollover120d"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "BOOTSTRAP LIFECYCLE POLICY 2Y",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{MASTER}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "master",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"policy\": {\r\n        \"description\" : \"Rollover audit2y\",\r\n        \"default_state\" : \"rollover\",\r\n        \"states\" : [\r\n          {\r\n            \"name\" : \"rollover\",\r\n            \"actions\" : [\r\n              {\r\n                \"rollover\" : {\r\n                  \"min_size\" : \"20gb\",\r\n                  \"min_index_age\":\"3d\"\r\n                }\r\n              }\r\n            ],\r\n            \"transitions\" : [\r\n              {\r\n                \"state_name\" : \"delete\",\r\n                \"conditions\" : {\r\n                  \"min_index_age\" : \"730d\"\r\n                }\r\n              }\r\n            ]\r\n          },\r\n          {\r\n            \"name\" : \"delete\",\r\n            \"actions\" : [\r\n              {\r\n                \"delete\" : { }\r\n              }\r\n            ],\r\n            \"transitions\" : [ ]\r\n          }\r\n        ],\r\n        \"ism_template\" : [\r\n          {\r\n            \"index_patterns\" : [\r\n              \"pn-logs2y*\"\r\n            ],\r\n            \"priority\" : 100\r\n          }\r\n        ]\r\n      }\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{OPENSEARCH-DOMAIN-URL}}:{{PORT}}/_plugins/_ism/policies/rollover2y",
+							"host": [
+								"{{OPENSEARCH-DOMAIN-URL}}"
+							],
+							"port": "{{PORT}}",
+							"path": [
+								"_plugins",
+								"_ism",
+								"policies",
+								"rollover2y"
 							]
 						}
 					},
@@ -440,6 +528,48 @@
 							"port": "{{PORT}}",
 							"path": [
 								"pn-logs5y-000001"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "BOOTSTRAP INDEX 2Y",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{MASTER}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "master",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"aliases\": {\r\n    \"pn-logs2y\": {\r\n      \"is_write_index\": true\r\n    }\r\n  }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{OPENSEARCH-DOMAIN-URL}}:{{PORT}}/pn-logs2y-000001",
+							"host": [
+								"{{OPENSEARCH-DOMAIN-URL}}"
+							],
+							"port": "{{PORT}}",
+							"path": [
+								"pn-logs2y-000001"
 							]
 						}
 					},
