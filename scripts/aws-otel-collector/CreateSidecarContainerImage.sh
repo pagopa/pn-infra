@@ -4,7 +4,7 @@
 
 CICD_PROFILE=cicd
 AWS_REGION=eu-central-1
-TAG=v0.23.0
+TAG=v0.36.0
 SOURCE_IMAGE=amazon/aws-otel-collector:$TAG
 REPOSITORY=aws-otel-collector ## ECR repository to host the container image - needs to be created before run this script
 IMAGE=$REPOSITORY:$TAG
