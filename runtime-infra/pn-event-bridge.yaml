@@ -52,6 +52,10 @@ Parameters:
     Type: Number
     Default: 14
 
+  ReservedConcurrentLambdaExecution:
+    Type: Number
+    Default: 10
+
   # pass-though parameters
   AlarmSNSTopicArn:
     Type: String
@@ -161,11 +165,17 @@ Parameters:
   DowntimeLogsSafeStorageEventsQueueURL:
     Type: String
 
+  # AddressManager to DeliveryPush
   AddressManagerToDeliveryPushQueueARN:
     Type: String
 
   AddressManagerToDeliveryPushQueueURL:
     Type: String
+
+  RateLimiter:
+    Type: Number
+    Default: 60
+    Description: rate limiter integer for delay sqs message
 
   AcmAlarmsQueueARN:
     Type: String
@@ -445,7 +455,7 @@ Resources:
                   "originalEvent": <aws.events.event.json>
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-AddressManager2DeliveryPush'
-          Arn: !Ref AddressManagerToDeliveryPushQueueARN
+          Arn: !GetAtt SQSRateLimiterFunction.Arn
           InputPath: $.detail.body
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
@@ -867,7 +877,7 @@ Resources:
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
-  EventBridgeLambdaPermission:
+  MatchedEventLoggerLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !GetAtt MatchedEventsLoggerFunction.Arn
@@ -922,6 +932,67 @@ Resources:
       Handler: index.handler
       Runtime: python3.9
       Role: !GetAtt MatchedEventsLoggerFunctionExecutionRole.Arn
+      ReservedConcurrentExecutions : !Ref ReservedConcurrentLambdaExecution
+
+  SQSRateLimiterLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt SQSRateLimiterFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/pn-CoreEventBus/*"
+
+  SQSRateLimiterFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: SQSRateLimiterPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: WriteOnQueue
+                Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource:
+                  - !Ref AddressManagerToDeliveryPushQueueARN
+
+  SQSRateLimiterFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: PnCoreEventBusSQSRateLimiter
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref AddressManagerToDeliveryPushQueueURL
+          RATE_LIMITER: !Ref RateLimiter
+      Code:
+        ZipFile: |
+          const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");
+          const client = new SQSClient({region: process.env.REGION});
+          
+          exports.handler = async function(event) {
+            const input = {
+              QueueUrl: process.env.QUEUE_URL,
+              DelaySeconds: Math.floor(Math.random() * (process.env.RATE_LIMITER - 1) + 1),
+              MessageBody: event
+            }
+            const command = new SendMessageCommand(input);
+            const response = await client.send(command);
+            return response;
+          };
+
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Role: !GetAtt SQSRateLimiterFunctionExecutionRole.Arn
+      ReservedConcurrentExecutions : !Ref ReservedConcurrentLambdaExecution
 
   # Standard Queue for events Dead Letter Queue
   EventBusDeadLetterQueue:
