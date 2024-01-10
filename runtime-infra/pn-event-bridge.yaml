@@ -172,9 +172,10 @@ Parameters:
   AddressManagerToDeliveryPushQueueURL:
     Type: String
 
-  RateLimiter:
+  # less than PnAddressManagerNormalizerBatchRequestDelay pn-address-manager
+  SQSMaxDelay:
     Type: Number
-    Default: 60
+    Default: 138
     Description: rate limiter integer for delay sqs message
 
   AcmAlarmsQueueARN:
@@ -972,17 +973,18 @@ Resources:
       Environment:
         Variables:
           QUEUE_URL: !Ref AddressManagerToDeliveryPushQueueURL
-          RATE_LIMITER: !Ref RateLimiter
+          SQS_MAX_DELAY: !Ref SQSMaxDelay
       Code:
         ZipFile: |
           const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");
           const client = new SQSClient({region: process.env.REGION});
+          const SQS_MAX_DELAY = parseInt(process.env.SQS_MAX_DELAY);
           
           exports.handler = async function(event) {
             const input = {
               QueueUrl: process.env.QUEUE_URL,
-              DelaySeconds: Math.floor(Math.random() * (process.env.RATE_LIMITER - 1) + 1),
-              MessageBody: event
+              DelaySeconds: Math.floor(Math.random() * (SQS_MAX_DELAY - 1) + 1),
+              MessageBody: event.body
             }
             const command = new SendMessageCommand(input);
             const response = await client.send(command);
