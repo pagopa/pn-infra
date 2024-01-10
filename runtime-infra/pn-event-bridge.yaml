@@ -965,6 +965,17 @@ Resources:
                   - sqs:SendMessage
                 Resource:
                   - !Ref AddressManagerToDeliveryPushQueueARN
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/PnCoreEventBusSQSRateLimiter'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
 
   SQSRateLimiterFunction:
     Type: AWS::Lambda::Function
