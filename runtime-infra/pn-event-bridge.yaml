@@ -33,7 +33,13 @@ Parameters:
     Type: Number
     Description: "The number of seconds that Amazon SQS retains a message. You can specify an integer 
       value from 60 seconds (1 minute) to 1,209,600 seconds (14 days)."
-  
+
+  PNAddressManagerToDeliveryPushLimiterMaximumRetentionPeriod:
+    Type: Number
+    Description: "The number of seconds that Amazon SQS retains a message. You can specify an integer 
+      value from 60 seconds (1 minute) to 1,209,600 seconds (14 days)."
+    Default: 1209600
+
   Version:
     Type: String
     Description: 'keep track of used projects commitIds'
@@ -456,7 +462,7 @@ Resources:
                   "originalEvent": <aws.events.event.json>
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-AddressManager2DeliveryPush'
-          Arn: !GetAtt SQSRateLimiterFunction.Arn
+          Arn: !GetAtt PNAddressManagerToDeliveryPushLimiterFunction.Arn
           InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
@@ -935,15 +941,15 @@ Resources:
       Role: !GetAtt MatchedEventsLoggerFunctionExecutionRole.Arn
       ReservedConcurrentExecutions : !Ref ReservedConcurrentLambdaExecution
 
-  SQSRateLimiterLambdaPermission:
+  PNAddressManagerToDeliveryPushLimiterLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !GetAtt SQSRateLimiterFunction.Arn
+      FunctionName: !GetAtt PNAddressManagerToDeliveryPushLimiterFunction.Arn
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/pn-CoreEventBus/*"
 
-  SQSRateLimiterFunctionExecutionRole:
+  PNAddressManagerToDeliveryPushLimiterExecutionRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -965,6 +971,7 @@ Resources:
                   - sqs:SendMessage
                 Resource:
                   - !Ref AddressManagerToDeliveryPushQueueARN
+                  - !GetAtt PNAddressManagerToDeliveryPushLimiterDeadLetterQueue.Arn
               - Effect: Allow
                 Action:
                   - logs:CreateLogGroup
@@ -977,10 +984,10 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
 
-  SQSRateLimiterFunction:
+  PNAddressManagerToDeliveryPushLimiterFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: PnCoreEventBusSQSRateLimiter
+      FunctionName: PNAddressManagerToDeliveryPushLimiter
       Environment:
         Variables:
           QUEUE_URL: !Ref AddressManagerToDeliveryPushQueueURL
@@ -1004,8 +1011,10 @@ Resources:
 
       Handler: index.handler
       Runtime: nodejs18.x
-      Role: !GetAtt SQSRateLimiterFunctionExecutionRole.Arn
+      Role: !GetAtt PNAddressManagerToDeliveryPushLimiterExecutionRole.Arn
       ReservedConcurrentExecutions : !Ref ReservedConcurrentLambdaExecution
+      DeadLetterConfig:
+        TargetArn: !GetAtt PNAddressManagerToDeliveryPushLimiterDeadLetterQueue.Arn
 
   # Standard Queue for events Dead Letter Queue
   EventBusDeadLetterQueue:
@@ -1013,6 +1022,12 @@ Resources:
     Properties:
       MessageRetentionPeriod: !Ref EventBusDeadLetterQueueMaximumRetentionPeriod
       QueueName: !Sub '${ProjectName}-CoreEventBus-DLQ'
+
+  PNAddressManagerToDeliveryPushLimiterDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: !Ref PNAddressManagerToDeliveryPushLimiterMaximumRetentionPeriod
+      QueueName: !Sub '${ProjectName}-PNAddressManagerToDeliveryPushLimiter-DLQ'
 
   # Dead Letter Queue policy 
   EventBusDeadLetterQueuePolicy:
