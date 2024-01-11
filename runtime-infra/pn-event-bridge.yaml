@@ -463,7 +463,6 @@ Resources:
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-AddressManager2DeliveryPush'
           Arn: !GetAtt PNAddressManagerToDeliveryPushLimiterFunction.Arn
-          InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
@@ -971,7 +970,7 @@ Resources:
                   - sqs:SendMessage
                 Resource:
                   - !Ref AddressManagerToDeliveryPushQueueARN
-                  - !GetAtt PNAddressManagerToDeliveryPushLimiterDeadLetterQueue.Arn
+                  - !GetAtt EventBusDeadLetterQueue.Arn
               - Effect: Allow
                 Action:
                   - logs:CreateLogGroup
@@ -1014,7 +1013,7 @@ Resources:
       Role: !GetAtt PNAddressManagerToDeliveryPushLimiterExecutionRole.Arn
       ReservedConcurrentExecutions : !Ref ReservedConcurrentLambdaExecution
       DeadLetterConfig:
-        TargetArn: !GetAtt PNAddressManagerToDeliveryPushLimiterDeadLetterQueue.Arn
+        TargetArn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Standard Queue for events Dead Letter Queue
   EventBusDeadLetterQueue:
@@ -1022,12 +1021,6 @@ Resources:
     Properties:
       MessageRetentionPeriod: !Ref EventBusDeadLetterQueueMaximumRetentionPeriod
       QueueName: !Sub '${ProjectName}-CoreEventBus-DLQ'
-
-  PNAddressManagerToDeliveryPushLimiterDeadLetterQueue:
-    Type: AWS::SQS::Queue
-    Properties:
-      MessageRetentionPeriod: !Ref PNAddressManagerToDeliveryPushLimiterMaximumRetentionPeriod
-      QueueName: !Sub '${ProjectName}-PNAddressManagerToDeliveryPushLimiter-DLQ'
 
   # Dead Letter Queue policy 
   EventBusDeadLetterQueuePolicy:
