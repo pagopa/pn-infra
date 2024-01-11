@@ -457,7 +457,7 @@ Resources:
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-AddressManager2DeliveryPush'
           Arn: !GetAtt SQSRateLimiterFunction.Arn
-          InputPath: $.detail.body
+          InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
@@ -995,7 +995,7 @@ Resources:
             const input = {
               QueueUrl: process.env.QUEUE_URL,
               DelaySeconds: Math.floor(Math.random() * (SQS_MAX_DELAY - 1) + 1),
-              MessageBody: event.body
+              MessageBody: JSON.stringify(event.body)
             }
             const command = new SendMessageCommand(input);
             const response = await client.send(command);
