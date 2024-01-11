@@ -1001,7 +1001,7 @@ Resources:
             const input = {
               QueueUrl: process.env.QUEUE_URL,
               DelaySeconds: Math.floor(Math.random() * (SQS_MAX_DELAY - 1) + 1),
-              MessageBody: JSON.stringify(event.body)
+              MessageBody: JSON.stringify(event.detail.body)
             }
             const command = new SendMessageCommand(input);
             const response = await client.send(command);
