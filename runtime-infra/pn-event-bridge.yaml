@@ -33,7 +33,7 @@ Parameters:
     Type: Number
     Description: "The number of seconds that Amazon SQS retains a message. You can specify an integer 
       value from 60 seconds (1 minute) to 1,209,600 seconds (14 days)."
-  
+
   Version:
     Type: String
     Description: 'keep track of used projects commitIds'
@@ -51,6 +51,10 @@ Parameters:
   LogRetention:
     Type: Number
     Default: 14
+
+  ReservedConcurrentLambdaExecution:
+    Type: Number
+    Default: 10
 
   # pass-though parameters
   AlarmSNSTopicArn:
@@ -161,11 +165,18 @@ Parameters:
   DowntimeLogsSafeStorageEventsQueueURL:
     Type: String
 
+  # AddressManager to DeliveryPush
   AddressManagerToDeliveryPushQueueARN:
     Type: String
 
   AddressManagerToDeliveryPushQueueURL:
     Type: String
+
+  # less than PnAddressManagerNormalizerBatchRequestDelay pn-address-manager
+  SQSMaxDelay:
+    Type: Number
+    Default: 138
+    Description: rate limiter integer for delay sqs message
 
   AcmAlarmsQueueARN:
     Type: String
@@ -445,8 +456,7 @@ Resources:
                   "originalEvent": <aws.events.event.json>
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-AddressManager2DeliveryPush'
-          Arn: !Ref AddressManagerToDeliveryPushQueueARN
-          InputPath: $.detail.body
+          Arn: !GetAtt PNAddressManagerToDeliveryPushLimiterFunction.Arn
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
@@ -867,7 +877,7 @@ Resources:
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
-  EventBridgeLambdaPermission:
+  MatchedEventLoggerLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !GetAtt MatchedEventsLoggerFunction.Arn
@@ -922,6 +932,82 @@ Resources:
       Handler: index.handler
       Runtime: python3.9
       Role: !GetAtt MatchedEventsLoggerFunctionExecutionRole.Arn
+      ReservedConcurrentExecutions : !Ref ReservedConcurrentLambdaExecution
+
+  PNAddressManagerToDeliveryPushLimiterLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt PNAddressManagerToDeliveryPushLimiterFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/pn-CoreEventBus/*"
+
+  PNAddressManagerToDeliveryPushLimiterExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: SQSRateLimiterPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: WriteOnQueue
+                Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource:
+                  - !Ref AddressManagerToDeliveryPushQueueARN
+                  - !GetAtt EventBusDeadLetterQueue.Arn
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
+
+  PNAddressManagerToDeliveryPushLimiterFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: PNAddressManagerToDeliveryPushLimiter
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref AddressManagerToDeliveryPushQueueURL
+          SQS_MAX_DELAY: !Ref SQSMaxDelay
+      Code:
+        ZipFile: |
+          const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");
+          const client = new SQSClient({region: process.env.REGION});
+          const SQS_MAX_DELAY = parseInt(process.env.SQS_MAX_DELAY);
+          
+          exports.handler = async function(event) {
+            const input = {
+              QueueUrl: process.env.QUEUE_URL,
+              DelaySeconds: Math.floor(Math.random() * (SQS_MAX_DELAY - 1) + 1),
+              MessageBody: JSON.stringify(event.detail.body)
+            }
+            const command = new SendMessageCommand(input);
+            const response = await client.send(command);
+            return response;
+          };
+
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Role: !GetAtt PNAddressManagerToDeliveryPushLimiterExecutionRole.Arn
+      ReservedConcurrentExecutions : !Ref ReservedConcurrentLambdaExecution
+      DeadLetterConfig:
+        TargetArn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Standard Queue for events Dead Letter Queue
   EventBusDeadLetterQueue:
