@@ -1,40 +1,37 @@
-const AWS = require('aws-sdk')
+const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 const zlib = require('zlib');
 const stream = require('stream');
 const auditLog = require("./lib/log.js");
+const client = new S3Client({region: process.env.REGION});
 
-exports.handler = async (event) => { 
+exports.handler = async (event) => {
     console.log( JSON.stringify(event, null, 2) );
 
     for( const record of event.Records ) {
-        
+
         const msgBodyStr = record.body;
         const msg = JSON.parse( msgBodyStr );
 
         for ( const msgRec of msg.Records ) {
-        
+
             const bucketName = msgRec.s3.bucket.name;
             const fileKey = msgRec.s3.object.key;
-            
-            console.log("bucketName=", bucketName, "fileKey=", fileKey)
-            
-            var s3 = new AWS.S3();
-            var params = {Bucket: bucketName, Key: fileKey}
-            var dataS3 = await readOne( s3, params )
-            console.log("dataS3= ", dataS3)
 
-            // Crea uno stream di lettura dal campo Body
-            const readStream = new stream.PassThrough();
-            readStream.end(Buffer.from(dataS3.Body, 'base64'));
+            console.log("bucketName=", bucketName, "fileKey=", fileKey)
+
+            // Recupero del file
+            console.log("bucketName=", bucketName, "fileKey=", fileKey)
+            var params = {Bucket: bucketName, Key: fileKey}
+            const dataS3 = await client.send(new GetObjectCommand(params))
 
             // Unzip del file
-            const unzippedStream = readStream.pipe(zlib.createGunzip());
+            const unzippedStream = dataS3.Body.pipe(zlib.createGunzip());
 
             // Legge il contenuto del file unzippato
             let unzippedBody = '';
-            unzippedStream.on('data', (data) => {
-                unzippedBody += data.toString();
-            });
+             unzippedStream.on('data', (data) => {
+                 unzippedBody += data.toString();
+             });
 
             // Ritorna una Promise che si risolve dopo che il processo di unzip è completato
             return new Promise((resolve, reject) => {
@@ -54,14 +51,6 @@ exports.handler = async (event) => {
 }
 
 
-function readOne(s3, params) {
-    return new Promise( (acc, rec) => {
-        s3.getObject(params, function(err, data) {
-            if (err) { rec(err) } else { acc(data) }
-        });  
-    })
-}
-
 function filterAndPrintElement(unzippedBody) {
     const body = JSON.parse(unzippedBody);
 
@@ -80,7 +69,7 @@ function filterAndPrintElement(unzippedBody) {
                 // ignoro l'evento
             }
         }
-
-
     });
 }
+
+
