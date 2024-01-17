@@ -82,9 +82,9 @@ async function executeCommand(accountName){
       const fileContent = fs.readFileSync(configPath+'/'+envName+'/_conf/'+accountName+'/system_params/'+file, 'utf-8')
       const key = file.split('##T##')[0].replace(/#/g, '/')
       if(parameters[key].Value != fileContent){
-        console.log('['+accountName+'] Parameter '+key+' is in sync')
-      } else {
         console.log('['+accountName+'] Parameter '+key+' has local changes')
+      } else {
+        console.log('['+accountName+'] Parameter '+key+' is in sync')
       }
     })
   }

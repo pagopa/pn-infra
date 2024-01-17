@@ -94,7 +94,6 @@ class AwsClientsWrapper {
     do {
       input.NextToken = nextToken
       const res = await this._getClient(accountName).send(new DescribeParametersCommand(input));
-      console.log(res.Parameters)
       if(res) {
         res.Parameters?.forEach(x => {
             parameters[x.Name] = x
