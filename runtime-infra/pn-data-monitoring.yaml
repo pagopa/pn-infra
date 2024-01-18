@@ -9,11 +9,11 @@ Parameters:
   
   ConfinfoBucketName:
     Type: String
-    Description: Name of the confinfo bucket created for the data monitoring   
+    Description: Name of the confinfo bucket created for the data monitoring (leave blank in Confinfo account)
 
   PnCoreAwsAccountId:
     Type: String
-    Description: Core Account ID
+    Description: Core Account ID (leav blank in Core account)
     Default: ''
 
   ParquetBucketPath:
@@ -34,10 +34,16 @@ Parameters:
     Type: String
     Description: Name of the logs bucket KMS key ARN
 
+  CronExpression:
+    Type: String
+    Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
+    Default: '' # example: 'cron(0 9 * * ? *)'
+
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
-  
+  HasCronExpression: !Not [ !Equals [!Ref CronExpression, '' ] ]
+
 Resources:
   
   # s3 bucket with name BucketName
@@ -64,7 +70,7 @@ Resources:
               - !Sub "arn:aws:s3:::${BucketName}/*"   
             Principal:
               AWS:
-                - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/pn-data-monitoring-codebuild-role"    
+                - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/pn-data-monitoring-codebuild-role"
           - Effect: Allow
             Action:
               - "s3:PutObject"
@@ -72,7 +78,7 @@ Resources:
               - !Sub "arn:aws:s3:::${BucketName}/${ParquetBucketPath}/*"
             Principal:
               AWS:
-                - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/pn-data-monitoring-codebuild-role"    
+                - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/pn-data-monitoring-codebuild-role"    
 
   DataMonitoringCodebuildProject:
     Type: 'AWS::CodeBuild::Project'
@@ -176,6 +182,46 @@ Resources:
               - kms:DescribeKey
             Resource: 
               - !Sub "${LogsBucketKmsKeyArn}"
+
+  DataMonitoringScheduleRole:
+    Condition: HasCronExpression
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: runCodeBuild
+          PolicyDocument:
+            Statement:
+              - Sid: startProjectRun
+                Action:
+                  - "codebuild:*"
+                Effect: Allow
+                Resource: 
+                  - !GetAtt DataMonitoringCodebuildProject.Arn
+
+  IndexScheduledRule:
+    Type: AWS::Events::Rule
+    Condition: HasCronExpression
+    Properties:
+      Description: "pn-data-monitoring-codebuild-scheduled-rule"
+      # every day at 9 am
+      ScheduleExpression: !Ref CronExpression 
+      State: "ENABLED"
+      RoleArn: !GetAtt "DataMonitoringScheduleRole.Arn"
+      Targets: 
+        - Id: "DataMonitoringIndex"
+          RoleArn: !GetAtt "DataMonitoringScheduleRole.Arn"
+          Arn: 
+            Fn::GetAtt: 
+              - "DataMonitoringCodebuildProject"
+              - "Arn"
+      
 Outputs:
   BucketName: 
     Value: !Ref BucketName
