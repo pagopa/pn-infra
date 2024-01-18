@@ -13,7 +13,7 @@ Parameters:
 
   PnCoreAwsAccountId:
     Type: String
-    Description: Core Account ID (leav blank in Core account)
+    Description: Core Account ID (leave blank in Core account)
     Default: ''
 
   ParquetBucketPath:
@@ -58,7 +58,7 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       BucketName: !Ref BucketName
-
+          
   DataMonitoringBucketPolicy:
     Condition: IsConfinfoAccount
     Type: AWS::S3::BucketPolicy
@@ -75,7 +75,7 @@ Resources:
               - !Sub "arn:aws:s3:::${BucketName}/*"   
             Principal:
               AWS:
-                - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/pn-data-monitoring-codebuild-role"
+                - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
           - Effect: Allow
             Action:
               - "s3:PutObject"
@@ -83,7 +83,7 @@ Resources:
               - !Sub "arn:aws:s3:::${BucketName}/${ParquetBucketPath}/*"
             Principal:
               AWS:
-                - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/pn-data-monitoring-codebuild-role"    
+                - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"    
 
   DataMonitoringCodebuildProject:
     Type: 'AWS::CodeBuild::Project'
@@ -177,6 +177,7 @@ Resources:
             - Effect: Allow
               Action:
                 - "s3:Get*"
+                - "s3:List*"
               Resource: 
               - !Sub "arn:aws:s3:::${ConfinfoBucketName}/${ParquetBucketPath}/*"       
             - !Ref AWS::NoValue
