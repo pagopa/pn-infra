@@ -1,0 +1,182 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys the queues needed for comuication between microservices and 
+              API gateway custom domains'
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: Name of the bucket created for the data monitoring   
+  
+  ConfinfoBucketName:
+    Type: String
+    Description: Name of the confinfo bucket created for the data monitoring   
+
+  PnCoreAwsAccountId:
+    Type: String
+    Description: Core Account ID
+    Default: ''
+
+  ParquetBucketPath:
+    Type: String
+    Description: parquet files s3 bucket path
+    Default: 'parquet'
+
+  CodebuildComputeType:
+    Type: String
+    Description: Codebuild compute type
+    Default: BUILD_GENERAL1_SMALL
+
+  LogsBucketName:
+    Type: String
+    Description: Name of the logs bucket
+
+  LogsBucketKmsKeyArn:
+    Type: String
+    Description: Name of the logs bucket KMS key ARN
+
+Conditions:
+  IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
+  IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
+  
+Resources:
+  
+  # s3 bucket with name BucketName
+  DataMonitoringBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref BucketName
+
+  DataMonitoringBucketPolicy:
+    Condition: IsConfinfoAccount
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DataMonitoringBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "s3:Get*"
+              - "s3:List*"              
+            Resource: 
+              - !Sub "arn:aws:s3:::${BucketName}/*"   
+            Principal:
+              AWS:
+                - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/pn-data-monitoring-codebuild-role"    
+          - Effect: Allow
+            Action:
+              - "s3:PutObject"
+            Resource: 
+              - !Sub "arn:aws:s3:::${BucketName}/${ParquetBucketPath}/*"
+            Principal:
+              AWS:
+                - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/pn-data-monitoring-codebuild-role"    
+
+  DataMonitoringCodebuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: pn-data-monitoring-codebuild
+      ServiceRole: !GetAtt DataMonitoringCodeBuildServiceRole.Arn
+      ConcurrentBuildLimit: 1
+      TimeoutInMinutes: 10
+      Source: 
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - echo "### NO PRE_BUILD"
+            build:
+              commands:
+                - echo "### NO BUILD"
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        ComputeType: !Ref CodebuildComputeType
+        Type: LINUX_CONTAINER
+        Image: "aws/codebuild/standard:7.0"
+        EnvironmentVariables:
+          - Name: REGION
+            Type: PLAINTEXT
+            Value: !Ref AWS::Region
+
+  DataMonitoringCodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: pn-data-monitoring-codebuild-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+            Condition:
+              ArnEquals:
+                aws:PrincipalArn: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/pn-data-monitoring-codebuild-role
+            Action:
+              - "sts:AssumeRole" 
+
+  DataMonitoringCodebuildManagedPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: pn-data-monitoring-codebuild-managed-policy
+      Roles:
+        - !Ref DataMonitoringCodeBuildServiceRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*
+          # lettura su tutto il bucket dei log e parquet
+          - Effect: Allow
+            Action:
+              - "s3:Get*"
+              - "s3:List*"
+            Resource: 
+              - !Sub "arn:aws:s3:::${LogsBucketName}"
+              - !Sub "arn:aws:s3:::${LogsBucketName}/*"
+              - !Sub "arn:aws:s3:::${BucketName}"
+              - !Sub "arn:aws:s3:::${BucketName}/*"
+          # Accesso in scrittura al bucket dump dell'account corrente nella cartella parquet
+          - Effect: Allow
+            Action:
+              - "s3:PutObject"
+            Resource: 
+              - !Sub "arn:aws:s3:::${BucketName}/${ParquetBucketPath}/*"       
+          # Accessi in lettura al bucket dump dell'account confinfo nella cartella parquet
+          - Fn::If:
+            - IsCoreAccount
+            - Effect: Allow
+              Action:
+                - "s3:Get*"
+              Resource: 
+              - !Sub "arn:aws:s3:::${ConfinfoBucketName}/${ParquetBucketPath}/*"       
+            - !Ref AWS::NoValue
+          # Allow the use of encryption key
+          - Effect: Allow
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+            Resource: 
+              - !Sub "${LogsBucketKmsKeyArn}"
+Outputs:
+  BucketName: 
+    Value: !Ref BucketName
+    Description: Name of the bucket created for the data monitoring   
