@@ -2,7 +2,7 @@ const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 const zlib = require('zlib');
 const stream = require('stream');
 const auditLog = require("./lib/log.js");
-const client = new S3Client({region: process.env.REGION});
+const client = new S3Client();
 
 exports.handler = async (event) => {
     console.log( JSON.stringify(event, null, 2) );
@@ -21,7 +21,7 @@ exports.handler = async (event) => {
 
             // Recupero del file
             console.log("bucketName=", bucketName, "fileKey=", fileKey)
-            var params = {Bucket: bucketName, Key: fileKey}
+            const params = {Bucket: bucketName, Key: fileKey}
             const dataS3 = await client.send(new GetObjectCommand(params))
 
             // Unzip del file
