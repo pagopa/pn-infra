@@ -52,7 +52,7 @@ Resources:
           const { DynamoDBClient, ListTablesCommand, DescribeTableCommand } = require("@aws-sdk/client-dynamodb");
           
           const DOCS = `PN Storage Widget`;
-          const dynamoDBclient = new DynamoDBClient({region: process.env.REGION});
+          const dynamoDBclient = new DynamoDBClient();
   
           async function getDynamoTablesSize(){
             const listTablesResult = await dynamoDBclient.send(new ListTablesCommand());
