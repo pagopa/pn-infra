@@ -58,14 +58,25 @@ _checkingParameters(args, values)
 const awsClient = new AwsClientsWrapper( envName );
 
 function sanitizeFile(systemParameter){
-  return systemParameter.Name.replace(/\//g, '#')+'##T##'+systemParameter.Tier
+  if(systemParameter.Tier==='Advanced'){
+    return systemParameter.Name.replace(/\//g, '#')+'##A##' // advanced
+  } else {
+    return systemParameter.Name.replace(/\//g, '#') // no suffix for Standard Tier
+  }
 }
+
+const appConfig = require('./config.json')
 
 async function executeCommand(accountName){
   // list parameters -> return {}
   const parameters = await awsClient._listSSMParameters(accountName)
-  
-  const keys = Object.keys(parameters)
+  const fullKeys = Object.keys(parameters)
+
+  // remove from Parameters keys not included in appConfig.skipParameters 
+  const keys = fullKeys.filter((k) => {
+    return appConfig.skipParameters.indexOf(k)<0
+  })
+
   for(let i=0; i<keys.length; i++) {
     parameters[keys[i]].Value = await awsClient._getSSMParameter(accountName, keys[i])
   }
@@ -80,7 +91,7 @@ async function executeCommand(accountName){
     const files = fs.readdirSync(configPath+'/'+envName+'/_conf/'+accountName+'/system_params/')
     files.forEach(file => {
       const fileContent = fs.readFileSync(configPath+'/'+envName+'/_conf/'+accountName+'/system_params/'+file, 'utf-8')
-      const key = file.split('##T##')[0].replace(/#/g, '/')
+      const key = file.split('##A##')[0].replace(/#/g, '/')
       if(parameters[key].Value != fileContent){
         console.log('['+accountName+'] Parameter '+key+' has local changes')
       } else {
