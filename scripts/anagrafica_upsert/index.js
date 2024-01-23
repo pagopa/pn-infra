@@ -4,7 +4,7 @@ const fs = require('fs');
 
 
 function _checkingParameters(args, values){
-  const usage = "Usage: index.js --envName <envName> --tableName <tableName> --configPath <configPath> [--batchDimension <batchDimension>] [--withSecretsValues]"
+  const usage = "Usage: index.js --envName <envName> --tableName <tableName> --configPath <configPath> [--batchDimension <batchDimension>]"
   //CHECKING PARAMETER
   args.forEach(el => {
     if(el.mandatory && !values.values[el.name]){
@@ -34,11 +34,10 @@ const args = [
   { name: "envName", mandatory: true, subcommand: [] },
   { name: "tableName", mandatory: true, subcommand: [] },
   { name: "configPath", mandatory: true, subcommand: [] },
-  { name: "withSecretValues", mandatory: false, subcommand: [] },
   { name: "batchDimension", mandatory: false, subcommand: [] },
 ]
 const values = {
-  values: { envName, tableName, configPath, batchDimension, withSecretValues},
+  values: { envName, tableName, configPath, batchDimension },
 } = parseArgs({
   options: {
     envName: {
@@ -49,9 +48,6 @@ const values = {
     },
     configPath: {
       type: "string", short: "c", default: undefined
-    },
-    withSecretValues: {
-      type: "boolean", short: "s", default: false
     },
     batchDimension: {
       type: "string", short: "b", default: "25"
@@ -73,41 +69,20 @@ function validateLines(lines){
 
   const tableKeyName = config[tableName].Key.name
   const tableKeyValue = config[tableName].Key.value
-  const secretAttributes = config[tableName].SecretAttributes
 
-  if(withSecretValues){
-    lines.forEach(l => {
-      if(!l) return;
-      const line = JSON.parse(l)
-      const lineKeyValue = line[tableKeyName].S
-      if(lineKeyValue===tableKeyValue){
-        secretAttributes.forEach(secretAttribute => {
-          if(!line[secretAttribute].S){
-            throw new Error("The import file does not contain the secret attribute "+secretAttribute+" for key "+lineKeyValue+' and value '+lineKeyValue)
-          }
-
-          if(line[secretAttribute].S.indexOf('<secret:')<0){
-            throw new Error("The import file does not contain the secret attribute placeholder in "+secretAttribute+" for key "+lineKeyValue+' and value '+lineKeyValue)
-          }
-        })
-      }
-    })
-  } else {
-    lines.forEach(l => {
-      if(!l) return;
-      const line = JSON.parse(l)
-      const lineKeyValue = line[tableKeyName].S
-      if(lineKeyValue===tableKeyValue){
-        throw new Error("The import file contains the key "+tableKeyName+" and value "+lineKeyValue+" while the withSecretValues flag is not set")
-      }
-    })
-  }
+  lines.forEach(l => {
+    if(!l) return;
+    const line = JSON.parse(l)
+    const lineKeyValue = line[tableKeyName].S
+    if(lineKeyValue===tableKeyValue){
+      throw new Error("The import file contains the protected key "+tableKeyName+" and value "+lineKeyValue+"")
+    }
+  })
 }
 
 function getImportFilePath(){
   const accountName = config[tableName].AccountName
-  const withSecretValuesStr = withSecretValues ? '-secrets' : ''
-  const localFile = configPath+'/'+envName+'/_conf/'+accountName+'/dynamodb/'+tableName+withSecretValuesStr+'.json'
+  const localFile = configPath+'/'+envName+'/_conf/'+accountName+'/dynamodb/'+tableName+'.json'
   if(!fs.existsSync(localFile)){
     const globalFile = configPath+'/_conf/'+accountName+'/dynamodb/'+tableName+'.json'
     if(!fs.existsSync(globalFile)){
