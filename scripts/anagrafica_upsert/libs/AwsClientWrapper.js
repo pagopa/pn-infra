@@ -1,6 +1,6 @@
 
 const { fromIni } = require("@aws-sdk/credential-provider-ini");
-const { DynamoDBClient, BatchWriteItemCommand } = require("@aws-sdk/client-dynamodb");
+const { DynamoDBClient, BatchWriteItemCommand, ScanCommand } = require("@aws-sdk/client-dynamodb");
 const { marshall, unmarshall } = require('@aws-sdk/util-dynamodb');
 
 function awsClientCfg( profile ) {
@@ -20,6 +20,16 @@ class AwsClientsWrapper {
   constructor( envName, profileName, roleArn ) {
     const ssoProfile = `${envName}`
     this._dynamoClient = new DynamoDBClient( awsClientCfg( ssoProfile, profileName, roleArn ));
+  }
+
+  async _scanRequest(tableName, lastEvaluatedKey){
+    const input = { // ScanInputno
+      TableName: tableName, // required
+    };
+    lastEvaluatedKey ? input['ExclusiveStartKey'] = lastEvaluatedKey : null
+    const command = new ScanCommand(input);
+    const response = await this._dynamoClient.send(command);
+    return response
   }
 
   async _batchWriteItems(tableName, items) {

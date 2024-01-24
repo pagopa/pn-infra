@@ -38,7 +38,7 @@ const args = [
   { name: "batchDimension", mandatory: false, subcommand: [] },
 ]
 const values = {
-  values: { envName, tableName, configPath, batchDimension },
+  values: { envName, tableName, configPath, batchDimension, cmd },
 } = parseArgs({
   options: {
     envName: {
@@ -95,19 +95,100 @@ const validateExecutor = async(lines, cfg) => {
       throw new Error("The import file contains the protected key "+tableKeyName+" and value "+lineKeyValue+"")
     }
   })
+
+  return {
+    validation: true
+  }
+}
+
+async function dumpTable(tableName){
+  let results = []
+  let first = true;
+  let lastEvaluatedKey = null
+  while(first || lastEvaluatedKey != null) {
+    const res = await awsClient._scanRequest(tableName, lastEvaluatedKey);
+    if(res.LastEvaluatedKey) {
+      lastEvaluatedKey = res.LastEvaluatedKey
+    } 
+    else {
+      lastEvaluatedKey = null;
+      first = false;
+    }
+    results = results.concat(res.Items);
+  }
+
+  return results
 }
 
 const compareExecutor = async(lines, cfg) => {
-  return true
+  // download from dynamodb
+  const items = await dumpTable(cfg.tableName)
+  const localItems = lines.map(JSON.parse)
+
+  // compare array of json objects to find different items, items in dynamodb but not in local file and items in local file but not in dynamodb
+  const differentItems = []
+  const itemsInDynamoDbButNotInLocalFile = []
+  const itemsInLocalFileButNotInDynamoDb = []
+
+  items.forEach(item => {
+    const localItem = localItems.find(localItem => {
+      const tableKeys = cfg.tableConfig.Keys
+      
+      const keysAreEqual = tableKeys.every(key => {
+        return localItem[key].S == item[key].S
+      })
+
+      return keysAreEqual
+    })
+
+    if(!localItem) {
+      itemsInDynamoDbButNotInLocalFile.push(item)
+    }
+    else {
+      if(JSON.stringify(item) != JSON.stringify(localItem)){
+        differentItems.push({ dynamodb: item, local: localItem })
+      }
+    }
+  })
+
+  localItems.forEach(localItem => {
+    const item = items.find(item => {
+      const tableKeys = cfg.tableConfig.Keys
+      
+      const keysAreEqual = tableKeys.every(key => {
+        return localItem[key].S == item[key].S
+      })
+
+      return keysAreEqual
+    })
+
+    if(!item) {
+      itemsInLocalFileButNotInDynamoDb.push(localItem)
+    }
+  })
+
+  return {
+    differentItems,
+    itemsInDynamoDbButNotInLocalFile,
+    itemsInLocalFileButNotInDynamoDb
+  
+  }
 }
 
 const syncExecutor = async(lines, cfg) => {
+  const validateExecutor = makeExecutor("validate")
+  await validateExecutor(lines, cfg)
+
   const elements = lines.map(JSON.parse);
   const batchDimension = Number(cfg.batchDimension)
   for (i = 0; i < elements.length; i = i+batchDimension){
     const batch = elements.slice(i, i+batchDimension);
     console.log("N° " + ((i+batchDimension > elements.length) ? elements.length : i+batchDimension) + " elements imported!")
     await awsClient._batchWriteItems(cfg.tableName, batch);
+  }
+
+  return {
+    total: elements.length
   }
 }
 
@@ -133,24 +214,17 @@ async function main() {
   const data = fs.readFileSync(fileName, { encoding: 'utf8', flag: 'r' });
   const lines = data.trim().split('\n');
 
-  validateLines(lines)
-
   const commandExecutor = makeExecutor(cmd)
 
-  await commandExecutor(lines, {
+  const res = await commandExecutor(lines, {
     tableName,
     tableConfig: config[tableName],
     batchDimension
   })
-  /*const elements = lines.map(JSON.parse);
-  batchDimension = Number(batchDimension)
-  for (i = 0; i < elements.length; i = i+batchDimension){
-    const batch = elements.slice(i, i+batchDimension);
-    console.log("N° " + ((i+batchDimension > elements.length) ? elements.length : i+batchDimension) + " elements imported!")
-    await awsClient._batchWriteItems(tableName, batch);
-    
-  }*/
+
   console.log("Command "+cmd+" complete")
+
+  fs.writeFileSync('./result/'+(new Date().toISOString())+'_'+tableName+'_'+cmd+'.json', JSON.stringify(res, null, 2))
 }
 
 main();
