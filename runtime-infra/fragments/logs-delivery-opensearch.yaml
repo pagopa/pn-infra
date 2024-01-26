@@ -146,6 +146,8 @@ Resources:
       Handler: index.handler
       MemorySize: !Ref OpenSearchLambdaMemory
       Timeout: 900 # 15 minutes
+      TracingConfig:
+        Mode: Active
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"      
       Environment:
