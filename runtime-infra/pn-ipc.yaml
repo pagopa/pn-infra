@@ -419,6 +419,18 @@ Resources:
         QueueOldestAgeLimit: 1296000 # 15 days
         OncallQueueOldestAgeLimit: 1296000 # 15 days
 
+  ### Communication FROM SafeStorage TO pn-radd-alt ###
+  SafeStorageToRaddAltQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain  
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestore_to_radd_alt'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
   ### Communication FROM SafeStorage TO pn-service-desk ###
   SafeStorageToServiceDeskQueue:
     Type: AWS::CloudFormation::Stack
@@ -780,6 +792,23 @@ Outputs:
   SafeStorageToRaddQueueAgeAlarmARN:
     Value: !GetAtt SafeStorageToRaddQueue.Outputs.SqsAgeAlarmArn
     Description: SafeStorage-to-radd queue age alarm ARN
+
+  # SafeStorage to Radd Alt
+  SafeStorageToRaddAltQueueName:
+    Value: !GetAtt SafeStorageToRaddAltQueue.Outputs.QueueName
+    Description: SafeStorage-to-radd-alt queue name
+  SafeStorageToRaddAltQueueURL:
+    Value: !GetAtt SafeStorageToRaddAltQueue.Outputs.QueueURL
+    Description: SafeStorage-to-radd-alt queue URL
+  SafeStorageToRaddAltQueueARN:
+    Value: !GetAtt SafeStorageToRaddAltQueue.Outputs.QueueARN
+    Description: SafeStorage-to-radd-alt queue ARN
+  SafeStorageToRaddAltQueueAlarmARN:
+    Value: !GetAtt SafeStorageToRaddAltQueue.Outputs.SqsDLQAlarmArn
+    Description: SafeStorage-to-radd-alt queue alarm ARN
+  SafeStorageToRaddAltQueueAgeAlarmARN:
+    Value: !GetAtt SafeStorageToRaddAltQueue.Outputs.SqsAgeAlarmArn
+    Description: SafeStorage-to-radd-alt queue age alarm ARN
 
   # SafeStorage to ServiceDesk
   SafeStorageToServiceDeskQueueName:
