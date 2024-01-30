@@ -8,7 +8,7 @@ TAG=v0.36.0
 SOURCE_IMAGE=amazon/aws-otel-collector:$TAG
 REPOSITORY=aws-otel-collector ## ECR repository to host the container image - needs to be created before run this script
 IMAGE=$REPOSITORY:$TAG
-CICD_ACCOUNT=$(aws sts get-caller-identity --profile $CICD_PROFILE --query 'Account')
+CICD_ACCOUNT=$(aws sts get-caller-identity --profile $CICD_PROFILE --query 'Account' | jq -r .)
 
 
 echo "Creating repo ${REPOSITORY} on account ${CICD_ACCOUNT}"
