@@ -40,6 +40,10 @@ Parameters:
     Default: ''
     Description: Log bucket resource policy custom statements
     
+  DynamoDBExportBucketName:
+    Type: String
+    Description: Name of the dynamodb export bucket
+    
 Conditions:
 
   ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
@@ -116,6 +120,16 @@ Resources:
                 - kms:DescribeKey
               Resource: 
                 - !Sub "${LogsBucketKmsKeyArn}"
+            # Allow data lake to read the dynamodb bucket items
+            - Effect: Allow
+              Action:
+                - "s3:Get*"
+                - "s3:List*"
+                - "s3-object-lambda:Get*"
+                - "s3-object-lambda:List*"
+              Resource: 
+                - !Sub "arn:aws:s3:::${DynamoDBExportBucketName}"
+                - !Sub "arn:aws:s3:::${DynamoDBExportBucketName}/*"
 
   CloudTrailDestinationBucketResourcePolicy:
     Type: AWS::S3::BucketPolicy
