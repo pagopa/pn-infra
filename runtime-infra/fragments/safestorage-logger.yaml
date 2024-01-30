@@ -92,6 +92,7 @@ Resources:
                   - !Sub 'arn:${AWS::Partition}:sqs:${AWS::Region}:${SafeStorageAccountId}:${QueueName}'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+        - 'arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy'
 
   SafestorageLoggerLambda:
     Type: AWS::Lambda::Function
@@ -102,8 +103,6 @@ Resources:
       Handler: index.handler
       MemorySize: !Ref LambdaMemory
       Timeout: 30
-      TracingConfig:
-        Mode: Active
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"      
       Code:
