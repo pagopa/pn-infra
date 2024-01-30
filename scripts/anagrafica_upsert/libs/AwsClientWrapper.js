@@ -1,25 +1,24 @@
 
 const { fromIni } = require("@aws-sdk/credential-provider-ini");
 const { DynamoDBClient, BatchWriteItemCommand, ScanCommand } = require("@aws-sdk/client-dynamodb");
-const { marshall, unmarshall } = require('@aws-sdk/util-dynamodb');
 
 function awsClientCfg( profile ) {
   const self = this;
-  //if(!profileName){
-    return { 
-      region: "eu-south-1", 
-      credentials: fromIni({ 
-        profile: profile,
-      })
-    }
-  //}
+  if(profile==='default') return {}
+
+  return { 
+    region: "eu-south-1", 
+    credentials: fromIni({ 
+      profile: profile,
+    })
+  }
 }
 
 class AwsClientsWrapper {
 
-  constructor( envName, profileName, roleArn ) {
+  constructor( envName ) {
     const ssoProfile = `${envName}`
-    this._dynamoClient = new DynamoDBClient( awsClientCfg( ssoProfile, profileName, roleArn ));
+    this._dynamoClient = new DynamoDBClient( awsClientCfg( ssoProfile ));
   }
 
   async _scanRequest(tableName, lastEvaluatedKey){

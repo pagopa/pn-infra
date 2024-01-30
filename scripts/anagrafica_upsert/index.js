@@ -4,7 +4,7 @@ const fs = require('fs');
 
 
 function _checkingParameters(args, values){
-  const usage = "Usage: index.js --envName <envName> --tableName <tableName> --configPath <configPath> --cmd <cmd> [--batchDimension <batchDimension>]"
+  const usage = "Usage: index.js --envName <envName> --tableName <tableName> --configPath <configPath> --cmd <cmd> [--batchDimension <batchDimension>] [--withRole <withRole>]"
   //CHECKING PARAMETER
   args.forEach(el => {
     if(el.mandatory && !values.values[el.name]){
@@ -36,9 +36,10 @@ const args = [
   { name: "configPath", mandatory: true, subcommand: [] },
   { name: "cmd", mandatory: false, subcommand: [] },
   { name: "batchDimension", mandatory: false, subcommand: [] },
+  { name: "withRole", mandatory: false, subcommand: [] },
 ]
 const values = {
-  values: { envName, tableName, configPath, batchDimension, cmd },
+  values: { envName, tableName, configPath, batchDimension, cmd, withRole },
 } = parseArgs({
   options: {
     envName: {
@@ -56,16 +57,23 @@ const values = {
     batchDimension: {
       type: "string", short: "b", default: "25"
     },
+    withRole: {
+      type: "boolean", short: "r", default: "false
+    }
   },
 });  
 
-if(!config[tableName]) throw new Error("Missing configuration for table "+tableName) 
-
-const profile = 'sso_pn-'+config[tableName].AccountName+'-'+envName
+let profile = 'sso_pn-'+config[tableName].AccountName+'-'+envName
+if(withRole){
+  profile = 'default'
+}
 
 console.log('profile', profile)
 
 _checkingParameters(args, values)
+
+if(!config[tableName]) throw new Error("Missing configuration for table "+tableName) 
+
 const awsClient = new AwsClientsWrapper( profile );
 
 function getImportFilePath(){

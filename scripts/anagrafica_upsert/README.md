@@ -31,11 +31,12 @@ aws sso login --profile <profile>
 
 ### Esecuzione
 ```bash
-node Usage: index.js --envName <envName> --tableName <tableName> --configPath <configPath> [--batchDimension <batchDimension>] [--withSecretsValues]
+node Usage: index.js --envName <envName> --tableName <tableName> --configPath <configPath> [--batchDimension <batchDimension>] [--withRole <withRole>]
 ```
 Dove:
 - `<envName>` è il nome dell'ambiente sul quale eseguire l'operazione
 - `<tableName>` è la tabella in cui vengono inseriti i dati
 - `<configPath>` è il path locale dove è stato scaricato il repository pn-configuration
 - `<batchDimension>` è la dimensione del batch che si vuole sottomettere (default:25)
+- `<withRole>` se impostato, il comando viene eseguito con il ruolo di default AWS
 
