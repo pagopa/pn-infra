@@ -13,7 +13,7 @@ CICD_ACCOUNT=$(aws sts get-caller-identity --profile $CICD_PROFILE --query 'Acco
 echo "Creating repo ${REPOSITORY} on account ${CICD_ACCOUNT}"
 
 # build source image
-docker build -t $REPOSITORY:$TAG --build-arg version=v1.32.0 .
+docker build -t $IMAGE --build-arg version=$TAG .
 
 # docker login
 aws ecr get-login-password --region $AWS_REGION --profile $CICD_PROFILE | docker login --username AWS --password-stdin $CICD_ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com
@@ -22,7 +22,7 @@ aws ecr get-login-password --region $AWS_REGION --profile $CICD_PROFILE | docker
 REMOTE_REPOSITORY=$CICD_ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY:$TAG
 
 # docker tag.
-docker tag $REPOSITORY:$TAG $REMOTE_REPOSITORY
+docker tag $IMAGE $REMOTE_REPOSITORY
 
 # docker push
 docker push $REMOTE_REPOSITORY
