@@ -59,13 +59,13 @@ Parameters:
   ContainerImageOtelURI:
     Type: String
     Description: Container image URI for Open telemetry
-    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-collector:v0.23.0
+    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-collector:v0.36.0
 
   ContainerImageInjectorURI:
     Type: String
     Description: Container image URI for Open telemetry
     #Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/alpine:3.14
-    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.19.2_1
+    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.32.0
 
   EfsFilesystem:
     Type: String
@@ -590,6 +590,14 @@ Parameters:
     Default: '60'
     Description: ErrorFatal alarm sum period
 
+  DisableOncallAlarm:
+    Type: String
+    Default: false
+    Description: Disable oncall alarm (the alarm name won't start by oncall-)
+    AllowedValues:
+      - true
+      - false
+
 Mappings:
   ContainerMemory:
     2GB:
@@ -626,6 +634,8 @@ Conditions:
   LogAlarmNotNone: !Not [ !Equals [ !Ref LogAlarmStrategyV1, '-' ] ]
   HasLogAlarm: !And [ !Condition HasAlarmTopic, !Condition LogAlarmNotNone ]
 
+  IsOncallAlarmDisabled: !Equals [ !Ref DisableOncallAlarm, 'true' ]
+  
   AutoscalingByRestApi: !Equals [ !Ref AutoscalingStrategy, REST-API]
   AutoscalingBySQS: !Equals [ !Ref AutoscalingStrategy, SQS]
   AutoscalingCustom: !Equals [ !Ref AutoscalingStrategy, CUSTOM]
@@ -1590,7 +1600,11 @@ Resources:
     Condition: HasLogAlarm
     DependsOn: ErrorFatalLogsMetricFilter
     Properties:
-      AlarmName: !Sub "oncall-${MicroServiceUniqueName}-ErrorFatalLogs-Alarm"
+      AlarmName: 
+        Fn::If:
+          - IsOncallAlarmDisabled
+          - !Sub "${MicroServiceUniqueName}-ErrorFatalLogs-Alarm"
+          - !Sub "oncall-${MicroServiceUniqueName}-ErrorFatalLogs-Alarm"
       AlarmDescription: "CloudWatch alarm for when ECS LogGroup has ERROR or FATAL line."
       TreatMissingData: notBreaching
       AlarmActions: 
