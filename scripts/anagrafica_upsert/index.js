@@ -58,10 +58,13 @@ const values = {
       type: "string", short: "b", default: "25"
     },
     withRole: {
-      type: "boolean", short: "r", default: "false
+      type: "boolean", short: "r", default: false
     }
   },
 });  
+
+_checkingParameters(args, values)
+if(!config[tableName]) throw new Error("Missing configuration for table "+tableName) 
 
 let profile = 'sso_pn-'+config[tableName].AccountName+'-'+envName
 if(withRole){
@@ -69,10 +72,6 @@ if(withRole){
 }
 
 console.log('profile', profile)
-
-_checkingParameters(args, values)
-
-if(!config[tableName]) throw new Error("Missing configuration for table "+tableName) 
 
 const awsClient = new AwsClientsWrapper( profile );
 
