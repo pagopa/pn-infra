@@ -124,6 +124,7 @@ Resources:
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+        - 'arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy'
 
   DeliveryLambdaSecGroup:
     Type: AWS::EC2::SecurityGroup
@@ -141,7 +142,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub '${ProjectName}-${StreamNamePrefix}-opensearch-ingestion'
-      Runtime: nodejs16.x
+      Runtime: nodejs18.x
       Role: !GetAtt DeliveryLambdaRole.Arn
       Handler: index.handler
       MemorySize: !Ref OpenSearchLambdaMemory
