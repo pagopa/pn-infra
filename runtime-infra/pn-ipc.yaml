@@ -86,6 +86,10 @@ Parameters:
     Type: String
     Description: 'The certificate used for browser rest IO API.'
 
+  RaddApiDnsName:
+    Type: String
+    Description: Radd Api DNS Name
+
   HostedZoneId:
     Description: "Hosted Zone Id in which you want to add record"
     Type: String
@@ -747,6 +751,9 @@ Outputs:
     Description: 'The DNS name used for B2B Selfecare PG rest API.'
   CNApiDnsName:
     Value: !Ref CNApiDnsName
+  RaddApiDnsName:
+    Value: !Ref RaddApiDnsName
+    
   # SafeStorage to DeliveryPush
   SafeStorageToDeliveryPushQueueName:
     Value: !GetAtt SafeStorageToDeliveryPushQueue.Outputs.QueueName

@@ -92,12 +92,13 @@ Resources:
                   - !Sub 'arn:${AWS::Partition}:sqs:${AWS::Region}:${SafeStorageAccountId}:${QueueName}'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+        - 'arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy'
 
   SafestorageLoggerLambda:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Ref LambdaName
-      Runtime: nodejs16.x
+      Runtime: nodejs18.x
       Role: !GetAtt SafestorageLoggerLambdaRole.Arn
       Handler: index.handler
       MemorySize: !Ref LambdaMemory
