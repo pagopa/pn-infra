@@ -24,7 +24,7 @@ Parameters:
   CodebuildComputeType:
     Type: String
     Description: Codebuild compute type (https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-compute-types.html)
-    Default: BUILD_GENERAL1_SMALL
+    Default: BUILD_GENERAL1_LARGE
 
   LogsBucketName:
     Type: String
@@ -74,16 +74,22 @@ Resources:
             Resource: 
               - !Sub "arn:aws:s3:::${BucketName}/*"   
             Principal:
-              AWS:
-                - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
+              AWS: 
+                - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
+            Condition:
+              ArnEquals:
+                aws:PrincipalArn: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
           - Effect: Allow
             Action:
               - "s3:PutObject"
             Resource: 
               - !Sub "arn:aws:s3:::${BucketName}/${ParquetBucketPath}/*"
             Principal:
-              AWS:
-                - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"    
+              AWS: 
+                - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
+            Condition:
+              ArnEquals:
+                aws:PrincipalArn: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
 
   DataMonitoringCodebuildProject:
     Type: 'AWS::CodeBuild::Project'
@@ -99,10 +105,28 @@ Resources:
           phases:
             pre_build:
               commands:
-                - echo "### NO PRE_BUILD"
+                - git clone https://github.com/pagopa/pn-troubleshooting.git
+                - ( cd pn-troubleshooting && git checkout ec_metadata_extract_v0_1 )
             build:
               commands:
-                - echo "### NO BUILD"
+                - |
+                  cd pn-troubleshooting/bi_or_not_bi__ec_metadata
+                  COMMANDLINE=" --dynexp-indexed-data-folder ./out/indexing/dynExp \
+                    dynamoExportsIndexing \
+                    --aws-bucket ${EXPORT_BUCKET_NAME} \
+                    --aws-full-export-date 2024-1-14 \
+                    --aws-dynexport-folder-prefix %s/incremental2024/ \
+                    --result-upload-url s3://${EXPORT_BUCKET_NAME}/parquet/ \
+                    pn-EcRichiesteMetadati 2024-1-1 3035-1-1 "
+
+                  export MAVEN_OPTS="-Xmx8g \
+                    --add-opens java.base/sun.nio.ch=ALL-UNNAMED \
+                    --add-opens java.base/sun.security.action=ALL-UNNAMED \
+                    --add-opens java.base/sun.util.calendar=ALL-UNNAMED"
+
+                  ARGUMENTS=$( echo $COMMANDLINE | sed -e 's/  */,/g' )
+                  ./mvnw compile
+                  ./mvnw exec:java "-Dexec.arguments=${ARGUMENTS}"
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
@@ -116,6 +140,9 @@ Resources:
           - Name: CMD
             Type: PLAINTEXT
             Value: !Ref Cmd
+          - Name: EXPORT_BUCKET_NAME
+            Type: PLAINTEXT
+            Value: !Ref BucketName
 
   DataMonitoringCodeBuildServiceRole:
     Type: AWS::IAM::Role
