@@ -47,6 +47,9 @@ Parameters:
     Description: String Prefix after S3Prefix
     Default: incremental2024
 
+  EnvironmentType:
+    Type: String
+    Description: Environment type (e.g. dev, test, prod)
 
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
@@ -115,23 +118,25 @@ Resources:
             build:
               commands:
                 - |
-                  cd pn-troubleshooting/bi_or_not_bi__ec_metadata
-                  COMMANDLINE=" --dynexp-indexed-data-folder ./out/indexing/dynExp \
-                    dynamoExportsIndexing \
-                    --aws-bucket ${EXPORT_BUCKET_NAME} \
-                    --aws-full-export-date 2024-1-14 \
-                    --aws-dynexport-folder-prefix %s/incremental2024/ \
-                    --result-upload-url s3://${EXPORT_BUCKET_NAME}/parquet/ \
-                    pn-EcRichiesteMetadati 2024-1-1 3035-1-1 "
+                  if ([ $ACCOUNT_TYPE == "confinfo" ]); then
+                    cd pn-troubleshooting/bi_or_not_bi__ec_metadata
+                    COMMANDLINE=" --dynexp-indexed-data-folder ./out/indexing/dynExp \
+                      dynamoExportsIndexing \
+                      --aws-bucket ${EXPORT_BUCKET_NAME} \
+                      --aws-full-export-date 2024-1-14 \
+                      --aws-dynexport-folder-prefix %s/incremental2024/ \
+                      --result-upload-url s3://${EXPORT_BUCKET_NAME}/parquet/ \
+                      pn-EcRichiesteMetadati 2024-1-1 3035-1-1 "
 
-                  export MAVEN_OPTS="-Xmx8g \
-                    --add-opens java.base/sun.nio.ch=ALL-UNNAMED \
-                    --add-opens java.base/sun.security.action=ALL-UNNAMED \
-                    --add-opens java.base/sun.util.calendar=ALL-UNNAMED"
+                    export MAVEN_OPTS="-Xmx8g \
+                      --add-opens java.base/sun.nio.ch=ALL-UNNAMED \
+                      --add-opens java.base/sun.security.action=ALL-UNNAMED \
+                      --add-opens java.base/sun.util.calendar=ALL-UNNAMED"
 
-                  ARGUMENTS=$( echo $COMMANDLINE | sed -e 's/  */,/g' )
-                  ./mvnw compile
-                  ./mvnw exec:java "-Dexec.arguments=${ARGUMENTS}"
+                    ARGUMENTS=$( echo $COMMANDLINE | sed -e 's/  */,/g' )
+                    ./mvnw compile
+                    ./mvnw exec:java "-Dexec.arguments=${ARGUMENTS}"
+                  fi
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
@@ -145,6 +150,12 @@ Resources:
           - Name: EXPORT_BUCKET_NAME
             Type: PLAINTEXT
             Value: !Ref DataMonitoringBucket
+          - Name: ACCOUNT_TYPE
+            Type: PLAINTEXT
+            Value: !If [IsCoreAccount, "core", "confinfo"]
+          - Name: ENV_TYPE
+            Type: PLAINTEXT
+            Value: !Ref EnvironmentType
 
   DataMonitoringCodeBuildServiceRole:
     Type: AWS::IAM::Role
