@@ -1,6 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: 'This template deploys the queues needed for comuication between microservices and 
-              API gateway custom domains'
+Description: 'This template deploys the resources for the data monitoring'
 
 Parameters:  
   ConfinfoBucketName:
@@ -152,7 +151,7 @@ Resources:
             Value: !Ref Cmd
           - Name: EXPORT_BUCKET_NAME
             Type: PLAINTEXT
-            Value: !Ref BucketName
+            Value: !Ref DataMonitoringBucket
 
   DataMonitoringCodeBuildServiceRole:
     Type: AWS::IAM::Role
@@ -342,6 +341,7 @@ Resources:
 
   ExportRole:
     Type: AWS::IAM::Role
+    Condition: HasDynamoDbExportTableNames
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -377,6 +377,7 @@ Resources:
 
   Schedule:
     Type: AWS::Events::Rule
+    Condition: HasDynamoDbExportTableNames
     Properties:
       ScheduleExpression: cron(0 5 * * ? *)
       State: ENABLED
@@ -386,6 +387,7 @@ Resources:
 
   PermissionForEventsToInvokeLambda:
     Type: AWS::Lambda::Permission
+    Condition: HasDynamoDbExportTableNames
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref DynamoDbExportFunction
@@ -394,6 +396,7 @@ Resources:
 
   ExportFunctionLogroup:
     Type: AWS::Logs::LogGroup
+    Condition: HasDynamoDbExportTableNames
     DeletionPolicy: Delete
     UpdateReplacePolicy : Delete
     Properties:
@@ -401,6 +404,6 @@ Resources:
       RetentionInDays: 3
       
 Outputs:
-  BucketName: 
+  DataMonitoringBucketName: 
     Value: !Ref DataMonitoringBucket
     Description: Name of the bucket created for the data monitoring   
