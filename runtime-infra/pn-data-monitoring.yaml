@@ -1,0 +1,413 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys the resources for the data monitoring'
+
+Parameters:  
+  ConfinfoDynamoDbExportBucketName:
+    Type: String
+    Default: ''
+    Description: Name of the confinfo bucket created for the data monitoring (leave blank in Confinfo account)
+
+  PnCoreAwsAccountId:
+    Type: String
+    Description: Core Account ID (leave blank in Core account)
+    Default: ''
+
+  ParquetBucketPath:
+    Type: String
+    Description: parquet files s3 bucket path
+    Default: 'parquet'
+
+  DataMonitoringCodebuildComputeType:
+    Type: String
+    Description: Codebuild compute type (https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-compute-types.html)
+    Default: BUILD_GENERAL1_LARGE
+
+  LogsBucketName:
+    Type: String
+    Description: Name of the logs bucket
+
+  LogsBucketKmsKeyArn:
+    Type: String
+    Description: Name of the logs bucket KMS key ARN
+
+  DataMonitoringIndexCronExpression:
+    Type: String
+    Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
+    Default: '' # example: 'cron(0 9 * * ? *)'
+
+  #Dynamodb export parameters:
+
+  DynamoDbExportTableNames:
+    Type: String
+    Default: ""
+    Description: DynamoDB List of Table to export
+
+  DynamoDbExportPrefix:
+    Type: String
+    Description: String Prefix after S3Prefix
+    Default: incremental2024
+
+  EnvironmentType:
+    Type: String
+    Description: Environment type (e.g. dev, test, prod)
+
+Conditions:
+  IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
+  IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
+  HasCronExpression: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
+  HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
+
+Resources:
+  
+  # s3 bucket with name BucketName
+  DataMonitoringBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub pn-datamonitoring-${AWS::Region}-${AWS::AccountId}
+          
+  DataMonitoringBucketPolicy:
+    Condition: IsConfinfoAccount
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DataMonitoringBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "s3:Get*"
+              - "s3:List*"              
+            Resource: 
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"   
+            Principal:
+              AWS: 
+                - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
+            Condition:
+              ArnEquals:
+                aws:PrincipalArn: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
+          - Effect: Allow
+            Action:
+              - "s3:PutObject"
+            Resource: 
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/${ParquetBucketPath}/*"
+            Principal:
+              AWS: 
+                - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
+            Condition:
+              ArnEquals:
+                aws:PrincipalArn: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
+
+  DataMonitoringCodebuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: pn-data-monitoring-codebuild
+      ServiceRole: !GetAtt DataMonitoringCodeBuildServiceRole.Arn
+      ConcurrentBuildLimit: 1
+      TimeoutInMinutes: 10
+      Source: 
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - git clone https://github.com/pagopa/pn-troubleshooting.git
+                - ( cd pn-troubleshooting && git checkout ec_metadata_extract_v0_1 )
+            build:
+              commands:
+                - |
+                  if ([ $ACCOUNT_TYPE == "confinfo" ]); then
+                    cd pn-troubleshooting/bi_or_not_bi__ec_metadata
+                    COMMANDLINE=" --dynexp-indexed-data-folder ./out/indexing/dynExp \
+                      dynamoExportsIndexing \
+                      --aws-bucket ${EXPORT_BUCKET_NAME} \
+                      --aws-full-export-date 2024-1-14 \
+                      --aws-dynexport-folder-prefix %s/incremental2024/ \
+                      --result-upload-url s3://${EXPORT_BUCKET_NAME}/parquet/ \
+                      pn-EcRichiesteMetadati 2024-1-1 3035-1-1 "
+
+                    export MAVEN_OPTS="-Xmx8g \
+                      --add-opens java.base/sun.nio.ch=ALL-UNNAMED \
+                      --add-opens java.base/sun.security.action=ALL-UNNAMED \
+                      --add-opens java.base/sun.util.calendar=ALL-UNNAMED"
+
+                    ARGUMENTS=$( echo $COMMANDLINE | sed -e 's/  */,/g' )
+                    ./mvnw compile
+                    ./mvnw exec:java "-Dexec.arguments=${ARGUMENTS}"
+                  fi
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        ComputeType: !Ref DataMonitoringCodebuildComputeType
+        Type: LINUX_CONTAINER
+        Image: "aws/codebuild/standard:7.0"
+        EnvironmentVariables:
+          - Name: REGION
+            Type: PLAINTEXT
+            Value: !Ref AWS::Region
+          - Name: EXPORT_BUCKET_NAME
+            Type: PLAINTEXT
+            Value: !Ref DataMonitoringBucket
+          - Name: ACCOUNT_TYPE
+            Type: PLAINTEXT
+            Value: !If [IsCoreAccount, "core", "confinfo"]
+          - Name: ENV_TYPE
+            Type: PLAINTEXT
+            Value: !Ref EnvironmentType
+
+  DataMonitoringCodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: pn-data-monitoring-codebuild-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+            Condition:
+              ArnEquals:
+                aws:PrincipalArn: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/pn-data-monitoring-codebuild-role
+            Action:
+              - "sts:AssumeRole" 
+
+  DataMonitoringCodebuildManagedPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: pn-data-monitoring-codebuild-managed-policy
+      Roles:
+        - !Ref DataMonitoringCodeBuildServiceRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*
+          # lettura su tutto il bucket dei log e parquet
+          - Effect: Allow
+            Action:
+              - "s3:Get*"
+              - "s3:List*"
+            Resource: 
+              - !Sub "arn:aws:s3:::${LogsBucketName}"
+              - !Sub "arn:aws:s3:::${LogsBucketName}/*"
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
+          # Accesso in scrittura al bucket dump dell'account corrente nella cartella parquet
+          - Effect: Allow
+            Action:
+              - "s3:PutObject"
+            Resource: 
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/${ParquetBucketPath}/*"       
+          # Accessi in lettura al bucket dump dell'account confinfo nella cartella parquet
+          - Fn::If:
+            - IsCoreAccount
+            - Effect: Allow
+              Action:
+                - "s3:Get*"
+                - "s3:List*"
+              Resource: 
+              - !Sub "arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}/${ParquetBucketPath}/*"       
+            - !Ref AWS::NoValue
+          # Allow the use of encryption key
+          - Effect: Allow
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+            Resource: 
+              - !Sub "${LogsBucketKmsKeyArn}"
+
+  DataMonitoringScheduleRole:
+    Condition: HasCronExpression
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: runCodeBuild
+          PolicyDocument:
+            Statement:
+              - Sid: startProjectRun
+                Action:
+                  - "codebuild:*"
+                Effect: Allow
+                Resource: 
+                  - !GetAtt DataMonitoringCodebuildProject.Arn
+
+  IndexScheduledRule:
+    Type: AWS::Events::Rule
+    Condition: HasCronExpression
+    Properties:
+      Description: "pn-data-monitoring-codebuild-scheduled-rule"
+      # every day at 9 am
+      ScheduleExpression: !Ref DataMonitoringIndexCronExpression 
+      State: "ENABLED"
+      RoleArn: !GetAtt "DataMonitoringScheduleRole.Arn"
+      Targets: 
+        - Id: "DataMonitoringIndex"
+          RoleArn: !GetAtt "DataMonitoringScheduleRole.Arn"
+          # Input:
+          #   !Sub |
+          #     {
+          #       "environmentVariablesOverride": {
+          #         "cmd": ${Cmd}
+          #       }
+          #     }
+          Arn: 
+            Fn::GetAtt: 
+              - "DataMonitoringCodebuildProject"
+              - "Arn"
+        
+  DynamoDbExportFunction:
+    Type: AWS::Lambda::Function
+    Condition: HasDynamoDbExportTableNames
+    Properties:
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      FunctionName: Lambda-DailyExport-DynamoDbTable
+      Code:
+        ZipFile: |
+          import boto3
+          import os
+          import logging
+          from datetime import datetime
+          from datetime import timedelta
+          
+          def lambda_handler(event, context):
+              dynamodb = boto3.client('dynamodb')
+              dynamo_table_names = os.environ['DynamoDbExportTableNames'].split(',')
+              s3_bucket = os.environ['S3Bucket']
+              prefix = os.environ['Prefix']
+              region = os.environ['Region']
+              accountid = os.environ['AccountID']
+              current_date = datetime.now().strftime('%Y%m%d')
+              yesterday_date= (datetime.strptime(current_date, '%Y%m%d') - timedelta(days=1)).strftime('%Y%m%d')
+
+              for dynamo_table_name in dynamo_table_names:
+                  dynamo_table_arn = f"arn:aws:dynamodb:{region}:{accountid}:table/{dynamo_table_name}"
+                  s3_full_prefix = dynamo_table_name + "/" + prefix + "/" + yesterday_date
+                  now = datetime.now()
+                  to_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                  from_time = to_time - timedelta(days=1)
+                  try:
+                      dynamodb.export_table_to_point_in_time(
+                                  TableArn=dynamo_table_arn,
+                                  S3Bucket=s3_bucket,
+                                  S3Prefix=s3_full_prefix,
+                                  ExportFormat='DYNAMODB_JSON',
+                                  ExportType='INCREMENTAL_EXPORT',
+                                  IncrementalExportSpecification={
+                                      'ExportFromTime': from_time,
+                                      'ExportToTime': to_time,
+                                      'ExportViewType': 'NEW_IMAGE'
+                                  }
+                              )
+                      print(f"Tabella '{dynamo_table_name}' export start.")
+                  except Exception as e:
+                      print(f"Error during l'export of table '{dynamo_table_name}': {e}")
+
+      Environment:
+        Variables:
+          DynamoDbExportTableNames:
+            Ref: DynamoDbExportTableNames
+          S3Bucket:
+            Ref: DataMonitoringBucket
+          Prefix:
+            Ref: DynamoDbExportPrefix
+          Region: !Ref AWS::Region
+          AccountID: !Ref AWS::AccountId
+
+
+      Role:
+        Fn::GetAtt:
+          - ExportRole
+          - Arn
+
+  ExportRole:
+    Type: AWS::IAM::Role
+    Condition: HasDynamoDbExportTableNames
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ExportPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Scan
+                  - dynamodb:ExportTableToPointInTime
+                Resource: arn:aws:dynamodb:*:*:*
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource:
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/*
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - "kms:Decrypt"
+                Resource: "*"
+
+  Schedule:
+    Type: AWS::Events::Rule
+    Condition: HasDynamoDbExportTableNames
+    Properties:
+      ScheduleExpression: cron(0 5 * * ? *)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt DynamoDbExportFunction.Arn
+          Id: DynamoDbExportFunction
+
+  PermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Condition: HasDynamoDbExportTableNames
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref DynamoDbExportFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt Schedule.Arn
+
+  ExportFunctionLogroup:
+    Type: AWS::Logs::LogGroup
+    Condition: HasDynamoDbExportTableNames
+    DeletionPolicy: Delete
+    UpdateReplacePolicy : Delete
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${DynamoDbExportFunction}"
+      RetentionInDays: 3
+      
+Outputs:
+  DataMonitoringBucketName: 
+    Value: !Ref DataMonitoringBucket
+    Description: Name of the bucket created for the data monitoring   

@@ -137,8 +137,8 @@ Parameters:
     Type: String
   LogsBucketName:
     Type: String
-#  LogsBucketKmsKeyArn:
-#    Type: String
+  LogsBucketKmsKeyArn:
+    Type: String
   LogsExporterRoleArn:
     Type: String
   LogsExporterPolicyArn:
@@ -312,6 +312,31 @@ Parameters:
   CdcKinesisMaxAgeInMillisecondsOncall:
     Type: Number
     Description: 'MaxAgeInMilliseconds for Kinesis Cdc GetRecords (oncall alarm)'
+
+  # Data Monitoring pass-through params
+  DynamoDbExportTableNames:
+    Type: String
+    Description: 'Comma separated list of DynamoDB tables to export'
+
+  DynamoDbExportPrefix:
+    Type: String
+    Description: 'Prefix for the DynamoDB export'
+
+  ConfinfoDynamoDbExportBucketName:
+    Type: String
+    Description: 'Bucket name for the DynamoDB export for Confinfo Account'
+
+  ParquetBucketPath:
+    Type: String
+    Description: parquet files s3 bucket path
+
+  DataMonitoringCodebuildComputeType:
+    Type: String
+    Description: Codebuild compute type (https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-compute-types.html)
+
+  DataMonitoringIndexCronExpression:
+    Type: String
+    Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
 
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
@@ -1181,8 +1206,8 @@ Outputs:
     Value: !Ref EcsDefaultSecurityGroup
   LogsBucketName:
     Value: !Ref LogsBucketName
-  #LogsBucketKmsKeyArn:
-  #  Value: !Ref LogsBucketKmsKeyArn
+  LogsBucketKmsKeyArn:
+    Value: !Ref LogsBucketKmsKeyArn
   LogsExporterRoleArn:
     Value: !Ref LogsExporterRoleArn
   LogsExporterPolicyArn:
@@ -1292,3 +1317,17 @@ Outputs:
     Value: !Ref F24DeliveryPushUser
   F24PaperChannelUser:
     Value: !Ref F24PaperChannelUser
+  
+  # Data Monitoring pass-through params
+  DynamoDbExportTableNames:
+    Value: !Ref DynamoDbExportTableNames
+  DynamoDbExportPrefix:
+    Value: !Ref DynamoDbExportPrefix
+  ConfinfoDynamoDbExportBucketName:
+    Value: !Ref ConfinfoDynamoDbExportBucketName
+  ParquetBucketPath:
+    Value: !Ref ParquetBucketPath
+  DataMonitoringCodebuildComputeType:
+    Value: !Ref DataMonitoringCodebuildComputeType
+  DataMonitoringIndexCronExpression:
+    Value: !Ref DataMonitoringIndexCronExpression
