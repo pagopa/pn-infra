@@ -2,8 +2,9 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: 'This template deploys the resources for the data monitoring'
 
 Parameters:  
-  ConfinfoBucketName:
+  ConfinfoDynamoDbExportBucketName:
     Type: String
+    Default: ''
     Description: Name of the confinfo bucket created for the data monitoring (leave blank in Confinfo account)
 
   PnCoreAwsAccountId:
@@ -16,7 +17,7 @@ Parameters:
     Description: parquet files s3 bucket path
     Default: 'parquet'
 
-  CodebuildComputeType:
+  DataMonitoringCodebuildComputeType:
     Type: String
     Description: Codebuild compute type (https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-compute-types.html)
     Default: BUILD_GENERAL1_LARGE
@@ -29,17 +30,12 @@ Parameters:
     Type: String
     Description: Name of the logs bucket KMS key ARN
 
-  CronExpression:
+  DataMonitoringIndexCronExpression:
     Type: String
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
     Default: '' # example: 'cron(0 9 * * ? *)'
 
-  Cmd:
-    Type: String
-    Description: Codebuild project cmd parameter
-    Default: 'index'
-
-#Dynamodb export parameters:
+  #Dynamodb export parameters:
 
   DynamoDbExportTableNames:
     Type: String
@@ -55,7 +51,7 @@ Parameters:
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
-  HasCronExpression: !Not [ !Equals [!Ref CronExpression, '' ] ]
+  HasCronExpression: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
 
 Resources:
@@ -139,16 +135,13 @@ Resources:
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
-        ComputeType: !Ref CodebuildComputeType
+        ComputeType: !Ref DataMonitoringCodebuildComputeType
         Type: LINUX_CONTAINER
         Image: "aws/codebuild/standard:7.0"
         EnvironmentVariables:
           - Name: REGION
             Type: PLAINTEXT
             Value: !Ref AWS::Region
-          - Name: CMD
-            Type: PLAINTEXT
-            Value: !Ref Cmd
           - Name: EXPORT_BUCKET_NAME
             Type: PLAINTEXT
             Value: !Ref DataMonitoringBucket
@@ -215,7 +208,7 @@ Resources:
                 - "s3:Get*"
                 - "s3:List*"
               Resource: 
-              - !Sub "arn:aws:s3:::${ConfinfoBucketName}/${ParquetBucketPath}/*"       
+              - !Sub "arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}/${ParquetBucketPath}/*"       
             - !Ref AWS::NoValue
           # Allow the use of encryption key
           - Effect: Allow
@@ -256,7 +249,7 @@ Resources:
     Properties:
       Description: "pn-data-monitoring-codebuild-scheduled-rule"
       # every day at 9 am
-      ScheduleExpression: !Ref CronExpression 
+      ScheduleExpression: !Ref DataMonitoringIndexCronExpression 
       State: "ENABLED"
       RoleArn: !GetAtt "DataMonitoringScheduleRole.Arn"
       Targets: 
