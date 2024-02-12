@@ -122,7 +122,8 @@ Resources:
                   ./cicd_runner.sh \
                       --account-type $ACCOUNT_TYPE \
                       --env-type $ENV_TYPE \
-                      --export-bucket-name $EXPORT_BUCKET_NAME
+                      --export-bucket-name $EXPORT_BUCKET_NAME \
+                      --logs-bucket-name $LOGS_BUCKET_NAME
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
@@ -136,6 +137,9 @@ Resources:
           - Name: EXPORT_BUCKET_NAME
             Type: PLAINTEXT
             Value: !Ref DataMonitoringBucket
+          - Name: LOGS_BUCKET_NAME
+            Type: PLAINTEXT
+            Value: !Ref LogsBucketName
           - Name: ACCOUNT_TYPE
             Type: PLAINTEXT
             Value: !If [IsCoreAccount, "core", "confinfo"]
