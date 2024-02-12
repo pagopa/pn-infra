@@ -114,29 +114,15 @@ Resources:
             pre_build:
               commands:
                 - git clone https://github.com/pagopa/pn-troubleshooting.git
-                - ( cd pn-troubleshooting && git checkout ec_metadata_extract_v0_1 )
+                - ( cd pn-troubleshooting && git checkout ${SCRIPTS_VERSION} )
             build:
               commands:
                 - |
-                  if ([ $ACCOUNT_TYPE == "confinfo" ]); then
-                    cd pn-troubleshooting/bi_or_not_bi__ec_metadata
-                    COMMANDLINE=" --dynexp-indexed-data-folder ./out/indexing/dynExp \
-                      dynamoExportsIndexing \
-                      --aws-bucket ${EXPORT_BUCKET_NAME} \
-                      --aws-full-export-date 2024-1-14 \
-                      --aws-dynexport-folder-prefix %s/incremental2024/ \
-                      --result-upload-url s3://${EXPORT_BUCKET_NAME}/parquet/ \
-                      pn-EcRichiesteMetadati 2024-1-1 3035-1-1 "
-
-                    export MAVEN_OPTS="-Xmx8g \
-                      --add-opens java.base/sun.nio.ch=ALL-UNNAMED \
-                      --add-opens java.base/sun.security.action=ALL-UNNAMED \
-                      --add-opens java.base/sun.util.calendar=ALL-UNNAMED"
-
-                    ARGUMENTS=$( echo $COMMANDLINE | sed -e 's/  */,/g' )
-                    ./mvnw compile
-                    ./mvnw exec:java "-Dexec.arguments=${ARGUMENTS}"
-                  fi
+                  cd pn-troubleshooting/bi_or_not_bi__ec_metadata
+                  ./cicd_runner.sh \
+                      --account-type $ACCOUNT_TYPE \
+                      --env-type $ENV_TYPE \
+                      --export-bucket-name $EXPORT_BUCKET_NAME
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
@@ -156,6 +142,9 @@ Resources:
           - Name: ENV_TYPE
             Type: PLAINTEXT
             Value: !Ref EnvironmentType
+          - Name: SCRIPTS_VERSION
+            Type: PLAINTEXT
+            Value: ec_metadata_extract_v0_1
 
   DataMonitoringCodeBuildServiceRole:
     Type: AWS::IAM::Role
