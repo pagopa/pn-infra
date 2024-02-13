@@ -214,6 +214,17 @@ Resources:
               Resource: 
               - !Sub "arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}/${ParquetBucketPath}/*"       
             - !Ref AWS::NoValue
+          # Accessi in lettura ai log di pn-delivery
+          - Fn::If:
+            - IsCoreAccount
+            - Effect: Allow
+              Action:
+                - "logs:StartQuery"
+                - "logs:StopQuery"
+                - "logs:GetQueryResults"
+              Resource: 
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/pn-delivery:*"
+            - !Ref AWS::NoValue
           # Allow the use of encryption key
           - Effect: Allow
             Action:
