@@ -28,7 +28,8 @@ Parameters:
       - BACKOFFICE
       - PNPG
       - CN_BE
-    Description: B2B, WEB, BACKOFFICE, PNPG or IO usage. Used from other back-end system or used from a browser
+      - RADD
+    Description: B2B, WEB, BACKOFFICE, RADD, PNPG or IO usage. Used from other back-end system or used from a browser
 
   ServiceApiPath:
     Type: String
@@ -106,7 +107,9 @@ Conditions:
   IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
   IsIO: !Equals [ !Ref IntendedUsage, 'IO' ]
   IsBackoffice: !Equals [ !Ref IntendedUsage, 'BACKOFFICE' ]
+  IsRADD: !Equals [ !Ref IntendedUsage, 'RADD' ]
   IsCNBE: !Equals [ !Ref IntendedUsage, 'CN_BE' ]
+  IsRADDorB2B: !Or [ !Condition IsRADD, !Condition IsB2B ]
   SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
   HasOpenApiBucketName: !Not [ !Equals [ !Ref OpenApiBucketName, '' ] ]
   HasOpenApiBucketKey: !Not [ !Equals [ !Ref OpenApiBucketKey, '' ] ]
@@ -141,7 +144,7 @@ Resources:
       FailOnWarnings: true
       Mode: overwrite
       DisableExecuteApiEndpoint: true      
-      ApiKeySourceType: !If [ IsB2B, AUTHORIZER, HEADER ]
+      ApiKeySourceType: !If [ IsRADDorB2B, AUTHORIZER, HEADER ]
       Body:
         Fn::If:
           - IsIncludeMode
@@ -194,7 +197,7 @@ Resources:
         DnsName: !Ref DnsName
         ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
 
-    # B2B Authorizer
+  # B2B Authorizer
   ApiKeyLambdaPermission:
     Condition: IsB2B
     Type: AWS::Lambda::Permission
@@ -212,6 +215,17 @@ Resources:
     DependsOn: PublicRestApiOpenapi
     Properties:
       FunctionName: !Sub '${ProjectName}-jwtAuthorizerLambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
+
+  # B2B Authorizer
+  B2BLambdaPermission:
+    Condition: IsRADD
+    Type: AWS::Lambda::Permission
+    DependsOn: PublicRestApiOpenapi
+    Properties:
+      FunctionName: !Sub '${ProjectName}-b2bAuthorizerLambda'
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
