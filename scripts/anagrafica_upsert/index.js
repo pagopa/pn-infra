@@ -187,13 +187,17 @@ const syncExecutor = async(lines, cfg) => {
   await validateExecutor(lines, cfg)
 
   const elements = lines.map(JSON.parse);
-  const batchDimension = Number(cfg.batchDimension)
-  for (i = 0; i < elements.length; i = i+batchDimension){
-    const batch = elements.slice(i, i+batchDimension);
-    console.log("N° " + ((i+batchDimension > elements.length) ? elements.length : i+batchDimension) + " elements imported!")
-    await awsClient._batchWriteItems(cfg.tableName, batch);
+  if(cfg.tableConfig.SyncMode==='UPDATE') {
+    await awsClient._batchWriteItemsWithUpdate(cfg.tableName, cfg.tableConfig, elements);
+    console.log('N° ' + elements.length + ' elements upserted!')
+  } else {
+    const batchDimension = Number(cfg.batchDimension)
+    for (i = 0; i < elements.length; i = i+batchDimension){
+      const batch = elements.slice(i, i+batchDimension);
+      console.log("N° " + ((i+batchDimension > elements.length) ? elements.length : i+batchDimension) + " elements imported!")
+      await awsClient._batchWriteItems(cfg.tableName, batch);
+    }
   }
-
   return {
     total: elements.length
   }
