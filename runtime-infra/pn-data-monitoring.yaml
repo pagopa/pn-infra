@@ -94,6 +94,18 @@ Resources:
                 aws:PrincipalArn: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
           - Effect: Allow
             Action:
+              - "s3:Get*"
+              - "s3:List*"              
+            Resource: 
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"   
+            Principal:
+              AWS: 
+                - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
+            Condition:
+              ArnEquals:
+                aws:PrincipalArn: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-ec2-service-role"                
+          - Effect: Allow
+            Action:
               - "s3:PutObject"
             Resource: 
               - !Sub "arn:aws:s3:::${DataMonitoringBucket}/${ParquetBucketPath}/*"
@@ -103,6 +115,17 @@ Resources:
             Condition:
               ArnEquals:
                 aws:PrincipalArn: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
+          - Effect: Allow
+            Action:
+              - "s3:PutObject"
+            Resource: 
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/${ParquetBucketPath}/*"
+            Principal:
+              AWS: 
+                - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
+            Condition:
+              ArnEquals:
+                aws:PrincipalArn: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-ec2-service-role"                
 
   DataMonitoringCodebuildProject:
     Type: 'AWS::CodeBuild::Project'
