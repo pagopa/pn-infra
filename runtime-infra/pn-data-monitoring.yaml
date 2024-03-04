@@ -180,6 +180,7 @@ Resources:
 
   EC2DataMonitoringServiceRole:
     Type: AWS::IAM::Role
+    Condition: IsCoreAccount
     Properties:
       RoleName: pn-data-monitoring-ec2-service-role
       AssumeRolePolicyDocument:
@@ -196,6 +197,7 @@ Resources:
 
   DataMonitoringEC2ManagedPolicy:
     Type: AWS::IAM::ManagedPolicy
+    Condition: IsCoreAccount
     Properties:
       ManagedPolicyName: pn-data-monitoring-ec2-managed-policy
       Roles:
