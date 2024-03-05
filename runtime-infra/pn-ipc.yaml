@@ -338,6 +338,10 @@ Parameters:
     Type: String
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
 
+  DataMonitoringScriptVersion:
+    Type: String
+    Description: 'Version of the script biOrNotBiEcMetadata'
+
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
 
@@ -1331,3 +1335,5 @@ Outputs:
     Value: !Ref DataMonitoringCodebuildComputeType
   DataMonitoringIndexCronExpression:
     Value: !Ref DataMonitoringIndexCronExpression
+  DataMonitoringScriptVersion:
+    Value: !Ref DataMonitoringScriptVersion
