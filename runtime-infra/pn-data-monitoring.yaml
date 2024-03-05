@@ -54,7 +54,7 @@ Parameters:
   DataMonitoringScriptVersion:
     Type: String
     Description: Version of the bi_or_not_bi__ec_metadata scripts
-    Default: ec_metadata_extract_v0_1
+    Default: ec_metadata_extract_v0_2
 
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
@@ -85,25 +85,18 @@ Resources:
               - "s3:Get*"
               - "s3:List*"              
             Resource: 
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
               - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"   
             Principal:
               AWS: 
                 - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
             Condition:
-              ArnEquals:
-                aws:PrincipalArn: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
-          - Effect: Allow
-            Action:
-              - "s3:Get*"
-              - "s3:List*"              
-            Resource: 
-              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"   
-            Principal:
-              AWS: 
-                - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
-            Condition:
-              ArnEquals:
-                aws:PrincipalArn: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-ec2-service-role"                
+              ArnLike:
+                aws:PrincipalArn: 
+                  - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
+                  - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-ec2-service-role"
+                  - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:instance-profile/pn-data-monitoring-ec2-instance-profile"
+                  - !Sub "arn:${AWS::Partition}:sts::${PnCoreAwsAccountId}:assumed-role/pn-data-monitoring-ec2-service-role/*"
           - Effect: Allow
             Action:
               - "s3:PutObject"
@@ -113,20 +106,13 @@ Resources:
               AWS: 
                 - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
             Condition:
-              ArnEquals:
-                aws:PrincipalArn: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
-          - Effect: Allow
-            Action:
-              - "s3:PutObject"
-            Resource: 
-              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/${ParquetBucketPath}/*"
-            Principal:
-              AWS: 
-                - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
-            Condition:
-              ArnEquals:
-                aws:PrincipalArn: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-ec2-service-role"                
-
+              ArnLike:
+                aws:PrincipalArn:
+                  - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
+                  - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-ec2-service-role"
+                  - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:instance-profile/pn-data-monitoring-ec2-instance-profile"
+                  - !Sub "arn:${AWS::Partition}:sts::${PnCoreAwsAccountId}:assumed-role/pn-data-monitoring-ec2-service-role/*"
+  
   DataMonitoringCodebuildProject:
     Type: 'AWS::CodeBuild::Project'
     Properties:
@@ -201,6 +187,15 @@ Resources:
             Action:
               - "sts:AssumeRole" 
 
+  EC2DataMonitoringInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Condition: IsCoreAccount
+    Properties:
+      InstanceProfileName: pn-data-monitoring-ec2-instance-profile
+      Path: "/"
+      Roles:
+        - !Ref EC2DataMonitoringServiceRole
+  
   EC2DataMonitoringServiceRole:
     Type: AWS::IAM::Role
     Condition: IsCoreAccount
@@ -252,7 +247,8 @@ Resources:
                 - "s3:Get*"
                 - "s3:List*"
               Resource: 
-              - !Sub "arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}/${ParquetBucketPath}/*"       
+              - !Sub "arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}"
+              - !Sub "arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}/${ParquetBucketPath}/*"
             - !Ref AWS::NoValue
           # Accessi in lettura ai log di pn-delivery
           - Fn::If:
