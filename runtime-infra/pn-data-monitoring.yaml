@@ -33,7 +33,7 @@ Parameters:
   DataMonitoringIndexCronExpression:
     Type: String
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
-    Default: '' # example: 'cron(0 9 * * ? *)'
+    Default: 'cron(30 6 * * ? *)'
 
   #Dynamodb export parameters:
 
@@ -50,6 +50,11 @@ Parameters:
   EnvironmentType:
     Type: String
     Description: Environment type (e.g. dev, test, prod)
+
+  DataMonitoringScriptVersion:
+    Type: String
+    Description: Version of the bi_or_not_bi__ec_metadata scripts
+    Default: ec_metadata_extract_v0_2
 
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
@@ -80,13 +85,18 @@ Resources:
               - "s3:Get*"
               - "s3:List*"              
             Resource: 
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
               - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"   
             Principal:
               AWS: 
                 - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
             Condition:
-              ArnEquals:
-                aws:PrincipalArn: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
+              ArnLike:
+                aws:PrincipalArn: 
+                  - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
+                  - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-ec2-service-role"
+                  - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:instance-profile/pn-data-monitoring-ec2-instance-profile"
+                  - !Sub "arn:${AWS::Partition}:sts::${PnCoreAwsAccountId}:assumed-role/pn-data-monitoring-ec2-service-role/*"
           - Effect: Allow
             Action:
               - "s3:PutObject"
@@ -96,9 +106,13 @@ Resources:
               AWS: 
                 - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
             Condition:
-              ArnEquals:
-                aws:PrincipalArn: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
-
+              ArnLike:
+                aws:PrincipalArn:
+                  - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
+                  - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-ec2-service-role"
+                  - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:instance-profile/pn-data-monitoring-ec2-instance-profile"
+                  - !Sub "arn:${AWS::Partition}:sts::${PnCoreAwsAccountId}:assumed-role/pn-data-monitoring-ec2-service-role/*"
+  
   DataMonitoringCodebuildProject:
     Type: 'AWS::CodeBuild::Project'
     Properties:
@@ -148,7 +162,7 @@ Resources:
             Value: !Ref EnvironmentType
           - Name: SCRIPTS_VERSION
             Type: PLAINTEXT
-            Value: ec_metadata_extract_v0_1
+            Value: !Ref DataMonitoringScriptVersion
 
   DataMonitoringCodeBuildServiceRole:
     Type: AWS::IAM::Role
@@ -172,6 +186,91 @@ Resources:
                 aws:PrincipalArn: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/pn-data-monitoring-codebuild-role
             Action:
               - "sts:AssumeRole" 
+
+  EC2DataMonitoringInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Condition: IsCoreAccount
+    Properties:
+      InstanceProfileName: pn-data-monitoring-ec2-instance-profile
+      Path: "/"
+      Roles:
+        - !Ref EC2DataMonitoringServiceRole
+  
+  EC2DataMonitoringServiceRole:
+    Type: AWS::IAM::Role
+    Condition: IsCoreAccount
+    Properties:
+      RoleName: pn-data-monitoring-ec2-service-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  DataMonitoringEC2ManagedPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Condition: IsCoreAccount
+    Properties:
+      ManagedPolicyName: pn-data-monitoring-ec2-managed-policy
+      Roles:
+        - !Ref EC2DataMonitoringServiceRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # lettura su tutto il bucket dei log e parquet
+          - Effect: Allow
+            Action:
+              - "s3:Get*"
+              - "s3:List*"
+            Resource: 
+              - !Sub "arn:aws:s3:::${LogsBucketName}"
+              - !Sub "arn:aws:s3:::${LogsBucketName}/*"
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
+          # Accesso in scrittura al bucket dump dell'account corrente nella cartella parquet
+          - Effect: Allow
+            Action:
+              - "s3:PutObject"
+            Resource: 
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/${ParquetBucketPath}/*"       
+          # Accessi in lettura al bucket dump dell'account confinfo nella cartella parquet
+          - Fn::If:
+            - IsCoreAccount
+            - Effect: Allow
+              Action:
+                - "s3:Get*"
+                - "s3:List*"
+              Resource: 
+              - !Sub "arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}"
+              - !Sub "arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}/${ParquetBucketPath}/*"
+            - !Ref AWS::NoValue
+          # Accessi in lettura ai log di pn-delivery
+          - Fn::If:
+            - IsCoreAccount
+            - Effect: Allow
+              Action:
+                - "logs:StartQuery"
+                - "logs:StopQuery"
+                - "logs:GetQueryResults"
+              Resource: 
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/pn-delivery:*"
+            - !Ref AWS::NoValue
+          # Allow the use of encryption key
+          - Effect: Allow
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+            Resource: 
+              - !Sub "${LogsBucketKmsKeyArn}"
 
   DataMonitoringCodebuildManagedPolicy:
     Type: AWS::IAM::ManagedPolicy
