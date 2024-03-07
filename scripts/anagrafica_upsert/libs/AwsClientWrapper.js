@@ -1,6 +1,6 @@
 
 const { fromIni } = require("@aws-sdk/credential-provider-ini");
-const { DynamoDBClient, BatchWriteItemCommand, ScanCommand } = require("@aws-sdk/client-dynamodb");
+const { DynamoDBClient, BatchWriteItemCommand, UpdateItemCommand, ScanCommand } = require("@aws-sdk/client-dynamodb");
 
 function awsClientCfg( profile ) {
   const self = this;
@@ -57,6 +57,47 @@ class AwsClientsWrapper {
       process.exit(1)
     }
     return response;
+  }
+
+  async _batchWriteItemsWithUpdate(tableName, tableConfig, items) {
+
+    const keys = tableConfig.Keys
+
+    for(let i=0; i<items.length; i++){  
+      // update Item
+      const item = items[i]
+      const Key = {}
+      let updateExpressionAccordingToItemProperties = ''
+      let expressionAttributeNames = {}
+      let expressionAttributeValues = {}
+      for (const key in item) {
+        if (keys.indexOf(key)>=0) {
+          Key[key] = item[key]
+          continue;
+        }
+        updateExpressionAccordingToItemProperties += `#${key} = :${key},`
+        expressionAttributeNames[`#${key}`] = key
+        expressionAttributeValues[`:${key}`] = item[key]
+      }
+      
+      const input = {
+        TableName: tableName,
+        Key: Key,
+        UpdateExpression: "SET "+updateExpressionAccordingToItemProperties.slice(0, -1),
+        ExpressionAttributeNames: expressionAttributeNames,
+        ExpressionAttributeValues: expressionAttributeValues,
+        ReturnValues: "ALL_NEW"
+      };
+
+      try {
+        const command = new UpdateItemCommand(input);
+        const response = await this._dynamoClient.send(command);
+      }
+      catch (error) {
+        console.error("Problem during UpdateItemCommand cause=", error)
+        process.exit(1)
+      }
+    }
   }
 }
 
