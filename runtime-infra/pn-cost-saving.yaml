@@ -2,23 +2,23 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: Template for reducing costs on PN
 
 Parameters:  
-  StopEc2FuctionTagName:
+  StopEc2FunctionTagName:
     Type: String
     Default: 'tostop'
     Description: Name of EC2 Tag that will be stopped
 
-  StopEc2FuctionTagValue:
+  StopEc2FunctionTagValue:
     Type: String
     Default: 'true'
     Description: Value of EC2 Tag that will be stopped
 
-  StopEc2FuctionTagNameCronExpression:
+  StopEc2FunctionTagNameCronExpression:
     Type: String
     Default: 'cron(0 22 * * ? *)'
     Description: Cron expression when ec2 stop
 
 Resources:
-  StopEc2Fuction:
+  StopEc2Function:
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.12
@@ -50,16 +50,16 @@ Resources:
       Environment:
         Variables:
           TagName:
-            Ref: StopEc2FuctionTagName
+            Ref: StopEc2FunctionTagName
           TagValue:
-            Ref: StopEc2FuctionTagValue
+            Ref: StopEc2FunctionTagValue
 
       Role:
         Fn::GetAtt:
-          - StopEc2FuctionRole
+          - StopEc2FunctionRole
           - Arn
 
-  StopEc2FuctionRole:
+  StopEc2FunctionRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -70,7 +70,7 @@ Resources:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: StopEc2FuctionPolicy
+        - PolicyName: StopEc2FunctionPolicy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -85,27 +85,27 @@ Resources:
                   - "logs:PutLogEvents"
                 Resource: arn:aws:logs:*:*:*
 
-  StopEc2FuctionSchedule:
+  StopEc2FunctionSchedule:
     Type: AWS::Events::Rule
     Properties:
-      ScheduleExpression: !Ref StopEc2FuctionTagNameCronExpression
+      ScheduleExpression: !Ref StopEc2FunctionTagNameCronExpression
       State: ENABLED
       Targets:
-        - Arn: !GetAtt StopEc2Fuction.Arn
-          Id: StopEc2Fuction
+        - Arn: !GetAtt StopEc2Function.Arn
+          Id: StopEc2Function
 
-  StopEc2FuctionInvokePermission:
+  StopEc2FunctionInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref StopEc2Fuction
+      FunctionName: !Ref StopEc2Function
       Principal: events.amazonaws.com
-      SourceArn: !GetAtt StopEc2FuctionSchedule.Arn
+      SourceArn: !GetAtt StopEc2FunctionSchedule.Arn
 
-  StopEc2FuctionLogGroup:
+  StopEc2FunctionLogGroup:
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
     UpdateReplacePolicy : Delete
     Properties:
-      LogGroupName: !Sub "/aws/lambda/${StopEc2Fuction}"
+      LogGroupName: !Sub "/aws/lambda/${StopEc2Function}"
       RetentionInDays: 3
