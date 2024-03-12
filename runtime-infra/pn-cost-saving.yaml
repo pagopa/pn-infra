@@ -1,0 +1,111 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Template for reducing costs on PN
+
+Parameters:  
+  StopEc2FunctionTagName:
+    Type: String
+    Default: 'tostop'
+    Description: Name of EC2 Tag that will be stopped
+
+  StopEc2FunctionTagValue:
+    Type: String
+    Default: 'true'
+    Description: Value of EC2 Tag that will be stopped
+
+  StopEc2FunctionTagNameCronExpression:
+    Type: String
+    Default: 'cron(0 22 * * ? *)'
+    Description: Cron expression when ec2 stop
+
+Resources:
+  StopEc2Function:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      FunctionName: lambda-ec2stop
+      Code:
+        ZipFile: |
+          import boto3
+          import os
+
+          ec2 = boto3.resource('ec2')
+
+          def lambda_handler(event, context):
+
+              tag_name = os.environ['TagName']
+              tag_value = os.environ['TagValue']
+
+              filter = [{
+                  'Name': 'tag:' + tag_name,
+                  'Values': ['tag_value']
+              }]
+
+              instances = ec2.instances.filter(Filters=filter)
+              for instance in instances:
+                instance.stop()
+                  
+              return 'Success'
+
+      Environment:
+        Variables:
+          TagName:
+            Ref: StopEc2FunctionTagName
+          TagValue:
+            Ref: StopEc2FunctionTagValue
+
+      Role:
+        Fn::GetAtt:
+          - StopEc2FunctionRole
+          - Arn
+
+  StopEc2FunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: StopEc2FunctionPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                  - ec2:StopInstances
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: arn:aws:logs:*:*:*
+
+  StopEc2FunctionSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: !Ref StopEc2FunctionTagNameCronExpression
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StopEc2Function.Arn
+          Id: StopEc2Function
+
+  StopEc2FunctionInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref StopEc2Function
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StopEc2FunctionSchedule.Arn
+
+  StopEc2FunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy : Delete
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${StopEc2Function}"
+      RetentionInDays: 3
