@@ -1,0 +1,33 @@
+{
+    "default": {
+        "CreatedBy"   : "Cloudformation",
+        "Environment" : "${Environment}",
+        "Owner"       : "Piattaforma Notifiche",
+        "Source"      : "https://github.com/pagopa/pn-infra",
+        "CostCenter"  : "TS610 PIATTAFORMA NOTIFICHE"
+    },
+    "dynamodb": {
+        "default": {
+            "InfraFeature": "Storage",
+            "Microservice": "${tableName}"
+        }
+    },
+    "sqs": {
+        "default": {
+            "pnInfraFeature": "Storage",
+            "pnMicroservice": "${queueName}"
+        }
+    },
+    "s3": {
+        "default": {
+            "InfraFeature": "Storage",
+            "Microservice": "${bucketName}"
+        }
+    },
+    "lambda": {
+        "default": {
+            "InfraFeature": "Lambda",
+            "Microservice": "${lambdaName}"
+        }
+    }
+}
