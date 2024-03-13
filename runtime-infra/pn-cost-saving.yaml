@@ -14,7 +14,7 @@ Parameters:
 
   StopEc2FunctionTagNameCronExpression:
     Type: String
-    Default: 'cron(0 22 * * ? *)'
+    Default: 'cron(0 20 * * ? *)'
     Description: Cron expression when ec2 stop
 
 Resources:
@@ -38,20 +38,24 @@ Resources:
 
               filter = [{
                   'Name': 'tag:' + tag_name,
-                  'Values': ['tag_value']
+                  'Values': [tag_value]
               }]
 
-              instances = ec2.instances.filter(Filters=filter)
-              for instance in instances:
-                instance.stop()
-                  
-              return 'Success'
+              # Print EC2 instances that match the filter criteria (without actually stopping them)
+              for instance in ec2.instances.filter(Filters=filter):
+                  instance_id = instance.id
+                  instance_type = instance.instance_type
+                  instance_state = instance.state['Name']
+                  instance.stop()
+                  print(f"EC2 Instance that will be stopped: {instance_id} ({instance_type}) - State: {instance_state}")
+
+              return 'Successfully identified EC2 instances and stopping it'  # Informative return message
 
       Environment:
         Variables:
-          TagName:
+          StopEc2FunctionTagName:
             Ref: StopEc2FunctionTagName
-          TagValue:
+          StopEc2FunctionTagValue:
             Ref: StopEc2FunctionTagValue
 
       Role:
