@@ -56,9 +56,15 @@ Parameters:
     Description: Version of the bi_or_not_bi__ec_metadata scripts
     Default: ec_metadata_extract_v0_2
 
+  DataMonitoringDataLakeAccountId:
+    Type: String
+    Description: Datalake AWS Account ID
+    Default: ''
+
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
+  IsDatalakeAccount: !Equals [!Ref DataMonitoringDataLakeAccountId, '' ]
   HasCronExpression: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
 
@@ -112,6 +118,43 @@ Resources:
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-ec2-service-role"
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:instance-profile/pn-data-monitoring-ec2-instance-profile"
                   - !Sub "arn:${AWS::Partition}:sts::${PnCoreAwsAccountId}:assumed-role/pn-data-monitoring-ec2-service-role/*"
+          - Effect: Allow
+            Action:
+              - "s3:Get*"
+              - "s3:List*"
+            Resource:
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
+            Principal:
+              AWS:
+                - !Sub "arn:${AWS::Partition}:iam::${DataMonitoringDataLakeAccountId1}:root"
+            Condition: IsDatalakeAccount
+              ArnLike:
+                aws:PrincipalArn:
+                  - !Sub "arn:${AWS::Partition}:iam::${DataMonitoringDataLakeAccountId1}:role/pagopa-pn"
+
+  DataMonitoringBucketPolicyCore:
+    Condition: IsCoreAccount
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DataMonitoringBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "s3:Get*"
+              - "s3:List*"
+            Resource:
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
+            Principal:
+              AWS:
+                - !Sub "arn:${AWS::Partition}:iam::${DataMonitoringDataLakeAccountId1}:root"
+            Condition: IsDatalakeAccount
+              ArnLike:
+                aws:PrincipalArn:
+                  - !Sub "arn:${AWS::Partition}:iam::${DataMonitoringDataLakeAccountId1}:role/pagopa-pn"
   
   DataMonitoringCodebuildProject:
     Type: 'AWS::CodeBuild::Project'
