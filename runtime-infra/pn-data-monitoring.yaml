@@ -69,7 +69,7 @@ Parameters:
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
-  IsDatalakeAccount: !Equals [!Ref DataLakeAccountId, '' ]
+  IsDatalakeAccount: !Not [ !Equals [!Ref DataLakeAccountId, '' ] ]
   IsDatalakeAccountInCore: !And [ !Condition IsDatalakeAccount, !Condition IsCoreAccount ]
   HasCronExpression: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
