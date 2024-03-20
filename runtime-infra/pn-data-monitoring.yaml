@@ -56,9 +56,21 @@ Parameters:
     Description: Version of the bi_or_not_bi__ec_metadata scripts
     Default: ec_metadata_extract_v0_2
 
+  DataLakeAccountId:
+    Type: String
+    Description: Datalake AWS Account ID
+    Default: ''
+  
+  DataLakeRoleName:
+    Type: String
+    Description: Datalake Role Name
+    Default: 'pagopa-pn'
+
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
+  IsDatalakeAccount: !Not [ !Equals [!Ref DataLakeAccountId, '' ] ]
+  IsDatalakeAccountInCore: !And [ !Condition IsDatalakeAccount, !Condition IsCoreAccount ]
   HasCronExpression: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
 
@@ -112,6 +124,46 @@ Resources:
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-ec2-service-role"
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:instance-profile/pn-data-monitoring-ec2-instance-profile"
                   - !Sub "arn:${AWS::Partition}:sts::${PnCoreAwsAccountId}:assumed-role/pn-data-monitoring-ec2-service-role/*"
+          - Fn::If:
+            - IsDatalakeAccount
+            - Effect: Allow
+              Action:
+                - "s3:Get*"
+                - "s3:List*"
+              Resource:
+                - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
+                - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
+              Principal:
+                AWS:
+                  - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:root"
+              Condition:
+                ArnLike:
+                  aws:PrincipalArn:
+                    - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:role/${DataLakeRoleName}"
+            - !Ref AWS::NoValue
+
+  DataMonitoringBucketPolicyCore:
+    Condition: IsDatalakeAccountInCore
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DataMonitoringBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "s3:Get*"
+              - "s3:List*"
+            Resource:
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
+            Principal:
+              AWS:
+                - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:root"
+            Condition:
+              ArnLike:
+                aws:PrincipalArn:
+                  - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:role/${DataLakeRoleName}"
   
   DataMonitoringCodebuildProject:
     Type: 'AWS::CodeBuild::Project'
