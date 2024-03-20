@@ -60,6 +60,11 @@ Parameters:
     Type: String
     Description: Datalake AWS Account ID
     Default: ''
+  
+  DataLakeRoleName:
+    Type: String
+    Description: Datalake Role Name
+    Default: 'pagopa-pn'
 
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
@@ -134,7 +139,7 @@ Resources:
               Condition:
                 ArnLike:
                   aws:PrincipalArn:
-                    - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:role/pagopa-pn"
+                    - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:role/${DataLakeRoleName}"
             - !Ref AWS::NoValue
 
   DataMonitoringBucketPolicyCore:
@@ -158,7 +163,7 @@ Resources:
             Condition:
               ArnLike:
                 aws:PrincipalArn:
-                  - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:role/pagopa-pn"
+                  - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:role/${DataLakeRoleName}"
   
   DataMonitoringCodebuildProject:
     Type: 'AWS::CodeBuild::Project'
