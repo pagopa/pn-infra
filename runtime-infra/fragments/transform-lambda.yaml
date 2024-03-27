@@ -1,0 +1,182 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+
+  # Lambda Context transformation
+  LambdaContextTransformExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: LogsUpdateDeplymentTransform
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/AddLambdaContextTransform'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListObjects
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/functions/*'
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}'
+
+
+  LambdaContextTransformFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${LambdaContextTransformFunction}"
+      RetentionInDays: 14
+
+  LambdaContextTransformFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: AddLambdaContextTransform
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import logging
+          import os
+
+          log = logging.getLogger()
+          log.setLevel(logging.INFO)
+
+          def read_config_from_s3(bucket, key):
+              s3 = boto3.client('s3')
+              try:
+                response = s3.get_object(Bucket=bucket, Key=key)
+                return json.loads(response['Body'].read().decode('utf-8'))
+              except Exception as e:
+                log.error('Failed to read config from S3: ' + str(e))
+                return {}
+
+          def prepare_cfn_parameters(parameters):
+            cfn_parameters = {}
+            for key, value in parameters.items():
+              cfn_body = {
+                'Type': value['Type']
+              }
+              if 'Default' in value:
+                cfn_body['Default'] = value['Default']                
+              if 'Description' in value:
+                cfn_body['Description'] = value['Description']
+
+              cfn_parameters[key] = cfn_body
+            return cfn_parameters
+
+          def prepare_cfn_conditions(conditions):
+            cfn_conditions = {}
+            for key, value in conditions.items():
+              cfn_body = {
+              }
+              if value === True:
+                cfn_body['Fn::Equals'] = ['true', 'true']
+              else:
+                cfn_body['Fn::Equals'] = ['true', 'false']
+
+              cfn_conditions[key] = cfn_body
+            return cfn_conditions
+
+          def process_template(event, lambda_config):
+            """
+            Add condition
+            """
+            fragment = event['fragment']
+
+            function_name = event['templateParameterValues']['FunctionName']
+            # read parameter FunctionEnvEntry{n} from i to 100 until no more, each param is in the form key=value
+            env_vars = {}
+            i = 1
+            while True:
+                try:
+                    env_var = event['templateParameterValues']['FunctionEnvEntry' + str(i)]
+                    key, value = env_var.split('=')
+                    env_vars[key] = value
+                    i += 1
+                except KeyError:
+                    break
+            
+            fragment['Resources']['Function']['Properties']['Environment'] = {'Variables': env_vars}
+            
+            # merge parameters from lambda_config into fragment['Parameters']
+            if 'Parameters' not in fragment:
+              fragment['Parameters'] = {}
+
+            if 'Parameters' in lambda_config:
+              additional_cfn_parameters = prepare_cfn_parameters(lambda_config['Parameters'])
+              for key, value in additional_cfn_parameters.items():
+                fragment['Parameters'][key] = value
+
+            # add condition
+            if 'Conditions' not in fragment:
+              fragment['Conditions'] = {}
+
+            if 'Conditions' in lambda_config:
+              additional_cfn_conditions = prepare_cfn_conditions(lambda_config['Conditions'])
+              for key, value in additional_cfn_conditions.items():
+                fragment['Conditions'][key] = value
+
+            return fragment
+
+          def handler(event, context):
+            """
+            Returns processed template back to CloudFormation
+            """
+            log.info(json.dumps(event))
+
+            bucket=os.environ['ConfigBucket']
+
+            log.info('Bucket: ' + bucket)
+            lambda_name=event['templateParameterValues']['FunctionName']
+            config_path='functions/'+lambda_name + '/config.json'
+            lambda_config=read_config_from_s3(bucket, config_path)
+            log.info('Lambda config: ' + json.dumps(lambda_config))
+            processed_template=process_template(event, lambda_config)
+            log.info('Processed template' + json.dumps(processed_template))
+
+            r = {}
+            r['requestId'] = event['requestId']
+            r['status'] = 'SUCCESS'
+            r['fragment'] = processed_template
+
+            return r
+
+      Handler: index.handler
+      Runtime: python3.9
+      Environment:
+        Variables:
+          ConfigBucket: !Sub "pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}"
+      Role: !GetAtt LambdaContextTransformExecutionRole.Arn
+
+  LambdaContextTransformFunctionPermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt LambdaContextTransformFunction.Arn
+      Principal: 'cloudformation.amazonaws.com'
+
+  LambdaContextTransform:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Name: 'AddLambdaContextTransform'
+      Description: Add environment variables to Lambda
+      FunctionName: !GetAtt LambdaContextTransformFunction.Arn
