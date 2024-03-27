@@ -80,6 +80,32 @@ Parameters:
     Description: ARN of the fifth layer
     Default: ''
   
+  # Tags
+  Tag1Entry:
+    Description: 1st tag in the form key=value
+    Type: String
+    Default: ''
+
+  Tag2Entry:
+    Description: 2nd tag in the form key=value
+    Type: String
+    Default: ''
+
+  Tag3Entry:
+    Description: 3rd tag in the form key=value
+    Type: String
+    Default: ''
+
+  Tag4Entry:
+    Description: 4th tag in the form key=value
+    Type: String
+    Default: ''
+  
+  Tag5Entry:
+    Description: 5th tag in the form key=value
+    Type: String
+    Default: ''
+
   # Function env environment map, maximum 15 entry
   FunctionEnvEntry1:
     Description: 1st container environment entry in the form key=value
@@ -154,6 +180,13 @@ Conditions:
   # this condition will be overridden by the transform
   LamdaInsightsEnabled: !Equals [ 'true', 'false' ]
 
+  # Tags conditions
+  Tag1Exist: !Not [ !Equals [ !Ref Tag1Entry, '' ] ]
+  Tag2Exist: !Not [ !Equals [ !Ref Tag2Entry, '' ] ]
+  Tag3Exist: !Not [ !Equals [ !Ref Tag3Entry, '' ] ]
+  Tag4Exist: !Not [ !Equals [ !Ref Tag4Entry, '' ] ]
+  Tag5Exist: !Not [ !Equals [ !Ref Tag5Entry, '' ] ]
+
 Resources:
 
   FunctionRole:
@@ -216,6 +249,33 @@ Resources:
           - HasLayer5
           - !Ref Layer5
           - !Ref "AWS::NoValue" 
+      Tags:
+        - 'Fn::If':
+          - Tag1Exist
+          - Key: !Select [ 0, !Split [ "=", !Ref Tag1Entry ] ]
+            Value: !Select [ 1, !Split [ "=", !Ref Tag1Entry ] ]
+          - !Ref "AWS::NoValue"
+        - 'Fn::If':
+          - Tag2Exist
+          - Key: !Select [ 0, !Split [ "=", !Ref Tag2Entry ] ]
+            Value: !Select [ 1, !Split [ "=", !Ref Tag2Entry ] ]
+          - !Ref "AWS::NoValue"
+        - 'Fn::If':
+          - Tag3Exist
+          - Key: !Select [ 0, !Split [ "=", !Ref Tag3Entry ] ]
+            Value: !Select [ 1, !Split [ "=", !Ref Tag3Entry ] ]
+          - !Ref "AWS::NoValue"
+        - 'Fn::If':
+          - Tag4Exist
+          - Key: !Select [ 0, !Split [ "=", !Ref Tag4Entry ] ]
+            Value: !Select [ 1, !Split [ "=", !Ref Tag4Entry ] ]
+          - !Ref "AWS::NoValue"
+        - 'Fn::If':
+          - Tag5Exist
+          - Key: !Select [ 0, !Split [ "=", !Ref Tag5Entry ] ]
+            Value: !Select [ 1, !Split [ "=", !Ref Tag5Entry ] ]
+          - !Ref "AWS::NoValue"
+
       VpcConfig:
         'Fn::If':
           - HasVpcId
