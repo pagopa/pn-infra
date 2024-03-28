@@ -1,12 +1,11 @@
-const { STSClient, GetCallerIdentityCommand } = require("@aws-sdk/client-sts"); 
-const { fromIni } = require("@aws-sdk/credential-provider-ini");
-const { CloudFormationClient, ListStackResourcesCommand } = require("@aws-sdk/client-cloudformation");
-const { ResourceGroupsTaggingAPIClient, TagResourcesCommand } = require("@aws-sdk/client-resource-groups-tagging-api");
 const { parseArgs } = require('util');
-
+const { WAIT_TIME_BETWEEN_TAGS_MS, ALL_MICROSERVICES } = require("./src/const");
+const { sleep } = require("./src/util");
+const mapping = require('./resource-tags.json');
+const { ResourceTagger } = require("./src/aws");
 
 function _checkingParameters(args, values){
-  const usage = "Usage: index.js --envName <envName> --microserviceName <microserviceName> --region <region> --accountType <accountType>"
+  const usage = "Usage: index.js --envName <envName> [--microserviceName <microserviceName>] --region <region> --accountType <accountType>"
   //CHECKING PARAMETER
   args.forEach(el => {
     if(el.mandatory && !values.values[el.name]){
@@ -32,7 +31,7 @@ function _checkingParameters(args, values){
 
 const args = [
   { name: "envName", mandatory: true, subcommand: [] },
-  { name: "microserviceName", mandatory: true, subcommand: [] },
+  { name: "microserviceName", mandatory: false, subcommand: [] },
   { name: "region", mandatory: false, subcommand: [] },
   { name: "accountType", mandatory: true, subcommand: [] },
 ]
@@ -47,7 +46,7 @@ const values = {
       type: "string", short: "m", default: undefined
     },
     region: {
-      type: "string", short: "r", default: 'eu-suoth-1'
+      type: "string", short: "r", default: 'eu-south-1'
     },
     accountType: {
       type: "string", short: "a", default: undefined
@@ -57,163 +56,109 @@ const values = {
 
 _checkingParameters(args, values)
 
-const profile = 'sso_pn-'+accountType+'-'+envName
+class Runner {
 
-const configObj = {
-    region: region,
-    credentials: fromIni({ 
-        profile: profile,
-    })
-};
+    #runningMode;
+    #cfg
 
-const cloudFormationClient = new CloudFormationClient(configObj);
-const taggingClient = new ResourceGroupsTaggingAPIClient(configObj);
-const stsClient = new STSClient(configObj);
-
-async function getAccountId(){
-    const input = {}
-    const command = new GetCallerIdentityCommand(input);
-    const response = await stsClient.send(command);
-    return response.Account;
-}
-
-async function getResources(stackName) {
-    const resources = [];
-    
-    let nextToken = null;
-    do {
-        const response = await cloudFormationClient.send(new ListStackResourcesCommand({ StackName: stackName, NextToken: nextToken }));
-        resources.push(...response.StackResourceSummaries);
-        nextToken = response.NextToken;
-    } while (nextToken);
-
-    const nestedStacks = resources.filter(r => r.ResourceType === 'AWS::CloudFormation::Stack');
-
-    if(nestedStacks.length > 0) {
-        for (const nestedStack of nestedStacks) {
-            const nestedStackResources = await getResources(nestedStack.PhysicalResourceId);
-            resources.push(...nestedStackResources);
+    constructor(cfg) {
+        this.resourceTagger = new ResourceTagger(cfg);
+        if(!cfg.microserviceName){
+            this.#runningMode = 'ALL';
         }
+        this.#cfg = cfg;
     }
 
-    return resources.filter(r => r.ResourceType !== 'AWS::CloudFormation::Stack');
-}
-
-function fromCamelCaseToDashCase(str) {
-    return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
-}
-
-function getSeparatorByResourceType(resourceType) {
-    switch(resourceType) {
-        case 'alarm':
-        case 'log-group':            
-            return ':';
-        default:
-            return '/';
-    }
-}
-
-function getResourceTypeByService(service, resourceType) {
-    if(service === 'apigateway') {
-        if(resourceType === 'RestApi') {
-            return '/restapis';
-        }
-    }
-
-    return fromCamelCaseToDashCase(resourceType);
-}
-
-function getResourceArnByCloudformationResource(resource, ctx = {}){
-    const { ResourceType, PhysicalResourceId } = resource;
-    const { Account: accountId } = ctx;
-
-    if(PhysicalResourceId.indexOf('arn:')===0) return PhysicalResourceId;
-
-    const service = ResourceType.split('::')[1].toLowerCase();
-    const resourcePart = getResourceTypeByService(service, ResourceType.split('::')[2]);
-    const resourceId = resourcePart+getSeparatorByResourceType(resourcePart)+PhysicalResourceId;
-    if(service === 's3') {
-        return `arn:aws:${service}:::${resourceId}`;
-    } else if(service === 'apigateway') {
-        return `arn:aws:${service}:${region}::${resourceId}`;
-    } else if(service === 'iam') {
-        return `arn:aws:${service}::${accountId}:${resourceId}`;
-    } else if(service==='cloudwatch' && resourcePart==='dashboard') {
-        return `arn:aws:${service}::${accountId}:${resourceId}`;
-    } else {
-        return `arn:aws:${service}:${region}:${accountId}:${resourceId}`;
-    }
-}
-
-async function tagResources(resources, tags, ctx = {}) {
-    const resourceARNs = resources.filter((r) => {
-        return ['AWS::CloudWatch::Dashboard', 'AWS::Logs::MetricFilter', 'AWS::Logs::SubscriptionFilter'].indexOf(r.ResourceType) === -1;
-    }).map(r => getResourceArnByCloudformationResource(r, ctx));
-
-    console.log('Tagging resources:', resourceARNs, 'with tags:', tags)
-    if(resourceARNs.length === 0) {
-        return;
-    }
-    const tagResourceCommand = new TagResourcesCommand({ ResourceARNList: resourceARNs, Tags: tags });
-    return await taggingClient.send(tagResourceCommand);
-}
-
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-const microsvcStackName = microserviceName+'-microsvc-'+envName;
-const storageStackName = microserviceName+'-storage-'+envName;
-
-const mapping = require('./resource-tags.json')
-
-async function tagStack(stackName, ctx = {}) {
-    return getResources(stackName).then(async (resources) => {
+    async tagStack(stackName, ctx = {}) {
+        return this.resourceTagger.getResources(stackName).then(async (resources) => {
+            
+            // group resources by resourceType
+            const resourcesByType = resources.reduce((acc, resource) => {
+                if(!acc[resource.ResourceType]) {
+                    acc[resource.ResourceType] = [];
+                }
+                acc[resource.ResourceType].push(resource);
+                return acc;
+            }, {});
         
-        // group resources by resourceType
-        const resourcesByType = resources.reduce((acc, resource) => {
-            if(!acc[resource.ResourceType]) {
-                acc[resource.ResourceType] = [];
+            // search configuration in mapping by resourceRype
+            const tagsByResourceType = Object.entries(resourcesByType).reduce((acc, [resourceType, resources]) => {
+                if(mapping[resourceType]) {
+                    acc[resourceType] = Object.assign({}, mapping[resourceType], mapping.default, { Environment: this.#cfg.envName,  Microservice: ctx.microserviceName });
+                } else {
+                    acc[resourceType] = Object.assign({}, mapping.default, { Environment: this.#cfg.envName, Microservice: ctx.microserviceName });
+                }
+                return acc;
+            }, {});
+        
+        
+            const res = Object.entries(tagsByResourceType)
+    
+            for(let i=0; i<res.length; i++){
+                const [ resourceType, tags ] = res[i];
+                console.log('applying tags ', tags, ' to resources of resources ', resourcesByType[resourceType])
+                try {
+                    await this.resourceTagger.tagResources(resourcesByType[resourceType], tags, ctx);
+                } catch(e){
+                    console.error('Error applying tags to resources of type ', resourceType, ' - ', e)
+                }
+                await sleep(WAIT_TIME_BETWEEN_TAGS_MS)
             }
-            acc[resource.ResourceType].push(resource);
-            return acc;
-        }, {});
-    
-        // search configuration in mapping by resourceRype
-        const tagsByResourceType = Object.entries(resourcesByType).reduce((acc, [resourceType, resources]) => {
-            if(mapping[resourceType]) {
-                acc[resourceType] = Object.assign({}, mapping[resourceType], mapping.default, { Environment: envName, Source: 'https://github.com/pagopa/'+microserviceName,  Microservice: microserviceName });
-            } else {
-                acc[resourceType] = Object.assign({}, mapping.default, { Environment: envName, Source: 'https://github.com/pagopa/'+microserviceName, Microservice: microserviceName });
-            }
-            return acc;
-        }, {});
-    
-    
-        const res = Object.entries(tagsByResourceType)
+        
+        }).catch((err) => {
+            console.error(err);
+        })    
+    }
 
-        for(let i=0; i<res.length; i++){
-            const [ resourceType, tags ] = res[i];
-            console.log('applying tags ', tags, ' to resources of resources ', resourcesByType[resourceType])
-            try {
-                await tagResources(resourcesByType[resourceType], tags, ctx);
-            } catch(e){
-                console.error('Error applying tags to resources of type ', resourceType, ' - ', e)
-            }
-            await sleep(5000)
+    async runSingleSvc() {
+        const accountId = await this.resourceTagger.getAccountId();
+        const ctx = {
+            Account: accountId,
+            microserviceName: this.#cfg.microserviceName
         }
+
+        const microsvcStackName = microserviceName+'-microsvc-'+envName;
+        const storageStackName = microserviceName+'-storage-'+envName;
     
-    }).catch((err) => {
-        console.error(err);
-    })    
+        await this.tagStack(microsvcStackName, ctx);
+        await this.tagStack(storageStackName, ctx);
+    }
+
+    async runAll() {
+        const accountId = await this.resourceTagger.getAccountId();
+        const ctx = {
+            Account: accountId,
+        }
+
+        // list of microservices
+        const microservices = ALL_MICROSERVICES[this.#cfg.accountType];
+    
+        for(let i=0; i<microservices.length; i++){
+            const microserviceName = microservices[i];
+            const microsvcStackName = microserviceName+'-microsvc-'+envName;
+            const storageStackName = microserviceName+'-storage-'+envName;
+
+            ctx.microserviceName = microserviceName; 
+
+            await this.tagStack(microsvcStackName, ctx);
+            await this.tagStack(storageStackName, ctx);
+        }
+    }
+
+    async run() {
+        if(this.#runningMode==='ALL'){
+            console.info('Running in ALL mode')
+            await this.runAll();
+        } else {
+            console.info('Running in SINGLE mode: '+this.#cfg.microserviceName)
+            await this.runSingleSvc();
+        }
+    }
 }
 
 async function main(){
-    const accountId = await getAccountId();
-    const ctx = {
-        Account: accountId,
-    }
-
-    await tagStack(microsvcStackName, ctx);
-    await tagStack(storageStackName, ctx);
+    const runner = new Runner({ envName, region, accountType, microserviceName });
+    await runner.run();
 }
 
 main().then(() => console.log('Tags applied successfully')).catch(err => console.error('Error applying tags:', err));
