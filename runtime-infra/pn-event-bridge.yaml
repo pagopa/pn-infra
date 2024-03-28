@@ -450,8 +450,7 @@ Resources:
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "AddressManagerOutcomeEvent" ]
-        detail: 
-          cxId: [ "pn-delivery-push" ]
+        source: [ "pn-address-manager" ]
       Targets: 
         - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
           Id: !Sub ${ProjectName}-Logger-AddressManager2DeliveryPush
