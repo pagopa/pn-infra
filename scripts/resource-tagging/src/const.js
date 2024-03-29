@@ -10,7 +10,10 @@ const IGNORED_RESOURCE_TYPES = [
     'AWS::ApiGateway::Deployment',
     'AWS::ApiGateway::Stage',
     'AWS::ApiGateway::Resource',
-    'AWS::ApiGateway::GatewayResponse'
+    'AWS::ApiGateway::GatewayResponse',
+    'AWS::Lambda::EventSourceMapping',
+    'AWS::ApiGateway::Model',
+    'AWS::ApiGateway::RequestValidator'
 ];
 
 const WAIT_TIME_BETWEEN_TAGS_MS = 5000

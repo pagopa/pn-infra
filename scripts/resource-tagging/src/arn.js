@@ -5,7 +5,8 @@ function fromCamelCaseToDashCase(str) {
 function getSeparatorByResourceType(resourceType) {
     switch(resourceType) {
         case 'alarm':
-        case 'log-group':            
+        case 'log-group': 
+        case 'function':            
             return ':';
         default:
             return '/';
