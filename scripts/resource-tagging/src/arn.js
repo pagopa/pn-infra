@@ -23,15 +23,25 @@ function getResourceTypeByService(service, resourceType) {
     return fromCamelCaseToDashCase(resourceType);
 }
 
+function getResourceName(physicalResourceId, resourceType) {
+    if(resourceType==='AWS::SQS::Queue'){
+        return physicalResourceId.split('/').pop();
+    }
+
+    return physicalResourceId;
+}
+
 function getResourceArnByCloudformationResource(resource, ctx = {}){
     const { ResourceType, PhysicalResourceId } = resource;
     const { Account: accountId } = ctx;
 
     if(PhysicalResourceId.indexOf('arn:')===0) return PhysicalResourceId;
 
+    const resourceName = getResourceName(PhysicalResourceId, ResourceType);
+
     const service = ResourceType.split('::')[1].toLowerCase();
     const resourcePart = getResourceTypeByService(service, ResourceType.split('::')[2]);
-    const resourceId = resourcePart+getSeparatorByResourceType(resourcePart)+PhysicalResourceId;
+    const resourceId = resourcePart+getSeparatorByResourceType(resourcePart)+resourceName;
     if(service === 's3') {
         return `arn:aws:${service}:::${resourceId}`;
     } else if(service === 'apigateway') {
@@ -40,6 +50,8 @@ function getResourceArnByCloudformationResource(resource, ctx = {}){
         return `arn:aws:${service}::${accountId}:${resourceId}`;
     } else if(service==='cloudwatch' && resourcePart==='dashboard') {
         return `arn:aws:${service}::${accountId}:${resourceId}`;
+    } else if(service==='sqs') {
+        return `arn:aws:${service}:${region}:${accountId}:${resourceName}`;
     } else {
         return `arn:aws:${service}:${region}:${accountId}:${resourceId}`;
     }
