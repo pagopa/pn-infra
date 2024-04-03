@@ -13,7 +13,8 @@ const IGNORED_RESOURCE_TYPES = [
     'AWS::ApiGateway::GatewayResponse',
     'AWS::Lambda::EventSourceMapping',
     'AWS::ApiGateway::Model',
-    'AWS::ApiGateway::RequestValidator'
+    'AWS::ApiGateway::RequestValidator',
+    'AWS::ApiGateway::UsagePlan'
 ];
 
 const WAIT_TIME_BETWEEN_TAGS_MS = 5000
@@ -49,8 +50,11 @@ const ALL_MICROSERVICES = {
     ]
 }
 
+RESOURCE_TAGGED_PER_API_CALL=20
+
 module.exports = {
     IGNORED_RESOURCE_TYPES,
     WAIT_TIME_BETWEEN_TAGS_MS,
-    ALL_MICROSERVICES
+    ALL_MICROSERVICES,
+    RESOURCE_TAGGED_PER_API_CALL
 };
