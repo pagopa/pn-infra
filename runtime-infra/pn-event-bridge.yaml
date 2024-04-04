@@ -236,6 +236,13 @@ Parameters:
   F24PaperChannelUser:
     Type: String
     
+  # AddressManager to RaddAlt
+  AddressManagerToRaddAltQueueARN:
+    Type: String
+
+  AddressManagerToRaddAltQueueURL:
+    Type: String
+
   OncallDlqRatio:
     Type: Number
     Default: 0.1
@@ -320,6 +327,7 @@ Resources:
                   - !Ref "NationalRegistries2PaperChannelQueueARN"
                   - !Ref "NationalRegistries2SelcPGQueueARN"
                   - !Ref "AddressManagerToDeliveryPushQueueARN"
+                  - !Ref "AddressManagerToRaddAltQueueARN"
                   - !Ref "AcmAlarmsQueueARN"
                   - !Ref "PaperChannelToServiceDeskQueueARN"
                   - !Ref "SafeStorageToF24QueueARN"
@@ -393,6 +401,7 @@ Resources:
         - !Ref "NationalRegistries2PaperChannelQueueURL"
         - !Ref "NationalRegistries2SelcPGQueueURL"  
         - !Ref "AddressManagerToDeliveryPushQueueURL"  
+        - !Ref "AddressManagerToRaddAltQueueURL"
         - !Ref "PaperChannelToServiceDeskQueueURL"
         - !Ref "F24ToPaperChannelQueueURL"
         - !Ref "F24ToDeliveryPushQueueURL"
@@ -419,7 +428,8 @@ Resources:
               - !Ref "NationalRegistries2DeliveryPushQueueARN"
               - !Ref "NationalRegistries2PaperChannelQueueARN"
               - !Ref "NationalRegistries2SelcPGQueueARN"        
-              - !Ref "AddressManagerToDeliveryPushQueueARN"   
+              - !Ref "AddressManagerToDeliveryPushQueueARN"  
+              - !Ref "AddressManagerToRaddAltQueueARN" 
               - !Ref "PaperChannelToServiceDeskQueueARN"
               - !Ref "F24ToPaperChannelQueueARN"
               - !Ref "F24ToDeliveryPushQueueARN"
@@ -461,7 +471,8 @@ Resources:
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "AddressManagerOutcomeEvent" ]
-        source: [ "pn-address-manager" ]
+        detail: 
+          cxId: [ "pn-delivery-push" ]
       Targets: 
         - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
           Id: !Sub ${ProjectName}-Logger-AddressManager2DeliveryPush
@@ -478,6 +489,37 @@ Resources:
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-AddressManager2DeliveryPush'
           Arn: !GetAtt PNAddressManagerToDeliveryPushLimiterFunction.Arn
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
+  # Send Address Manager Response to pn-radd-alt
+  PnCoreEventBusToAddressManagerToRaddAltResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route Address Manager Events to pn-radd-alt
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "AddressManagerOutcomeEvent" ]
+        detail: 
+          cxId: [ "pn-radd-alt" ]
+      Targets: 
+        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
+          Id: !Sub ${ProjectName}-Logger-AddressManager2RaddAlt
+          InputTransformer:
+            InputPathsMap:
+              "timestamp": "$.time"
+            InputTemplate: |
+              {
+                  "timestamp": <timestamp>,
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }       
+        - Id: !Sub '${ProjectName}-CoreEventBus-AddressManager2RaddAlt'
+          Arn: !Ref AddressManagerToRaddAltQueueARN
+          InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
