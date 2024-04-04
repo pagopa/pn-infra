@@ -2,8 +2,9 @@ const { STSClient, GetCallerIdentityCommand } = require("@aws-sdk/client-sts");
 const { fromIni } = require("@aws-sdk/credential-provider-ini");
 const { CloudFormationClient, ListStackResourcesCommand } = require("@aws-sdk/client-cloudformation");
 const { ResourceGroupsTaggingAPIClient, TagResourcesCommand } = require("@aws-sdk/client-resource-groups-tagging-api");
-const { IGNORED_RESOURCE_TYPES } = require("./const");
+const { IGNORED_RESOURCE_TYPES, RESOURCE_TAGGED_PER_API_CALL, WAIT_TIME_BETWEEN_TAGS_MS } = require("./const");
 const { getResourceArnByCloudformationResource } = require("./arn");
+const { sleep } = require("./util");
 
 class ResourceTagger {
 
@@ -72,16 +73,36 @@ class ResourceTagger {
         // tag nested resource
         if(nestedResources.length > 0) {
             tags.Source = 'https://github.com/pagopa/'+ctx.microserviceName
-            const tagResourceCommand = new TagResourcesCommand({ ResourceARNList: nestedResources, Tags: tags });
-            await this.taggingClient.send(tagResourceCommand);
+
+            // split in batch of RESOURCE_TAGGED_PER_API_CALL and do multiple calls
+            const chunks = [];
+            for (let i = 0; i < nestedResources.length; i += RESOURCE_TAGGED_PER_API_CALL) {
+                chunks.push(nestedResources.slice(i, i + RESOURCE_TAGGED_PER_API_CALL));
+            }
+
+            for (const chunk of chunks) {
+                const tagResourceCommand = new TagResourcesCommand({ ResourceARNList: chunk, Tags: tags });
+                await this.taggingClient.send(tagResourceCommand);
+                await sleep(WAIT_TIME_BETWEEN_TAGS_MS)
+            }
         }
 
         // tag not nested resources
         if(notNestedResources.length > 0) {
             // update tags Source with new value "pn-infra"
             tags.Source = 'https://github.com/pagopa/pn-infra'
-            const tagResourceCommand = new TagResourcesCommand({ ResourceARNList: notNestedResources, Tags: tags });
-            await this.taggingClient.send(tagResourceCommand);
+
+            // split in batch of RESOURCE_TAGGED_PER_API_CALL and do multiple calls
+            const chunks = [];
+            for (let i = 0; i < notNestedResources.length; i += RESOURCE_TAGGED_PER_API_CALL) {
+                chunks.push(notNestedResources.slice(i, i + RESOURCE_TAGGED_PER_API_CALL));
+            }
+
+            for (const chunk of chunks) {
+                const tagResourceCommand = new TagResourcesCommand({ ResourceARNList: chunk, Tags: tags });
+                await this.taggingClient.send(tagResourceCommand);
+                await sleep(WAIT_TIME_BETWEEN_TAGS_MS)
+            }
         }
 
         return true
