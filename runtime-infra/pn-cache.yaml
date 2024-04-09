@@ -118,7 +118,7 @@ Resources:
         - FromPort: 6379
           IpProtocol: tcp
           SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
-          ToPort: 6379
+          ToPort: 6380
       VpcId: !Ref VpcId
 
   RedisReplicationGroup:
@@ -236,8 +236,8 @@ Outputs:
     Description: The endpoint Address for Redis serverless
     Value:
       Fn::GetAtt:
-      - RedisServerless
-      - Endpoint.Address
+        - RedisReplicationGroup
+        - PrimaryEndPoint.Address
 
   RedisCurrentConnectionsAlarmArn:
     Value: ""
