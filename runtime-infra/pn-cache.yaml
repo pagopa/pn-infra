@@ -8,10 +8,6 @@ Parameters:
     Type: String
     Description: Name of the project
 
-  AlarmSNSTopicName:
-    Type: String
-    Description: "A name of an SNS topic where to send alarm." 
-
   NodeType:
     Type: String
     Description: Cache node type (i.e. cache.t2.micro)
@@ -28,35 +24,46 @@ Parameters:
     Type: "AWS::EC2::VPC::Id"
     Description: VPC id for the cluster
 
-  CPUUtilizationThreshold:
-    Type: Number
-    Description: The threshold percentage of CPU usage.
-    MinValue: 0
-    MaxValue: 100
-    Default: 60
-
-  EngineCPUUtilizationThreshold:
-    Type: Number
-    Description: The threshold percentage of CPU utilization of the Redis engine thread
-    MinValue: 0
-    MaxValue: 100
-    Default: 60
-
-  RedisMemoryUsedThreshold:
-    Type: Number
-    Description: The threshold percentage for the amount of memory utilized.
-    MinValue: 0
-    MaxValue: 100
-    Default: 60
-
-  CurrentConnectionsThreshold:
-    Type: Number
-    Description: "The threshold number of concurrent and active connections. (Max connections: 65000)."
-    MinValue: 0
-    MaxValue: 65000
-    Default: 60000
-
 Resources:
+
+  RedisServerless:
+    Type: AWS::ElastiCache::ServerlessCache
+    Properties:
+      ServerlessCacheName: !Sub ${ProjectName}-redis-serverless
+      Engine: redis
+      Description: Redis Serverless Cache for Logextractor
+      MajorEngineVersion: 7
+      SecurityGroupIds:
+        - !GetAtt SecurityGroup.GroupId
+      SubnetIds: !Ref VpcSubnets
+      KmsKeyId: !Ref RedisServerlessEncryptionKey
+
+  RedisServerlessEncryptionKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Redis Serverless Cache Encryption Key
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: key-default-1
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: kms:*
+            Resource: '*'
+          - Sid: Allow use of the key
+            Effect: Allow
+            Principal:
+              Service: elasticache.amazonaws.com
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+            Resource: '*'
+
   SubnetGroup:
     Type: "AWS::ElastiCache::SubnetGroup"
     Properties:
@@ -79,7 +86,7 @@ Resources:
         - FromPort: 6379
           IpProtocol: tcp
           SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
-          ToPort: 6379
+          ToPort: 6380
       VpcId: !Ref VpcId
 
   RedisReplicationGroup:
@@ -100,114 +107,26 @@ Resources:
             - SecurityGroup
             - GroupId
 
-  RedisEngineCPUAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${ProjectName}-core-redis-EngineCPUUtilization
-      AlarmDescription: "CloudWatch alarm for Redis Engine CPU Unilization."
-      AlarmActions: 
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      DatapointsToAlarm: 1
-      Dimensions: 
-        - Name: CacheClusterId
-          Value: !Ref RedisReplicationGroup
-      MetricName: EngineCPUUtilization
-      Namespace: AWS/ElastiCache
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
-      Period: 60
-      Statistic: Sum
-      Threshold: !Ref EngineCPUUtilizationThreshold
-      TreatMissingData: missing
-
-  RedisCPUUtilizationAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${ProjectName}-core-redis-CPUUtilization
-      AlarmDescription: "CloudWatch alarm for Redis  CPU Unilization."
-      AlarmActions: 
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      DatapointsToAlarm: 1
-      Dimensions: 
-        - Name: CacheClusterId
-          Value: !Ref RedisReplicationGroup
-      MetricName: CPUUtilization
-      Namespace: AWS/ElastiCache
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
-      Period: 60
-      Statistic: Sum
-      Threshold: !Ref CPUUtilizationThreshold
-      TreatMissingData: missing
-
-  RedisMemoryUtilizationAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${ProjectName}-core-redis-MemoryUsage
-      AlarmDescription: "CloudWatch alarm for Redis  Memory usage."
-      AlarmActions: 
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      DatapointsToAlarm: 1
-      Dimensions: 
-        - Name: CacheClusterId
-          Value: !Ref RedisReplicationGroup
-      MetricName: DatabaseMemoryUsagePercentage
-      Namespace: AWS/ElastiCache
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
-      Period: 60
-      Statistic: Sum
-      Threshold: !Ref RedisMemoryUsedThreshold
-      TreatMissingData: missing
-
-  RedisCurrentConnectionsAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${ProjectName}-core-redis-CurrentConnections
-      AlarmDescription: "CloudWatch alarm for concurrent and active connections."
-      AlarmActions: 
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      DatapointsToAlarm: 1
-      Dimensions: 
-        - Name: CacheClusterId
-          Value: !Ref RedisReplicationGroup
-      MetricName: CurrConnections
-      Namespace: AWS/ElastiCache
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
-      Period: 60
-      Statistic: Sum
-      Threshold: !Ref CurrentConnectionsThreshold
-      TreatMissingData: missing
-
 Outputs:
   AllowedSecurityGroupId:
     Description: The id of the security group that can access the cache cluster
     Value: !GetAtt AllowedSecurityGroup.GroupId
 
   RedisEndpoint:
-    Description: The endpoint Address for Primary Redis cluster 
+    Description: The endpoint Address for Redis serverless
     Value:
       Fn::GetAtt:
-      - RedisReplicationGroup
-      - PrimaryEndPoint.Address
+        - RedisServerless
+        - Endpoint.Address
 
   RedisCurrentConnectionsAlarmArn:
-    Value: !GetAtt RedisCurrentConnectionsAlarm.Arn
+    Value: ""
 
   RedisMemoryUtilizationAlarm:
-    Value: !GetAtt RedisMemoryUtilizationAlarm.Arn
+    Value: ""
 
   RedisCPUUtilizationAlarm:
-    Value: !GetAtt RedisCPUUtilizationAlarm.Arn
+    Value: ""
 
   RedisEngineCPUAlarm:
-    Value: !GetAtt RedisEngineCPUAlarm.Arn
+    Value: ""
