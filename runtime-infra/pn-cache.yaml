@@ -260,25 +260,25 @@ Outputs:
       Fn::If:
         - IsServerless
         - ""
-        - !Ref RedisCurrentConnectionsAlarm
+        - !GetAtt RedisCurrentConnectionsAlarm.Arn
 
   RedisMemoryUtilizationAlarm:
     Value: 
       Fn::If:
         - IsServerless
         - ""
-        - !Ref RedisMemoryUtilizationAlarm
+        - !GetAtt RedisMemoryUtilizationAlarm.Arn
 
   RedisCPUUtilizationAlarm:
     Value: 
       Fn::If:
         - IsServerless
         - ""
-        - !Ref RedisCPUUtilizationAlarm
+        - !GetAtt RedisCPUUtilizationAlarm.Arn
 
   RedisEngineCPUAlarm:
     Value: 
       Fn::If:
         - IsServerless
         - ""
-        - !Ref RedisEngineCPUAlarm
+        - !GetAtt RedisEngineCPUAlarm.Arn
