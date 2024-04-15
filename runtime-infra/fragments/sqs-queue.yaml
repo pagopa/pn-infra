@@ -160,7 +160,7 @@ Resources:
       ContentBasedDeduplication: !If [IsContentBasedDeduplication, true, false]
       DeduplicationScope: !If [IsHighThroughput, 'messageGroup', !Ref DeduplicationScope]
       SqsManagedSseEnabled: !Ref SqsManagedSseEnabled
-      FifoThroughputLimit: !If [IsHighThroughput, 'perMessageGroupId', '']
+      FifoThroughputLimit: !If [IsHighThroughput, 'perMessageGroupId', !Ref AWS::NoValue]
 
   DeadLetterQueue:
     Condition: IsNotFifoWithDLQ
