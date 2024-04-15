@@ -86,6 +86,14 @@ Parameters:
     Default: 0
     Description: The minimum number of messages in DLQ to raise an oncall alarm (it applies to standalone DLQ only). When zero, the oncall alarm is not created.
 
+  HighThroughput:
+    Type: String
+    Default: 'false'
+    Description: 'Enable high throughput mode for the queue'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
 Conditions:
   DlqHasDefaultName: !Equals [ !Ref DeadLetterQueueName, '-' ]
   DlqHasAlarm: !Not [ !Equals [ !Ref AlarmSNSTopicName, '-' ] ]
@@ -94,6 +102,8 @@ Conditions:
   IsContentBasedDeduplication: !Equals [ !Ref ContentBasedDeduplication, 'true' ]
   IsWithDLQ:  !Equals [ !Ref HasDLQ, 'true' ]
   IsWithAlarm:  !Equals [ !Ref QueueHasAlarm, 'true' ]
+  IsHighThroughput:  !Equals [ !Ref HighThroughput, 'true' ]
+
   IsNotFifoWithDLQ: !And
     - !Condition IsNotFifo
     - !Condition IsWithDLQ
@@ -148,8 +158,9 @@ Resources:
       FifoQueue: true
       VisibilityTimeout: !Ref VisibilityTimeout
       ContentBasedDeduplication: !If [IsContentBasedDeduplication, true, false]
-      DeduplicationScope: !Ref DeduplicationScope
+      DeduplicationScope: !If [IsHighThroughput, 'messageGroup', !Ref DeduplicationScope]
       SqsManagedSseEnabled: !Ref SqsManagedSseEnabled
+      FifoThroughputLimit: !If [IsHighThroughput, 'perMessageGroupId', '']
 
   DeadLetterQueue:
     Condition: IsNotFifoWithDLQ
