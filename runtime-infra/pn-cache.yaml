@@ -12,6 +12,14 @@ Parameters:
     Type: String
     Description: "A name of an SNS topic where to send alarm." 
 
+  ElasticacheType: 
+    Type: String
+    Description: Which type of elasticache to deploy (serverless or managed)
+    Default: managed
+    AllowedValues:
+      - serverless
+      - managed
+
   NodeType:
     Type: String
     Description: Cache node type (i.e. cache.t2.micro)
@@ -55,8 +63,50 @@ Parameters:
     MinValue: 0
     MaxValue: 65000
     Default: 60000
+Conditions:
+  IsServerless: !Equals [!Ref ElasticacheType, "serverless"]
+  IsManaged: !Equals [!Ref ElasticacheType, "managed"]
 
 Resources:
+
+  RedisServerless:
+    Type: AWS::ElastiCache::ServerlessCache
+    Properties:
+      ServerlessCacheName: !Sub ${ProjectName}-redis-serverless
+      Engine: redis
+      Description: Redis Serverless Cache for Logextractor
+      MajorEngineVersion: 7
+      SecurityGroupIds:
+        - !GetAtt SecurityGroup.GroupId
+      SubnetIds: !Ref VpcSubnets
+      KmsKeyId: !Ref RedisServerlessEncryptionKey
+
+  RedisServerlessEncryptionKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Redis Serverless Cache Encryption Key
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: key-default-1
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: kms:*
+            Resource: '*'
+          - Sid: Allow use of the key
+            Effect: Allow
+            Principal:
+              Service: elasticache.amazonaws.com
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+            Resource: '*'
+
   SubnetGroup:
     Type: "AWS::ElastiCache::SubnetGroup"
     Properties:
@@ -79,7 +129,7 @@ Resources:
         - FromPort: 6379
           IpProtocol: tcp
           SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
-          ToPort: 6379
+          ToPort: 6380
       VpcId: !Ref VpcId
 
   RedisReplicationGroup:
@@ -194,20 +244,41 @@ Outputs:
     Value: !GetAtt AllowedSecurityGroup.GroupId
 
   RedisEndpoint:
-    Description: The endpoint Address for Primary Redis cluster 
+    Description: The endpoint Address for Redis serverless
     Value:
-      Fn::GetAtt:
-      - RedisReplicationGroup
-      - PrimaryEndPoint.Address
+      Fn::If:
+        - IsServerless
+        - Fn::GetAtt:
+          - RedisServerless
+          - Endpoint.Address
+        - Fn::GetAtt:
+          - RedisReplicationGroup
+          - PrimaryEndPoint.Address
 
   RedisCurrentConnectionsAlarmArn:
-    Value: !GetAtt RedisCurrentConnectionsAlarm.Arn
+    Value: 
+      Fn::If:
+        - IsServerless
+        - ""
+        - !GetAtt RedisCurrentConnectionsAlarm.Arn
 
   RedisMemoryUtilizationAlarm:
-    Value: !GetAtt RedisMemoryUtilizationAlarm.Arn
+    Value: 
+      Fn::If:
+        - IsServerless
+        - ""
+        - !GetAtt RedisMemoryUtilizationAlarm.Arn
 
   RedisCPUUtilizationAlarm:
-    Value: !GetAtt RedisCPUUtilizationAlarm.Arn
+    Value: 
+      Fn::If:
+        - IsServerless
+        - ""
+        - !GetAtt RedisCPUUtilizationAlarm.Arn
 
   RedisEngineCPUAlarm:
-    Value: !GetAtt RedisEngineCPUAlarm.Arn
+    Value: 
+      Fn::If:
+        - IsServerless
+        - ""
+        - !GetAtt RedisEngineCPUAlarm.Arn
