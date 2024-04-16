@@ -262,7 +262,9 @@ Resources:
     Type: AWS::Events::EventBus
     Properties: 
       Name: !Sub '${ProjectName}-CoreEventBus'
-      # pn-infra-core
+      Tags:
+        - Key: Microservice
+          Value: pn-infra-core
   
   # Allow access from partner system
   PnCoreEventBusSafeStoreAccessPolicy: 
@@ -335,6 +337,10 @@ Resources:
                   - !Ref "F24ToPaperChannelQueueARN"
                   - !Ref "F24ToDeliveryPushQueueARN"
                   - !Ref "RaddAltToPaperChannelQueueARN"
+      Tags:
+        - Key: Microservice
+          Value: pn-infra-core
+                  
   
   # Resource based policy to allow EventBridge to publish to CloudWatch Logs
   LogGroupCoreEventBusPolicy:
@@ -385,6 +391,9 @@ Resources:
                 Effect: Allow
                 Resource: 
                   - !GetAtt CoreEventBusEventsLogGroup.Arn
+      Tags:
+        - Key: Microservice
+          Value: pn-infra-logs
 
   ExternalChannelsOutputsQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -444,6 +453,9 @@ Resources:
     Properties:
       LogGroupName: /aws/events/core-event-bus-input-events
       RetentionInDays: !Ref LogRetention
+      Tags:
+        - Key: Microservice
+          Value: pn-infra-logs
 
   # pn-infra-logs
   CoreEventBusMatchedEventsLoggerFnLogGroup:
@@ -451,6 +463,9 @@ Resources:
     Properties:
       LogGroupName: /aws/lambda/PnCoreEventBusMatchedEventLogger
       RetentionInDays: !Ref LogRetention
+      Tags:
+        - Key: Microservice
+          Value: pn-infra-logs
 
   # pn-infra-logs
   PnCoreEventBusToLogGroup:
@@ -1082,6 +1097,9 @@ Resources:
       Runtime: python3.9
       Role: !GetAtt MatchedEventsLoggerFunctionExecutionRole.Arn
       ReservedConcurrentExecutions : !Ref ReservedConcurrentLambdaExecution
+      Tags:
+        - Key: Microservice
+          Value: pn-infra-logs      
 
   # pn-address-manager
   PNAddressManagerToDeliveryPushLimiterLambdaPermission:
@@ -1160,6 +1178,9 @@ Resources:
       ReservedConcurrentExecutions : !Ref ReservedConcurrentLambdaExecution
       DeadLetterConfig:
         TargetArn: !GetAtt EventBusDeadLetterQueue.Arn
+      Tags:
+        - Key: Microservice
+          Value: pn-address-manager      
 
   # Standard Queue for events Dead Letter Queue
   # pn-infra-monitoring
@@ -1168,6 +1189,10 @@ Resources:
     Properties:
       MessageRetentionPeriod: !Ref EventBusDeadLetterQueueMaximumRetentionPeriod
       QueueName: !Sub '${ProjectName}-CoreEventBus-DLQ'
+      Tags:
+        - Key: Microservice
+          Value: pn-infra-monitoring      
+      
 
   # Dead Letter Queue policy 
   # pn-infra-monitoring
@@ -1319,6 +1344,7 @@ Resources:
                   - 'events:PutEvents'
                 Resource: 
                   - !GetAtt PnCoreEventBus.Arn
+
   # pn-national-registries
   NationalRegistriesToEventBridgePipe:
     Type: AWS::Pipes::Pipe
@@ -1340,6 +1366,9 @@ Resources:
                 "body": <$.body>,
                 "source": <$.messageAttributes.clientId.stringValue>
               }
+      Tags:
+        - Key: Microservice
+          Value: pn-national-registries
 
 Outputs:
 
