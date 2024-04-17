@@ -142,6 +142,7 @@ Resources:
                 "StringLike":{
                   "aws:SourceArn": [ 
                     "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                    "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/*"
                   ]
                 }
               }
@@ -162,6 +163,26 @@ Resources:
                 "StringLike":{
                   "aws:SourceArn": [ 
                     "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                  ]                  
+                }
+              }
+            }
+            {
+              "Sid": "AWSCloudTrailWriteCore",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudtrail.amazonaws.com"
+              },
+              "Action": [
+                "s3:PutObject"
+              ],
+              "Resource": [
+                "arn:${AWS::Partition}:s3:::${LogsBucketName}/diagnosticTrail/*"
+              ],
+              "Condition":{
+                "StringLike":{
+                  "aws:SourceArn": [ 
+                    "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/*"
                   ]                  
                 }
               }

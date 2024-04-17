@@ -157,7 +157,9 @@ Resources:
               Resource: "*"
               Condition:
                 ArnLike: 
-                  aws:SourceArn: !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                  aws:SourceArn: 
+                    - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                    - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/*"
             - !Ref AWS::NoValue
 
   RuntimeEnvironmentVariablesBucket:
