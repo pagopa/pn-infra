@@ -1436,6 +1436,9 @@ Resources:
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry75 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry75 ] ]
                 - !Ref "AWS::NoValue"
+          EnvironmentFiles:
+            - Type: s3
+              Value: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/runtime-variable.env'
           PortMappings:
             - ContainerPort: 8080
           LinuxParameters:
@@ -1524,7 +1527,18 @@ Resources:
         - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
         - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
       Policies:
-        Fn::If:
+        - PolicyName: !Sub '${MicroServiceUniqueName}-S3RuntimePolicy'
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/*'
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}'
+        - Fn::If:
           - HasSecrets
           - - PolicyName: !Sub '${MicroServiceUniqueName}-ExecutionPolicy'
               PolicyDocument:

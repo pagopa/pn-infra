@@ -160,8 +160,19 @@ Resources:
                   aws:SourceArn: !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
             - !Ref AWS::NoValue
 
+  RuntimeEnvironmentVariablesBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub '${ProjectName}-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
 
-## KINESIS SOURCE STREAM FOR Change Data Capture
+  ## KINESIS SOURCE STREAM FOR Change Data Capture
 
   ### AWS KMS / Server-side encryption for Kinesis Stream 
   CdcKinesisServerSideEncryptionKey:
