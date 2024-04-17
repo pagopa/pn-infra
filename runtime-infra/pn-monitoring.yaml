@@ -533,35 +533,6 @@ Resources:
       Threshold: 1
 
   # Trail for diagnostic lambda functions
-  DiagnosticLambdaCloudTrailLogGroup:
-    Type: AWS::Logs::LogGroup
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
-    Properties:
-      LogGroupName: !Sub "/aws/cloudtrail/${ProjectName}-DiagnosticLambdaCloudTrail"
-      RetentionInDays: !Ref DiagnosticTrailLogRetentionInDays
-
-  DiagnosticLambdaCloudTrailLogGroupRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: cloudtrail.amazonaws.com
-            Action: sts:AssumeRole
-        Version: "2012-10-17"
-      Policies:
-        - PolicyName: !Sub "${ProjectName}-DiagnosticLambdaCloudTrailLogGroupPolicy"
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DiagnosticLambdaCloudTrailLogGroup}:*"
-                
   DiagnosticLambdaCloudTrail:
     Type: AWS::CloudTrail::Trail
     Properties:
@@ -583,8 +554,6 @@ Resources:
                 - !Sub "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:diagnostic"
       S3BucketName: !Ref LogsBucketName
       S3KeyPrefix: "cloudtrail/diagnostic"
-      CloudWatchLogsLogGroupArn: !GetAtt DiagnosticLambdaCloudTrailLogGroup.Arn
-      CloudWatchLogsRoleArn: !GetAtt DiagnosticLambdaCloudTrailLogGroupRole.Arn
       IsLogging: true
 
 Outputs:
