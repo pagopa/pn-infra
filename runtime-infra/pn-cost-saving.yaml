@@ -14,17 +14,17 @@ Parameters:
 
   StopEc2FunctionTagNameCronExpression:
     Type: String
-    Default: 'cron(0 20 * * ? *)'
+    Default: 'cron(0 19 * * ? *)'
     Description: Cron expression when ec2 stop
 
   StopEcsFunctionCronExpression:
     Type: String
-    Default: 'cron(0 20 * * ? *)'
+    Default: 'cron(0 19 * * ? *)'
     Description: Cron expression when ecs stop
 
   StartEcsFunctionCronExpression:
     Type: String
-    Default: 'cron(0 6 ? * MON-FRI *)'
+    Default: 'cron(0 5 ? * MON-FRI *)'
     Description: Cron expression when ecs start
 
   ECSClusterName:
@@ -191,11 +191,11 @@ Resources:
                   service_name = service_arn.split('/')[-1]
                   ecs_client.update_service(cluster=cluster_name, service=service_name, desiredCount=0)
 
-              print(f"JSON salvato su S3 con successo.")
+              print(f"JSON salvato su S3 con successo, desire_count impostati a zero")
                   
               return {
                   'statusCode': 200,
-                  'body': json.dumps('JSON salvato su S3 con successo')
+                  'body': json.dumps('JSON salvato su S3 con successo, desire_count impostati a zero')
               }
 
       Environment:
@@ -250,7 +250,7 @@ Resources:
       ScheduleExpression:
         Fn::If:
         - IsTestAccount
-        - cron(0 20 ? * FRI *)
+        - cron(0 19 ? * FRI *)
         - !Ref StopEcsFunctionCronExpression
       State: ENABLED
       Targets:
@@ -354,7 +354,7 @@ Resources:
       ScheduleExpression:
         Fn::If:
         - IsTestAccount
-        - cron(0 6 ? * MON *)
+        - cron(0 5 ? * MON *)
         - !Ref StartEcsFunctionCronExpression
       State: ENABLED
       Targets:
