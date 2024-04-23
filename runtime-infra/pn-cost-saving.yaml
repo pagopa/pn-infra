@@ -19,7 +19,7 @@ Parameters:
 
   StopEcsFunctionCronExpression:
     Type: String
-    Default: 'cron(0 19 * * ? *)'
+    Default: 'cron(0 19 ? * MON-FRI *)'
     Description: Cron expression when ecs stop
 
   StartEcsFunctionCronExpression:
@@ -236,8 +236,8 @@ Resources:
                 Action:
                   - ecs:*
                 Resource:
-                  - !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*:${ECSClusterName}"
-                  - !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*:${ECSClusterName}/*"
+                  - !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*/${ECSClusterName}"
+                  - !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*/${ECSClusterName}/*"
               - Effect: Allow
                 Action:
                   - "logs:CreateLogStream"
