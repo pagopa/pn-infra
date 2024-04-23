@@ -236,7 +236,8 @@ Resources:
                 Action:
                   - ecs:*
                 Resource:
-                  - !Sub "arn:aws:ecs:::${ECSClusterName}"
+                  - !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*:${ECSClusterName}"
+                  - !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*:${ECSClusterName}/*"
               - Effect: Allow
                 Action:
                   - "logs:CreateLogStream"
