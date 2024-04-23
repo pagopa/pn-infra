@@ -152,6 +152,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.12
+      Timeout: 15
       Handler: index.lambda_handler
       FunctionName:  !Sub 'Lambda-Ecs-Stop-${EnvironmentType}'
       Code:
@@ -282,6 +283,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.12
+      Timeout: 5
       Handler: index.lambda_handler
       FunctionName: !Sub 'Lambda-Ecs-Start-${EnvironmentType}'
       Code:
