@@ -17,6 +17,38 @@ Parameters:
     Default: 'cron(0 20 * * ? *)'
     Description: Cron expression when ec2 stop
 
+  StopEcsFunctionCronExpression:
+    Type: String
+    Default: 'cron(0 20 * * ? *)'
+    Description: Cron expression when ecs stop
+
+  StartEcsFunctionCronExpression:
+    Type: String
+    Default: 'cron(0 6 ? * MON-FRI *)'
+    Description: Cron expression when ecs start
+
+  ECSClusterName:
+    Type: String
+    Default: ''
+    Description: Cluster Ecs Name
+
+  EnvironmentType:
+    Type: String
+    Default: ''
+    Description: Environment type
+
+  LambdasBucketName:
+    Type: String
+    Description: Bucket for save Json with desire count of Ecs
+
+Conditions:
+  IsNotProdAccount: !Not [ !Equals [!Ref EnvironmentType, prod ] ]
+  IsNotUatAccount: !Not [ !Equals [!Ref EnvironmentType, uat ] ]
+  IsStopEcsService: !And [ !Condition IsNotProdAccount, !Condition IsNotUatAccount ]
+  IsTestAccount: !Equals [!Ref EnvironmentType, test ] 
+
+#LAMBDA STOP EC2
+
 Resources:
   StopEc2Function:
     Type: AWS::Lambda::Function
@@ -111,4 +143,235 @@ Resources:
     UpdateReplacePolicy : Delete
     Properties:
       LogGroupName: !Sub "/aws/lambda/${StopEc2Function}"
+      RetentionInDays: 3
+
+#LAMBDA STOP ECS
+
+  StopEcsFunction:
+    Condition: IsStopEcsService
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      FunctionName: lambda-ecsstop
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+
+          def lambda_handler(event, context):
+
+              ecs_cluster_name = os.environ['ECSClusterName']
+              s3bucket_name = os.environ['EcsDesireCountBucket']
+        
+              ecs_client = boto3.client('ecs')
+              
+              cluster_name = ecs_cluster_name
+              services_response = ecs_client.list_services(cluster=cluster_name)
+              
+              service_arns = services_response['serviceArns']
+              service_counts = {}
+        
+              for service_arn in service_arns:
+                  service_name = service_arn.split('/')[-1]
+                  service_details = ecs_client.describe_services(cluster=cluster_name, services=[service_name])
+                  desired_count = service_details['services'][0]['desiredCount']
+                  service_counts[service_name] = desired_count
+
+              json_data = json.dumps(service_counts)
+              
+              s3_client = boto3.client('s3')
+              bucket_name = s3bucket_name
+              object_key = 'desired_counts_ecs.json'
+              s3_client.put_object(Body=json_data, Bucket=bucket_name, Key=object_key)
+              
+              for service_arn in service_arns:
+                  service_name = service_arn.split('/')[-1]
+                  ecs_client.update_service(cluster=cluster_name, service=service_name, desiredCount=0)
+
+              print(f"JSON salvato su S3 con successo.")
+                  
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps('JSON salvato su S3 con successo')
+              }
+
+      Environment:
+        Variables:
+          EcsDesireCountBucket:
+            Ref: LambdasBucketName
+          ECSClusterName:
+            Ref: ECSClusterName
+
+      Role:
+        Fn::GetAtt:
+          - EcsOptimizedCostFunctionRole
+          - Arn
+
+  EcsOptimizedCostFunctionRole:
+    Condition: IsStopEcsService
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: EcsOptimizedCostFunctionPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                Resource:
+                  - !Sub "arn:aws:s3:::${LambdasBucketName}"
+                  - !Sub "arn:aws:s3:::${LambdasBucketName}/*"
+              - Effect: Allow
+                Action:
+                  - ecs:*
+                Resource:
+                  - !Sub "arn:aws:ecs:::${ECSClusterName}"
+                  - !Sub "arn:aws:ecs:::${ECSClusterName}/*"
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: arn:aws:logs:*:*:*
+
+  StopEcsFunctionSchedule:
+    Condition: IsStopEcsService
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression:
+        Fn::If:
+        - IsTestAccount
+        - cron(0 20 ? * FRI *)
+        - !Ref StopEcsFunctionCronExpression
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StopEcsFunction.Arn
+          Id: StopEcsFunction
+
+  StopEcsFunctionInvokePermission:
+    Condition: IsStopEcsService
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref StopEcsFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StopEcsFunctionSchedule.Arn
+
+  StopEcsFunctionLogGroup:
+    Condition: IsStopEcsService
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy : Delete
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${StopEcsFunction}"
+      RetentionInDays: 3
+
+
+#LAMBDA START ECS
+
+  StartEcsFunction:
+    Condition: IsStopEcsService
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      FunctionName: lambda-ecsstop
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+
+          def lambda_handler(event, context):
+
+              ecs_cluster_name = os.environ['ECSClusterName']
+              s3bucket_name = os.environ['EcsDesireCountBucket']
+
+              s3_client = boto3.client('s3')
+              ecs_client = boto3.client('ecs')
+
+              bucket_name = s3bucket_name
+              object_key = 'desired_counts_ecs.json'
+              
+              try:
+                  response = s3_client.get_object(Bucket=bucket_name, Key=object_key)
+                  json_data = response['Body'].read().decode('utf-8')
+                  service_counts = json.loads(json_data)
+              except Exception as e:
+                  return {
+                      'statusCode': 500,
+                      'body': f'Errore nel recuperare il file JSON da S3: {str(e)}'
+                  }
+
+              cluster_name = ecs_cluster_name
+
+              for service_name, desired_count in service_counts.items():
+                  try:
+                      ecs_client.update_service(
+                          cluster=cluster_name,
+                          service=service_name,
+                          desiredCount=desired_count
+                      )
+                      print(f"Desire Count Ecs Service Update Successiful.")
+                  except Exception as e:
+                      print(f"Error During Update Desire Count Ecs Service.")
+                      return {
+                          'statusCode': 500,
+                          'body': f'Error During Update Desire Count of {service_name}: {str(e)}'
+                      }
+
+              return {
+                  'statusCode': 200,
+                  'body': 'Desired counts Successiful Updated'
+              }
+
+      Environment:
+        Variables:
+          EcsDesireCountBucket:
+            Ref: LambdasBucketName
+          ECSClusterName:
+            Ref: ECSClusterName
+
+      Role:
+        Fn::GetAtt:
+          - EcsOptimizedCostFunctionRole
+          - Arn
+
+  StartEcsFunctionSchedule:
+    Condition: IsStopEcsService
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression:
+        Fn::If:
+        - IsTestAccount
+        - cron(0 6 ? * MON *)
+        - !Ref StartEcsFunctionCronExpression
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StartEcsFunction.Arn
+          Id: StartEcsFunction
+
+  StartEcsFunctionInvokePermission:
+    Condition: IsStopEcsService
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref StartEcsFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StartEcsFunctionSchedule.Arn
+
+  StartEcsFunctionLogGroup:
+    Condition: IsStopEcsService
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy : Delete
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${StartEcsFunction}"
       RetentionInDays: 3
