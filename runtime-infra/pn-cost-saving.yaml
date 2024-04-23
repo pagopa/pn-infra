@@ -55,7 +55,7 @@ Resources:
     Properties:
       Runtime: python3.12
       Handler: index.lambda_handler
-      FunctionName: lambda-ec2stop
+      FunctionName: lambda-ec2stop-${EnvironmentType}
       Code:
         ZipFile: |
           import boto3
@@ -153,11 +153,12 @@ Resources:
     Properties:
       Runtime: python3.12
       Handler: index.lambda_handler
-      FunctionName: lambda-ecsstop
+      FunctionName: lambda-ecsstop-${EnvironmentType}
       Code:
         ZipFile: |
           import boto3
           import json
+          import os
 
           def lambda_handler(event, context):
 
@@ -282,11 +283,12 @@ Resources:
     Properties:
       Runtime: python3.12
       Handler: index.lambda_handler
-      FunctionName: lambda-ecsstart
+      FunctionName: lambda-ecsstart-${EnvironmentType}
       Code:
         ZipFile: |
           import boto3
           import json
+          import os
 
           def lambda_handler(event, context):
 
