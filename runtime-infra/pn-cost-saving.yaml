@@ -55,7 +55,7 @@ Resources:
     Properties:
       Runtime: python3.12
       Handler: index.lambda_handler
-      FunctionName: lambda-ec2stop-${EnvironmentType}
+      FunctionName: !Sub 'Lambda-Ec2-stop-${EnvironmentType}'
       Code:
         ZipFile: |
           import boto3
@@ -153,7 +153,7 @@ Resources:
     Properties:
       Runtime: python3.12
       Handler: index.lambda_handler
-      FunctionName: lambda-ecsstop-${EnvironmentType}
+      FunctionName:  !Sub 'Lambda-Ecs-Stop-${EnvironmentType}'
       Code:
         ZipFile: |
           import boto3
@@ -283,7 +283,7 @@ Resources:
     Properties:
       Runtime: python3.12
       Handler: index.lambda_handler
-      FunctionName: lambda-ecsstart-${EnvironmentType}
+      FunctionName: !Sub 'Lambda-Ecs-Start-${EnvironmentType}'
       Code:
         ZipFile: |
           import boto3
