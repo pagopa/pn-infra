@@ -9,43 +9,40 @@ exports.handler = async (event) => {
     for( const record of event.Records ) {
 
         const msgBodyStr = record.body;
-        const msg = JSON.parse( msgBodyStr );
+        const msgRec = JSON.parse( msgBodyStr );
 
-        for ( const msgRec of msg.Records ) {
+        const bucketName = msgRec.s3.bucket.name;
+        const fileKey = msgRec.s3.object.key;
 
-            const bucketName = msgRec.s3.bucket.name;
-            const fileKey = msgRec.s3.object.key;
+        console.log("bucketName=", bucketName, "fileKey=", fileKey)
 
-            console.log("bucketName=", bucketName, "fileKey=", fileKey)
+        // Recupero del file
+        console.log("bucketName=", bucketName, "fileKey=", fileKey)
+        const params = {Bucket: bucketName, Key: fileKey}
+        const dataS3 = await client.send(new GetObjectCommand(params))
 
-            // Recupero del file
-            console.log("bucketName=", bucketName, "fileKey=", fileKey)
-            const params = {Bucket: bucketName, Key: fileKey}
-            const dataS3 = await client.send(new GetObjectCommand(params))
+        // Unzip del file
+        const unzippedStream = dataS3.Body.pipe(zlib.createGunzip());
 
-            // Unzip del file
-            const unzippedStream = dataS3.Body.pipe(zlib.createGunzip());
-
-            // Legge il contenuto del file unzippato
-            let unzippedBody = '';
-             unzippedStream.on('data', (data) => {
-                 unzippedBody += data.toString();
-             });
-
-            // Ritorna una Promise che si risolve dopo che il processo di unzip è completato
-            return new Promise((resolve, reject) => {
-                unzippedStream.on('end', () => {
-                    console.log('Processo di unzip completato.');
-                    console.log('Contenuto del file unzippato:', unzippedBody);
-                    filterAndPrintElement(unzippedBody);
-                    resolve();
-                });
-                unzippedStream.on('error', (error) => {
-                    console.error('Errore durante il processo di unzip:', error);
-                    reject(error);
-                });
+        // Legge il contenuto del file unzippato
+        let unzippedBody = '';
+            unzippedStream.on('data', (data) => {
+                unzippedBody += data.toString();
             });
-        }
+
+        // Ritorna una Promise che si risolve dopo che il processo di unzip è completato
+        return new Promise((resolve, reject) => {
+            unzippedStream.on('end', () => {
+                console.log('Processo di unzip completato.');
+                console.log('Contenuto del file unzippato:', unzippedBody);
+                filterAndPrintElement(unzippedBody);
+                resolve();
+            });
+            unzippedStream.on('error', (error) => {
+                console.error('Errore durante il processo di unzip:', error);
+                reject(error);
+            });
+        });
     }
 }
 
