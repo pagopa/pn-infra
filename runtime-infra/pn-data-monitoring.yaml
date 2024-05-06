@@ -17,6 +17,11 @@ Parameters:
     Description: parquet files s3 bucket path
     Default: 'parquet'
 
+  ReportsBucketPath:
+    Type: String
+    Description: reports files bucket path
+    Default: 'reports'
+
   DataMonitoringCodebuildComputeType:
     Type: String
     Description: Codebuild compute type (https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-compute-types.html)
@@ -55,6 +60,11 @@ Parameters:
     Type: String
     Description: Version of the bi_or_not_bi__ec_metadata scripts
     Default: ec_metadata_extract_v0_2
+
+  DataMonitoringPrototypeVersion:
+    Type: String
+    Description: Version of the pn-prototype scripts
+    Default: main
 
   DataLakeAccountId:
     Type: String
@@ -179,17 +189,24 @@ Resources:
           phases:
             pre_build:
               commands:
+                - ROOT_FOLDER=$(pwd) && echo ${ROOT_FOLDER}
                 - git clone https://github.com/pagopa/pn-troubleshooting.git
-                - ( cd pn-troubleshooting && git checkout ${SCRIPTS_VERSION} )
+                - git clone https://github.com/pagopa/pn-prototypes.git
+                - ( cd ${ROOT_FOLDER}/pn-prototypes && git checkout $PROTOTYPE_VERSION )
+                - ( cd ${ROOT_FOLDER}/pn-troubleshooting && git checkout $SCRIPTS_VERSION )
             build:
               commands:
+                - ROOT_FOLDER=$(pwd) && echo ${ROOT_FOLDER}
                 - |
                   cd pn-troubleshooting/bi_or_not_bi__ec_metadata
                   ./cicd_runner.sh \
                       --account-type $ACCOUNT_TYPE \
                       --env-type $ENV_TYPE \
                       --export-bucket-name $EXPORT_BUCKET_NAME \
-                      --logs-bucket-name $LOGS_BUCKET_NAME
+                      --logs-bucket-name $LOGS_BUCKET_NAME \
+                      --resource-root $ROOT_FOLDER/pn-prototypes \
+                      --core-bucket-name $CORE_BUCKET \
+                      --confinfo-bucket-name $CONFINFO_BUCKET
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
@@ -215,6 +232,15 @@ Resources:
           - Name: SCRIPTS_VERSION
             Type: PLAINTEXT
             Value: !Ref DataMonitoringScriptVersion
+          - Name: PROTOTYPE_VERSION
+            Type: PLAINTEXT
+            Value: !Ref DataMonitoringPrototypeVersion
+          - Name: CORE_BUCKET
+            Type: PLAINTEXT
+            Value: !If [IsCoreAccount, !Ref DataMonitoringBucket, !Sub "pn-datamonitoring-${AWS::Region}-${PnCoreAwsAccountId}"]
+          - Name: CONFINFO_BUCKET
+            Type: PLAINTEXT
+            Value: !If [IsCoreAccount, !Ref ConfinfoDynamoDbExportBucketName, !Ref DataMonitoringBucket]
 
   DataMonitoringCodeBuildServiceRole:
     Type: AWS::IAM::Role
@@ -291,7 +317,8 @@ Resources:
               - "s3:PutObject"
               - "s3:DeleteObject"
             Resource: 
-              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/${ParquetBucketPath}/*"       
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/${ParquetBucketPath}/*"
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/${ReportsBucketPath}/*"
           # Accessi in lettura al bucket dump dell'account confinfo nella cartella parquet
           - Fn::If:
             - IsCoreAccount
@@ -302,6 +329,15 @@ Resources:
               Resource: 
               - !Sub "arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}"
               - !Sub "arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}/${ParquetBucketPath}/*"
+            - !Ref AWS::NoValue
+          # Accesso in lettura al bucket di confinfo per protocollo S3A
+          - Fn::If:
+            - IsCoreAccount
+            - Effect: Allow
+              Action:
+                - "s3:ListBucket"
+              Resource:
+                - !Sub "arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}"
             - !Ref AWS::NoValue
           # Accessi in lettura ai log di pn-delivery
           - Fn::If:
@@ -356,7 +392,8 @@ Resources:
               - "s3:PutObject"
               - "s3:DeleteObject"
             Resource: 
-              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/${ParquetBucketPath}/*"       
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/${ParquetBucketPath}/*"
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/${ReportsBucketPath}/*"
           # Accessi in lettura al bucket dump dell'account confinfo nella cartella parquet
           - Fn::If:
             - IsCoreAccount
@@ -366,6 +403,15 @@ Resources:
                 - "s3:List*"
               Resource: 
               - !Sub "arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}/${ParquetBucketPath}/*"       
+            - !Ref AWS::NoValue
+          # Accesso in lettura al bucket di confinfo per protocollo S3A
+          - Fn::If:
+            - IsCoreAccount
+            - Effect: Allow
+              Action:
+                - "s3:ListBucket"
+              Resource:
+                - !Sub "arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}"
             - !Ref AWS::NoValue
           # Accessi in lettura ai log di pn-delivery
           - Fn::If:

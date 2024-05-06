@@ -193,6 +193,11 @@ Parameters:
     Description: 'The version of the BI or not BI EC metadata'
     Default: ec_metadata_extract_v0_1
 
+  DataMonitoringPrototypeVersion:
+    Type: String
+    Description: Version of the pn-prototype scripts
+    Default: main
+
 Conditions:
   IsAlbArnEmpty: !Equals [ !Ref ApplicationLoadBalancerArn, '-' ]
   IsAlbArnDnsEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDns, '-' ]
@@ -398,3 +403,5 @@ Outputs:
     Value: !Ref DataMonitoringScriptVersion
   DataLakeAccountId:
     Value: !Ref DataLakeAccountId1
+  DataMonitoringPrototypeVersion:
+    Value: !Ref DataMonitoringPrototypeVersion
