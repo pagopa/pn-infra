@@ -76,7 +76,9 @@ function filterAndPrintElement(unzippedBody) {
             }
         }
 
-        auditLog(logData, 'Diagnostic lambda invoked', 'DIAGNOSTIC_INVOKE', 'OK').info('info');
+        const auditType = 'AUD_DIAG_INVOKE'
+        const auditMessage = logData.requestID + ' - ' + logData.userIdentity.arn;
+        auditLog(logData, auditMessage, auditType, 'OK').info('info');
     });
 }
 
