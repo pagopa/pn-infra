@@ -11,6 +11,11 @@ exports.handler = async (event) => {
         const msgBodyStr = record.body;
         const msgRec = JSON.parse( msgBodyStr );
 
+        if(!msgRec.s3) {
+            console.log("The message is not a lambda invocation event.")
+            continue;
+        }
+
         const bucketName = msgRec.s3.bucket.name;
         const fileKey = msgRec.s3.object.key;
 
