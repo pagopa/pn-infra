@@ -21,8 +21,6 @@ exports.handler = async (event) => {
 
         console.log("bucketName=", bucketName, "fileKey=", fileKey)
 
-        // Recupero del file
-        console.log("bucketName=", bucketName, "fileKey=", fileKey)
         const params = {Bucket: bucketName, Key: fileKey}
         const dataS3 = await client.send(new GetObjectCommand(params))
 
