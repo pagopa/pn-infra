@@ -78,12 +78,54 @@ Parameters:
   LayerS3BucketKey:
     Type: String
     Description: "S3 layer bucket key"
-
+  
+  EnvEntry1:
+    Description: 1st environment entry in the form key=value
+    Type: String
+    Default: ''
+  
+  EnvEntry2:
+    Description: 2nd environment entry in the form key=value
+    Type: String
+    Default: ''
+  
+  EnvEntry3:
+    Description: 3nd environment entry in the form key=value
+    Type: String
+    Default: ''
+  
+  EnvEntry4:
+    Description: 4nd environment entry in the form key=value
+    Type: String
+    Default: ''
+  
+  EnvEntry5:
+    Description: 5nd environment entry in the form key=value
+    Type: String
+    Default: ''
+  
+  TagEntry1:
+    Description: 1st tag entry in the form key=value
+    Type: String
+    Default: ''
+  
+  TagEntry2:
+    Description: 2nd tag entry in the form key=value
+    Type: String
+    Default: ''
+    
 Conditions:
   HaveToDefineVpcs: !Equals [ "true", !Ref PutIntoVpc ]
   IsEnabledTracingConfig: !Not [ !Equals [ !Ref TracingConfigMode, '' ] ]
   HaveToUseLambdaInsights: !Equals [!Ref UseLambdaInsights, "true"]
   HaveToUseLayer: !Equals [ !Ref UseLayer, "true" ]
+  Env1Exist: !Not [ !Equals [ !Ref EnvEntry1, '' ] ]
+  Env2Exist: !Not [ !Equals [ !Ref EnvEntry2, '' ] ]
+  Env3Exist: !Not [ !Equals [ !Ref EnvEntry3, '' ] ]
+  Env4Exist: !Not [ !Equals [ !Ref EnvEntry4, '' ] ]
+  Env5Exist: !Not [ !Equals [ !Ref EnvEntry5, '' ] ]
+  Tag1Exist: !Not [ !Equals [ !Ref TagEntry1, '' ] ]
+  Tag2Exist: !Not [ !Equals [ !Ref TagEntry2, '' ] ]
   
 Resources:
   # Lambda function
@@ -106,8 +148,31 @@ Resources:
           - !Ref AWS::NoValue
       Environment:
         Variables:
-          REGION: !Sub ${AWS::Region}
-          PN_DELIVERY_URL: !Sub "http://${ApplicationLoadBalancerDomain}:8080/delivery/v2.3"
+          - 'Fn::If':
+              - Env1Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref EnvEntry1 ] ]
+                Value: !Select [ 1, !Split [ "=", !Ref EnvEntry1 ] ]
+              - !Ref "AWS::NoValue"
+          - 'Fn::If':
+              - Env2Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref EnvEntry2 ] ]
+                Value: !Select [ 1, !Split [ "=", !Ref EnvEntry2 ] ]
+              - !Ref "AWS::NoValue"
+          - 'Fn::If':
+              - Env3Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref EnvEntry3 ] ]
+                Value: !Select [ 1, !Split [ "=", !Ref EnvEntry3 ] ]
+              - !Ref "AWS::NoValue"
+          - 'Fn::If':
+              - Env4Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref EnvEntry4 ] ]
+                Value: !Select [ 1, !Split [ "=", !Ref EnvEntry4 ] ]
+              - !Ref "AWS::NoValue"
+          - 'Fn::If':
+              - Env5Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref EnvEntry5 ] ]
+                Value: !Select [ 1, !Split [ "=", !Ref EnvEntry5 ] ]
+              - !Ref "AWS::NoValue"
       TracingConfig:
         Condition: IsEnabledTracingConfig
         Mode: !Ref TracingConfigMode
@@ -117,11 +182,17 @@ Resources:
       Timeout: !Ref Timeout
       MemorySize: !Ref Timeout
       Tags:
-        - Key: "pn-eni-related"
-          Value: "true"
-        - Key: "pn-eni-related-groupName-regexp"
-          Value: !Base64 "^pn-delivery-microsvc-prod-VersioningV1V2GetNotificationSecGroup*$"
-          
+        - 'Fn::If':
+            - Tag1Exist
+            - Name: !Select [ 0, !Split [ "=", !Ref TagEntry1 ] ]
+              Value: !Select [ 1, !Split [ "=", !Ref TagEntry1 ] ]
+            - !Ref "AWS::NoValue"
+        - 'Fn::If':
+            - Tag2Exist
+            - Name: !Select [ 0, !Split [ "=", !Ref TagEntry2 ] ]
+              Value: !Select [ 1, !Split [ "=", !Ref TagEntry2 ] ]
+            - !Ref "AWS::NoValue"
+
   # Lib Layer Declaration
   LambdaLayer:
     Type: AWS::Lambda::LayerVersion
