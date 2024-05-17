@@ -129,7 +129,7 @@ Conditions:
   
 Resources:
   # Lambda function
-  VersioningV1V2GetNotificationLambda:
+  Lambda:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Ref LambdaName
@@ -193,7 +193,6 @@ Resources:
               Value: !Select [ 1, !Split [ "=", !Ref TagEntry2 ] ]
             - !Ref "AWS::NoValue"
 
-  # Lib Layer Declaration
   LambdaLayer:
     Type: AWS::Lambda::LayerVersion
     Properties:
@@ -207,3 +206,10 @@ Resources:
 
 
 Outputs:
+  LambdaName:
+    Value: !Ref Lambda
+    Description: 'Lambda name'
+
+  LambdaArn:
+    Value: !GetAtt Lambda.Arn
+    Description: 'Lambda ARN'
