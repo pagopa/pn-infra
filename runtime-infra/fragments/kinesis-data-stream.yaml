@@ -33,7 +33,7 @@ Parameters:
     Default: 0
     Description: Threshold for standard alarms in milliseconds
 
-  OncallAlarmThresholdsMs:
+  OnCallAlarmThresholdsMs:
     Type: Number
     Default: 0
     Description: Threshold for oncall alarms in milliseconds
@@ -71,7 +71,7 @@ Parameters:
 Conditions:
   OnDemandDisabled: !Equals [!Ref StreamShardsCount, 0]
   HasStandardAlarmThresholds: !Not [!Equals [!Ref StandardAlarmThresholdsMs, 0]]
-  HasOncallAlarmThresholds: !Not [!Equals [!Ref OncallAlarmThresholdsMs, 0]]
+  HasOncallAlarmThresholds: !Not [!Equals [!Ref OnCallAlarmThresholdsMs, 0]]
   HasRequireManagedKey: !Equals [!Ref RequireManagedKey, "true"]
   
 Resources:
@@ -158,7 +158,7 @@ Resources:
       Namespace: AWS/Kinesis   
       MetricName: GetRecords.IteratorAgeMilliseconds
       Statistic: Maximum
-      Threshold: !Ref OncallAlarmThresholdsMs
+      Threshold: !Ref OnCallAlarmThresholdsMs
 
 Outputs:
   KinesisStreamName:

@@ -9,7 +9,7 @@ Parameters:
   # Logical parameters
   FunctionName:
     Type: String
-    Description: Microservice unique (logical) name
+    Description: Lambda unique (logical) name
 
   AlarmSNSTopicArn:
     Type: String
@@ -36,19 +36,22 @@ Parameters:
   Runtime:
     Type: String
     Default: 'nodejs18.x'
-
-  FunctionManagedPolicyArn:
-    Default: ''
+  
+  RoleArn:
     Type: String
-    Description: |
-        Managed policy containing specific policy that allow access to resources needed by the specific 
-        lambda. For example queues and dynamo tables.
-
+    Description: Lambda role arn
+  
+  Handler:
+    Type: String
+    Description: Lambda Handler
+    Default: "index.handler"
+    
   # Technical parameters
   VpcId:
     Type: AWS::EC2::VPC::Id
     Default: ''
     Description: the VPC id of the vpc where's the cluster containing the current service is deployed
+    
   Subnets:
     Type: List<AWS::EC2::Subnet::Id>
     Default: ''
@@ -169,7 +172,6 @@ Parameters:
     Default: ''
   
 Conditions:
-  HasManagedPolicyArn: !Not [ !Equals [ !Ref FunctionManagedPolicyArn, '' ] ] 
   HasVpcId: !Not [ !Equals [ !Ref VpcId, '' ] ]
   HasLayer1: !Not [ !Equals [ !Ref Layer1, '' ] ]
   HasLayer2: !Not [ !Equals [ !Ref Layer2, '' ] ]
@@ -189,40 +191,13 @@ Conditions:
 
 Resources:
 
-  FunctionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub '${FunctionName}-role'
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
-        - Fn::If: 
-          - HasManagedPolicyArn
-          - !Ref FunctionManagedPolicyArn
-          - !Ref "AWS::NoValue"
-        - Fn::If:
-          - HasVpcId
-          - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
-          - !Ref "AWS::NoValue"
-        # basare import su nuova condition importata dalla transform
-        - Fn::If:
-          - LamdaInsightsEnabled
-          - 'arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy'
-          - !Ref "AWS::NoValue"
-
   Function:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Ref FunctionName
       Runtime: !Ref Runtime
-      Role: !GetAtt FunctionRole.Arn
-      Handler: index.handler
+      Role: !Ref RoleArn
+      Handler: !Ref Handler
       MemorySize: !Ref MemorySize
       Timeout: !Ref Timeout
       TracingConfig:
@@ -275,7 +250,6 @@ Resources:
           - Key: !Select [ 0, !Split [ "=", !Ref Tag5Entry ] ]
             Value: !Select [ 1, !Split [ "=", !Ref Tag5Entry ] ]
           - !Ref "AWS::NoValue"
-
       VpcConfig:
         'Fn::If':
           - HasVpcId
@@ -296,11 +270,8 @@ Resources:
 
 
 Outputs:
-  FunctioName:
+  FunctionName:
     Value: !Ref Function
   
   FunctionArn:
     Value: !GetAtt Function.Arn
-
-  FunctionRoleArn:
-    Value: !GetAtt FunctionRole.Arn
