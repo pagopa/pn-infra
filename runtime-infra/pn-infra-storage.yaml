@@ -63,7 +63,7 @@ Parameters:
     Type: Number
     Default: 14
 
-  ## NEW KINESIS STREAM PARAMS
+  ## KINESIS STREAM PARAMS USED FOR NEW kinesis-data-stream.yml fragment template
   CdCPnFutureActionShards:
     Type: Number
     Default: 8
@@ -349,7 +349,10 @@ Resources:
             Action: "kms:*"
             Resource: "*"
 
-    ### Kinesis Data Stream: CDC for PN-ACTION DynamoDB Table
+  ## NOTE: WE ARE USING NEW TEMPLATES FOR DynamoDB tables used for Actions in pn-delivery-push (pn-action and pn-futureAction)
+  ##       TEMPLATES DEFINE ALSO ALARMS FOR STREAMS
+
+  ### Kinesis Data Stream: CDC for PN-ACTION DynamoDB Table (INSERT CDC ARE THE INTERESTED ONE)
   CdCPnActionStream:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Retain
@@ -358,10 +361,14 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-data-stream.yaml"
       Parameters:
         StreamName: "pn-action-cdc"
+        # PROVISIONED MODE: follow shard configuration
         StreamShardsCount: !Ref CdCPnActionShards
         StreamRetentionHours: !Ref CdCPnActionStreamRetentionHours
         RequireManagedKey: false
+        # USES SNSTopic used for all Kinesis alarms
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+        ## TODO: check alarms parameters
         DatapointsToAlarmStandard: !Ref CdCActionDatapointsToAlarmOncall
         StandardAlarmThresholdsMs: !Ref CdCActionStandardAlarmThresholdsMs
         OnCallAlarmThresholdsMs: !Ref CdCActionOnCallAlarmThresholdsMs
@@ -379,11 +386,14 @@ Resources:
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-data-stream.yaml"
       Parameters:
-        StreamName: "pn-action-cdc"
+        StreamName: "pn-future-action-cdc"
+        # PROVISIONED MODE: follow shard configuration
         StreamShardsCount: !Ref CdCPnFutureActionShards
         StreamRetentionHours: !Ref CdCPnFutureActionStreamRetentionHours
         RequireManagedKey: false
+        # USES SNSTopic used for all Kinesis alarms
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        ## TODO: check alarms parameters
         DatapointsToAlarmStandard: !Ref CdCActionDatapointsToAlarmOncall
         StandardAlarmThresholdsMs: !Ref CdCActionStandardAlarmThresholdsMs
         OnCallAlarmThresholdsMs: !Ref CdCActionOnCallAlarmThresholdsMs
