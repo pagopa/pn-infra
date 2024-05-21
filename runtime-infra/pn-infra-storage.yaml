@@ -347,6 +347,7 @@ Resources:
         StandardAlarmPeriodSeconds: !Ref CdCActionStandardAlarmPeriodSeconds
         StandardAlarmEvaluationPeriods: !Ref CdCActionStandardAlarmEvaluationPeriods
         DatapointsToAlarmOncall: !Ref CdCActionDatapointsToAlarmStandard
+
         OncallAlarmPeriodSeconds: !Ref CdCActionOncallAlarmPeriodSeconds
         OncallAlarmEvaluationPeriods: !Ref CdCActionOncallAlarmEvaluationPeriods
 
@@ -487,14 +488,6 @@ Outputs:
   CdcKinesisStreamKeyArn:
     Value: !GetAtt CdcKinesisServerSideEncryptionKey.Arn
     Description: "Arn of the KMS key used to encrypt the Kinesis source stream"
-
-  CdCPnFutureActionName:
-    Value: !Ref CdCPnFutureAction
-    Description: "Kinesis FutureAction Stream Name"
-
-  CdCPnActionName:
-    Value: !Ref CdCPnAction
-    Description: "Kinesis Action Stream Name"
 
   LogsKinesisStreamName:
     Value: !Ref LogsKinesisStream
