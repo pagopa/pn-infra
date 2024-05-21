@@ -1023,9 +1023,9 @@ Outputs:
     Description: pn-delivery-push input queue age alarm ARN
   
   # Delivery push inputs
-  DeliveryPushValidationUrlArn:
-    Value: [!GetAtt DeliveryPushValidationInputsQueue.Outputs.QueueURL,!GetAtt DeliveryPushValidationInputsQueue.Outputs.QueueARN]
-    Description: pn-delivery-push validation input queue url and arn, key pair
+  DeliveryPushInputValidationArrayInfo:
+    Value: [!GetAtt DeliveryPushValidationInputsQueue.Outputs.QueueURL,!GetAtt DeliveryPushValidationInputsQueue.Outputs.QueueARN, !GetAtt DeliveryPushValidationInputsQueue.Outputs.QueueName, !GetAtt DeliveryPushValidationInputsQueue.Outputs.SqsDLQAlarmArn, !GetAtt DeliveryPushValidationInputsQueue.Outputs.SqsAgeAlarmArn]
+    Description: Parameter [0 = QueueURL, 1 = QueueARN, 2 = QueueName, 3 = SqsDLQAlarmArn, 4 = SqsAgeAlarmArn]
     #TODO Superato limite 200 outputs
   # Delivery push inputs
     #  DeliveryPushValidationInputsQueueName:
