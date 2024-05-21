@@ -63,6 +63,65 @@ Parameters:
     Type: Number
     Default: 14
 
+  ## NEW KINESIS STREAM PARAMS
+  CdCPnFutureActionShards:
+    Type: Number
+    Default: 8
+    Description: Number of shards for the stream CdCPnFutureAction, 0 for OnDemand
+  CdCPnActionShards:
+    Type: Number
+    Default: 12
+    Description: Number of shards for the stream CdCPnFutureAction, 0 for OnDemand
+
+  CdCPnFutureActionStreamRetentionHours:
+    Type: Number
+    Default: 168
+    Description: Number of hours to retain data records in the stream
+
+  CdCPnActionStreamRetentionHours:
+    Type: Number
+    Default: 168
+    Description: Number of hours to retain data records in the stream
+
+  CdCActionStandardAlarmThresholdsMs:
+    Type: Number
+    Default: 2000000
+    Description: Threshold for standard alarms in milliseconds
+
+  CdCActionOnCallAlarmThresholdsMs:
+    Type: Number
+    Default: 2000000
+    Description: Threshold for oncall alarms in milliseconds for pn-<xx>Action tables
+
+  CdCActionDatapointsToAlarmStandard:
+    Type: Number
+    Default: 10
+    Description: Number of datapoints to alarm for standard alarms for pn-<xx>Action tables
+
+  CdCActionStandardAlarmPeriodSeconds:
+    Type: Number
+    Default: 60
+    Description: Period to alarm for standard alarms for pn-<xx>Action tables
+
+  CdCActionStandardAlarmEvaluationPeriods:
+    Type: Number
+    Default: 60
+    Description: Evaluation periods for standard alarms for pn-<xx>Action tables
+
+  CdCActionDatapointsToAlarmOncall:
+    Type: Number
+    Default: 10
+    Description: Number of datapoints to alarm for oncall alarms for pn-<xx>Action tables
+
+  CdCActionOncallAlarmPeriodSeconds:
+    Type: Number
+    Default: 60
+    Description: Period to alarm for oncall alarms for pn-<xx>Action tables
+
+  CdCActionOncallAlarmEvaluationPeriods:
+    Type: Number
+    Default: 60
+    Description: Evaluation periods for oncall alarms for pn-<xx>Action tables
 Conditions:
   MakeBucketCondition: !Not [!Equals [!Ref BucketSuffix, ""]]
 
