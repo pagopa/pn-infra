@@ -58,6 +58,8 @@ Parameters:
   MemorySize:
     Type: Number
     Description: "Define memory size for lambda"
+    MinValue: 128
+    MaxValue: 10240
 
   UseLambdaInsights:
     Type: String
@@ -130,7 +132,7 @@ Resources:
           ]
         - !If [HaveToUseLayer, !Ref LambdaLayer, "AWS::NoValue"]
       Timeout: !Ref Timeout
-      MemorySize: !Ref Timeout
+      MemorySize: !Ref MemorySize
       Tags:
         "Fn::Transform":
           Name: DynamicTagListMacro
