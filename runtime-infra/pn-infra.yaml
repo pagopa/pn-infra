@@ -1,12 +1,14 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: 'This template deploys the base infra for PN. VPC, AWS services endpoints, 
-              load balancer, ECS cluster'
+Description:
+  "This template deploys the base infra for PN. VPC, AWS services endpoints,
+  load balancer, ECS cluster"
 
 Parameters:
   ProjectName:
     Type: String
-    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
-      experimental environments without crash official development environment'
+    Description:
+      "Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment"
 
   VpcId:
     Type: String
@@ -46,20 +48,20 @@ Parameters:
     Description: Suffix to the log bucket name
   DataLakeAccountId1:
     Type: String
-    Default: '-'
+    Default: "-"
     Description: Data lake can read logs
   DataLakeAccountId2:
     Type: String
-    Default: '-'
+    Default: "-"
     Description: Data lake can read logs
 
   TemplateBucketBaseUrl:
     Type: String
-    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
-    
+    Description: "The S3 bucket from which to fetch the templates used by this stack."
+
   Version:
     Type: String
-    Description: 'keep track of used projects commitIds'
+    Description: "keep track of used projects commitIds"
 
   VpcEndpointsRequired:
     Type: String
@@ -67,40 +69,40 @@ Parameters:
     AllowedValues:
       - true
       - false
-      
-  ApplicationLoadBalancerArn: 
+
+  ApplicationLoadBalancerArn:
     Type: String
-    Default: '-'
+    Default: "-"
     Description: Application load balancer
 
-  ApplicationLoadBalancerAwsDns: 
+  ApplicationLoadBalancerAwsDns:
     Type: String
-    Default: '-'
+    Default: "-"
     Description: Application load balancer AWS DNS
 
   ApplicationLoadBalancerAwsDnsZoneId:
     Type: String
-    Default: '-'
+    Default: "-"
     Description: Application load balancer AWS DNS Zone ID
 
   ApplicationLoadBalancerListenerArn:
     Type: String
-    Default: '-'
+    Default: "-"
     Description: Application load balancer listener ARN
 
-  NetworkLoadBalancerLink: 
+  NetworkLoadBalancerLink:
     Type: String
-    Default: '-'
+    Default: "-"
     Description: Network load balancer VpcLink (used by api-gw)
 
-  WebappSecurityGroupId: 
+  WebappSecurityGroupId:
     Type: String
-    Default: '-'
+    Default: "-"
     Description: ALB security group ID
 
   VpcEgressSubnetsIds:
     Type: String
-    Default: '-'
+    Default: "-"
     Description: List of egress subnets
 
   LogRetention:
@@ -140,43 +142,42 @@ Parameters:
   LogsKinesisMaxAgeInMilliseconds:
     Type: Number
     Default: 36000000 # 10 hours
-    Description: 'MaxAgeInMilliseconds for Kinesis Logs GetRecords'
+    Description: "MaxAgeInMilliseconds for Kinesis Logs GetRecords"
 
   LogsKinesisMaxAgeInMillisecondsOncall:
     Type: Number
     Default: 216000000 # 60 hours
-    Description: 'MaxAgeInMilliseconds for Kinesis Logs GetRecords'
+    Description: "MaxAgeInMilliseconds for Kinesis Logs GetRecords"
 
   CdcKinesisMaxAgeInMilliseconds:
     Type: Number
     Default: 3600000 # 1 hour
-    Description: 'MaxAgeInMilliseconds for Kinesis Cdc GetRecords'
+    Description: "MaxAgeInMilliseconds for Kinesis Cdc GetRecords"
 
   CdcKinesisMaxAgeInMillisecondsOncall:
     Type: Number
     Default: 43200000 # 12 hours
-    Description: 'MaxAgeInMilliseconds for Kinesis Cdc GetRecords'
-
+    Description: "MaxAgeInMilliseconds for Kinesis Cdc GetRecords"
 
   # Data Monitoring pass-through params
   DynamoDbExportTableNames:
     Type: String
-    Description: 'Comma separated list of DynamoDB tables to export'
-    Default: ''
+    Description: "Comma separated list of DynamoDB tables to export"
+    Default: ""
 
   DynamoDbExportPrefix:
     Type: String
-    Description: 'Prefix for the DynamoDB export'
-    Default: 'incremental2024'
+    Description: "Prefix for the DynamoDB export"
+    Default: "incremental2024"
 
   ConfinfoDynamoDbExportBucketName:
     Type: String
-    Description: 'Bucket name for the DynamoDB export for Confinfo Account'
+    Description: "Bucket name for the DynamoDB export for Confinfo Account"
 
   ParquetBucketPath:
     Type: String
     Description: parquet files s3 bucket path
-    Default: 'parquet'
+    Default: "parquet"
 
   DataMonitoringCodebuildComputeType:
     Type: String
@@ -186,27 +187,35 @@ Parameters:
   DataMonitoringIndexCronExpression:
     Type: String
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
-    Default: '' # example: 'cron(0 9 * * ? *)'
+    Default: "" # example: 'cron(0 9 * * ? *)'
 
   DataMonitoringScriptVersion:
     Type: String
-    Description: 'The version of the BI or not BI EC metadata'
+    Description: "The version of the BI or not BI EC metadata"
     Default: ec_metadata_extract_v0_1
 
 Conditions:
-  IsAlbArnEmpty: !Equals [ !Ref ApplicationLoadBalancerArn, '-' ]
-  IsAlbArnDnsEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDns, '-' ]
-  IsAlbArnDnsZoneIdEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDnsZoneId, '-' ]
-  IsAlbListenerArnEmpty: !Equals [ !Ref ApplicationLoadBalancerListenerArn, '-' ]
-  IsNetworkLoadBalancerLinkEmpty: !Equals [ !Ref NetworkLoadBalancerLink, '-' ]
-  IsWebappSecurityGroupIdEmpty: !Equals [ !Ref WebappSecurityGroupId, '-' ]
-  RequiresAlbCreation: !Or [ !Condition IsAlbArnEmpty, !Condition IsAlbArnDnsEmpty, !Condition IsAlbArnDnsZoneIdEmpty, !Condition IsAlbListenerArnEmpty, !Condition IsNetworkLoadBalancerLinkEmpty, !Condition IsWebappSecurityGroupIdEmpty ]
-  
-  RequiresVpcEndpoints: !Equals [ !Ref VpcEndpointsRequired, true ]
+  IsAlbArnEmpty: !Equals [!Ref ApplicationLoadBalancerArn, "-"]
+  IsAlbArnDnsEmpty: !Equals [!Ref ApplicationLoadBalancerAwsDns, "-"]
+  IsAlbArnDnsZoneIdEmpty:
+    !Equals [!Ref ApplicationLoadBalancerAwsDnsZoneId, "-"]
+  IsAlbListenerArnEmpty: !Equals [!Ref ApplicationLoadBalancerListenerArn, "-"]
+  IsNetworkLoadBalancerLinkEmpty: !Equals [!Ref NetworkLoadBalancerLink, "-"]
+  IsWebappSecurityGroupIdEmpty: !Equals [!Ref WebappSecurityGroupId, "-"]
+  RequiresAlbCreation:
+    !Or [
+      !Condition IsAlbArnEmpty,
+      !Condition IsAlbArnDnsEmpty,
+      !Condition IsAlbArnDnsZoneIdEmpty,
+      !Condition IsAlbListenerArnEmpty,
+      !Condition IsNetworkLoadBalancerLinkEmpty,
+      !Condition IsWebappSecurityGroupIdEmpty,
+    ]
 
-  IsEgressDefined: !Not [ !Equals [ !Ref VpcEgressSubnetsIds, '-' ] ]
+  RequiresVpcEndpoints: !Equals [!Ref VpcEndpointsRequired, true]
+
+  IsEgressDefined: !Not [!Equals [!Ref VpcEgressSubnetsIds, "-"]]
 Resources:
-
   ###                       VPC BASE CONFIGURATIONS                       ###
   ###########################################################################
 
@@ -252,11 +261,11 @@ Resources:
     Condition: RequiresAlbCreation
     Type: AWS::Route53::RecordSet
     Properties:
-      Name: !Sub 'alb.core.${ProjectName}.internal'
+      Name: !Sub "alb.core.${ProjectName}.internal"
       Type: A
-      HostedZoneId: !Ref PrivateHostedZone  
+      HostedZoneId: !Ref PrivateHostedZone
       AliasTarget:
-        DNSName: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain 
+        DNSName: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain
         EvaluateTargetHealth: false
         HostedZoneId: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomainZone
 
@@ -269,8 +278,8 @@ Resources:
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-cluster.yaml"
       Parameters:
-        MacroServiceName: !Sub '${ProjectName}-core'
-  
+        MacroServiceName: !Sub "${ProjectName}-core"
+
   # Exporter role
   LogsExporterRole:
     Type: AWS::CloudFormation::Stack
@@ -283,7 +292,7 @@ Resources:
         DataLakeAccountId1: !Ref DataLakeAccountId1
         DataLakeAccountId2: !Ref DataLakeAccountId2
         SafeStorageAccountId: !Ref SafeStorageAccountId
-        BucketSuffix: !Ref BucketSuffix 
+        BucketSuffix: !Ref BucketSuffix
 
   ###                       CLOUDFORMATION TRANSFORM LAMBDAS              ###
   ###########################################################################
@@ -298,8 +307,12 @@ Resources:
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-cloudwatch-dashboard-transform.yaml"
 
-Outputs:
+  FragmentUtilitiesTransform:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-fragments-utils-transform.yaml"
 
+Outputs:
   # VPC outputs
   VpcId:
     Value: !Ref VpcId
@@ -311,19 +324,39 @@ Outputs:
 
   # Load balancers outputs
   NetworkLoadBalancerLink:
-    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink, !Ref NetworkLoadBalancerLink ]
+    Value:
+      !If [
+        RequiresAlbCreation,
+        !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink,
+        !Ref NetworkLoadBalancerLink,
+      ]
     Description: Used by API-Gw to connect into VPC
 
   ApplicationLoadBalancerListenerArn:
-    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerListenerArn, !Ref ApplicationLoadBalancerListenerArn ]
+    Value:
+      !If [
+        RequiresAlbCreation,
+        !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerListenerArn,
+        !Ref ApplicationLoadBalancerListenerArn,
+      ]
     Description: Application Load Balancerlistener Arn
 
   ApplicationLoadBalancerDomain:
-    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain, !Ref ApplicationLoadBalancerAwsDns ]
+    Value:
+      !If [
+        RequiresAlbCreation,
+        !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain,
+        !Ref ApplicationLoadBalancerAwsDns,
+      ]
     Description: Application Load Balancer Domain to use for http URL
 
   AlbSecurityGroup:
-    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.AlbSecurityGroup, !Ref WebappSecurityGroupId ]
+    Value:
+      !If [
+        RequiresAlbCreation,
+        !GetAtt LoadBalancer.Outputs.AlbSecurityGroup,
+        !Ref WebappSecurityGroupId,
+      ]
 
   # ECS Cluster
   ECSClusterName:
@@ -337,10 +370,10 @@ Outputs:
   LogsExporterPolicyArn:
     Description: Policy used by LogsExporterRoleArn Role
     Value: !GetAtt LogsExporterRole.Outputs.LogsIngestionPolicyArn
-    
+
   LogRetention:
     Value: !Ref LogRetention
-    
+
   # pass-though parameters
   AlarmSNSTopicArn:
     Value: !Ref AlarmSNSTopicArn
@@ -357,9 +390,9 @@ Outputs:
   CdcKinesisStreamName:
     Value: !Ref CdcKinesisStreamName
   CdcKinesisMaxAgeInMilliseconds:
-    Value: !Ref CdcKinesisMaxAgeInMilliseconds    
+    Value: !Ref CdcKinesisMaxAgeInMilliseconds
   CdcKinesisMaxAgeInMillisecondsOncall:
-    Value: !Ref CdcKinesisMaxAgeInMillisecondsOncall    
+    Value: !Ref CdcKinesisMaxAgeInMillisecondsOncall
   CdcKinesisStreamArn:
     Value: !Ref CdcKinesisStreamArn
   CdcKinesisStreamKeyArn:
@@ -379,8 +412,8 @@ Outputs:
   SafestorageLoggerLogGroupName:
     Value: !Ref SafestorageLoggerLogGroupName
   VpcEgressSubnetsIds:
-    Value: !If [ IsEgressDefined, !Ref VpcEgressSubnetsIds, !Ref VpcSubnets ]
-  
+    Value: !If [IsEgressDefined, !Ref VpcEgressSubnetsIds, !Ref VpcSubnets]
+
   # Data Monitoring pass-through params
   DynamoDbExportTableNames:
     Value: !Ref DynamoDbExportTableNames

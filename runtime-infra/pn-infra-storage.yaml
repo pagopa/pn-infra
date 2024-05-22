@@ -2,12 +2,11 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: "Infra storage resources"
 
 Parameters:
-  
   ProjectName:
     Type: String
     Default: pn
     Description: Base name for pn project
-  
+
   TemplateBucketBaseUrl:
     Type: String
     Description: cfn template bucket base url
@@ -18,20 +17,20 @@ Parameters:
   BucketSuffix:
     Type: String
     Description: Suffix to the log bucket name
-  
+
   SafeStorageAccountId:
     Type: String
-    Default: '-'
+    Default: "-"
     Description: Safestorage Account ID
 
   CdcStreamRetentionHours:
     Type: Number
-    Description: 'Change Data Capture Kinesis Data Stream retention period in hours'
+    Description: "Change Data Capture Kinesis Data Stream retention period in hours"
 
   CdcStreamShardCount:
     Type: Number
     Default: 0
-    Description: 'Number of shards in the stream'
+    Description: "Number of shards in the stream"
 
   CdcStreamMode:
     Description: Stream Mode.
@@ -41,12 +40,12 @@ Parameters:
 
   LogsStreamRetentionHours:
     Type: Number
-    Description: 'Cloudwatch Logs Kinesis Data Stream retention period in hours'
+    Description: "Cloudwatch Logs Kinesis Data Stream retention period in hours"
 
   LogsStreamShardCount:
     Type: Number
     Default: 0
-    Description: 'Number of shards in the stream'
+    Description: "Number of shards in the stream"
 
   LogsStreamMode:
     Description: Stream Mode.
@@ -64,18 +63,78 @@ Parameters:
     Type: Number
     Default: 14
 
-Conditions:
-  MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
-  
-  HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
+  ## KINESIS STREAM PARAMS USED FOR NEW kinesis-data-stream.yml fragment template
+  CdCPnFutureActionShards:
+    Type: Number
+    Default: 8
+    Description: Number of shards for the stream CdCPnFutureAction, 0 for OnDemand
 
-  ActivateSafeStorageCondition: !And [ !Condition MakeBucketCondition, !Condition HasStorageStorageAccountId]
+  CdCPnActionShards:
+    Type: Number
+    Default: 12
+    Description: Number of shards for the stream CdCPnActionShards, 0 for OnDemand
+
+  CdCPnFutureActionStreamRetentionHours:
+    Type: Number
+    Default: 168
+    Description: Number of hours to retain data records in the stream
+
+  CdCPnActionStreamRetentionHours:
+    Type: Number
+    Default: 168
+    Description: Number of hours to retain data records in the stream
+
+  CdCActionStandardAlarmThresholdsMs:
+    Type: Number
+    Default: 2000000
+    Description: Threshold for standard alarms in milliseconds
+
+  CdCActionOnCallAlarmThresholdsMs:
+    Type: Number
+    Default: 2000000
+    Description: Threshold for oncall alarms in milliseconds for pn-<xx>Action tables
+
+  CdCActionDatapointsToAlarmStandard:
+    Type: Number
+    Default: 10
+    Description: Number of datapoints to alarm for standard alarms for pn-<xx>Action tables
+
+  CdCActionStandardAlarmPeriodSeconds:
+    Type: Number
+    Default: 60
+    Description: Period to alarm for standard alarms for pn-<xx>Action tables
+
+  CdCActionStandardAlarmEvaluationPeriods:
+    Type: Number
+    Default: 60
+    Description: Evaluation periods for standard alarms for pn-<xx>Action tables
+
+  CdCActionDatapointsToAlarmOncall:
+    Type: Number
+    Default: 10
+    Description: Number of datapoints to alarm for oncall alarms for pn-<xx>Action tables
+
+  CdCActionOncallAlarmPeriodSeconds:
+    Type: Number
+    Default: 60
+    Description: Period to alarm for oncall alarms for pn-<xx>Action tables
+
+  CdCActionOncallAlarmEvaluationPeriods:
+    Type: Number
+    Default: 60
+    Description: Evaluation periods for oncall alarms for pn-<xx>Action tables
+Conditions:
+  MakeBucketCondition: !Not [!Equals [!Ref BucketSuffix, ""]]
+
+  HasStorageStorageAccountId: !Not [!Equals [!Ref SafeStorageAccountId, "-"]]
+
+  ActivateSafeStorageCondition:
+    !And [!Condition MakeBucketCondition, !Condition HasStorageStorageAccountId]
 
   CdcOnDemandDisabled: !Not [!Equals [!Ref CdcStreamMode, ON_DEMAND]]
   LogsOnDemandDisabled: !Not [!Equals [!Ref LogsStreamMode, ON_DEMAND]]
 
 Resources:
-  
   ### - S3 Bucket for logs storages
   ###########################################
   LogsBucket:
@@ -84,31 +143,31 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Sub '${ProjectName}-logs-bucket-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}'
+      BucketName: !Sub "${ProjectName}-logs-bucket-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}"
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-              KMSMasterKeyID: !Ref LogsBucketKmsKey              
-              SSEAlgorithm: 'aws:kms'
+              KMSMasterKeyID: !Ref LogsBucketKmsKey
+              SSEAlgorithm: "aws:kms"
             BucketKeyEnabled: true
-      PublicAccessBlockConfiguration: 
+      PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
       NotificationConfiguration:
         QueueConfigurations:
-          - Event: 's3:ObjectCreated:*'
-            Filter: 
+          - Event: "s3:ObjectCreated:*"
+            Filter:
               S3Key:
                 Rules:
                   - Name: prefix
-                    Value: 'diagnosticTrail'
+                    Value: "diagnosticTrail"
             Queue: !GetAtt DiagnosticCloudTrailFileQueue.Outputs.QueueARN
 
-  # - Log storage cryptography key 
+  # - Log storage cryptography key
   LogsBucketKmsKey:
     Condition: MakeBucketCondition
     Type: AWS::KMS::Key
@@ -154,29 +213,29 @@ Resources:
               - kms:DescribeKey
             Resource: "*"
           - Fn::If:
-            - ActivateSafeStorageCondition
-            - Sid: Allow safe storage kms usage
-              Effect: Allow
-              Action:
-                - kms:Encrypt
-                - kms:Decrypt
-                - kms:GenerateDataKey*
-              Principal:
-                Service: "cloudtrail.amazonaws.com"
-              Resource: "*"
-              Condition:
-                ArnLike: 
-                  aws:SourceArn: 
-                    - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
-                    - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/*"
-            - !Ref AWS::NoValue
+              - ActivateSafeStorageCondition
+              - Sid: Allow safe storage kms usage
+                Effect: Allow
+                Action:
+                  - kms:Encrypt
+                  - kms:Decrypt
+                  - kms:GenerateDataKey*
+                Principal:
+                  Service: "cloudtrail.amazonaws.com"
+                Resource: "*"
+                Condition:
+                  ArnLike:
+                    aws:SourceArn:
+                      - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                      - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/*"
+              - !Ref AWS::NoValue
 
   RuntimeEnvironmentVariablesBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Sub '${ProjectName}-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}'
+      BucketName: !Sub "${ProjectName}-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -185,7 +244,7 @@ Resources:
 
   ## KINESIS SOURCE STREAM FOR Change Data Capture
 
-  ### AWS KMS / Server-side encryption for Kinesis Stream 
+  ### AWS KMS / Server-side encryption for Kinesis Stream
   CdcKinesisServerSideEncryptionKey:
     Type: AWS::KMS::Key
     Properties:
@@ -207,15 +266,16 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
 
-  ### Kinesis Data Stream 
+  ### Kinesis Data Stream
   CdcKinesisStream:
     Type: AWS::Kinesis::Stream
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      Name: !Sub '${ProjectName}-cdc-stream'
+      Name: !Sub "${ProjectName}-cdc-stream"
       RetentionPeriodHours: !Ref CdcStreamRetentionHours
-      ShardCount: !If [CdcOnDemandDisabled, !Ref CdcStreamShardCount, !Ref "AWS::NoValue"]
+      ShardCount:
+        !If [CdcOnDemandDisabled, !Ref CdcStreamShardCount, !Ref "AWS::NoValue"]
       StreamEncryption:
         EncryptionType: KMS
         KeyId:
@@ -223,7 +283,7 @@ Resources:
             - CdcKinesisServerSideEncryptionKey
             - Arn
       StreamModeDetails:
-        StreamMode: !Ref CdcStreamMode   
+        StreamMode: !Ref CdcStreamMode
 
   ## KINESIS SOURCE STREAM FOR Logs
   LogsKinesisServerSideEncryptionKey:
@@ -247,15 +307,20 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
 
-  ### Kinesis Data Stream 
+  ### Kinesis Data Stream
   LogsKinesisStream:
     Type: AWS::Kinesis::Stream
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      Name: !Sub '${ProjectName}-logs-stream'
+      Name: !Sub "${ProjectName}-logs-stream"
       RetentionPeriodHours: !Ref LogsStreamRetentionHours
-      ShardCount: !If [LogsOnDemandDisabled, !Ref LogsStreamShardCount, !Ref "AWS::NoValue"]
+      ShardCount:
+        !If [
+          LogsOnDemandDisabled,
+          !Ref LogsStreamShardCount,
+          !Ref "AWS::NoValue",
+        ]
       StreamEncryption:
         EncryptionType: KMS
         KeyId:
@@ -263,11 +328,11 @@ Resources:
             - LogsKinesisServerSideEncryptionKey
             - Arn
       StreamModeDetails:
-        StreamMode: !Ref LogsStreamMode   
-        
+        StreamMode: !Ref LogsStreamMode
+
   # KMS AWS managed key for SSE pn-apikey-manager DynamoDB tables
   ApiKeyTablesEncryptKey:
-    Type: 'AWS::KMS::Key'
+    Type: "AWS::KMS::Key"
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -280,19 +345,73 @@ Resources:
           - Sid: Enable IAM User Permissions
             Effect: Allow
             Principal:
-              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
-            Action: 'kms:*'
-            Resource: '*'
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "kms:*"
+            Resource: "*"
+
+  ## NOTE: WE ARE USING NEW TEMPLATES FOR DynamoDB tables used for Actions in pn-delivery-push (pn-action and pn-futureAction)
+  ##       TEMPLATES DEFINE ALSO ALARMS FOR STREAMS
+
+  ### Kinesis Data Stream: CDC for PN-ACTION DynamoDB Table (INSERT CDC ARE THE INTERESTED ONE)
+  CdCPnActionStream:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-data-stream.yaml"
+      Parameters:
+        StreamName: "pn-action-cdc"
+        # PROVISIONED MODE: follow shard configuration
+        StreamShardsCount: !Ref CdCPnActionShards
+        StreamRetentionHours: !Ref CdCPnActionStreamRetentionHours
+        RequireManagedKey: false
+        # USES SNSTopic used for all Kinesis alarms
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+        ## TODO: check alarms parameters
+        DatapointsToAlarmStandard: !Ref CdCActionDatapointsToAlarmOncall
+        StandardAlarmThresholdsMs: !Ref CdCActionStandardAlarmThresholdsMs
+        OnCallAlarmThresholdsMs: !Ref CdCActionOnCallAlarmThresholdsMs
+        StandardAlarmPeriodSeconds: !Ref CdCActionStandardAlarmPeriodSeconds
+        StandardAlarmEvaluationPeriods: !Ref CdCActionStandardAlarmEvaluationPeriods
+        DatapointsToAlarmOncall: !Ref CdCActionDatapointsToAlarmStandard
+        OncallAlarmPeriodSeconds: !Ref CdCActionOncallAlarmPeriodSeconds
+        OncallAlarmEvaluationPeriods: !Ref CdCActionOncallAlarmEvaluationPeriods
+
+  ### Kinesis Data Stream: CDC for PN-FUTURE-ACTION DynamoDB Table
+  CdCPnFutureActionStream:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-data-stream.yaml"
+      Parameters:
+        StreamName: "pn-future-action-cdc"
+        # PROVISIONED MODE: follow shard configuration
+        StreamShardsCount: !Ref CdCPnFutureActionShards
+        StreamRetentionHours: !Ref CdCPnFutureActionStreamRetentionHours
+        RequireManagedKey: false
+        # USES SNSTopic used for all Kinesis alarms
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        ## TODO: check alarms parameters
+        DatapointsToAlarmStandard: !Ref CdCActionDatapointsToAlarmOncall
+        StandardAlarmThresholdsMs: !Ref CdCActionStandardAlarmThresholdsMs
+        OnCallAlarmThresholdsMs: !Ref CdCActionOnCallAlarmThresholdsMs
+        StandardAlarmPeriodSeconds: !Ref CdCActionStandardAlarmPeriodSeconds
+        StandardAlarmEvaluationPeriods: !Ref CdCActionStandardAlarmEvaluationPeriods
+        DatapointsToAlarmOncall: !Ref CdCActionDatapointsToAlarmStandard
+        OncallAlarmPeriodSeconds: !Ref CdCActionOncallAlarmPeriodSeconds
+        OncallAlarmEvaluationPeriods: !Ref CdCActionOncallAlarmEvaluationPeriods
 
   SafestorageLoggerLogGroup:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain    
+    DeletionPolicy: Retain
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
       Parameters:
-        LogGroupName: !Sub '${ProjectName}-safestorage-logger'
-        LogGroupPrefix: '/aws/lambda'
+        LogGroupName: !Sub "${ProjectName}-safestorage-logger"
+        LogGroupPrefix: "/aws/lambda"
         LogGroupRetention: !Ref LogRetention
         LogsKinesisSourceStreamArn: !GetAtt LogsKinesisStream.Arn
 
@@ -300,40 +419,40 @@ Resources:
   DiagnosticLambdaLoggerName:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain    
+    DeletionPolicy: Retain
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
       Parameters:
-        LogGroupName: !Sub '${ProjectName}-diagnostic-logger'
-        LogGroupPrefix: '/aws/lambda'
+        LogGroupName: !Sub "${ProjectName}-diagnostic-logger"
+        LogGroupPrefix: "/aws/lambda"
         LogGroupRetention: !Ref LogRetention
         LogsKinesisSourceStreamArn: !GetAtt LogsKinesisStream.Arn
 
   DiagnosticCloudTrailFileQueue:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain      
+    DeletionPolicy: Retain
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
-        QueueName: !Sub '${ProjectName}-diagnostic-cloudtrail-file'
+        QueueName: !Sub "${ProjectName}-diagnostic-cloudtrail-file"
         DelaySeconds: 1
-        AlarmSNSTopicName: !Ref AlarmSNSTopicName    
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
   # Export new safestorage cloudtrail file events
   DiagnosticCloudTrailFileQueueResourcePolicy:
     Type: AWS::SQS::QueuePolicy
-    Properties: 
-      Queues: 
+    Properties:
+      Queues:
         - !GetAtt DiagnosticCloudTrailFileQueue.Outputs.QueueURL
       PolicyDocument:
-        Statement: 
+        Statement:
           - Sid: pnCoreAccountGet
             Effect: "Allow"
-            Principal:  
+            Principal:
               AWS:
                 - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
-            Action: 
+            Action:
               - "sqs:ReceiveMessage"
               - "sqs:DeleteMessage"
               - "sqs:GetQueueAttributes"
@@ -342,10 +461,10 @@ Resources:
             Resource: !GetAtt DiagnosticCloudTrailFileQueue.Outputs.QueueARN
           - Sid: s3ServicePut
             Effect: "Allow"
-            Principal:  
-              Service: 
+            Principal:
+              Service:
                 - "s3.amazonaws.com"
-            Action: 
+            Action:
               - "sqs:SendMessage"
               - "sqs:GetQueueAttributes"
               - "sqs:ChangeMessageVisibility"
@@ -358,45 +477,53 @@ Resources:
                 "aws:SourceAccount": !Ref AWS::AccountId
 Outputs:
   LogsBucketKmsKeyArn:
-    Value: 
+    Value:
       Fn::If:
         - MakeBucketCondition
         - !GetAtt LogsBucketKmsKey.Arn
-        - ''
-  
+        - ""
+
   LogsBucketName:
-    Value: 
+    Value:
       Fn::If:
         - MakeBucketCondition
         - !Ref LogsBucket
-        - ''
+        - ""
 
   CdcKinesisStreamName:
     Value: !Ref CdcKinesisStream
-    Description: 'Kinesis source stream name'
-  
+    Description: "Kinesis source stream name"
+
   CdcKinesisStreamArn:
     Value: !GetAtt CdcKinesisStream.Arn
-    Description: 'Kinesis source stream name ARN'
+    Description: "Kinesis source stream name ARN"
+
+  CdCPnFutureActionArn:
+    Value: !Ref CdCPnFutureActionStream
+    Description: "Kinesis source stream name ARN"
+
+  CdCPnActionArn:
+    Value: !GetAtt CdCPnActionStream.Arn
+    Description: "Kinesis source stream name ARN"
 
   CdcKinesisStreamKeyArn:
     Value: !GetAtt CdcKinesisServerSideEncryptionKey.Arn
-    Description: 'Arn of the KMS key used to encrypt the Kinesis source stream'
+    Description: "Arn of the KMS key used to encrypt the Kinesis source stream"
 
   LogsKinesisStreamName:
     Value: !Ref LogsKinesisStream
-    Description: 'Kinesis source stream name'
-  
+    Description: "Kinesis source stream name"
+
   LogsKinesisStreamArn:
     Value: !GetAtt LogsKinesisStream.Arn
-    Description: 'Kinesis source stream name ARN'
+    Description: "Kinesis source stream name ARN"
 
   LogsKinesisStreamKeyArn:
     Value: !GetAtt LogsKinesisServerSideEncryptionKey.Arn
-    Description: 'Arn of the KMS key used to encrypt the Kinesis source stream'
+    Description: "Arn of the KMS key used to encrypt the Kinesis source stream"
 
   BucketSuffix: # used to generate kms alias
-    Value: !Ref BucketSuffix 
+    Value: !Ref BucketSuffix
 
   # Pass through parameters
   AlarmSNSTopicArn:
@@ -404,7 +531,7 @@ Outputs:
 
   AlarmSNSTopicName:
     Value: !Ref AlarmSNSTopicName
-  
+
   SafeStorageAccountId:
     Value: !Ref SafeStorageAccountId
 
@@ -415,7 +542,7 @@ Outputs:
     Value: !Ref ApiKeyTablesEncryptKey
 
   SafestorageLoggerLogGroupName:
-    Value: !Sub '${ProjectName}-safestorage-logger'
+    Value: !Sub "${ProjectName}-safestorage-logger"
 
   LogRetention:
     Value: !Ref LogRetention
