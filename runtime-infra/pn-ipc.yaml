@@ -521,22 +521,6 @@ Resources:
         - Key: "Microservice"
           Value: "pn-delivery-push"
   
-  ### Communication between PN-DELIVERY and PN-DELIVERY-PUSH - FOR NEW NOTIFICATION EVENT ###
-  DeliveryPushValidationInputsQueue:
-    Type: AWS::CloudFormation::Stack
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
-      Parameters:
-        QueueName: !Sub '${ProjectName}-delivery_push_validation_inputs'
-        DelaySeconds: 10
-        AlarmSNSTopicName: !Ref AlarmSNSTopicName
-        FifoQueue: true
-      Tags:
-        - Key: "Microservice"
-          Value: "pn-delivery-push"
-
   ### Communication FROM EXTERNAL-CHANNELS ###
   ExternalChannelsOutputsQueue:
     Type: AWS::CloudFormation::Stack
@@ -1022,28 +1006,6 @@ Outputs:
     Value: !GetAtt DeliveryPushInputsQueue.Outputs.SqsAgeAlarmArn
     Description: pn-delivery-push input queue age alarm ARN
   
-  # Delivery push inputs
-  DeliveryPushInputValidationArrayInfo:
-    Value: [!GetAtt DeliveryPushValidationInputsQueue.Outputs.QueueURL,!GetAtt DeliveryPushValidationInputsQueue.Outputs.QueueARN, !GetAtt DeliveryPushValidationInputsQueue.Outputs.QueueName, !GetAtt DeliveryPushValidationInputsQueue.Outputs.SqsDLQAlarmArn, !GetAtt DeliveryPushValidationInputsQueue.Outputs.SqsAgeAlarmArn]
-    Description: Parameter [0 = QueueURL, 1 = QueueARN, 2 = QueueName, 3 = SqsDLQAlarmArn, 4 = SqsAgeAlarmArn]
-    #TODO Superato limite 200 outputs
-  # Delivery push inputs
-    #  DeliveryPushValidationInputsQueueName:
-    #Value: !GetAtt DeliveryPushValidationInputsQueue.Outputs.QueueName
-    #Description: pn-delivery-push validation input queue name
-    #DeliveryPushValidationInputsQueueURL:
-    #Value: !GetAtt DeliveryPushValidationInputsQueue.Outputs.QueueURL
-    #Description: pn-delivery-push validation input queue URL
-    #DeliveryPushValidationInputsQueueARN:
-    #Value: !GetAtt DeliveryPushValidationInputsQueue.Outputs.QueueARN
-    #Description: pn-delivery-push validation input queue ARN
-    #DeliveryPushValidationInputsQueueAlarmARN:
-    #Value: !GetAtt DeliveryPushValidationInputsQueue.Outputs.SqsDLQAlarmArn
-    #Description: pn-delivery-push validation input queue alarm ARN
-    #DeliveryPushValidationInputsQueueAgeAlarmARN:
-    #Value: !GetAtt DeliveryPushValidationInputsQueue.Outputs.SqsAgeAlarmArn
-    #Description: pn-delivery-push validation input queue age alarm ARN
-
   # External channels outputs
   ExternalChannelsOutputsQueueName:
     Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueName
