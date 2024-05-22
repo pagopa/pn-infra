@@ -12,7 +12,11 @@ Resources:
   DynamicEnvVariablesLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub "/aws/lambda/${!GetAtt DynamicVariableListMacro.Name}"
+      LogGroupName:
+        !Sub [
+          "/aws/lambda/${groupName}",
+          { groupName: !Ref DynamicVariableListMacro },
+        ]
       RetentionInDays: 14
 
   DynamicEnvVariablesRole:
@@ -49,11 +53,18 @@ Resources:
       Code:
         ZipFile: |
           async function handler(event, context) {
-              console.log('event is ', event.body);
-
-              return  {
-                  statusCode:200,
-                  body:"ok"
+              let envVars = event.params?.KeyValue?(event.params?.KeyValue):[];
+              const resFragment = {};
+              for (let i = 0; i < envVars.length; i++) {
+                const keyPair = envVars[i].split("=");
+                if (!keyPair || keyPair.length != 2)
+                  continue;
+                resFragment[keyPair[0]]=keyPair[1];
+              }
+              return {
+                "requestId": event.requestId,
+                "fragment": resFragment,
+                "status": 'success'
               }
           };
           exports.handler = handler;
@@ -66,4 +77,83 @@ Resources:
     Properties:
       Action: "lambda:InvokeFunction"
       FunctionName: !GetAtt DynamicEnvVariablesFunction.Arn
+      Principal: "cloudformation.amazonaws.com"
+
+  ###########
+  DynamicTagListMacro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Description: Define a custom enviroment variable set for a lambda function
+      FunctionName: !GetAtt DynamicTagFunction.Arn
+      Name: DynamicVariableListTransform
+
+  DynamicTagLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        !Sub [
+          "/aws/lambda/${groupName}",
+          { groupName: !Ref DynamicTagListMacro },
+        ]
+      RetentionInDays: 14
+
+  DynamicTagRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ["sts:AssumeRole"]
+      Path: /
+      Policies:
+        - PolicyName: DynamicTag
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/${!GetAtt DynamicTagListMacro.Name}"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/${!GetAtt DynamicTagListMacro.Name}:*"
+
+  DynamicTagFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          const handler = async  (event, context) => {
+            let envVars = event.params?.KeyValue?(event.params?.KeyValue):[];
+            let resFragment = [];
+            for (let i = 0; i < envVars.length; i++) {
+              const keyPair = envVars[i].split("=");
+              if (!keyPair || keyPair.length != 2) continue;
+              let res = {Key: keyPair[0], Value: keyPair[1]}
+              resFragment.push(res);
+            }
+            console.log(resFragment);
+            return {
+              requestId: event.requestId,
+              fragment: resFragment,
+              status: "success",
+            };
+          }
+          exports.handler=handler;
+      Runtime: nodejs18.x
+      Handler: "index.handler"
+      Role: !GetAtt DynamicTagRole.Arn
+
+  DynamicTagFunctionPermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt DynamicTagFunction.Arn
       Principal: "cloudformation.amazonaws.com"
