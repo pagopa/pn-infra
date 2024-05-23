@@ -5,7 +5,7 @@ Resources:
   DynamicVariableListMacro:
     Type: AWS::CloudFormation::Macro
     Properties:
-      Description: Define a custom enviroment variable set for a lambda function
+      Description: Define a custom environment variable set for a lambda function
       FunctionName: !GetAtt DynamicEnvVariablesFunction.Arn
       Name: DynamicVariableListTransform
 
@@ -39,13 +39,13 @@ Resources:
                 Action:
                   - logs:CreateLogGroup
                 Resource:
-                  - !Sub ["arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/${DynamicVariableListMacroName}", { DynamicVariableListMacroName: !Ref DynamicVariableListMacro }]
+                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/DynamicEnvVariables"
               - Effect: Allow
                 Action:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - !Sub [ "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/${DynamicVariableListMacroName}:*", { DynamicVariableListMacroName: !Ref DynamicVariableListMacro } ]
+                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/DynamicEnvVariables:*" 
 
   DynamicEnvVariablesFunction:
     Type: AWS::Lambda::Function
@@ -117,13 +117,13 @@ Resources:
                 Action:
                   - logs:CreateLogGroup
                 Resource:
-                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/${!GetAtt DynamicTagListMacro.Name}"
+                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/DynamicTag"
               - Effect: Allow
                 Action:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/${!GetAtt DynamicTagListMacro.Name}:*"
+                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/DynamicTag:*"
 
   DynamicTagFunction:
     Type: AWS::Lambda::Function
