@@ -168,27 +168,27 @@ Outputs:
     Value: !GetAtt KinesisStream.Arn
     Description: "Kinesis source stream name ARN"
 
-  KinesisStreamKeyArn:
-    Value:
-      !If [
-        HasRequireManagedKey,
-        !GetAtt KinesisServerSideEncryptionKey.Arn,
-        !Ref "AWS::NoValue",
-      ]
-    Description: "Arn of the KMS key used to encrypt the Kinesis source stream"
-
-  StandardAlarmArn:
-    Value:
-      !If [
-        HasStandardAlarmThresholds,
-        !GetAtt KinesisGetRecordsIteratorAgeStandardAlarm.Arn,
-        !Ref "AWS::NoValue",
-      ]
-
-  OncallAlarmArn:
-    Value:
-      !If [
-        HasOncallAlarmThresholds,
-        !GetAtt KinesisGetRecordsIteratorAgeStandardOncallAlarm.Arn,
-        !Ref "AWS::NoValue",
-      ]
+#  KinesisStreamKeyArn:
+#    Value:
+#      !If [
+#        HasRequireManagedKey,
+#        !GetAtt KinesisServerSideEncryptionKey.Arn,
+#        !Ref "AWS::NoValue",
+#      ]
+#    Description: "Arn of the KMS key used to encrypt the Kinesis source stream"
+#
+#  StandardAlarmArn:
+#    Value:
+#      !If [
+#        HasStandardAlarmThresholds,
+#        !GetAtt KinesisGetRecordsIteratorAgeStandardAlarm.Arn,
+#        !Ref "AWS::NoValue",
+#      ]
+#
+#  OncallAlarmArn:
+#    Value:
+#      !If [
+#        HasOncallAlarmThresholds,
+#        !GetAtt KinesisGetRecordsIteratorAgeStandardOncallAlarm.Arn,
+#        !Ref "AWS::NoValue",
+#      ]
