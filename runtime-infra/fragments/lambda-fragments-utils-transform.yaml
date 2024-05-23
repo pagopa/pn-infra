@@ -39,13 +39,13 @@ Resources:
                 Action:
                   - logs:CreateLogGroup
                 Resource:
-                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/${!GetAtt DynamicVariableListMacro.Name}"
+                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/${DynamicVariableListMacro}"
               - Effect: Allow
                 Action:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/${!GetAtt DynamicVariableListMacro.Name}:*"
+                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/${DynamicVariableListMacro}:*"
 
   DynamicEnvVariablesFunction:
     Type: AWS::Lambda::Function
