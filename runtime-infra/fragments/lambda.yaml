@@ -51,7 +51,15 @@ Parameters:
     Type: List<AWS::EC2::Subnet::Id>
     Default: ''
     Description: the subnets where the service is going to be deployed
-
+  
+  TracingConfigMode:
+    Type: String
+    AllowedValues:
+      - Active
+      - PassThrough
+      - NotUsed
+    Default: NotUsed
+    
   # Function layers
   Layer1:
     Type: String
@@ -100,7 +108,8 @@ Conditions:
 
   # this condition will be overridden by the transform
   LamdaInsightsEnabled: !Equals [ 'true', 'false' ]
-
+  IsEnabledTracingConfig: !Not [!Equals [!Ref TracingConfigMode, NotUsed]]
+  
 Resources:
 
   Function:
@@ -113,7 +122,12 @@ Resources:
       MemorySize: !Ref MemorySize
       Timeout: !Ref Timeout
       TracingConfig:
-        Mode: Active
+        Mode:
+          !If [
+            IsEnabledTracingConfig,
+            !Ref TracingConfigMode,
+            !Ref "AWS::NoValue",
+          ]
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"    
         - Fn::If:
