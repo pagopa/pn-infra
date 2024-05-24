@@ -330,46 +330,6 @@ Resources:
       StreamModeDetails:
         StreamMode: !Ref LogsStreamMode
 
-  ### Kinesis Data Stream: CDC for PN-ACTION DynamoDB Table
-  CdCPnAction:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-data-stream.yaml"
-      Parameters:
-        StreamName: "pn-action-cdc"
-        StreamShardsCount: !Ref CdCPnActionShards
-        StreamRetentionHours: !Ref CdCPnFutureActionStreamRetentionHours
-        RequireManagedKey: false
-        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        DatapointsToAlarmStandard: !Ref CdCActionDatapointsToAlarmOncall
-        StandardAlarmThresholdsMs: !Ref CdCActionStandardAlarmThresholdsMs
-        OnCallAlarmThresholdsMs: !Ref CdCActionOnCallAlarmThresholdsMs
-        StandardAlarmPeriodSeconds: !Ref CdCActionStandardAlarmPeriodSeconds
-        StandardAlarmEvaluationPeriods: !Ref CdCActionStandardAlarmEvaluationPeriods
-        DatapointsToAlarmOncall: !Ref CdCActionDatapointsToAlarmStandard
-        OncallAlarmPeriodSeconds: !Ref CdCActionOncallAlarmPeriodSeconds
-        OncallAlarmEvaluationPeriods: !Ref CdCActionOncallAlarmEvaluationPeriods
-
-  ### Kinesis Data Stream: CDC for PN-FUTURE-ACTION DynamoDB Table
-  CdCPnFutureAction:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-data-stream.yaml"
-      Parameters:
-        StreamName: "pn-action-cdc"
-        StreamShardsCount: !Ref CdCPnFutureActionShards
-        StreamRetentionHours: !Ref CdCPnActionStreamRetentionHours
-        RequireManagedKey: false
-        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        DatapointsToAlarmStandard: !Ref CdCActionDatapointsToAlarmOncall
-        StandardAlarmThresholdsMs: !Ref CdCActionStandardAlarmThresholdsMs
-        OnCallAlarmThresholdsMs: !Ref CdCActionOnCallAlarmThresholdsMs
-        StandardAlarmPeriodSeconds: !Ref CdCActionStandardAlarmPeriodSeconds
-        StandardAlarmEvaluationPeriods: !Ref CdCActionStandardAlarmEvaluationPeriods
-        DatapointsToAlarmOncall: !Ref CdCActionDatapointsToAlarmStandard
-        OncallAlarmPeriodSeconds: !Ref CdCActionOncallAlarmPeriodSeconds
-        OncallAlarmEvaluationPeriods: !Ref CdCActionOncallAlarmEvaluationPeriods
-
   # KMS AWS managed key for SSE pn-apikey-manager DynamoDB tables
   ApiKeyTablesEncryptKey:
     Type: "AWS::KMS::Key"
