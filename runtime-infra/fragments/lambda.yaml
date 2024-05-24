@@ -59,7 +59,6 @@ Parameters:
     Type: Number
     Description: "Define memory size for lambda"
     MinValue: 128
-    MaxValue: 10240
 
   UseLambdaInsights:
     Type: String
@@ -68,7 +67,11 @@ Parameters:
 
   UseLayer:
     Type: String
-    Description: "Define use of lambda insights"
+    Description: "Define use of lambda multilayers"
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "false"
 
   LayerName:
     Type: String
@@ -146,6 +149,7 @@ Resources:
               KeyValue: !Ref EnvVariables
 
   LambdaLayer:
+    Condition: HaveToUseLayer
     Type: AWS::Lambda::LayerVersion
     Properties:
       CompatibleRuntimes:
