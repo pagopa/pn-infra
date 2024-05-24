@@ -19,8 +19,10 @@ Parameters:
     Description: S3 object key where the lambda code is stored
 
   MemorySize:
-    Type: String
-    Description: memory amount reserved to the task pod.
+    Type: Number
+    Description: memory amount reserved to the task pod
+    MinValue: 256
+    MaxValue: 10240
 
   Timeout:
     Type: String
@@ -42,13 +44,15 @@ Parameters:
 
   # Technical parameters
   VpcId:
-    Type: AWS::EC2::VPC::Id
-    Default: ""
+    # Type: AWS::EC2::VPC::Id
+    Type: String
+    Default: ''
     Description: the VPC id of the vpc where's the cluster containing the current service is deployed
 
   Subnets:
-    Type: List<AWS::EC2::Subnet::Id>
-    Default: ""
+    # Type: List<AWS::EC2::Subnet::Id>
+    Type: String
+    Default: ''
     Description: the subnets where the service is going to be deployed
 
   TracingConfigMode:
