@@ -1,0 +1,214 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Lambda template
+
+Parameters:
+  LambdaName:
+    Type: String
+    Description: Lambda name
+  
+  Runtime:
+    Type: String
+    Description: Lambda runtime
+    AllowedValues:
+      - nodejs18.x
+    Default: nodejs18.x
+    
+  Handler:
+    Type: String
+    Description: Lambda Handler
+    Default: "index.handler"
+    
+  CodeS3BucketName:
+    Type: String
+    Description: S3 bucket name
+  
+  CodeS3BucketKey:
+    Type: String
+    Description: S3 bucket key
+  
+  RoleArn:
+    Type: String
+    Description: Lambda role arn
+  
+  PutIntoVpc:
+    Type: String
+    Default: "false"
+  
+  GroupIdSecurityGroup:
+    Type: String
+    Description: Lambda security groupId
+  
+  SubnetsIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: "subnets ids comma separated list"
+  
+  TracingConfigMode:
+    Type: String
+    AllowedValues:
+      - Active
+      - PassThrough
+    Default: ''
+  
+  Timeout:
+    Type: Number
+    Default: 10
+    Description: "Define timeout time for lambda"
+  
+  MemorySize:
+    Type: Number
+    Description: "Define memory size for lambda"
+    
+  UseLambdaInsights:
+    Type: String
+    Description: "Define use of lambda layer"
+    Default: "true"
+  
+  UseLayer:
+    Type: String
+    Description: "Define use of lambda insights"
+    
+  LayerName:
+    Type: String
+    Description: "Define layer name"
+    
+  LayerS3BucketName:
+    Type: String
+    Description: "S3 layer bucket name"
+  
+  LayerS3BucketKey:
+    Type: String
+    Description: "S3 layer bucket key"
+  
+  EnvEntry1:
+    Description: 1st environment entry in the form key=value
+    Type: String
+    Default: ''
+  
+  EnvEntry2:
+    Description: 2nd environment entry in the form key=value
+    Type: String
+    Default: ''
+  
+  EnvEntry3:
+    Description: 3nd environment entry in the form key=value
+    Type: String
+    Default: ''
+  
+  EnvEntry4:
+    Description: 4nd environment entry in the form key=value
+    Type: String
+    Default: ''
+  
+  EnvEntry5:
+    Description: 5nd environment entry in the form key=value
+    Type: String
+    Default: ''
+  
+  TagEntry1:
+    Description: 1st tag entry in the form key=value
+    Type: String
+    Default: ''
+  
+  TagEntry2:
+    Description: 2nd tag entry in the form key=value
+    Type: String
+    Default: ''
+    
+Conditions:
+  HaveToDefineVpcs: !Equals [ "true", !Ref PutIntoVpc ]
+  IsEnabledTracingConfig: !Not [ !Equals [ !Ref TracingConfigMode, '' ] ]
+  HaveToUseLambdaInsights: !Equals [!Ref UseLambdaInsights, "true"]
+  HaveToUseLayer: !Equals [ !Ref UseLayer, "true" ]
+  Env1Exist: !Not [ !Equals [ !Ref EnvEntry1, '' ] ]
+  Env2Exist: !Not [ !Equals [ !Ref EnvEntry2, '' ] ]
+  Env3Exist: !Not [ !Equals [ !Ref EnvEntry3, '' ] ]
+  Env4Exist: !Not [ !Equals [ !Ref EnvEntry4, '' ] ]
+  Env5Exist: !Not [ !Equals [ !Ref EnvEntry5, '' ] ]
+  Tag1Exist: !Not [ !Equals [ !Ref TagEntry1, '' ] ]
+  Tag2Exist: !Not [ !Equals [ !Ref TagEntry2, '' ] ]
+  
+Resources:
+  # Lambda function
+  Lambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref LambdaName
+      Runtime: !Ref Runtime
+      Handler: !Ref Handler
+      Code:
+        S3Bucket: !Ref CodeS3BucketName
+        S3Key: !Ref CodeS3BucketKey
+      Role: !Ref RoleArn
+      VpcConfig:
+        Fn::If:
+          - HaveToDefineVpcs
+          - SecurityGroupIds:
+              - !Ref GroupIdSecurityGroup
+            SubnetIds: !Ref SubnetsIds
+          - !Ref AWS::NoValue
+      Environment:
+        Variables:
+          - 'Fn::If':
+              - Env1Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref EnvEntry1 ] ]
+                Value: !Select [ 1, !Split [ "=", !Ref EnvEntry1 ] ]
+              - !Ref "AWS::NoValue"
+          - 'Fn::If':
+              - Env2Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref EnvEntry2 ] ]
+                Value: !Select [ 1, !Split [ "=", !Ref EnvEntry2 ] ]
+              - !Ref "AWS::NoValue"
+          - 'Fn::If':
+              - Env3Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref EnvEntry3 ] ]
+                Value: !Select [ 1, !Split [ "=", !Ref EnvEntry3 ] ]
+              - !Ref "AWS::NoValue"
+          - 'Fn::If':
+              - Env4Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref EnvEntry4 ] ]
+                Value: !Select [ 1, !Split [ "=", !Ref EnvEntry4 ] ]
+              - !Ref "AWS::NoValue"
+          - 'Fn::If':
+              - Env5Exist
+              - Name: !Select [ 0, !Split [ "=", !Ref EnvEntry5 ] ]
+                Value: !Select [ 1, !Split [ "=", !Ref EnvEntry5 ] ]
+              - !Ref "AWS::NoValue"
+      TracingConfig:
+        Condition: IsEnabledTracingConfig
+        Mode: !Ref TracingConfigMode
+      Layers:
+        - !If [HaveToUseLambdaInsights, "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13", "AWS::NoValue"]
+        - !If [HaveToUseLayer, !Ref LambdaLayer, "AWS::NoValue"]
+      Timeout: !Ref Timeout
+      MemorySize: !Ref Timeout
+      Tags:
+        - 'Fn::If':
+            - Tag1Exist
+            - Name: !Select [ 0, !Split [ "=", !Ref TagEntry1 ] ]
+              Value: !Select [ 1, !Split [ "=", !Ref TagEntry1 ] ]
+            - !Ref "AWS::NoValue"
+        - 'Fn::If':
+            - Tag2Exist
+            - Name: !Select [ 0, !Split [ "=", !Ref TagEntry2 ] ]
+              Value: !Select [ 1, !Split [ "=", !Ref TagEntry2 ] ]
+            - !Ref "AWS::NoValue"
+
+  LambdaLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+        - !Ref Runtime
+      Content:
+        S3Bucket: !Ref LayerS3BucketName
+        S3Key: !Ref LayerS3BucketKey
+      Description: NodeJs Libs layer
+      LayerName: !Ref LayerName
+
+Outputs:
+  LambdaName:
+    Value: !Ref Lambda
+    Description: 'Lambda name'
+
+  LambdaArn:
+    Value: !GetAtt Lambda.Arn
+    Description: 'Lambda ARN'
