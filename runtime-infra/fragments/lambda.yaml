@@ -1,11 +1,10 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Description: Add an ECS Service to an exsisting ECS cluster
 
-Transform:
-  - AddLambdaContextTransform
+# Transform:
+#   - AddLambdaContextTransform
 
 Parameters:
-
   # Logical parameters
   FunctionName:
     Type: String
@@ -30,28 +29,28 @@ Parameters:
 
   Runtime:
     Type: String
-    Default: 'nodejs18.x'
-  
+    Default: "nodejs18.x"
+
   RoleArn:
     Type: String
     Description: Lambda role arn
-  
+
   Handler:
     Type: String
     Description: Lambda Handler
     Default: "index.handler"
-    
+
   # Technical parameters
   VpcId:
     Type: AWS::EC2::VPC::Id
-    Default: ''
+    Default: ""
     Description: the VPC id of the vpc where's the cluster containing the current service is deployed
-    
+
   Subnets:
     Type: List<AWS::EC2::Subnet::Id>
-    Default: ''
+    Default: ""
     Description: the subnets where the service is going to be deployed
-  
+
   TracingConfigMode:
     Type: String
     AllowedValues:
@@ -59,33 +58,33 @@ Parameters:
       - PassThrough
       - NotUsed
     Default: NotUsed
-    
+
   # Function layers
   Layer1:
     Type: String
     Description: ARN of the first layer
-    Default: ''
-  
+    Default: ""
+
   Layer2:
     Type: String
     Description: ARN of the second layer
-    Default: ''
-  
+    Default: ""
+
   Layer3:
     Type: String
     Description: ARN of the third layer
-    Default: ''
-  
+    Default: ""
+
   Layer4:
     Type: String
     Description: ARN of the fourth layer
-    Default: ''
-  
+    Default: ""
+
   Layer5:
     Type: String
     Description: ARN of the fifth layer
-    Default: ''
-  
+    Default: ""
+
   # Tags
   TagList:
     Description: Comma separated Tag List  in the form key1=value1,key2=value2,....
@@ -97,21 +96,20 @@ Parameters:
     Description: Comma separated environment entries in the form key1=value1,key2=value2,....
     Type: CommaDelimitedList
     Default: ""
-    
+
 Conditions:
-  HasVpcId: !Not [ !Equals [ !Ref VpcId, '' ] ]
-  HasLayer1: !Not [ !Equals [ !Ref Layer1, '' ] ]
-  HasLayer2: !Not [ !Equals [ !Ref Layer2, '' ] ]
-  HasLayer3: !Not [ !Equals [ !Ref Layer3, '' ] ]
-  HasLayer4: !Not [ !Equals [ !Ref Layer4, '' ] ]
-  HasLayer5: !Not [ !Equals [ !Ref Layer5, '' ] ]
+  HasVpcId: !Not [!Equals [!Ref VpcId, ""]]
+  HasLayer1: !Not [!Equals [!Ref Layer1, ""]]
+  HasLayer2: !Not [!Equals [!Ref Layer2, ""]]
+  HasLayer3: !Not [!Equals [!Ref Layer3, ""]]
+  HasLayer4: !Not [!Equals [!Ref Layer4, ""]]
+  HasLayer5: !Not [!Equals [!Ref Layer5, ""]]
 
   # this condition will be overridden by the transform
-  LamdaInsightsEnabled: !Equals [ 'true', 'false' ]
+  # LamdaInsightsEnabled: !Equals [ 'true', 'false' ]
   IsEnabledTracingConfig: !Not [!Equals [!Ref TracingConfigMode, NotUsed]]
-  
-Resources:
 
+Resources:
   Function:
     Type: AWS::Lambda::Function
     Properties:
@@ -129,34 +127,34 @@ Resources:
             !Ref "AWS::NoValue",
           ]
       Layers:
-        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"    
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
         - Fn::If:
-          - HasLayer1
-          - !Ref Layer1
-          - !Ref "AWS::NoValue"
+            - HasLayer1
+            - !Ref Layer1
+            - !Ref "AWS::NoValue"
         - Fn::If:
-          - HasLayer2
-          - !Ref Layer2
-          - !Ref "AWS::NoValue"
+            - HasLayer2
+            - !Ref Layer2
+            - !Ref "AWS::NoValue"
         - Fn::If:
-          - HasLayer3
-          - !Ref Layer3
-          - !Ref "AWS::NoValue"
+            - HasLayer3
+            - !Ref Layer3
+            - !Ref "AWS::NoValue"
         - Fn::If:
-          - HasLayer4
-          - !Ref Layer4
-          - !Ref "AWS::NoValue"
+            - HasLayer4
+            - !Ref Layer4
+            - !Ref "AWS::NoValue"
         - Fn::If:
-          - HasLayer5
-          - !Ref Layer5
-          - !Ref "AWS::NoValue" 
+            - HasLayer5
+            - !Ref Layer5
+            - !Ref "AWS::NoValue"
       Tags:
         "Fn::Transform":
           Name: DynamicTagListMacro
           Parameters:
             KeyValue: !Ref TagList
       VpcConfig:
-        'Fn::If':
+        "Fn::If":
           - HasVpcId
           - SecurityGroupIds:
               - !GetAtt FunctionSecGroup.GroupId
@@ -172,18 +170,16 @@ Resources:
             Parameters:
               KeyValue: !Ref EnvVariables
 
-
   FunctionSecGroup:
     Type: AWS::EC2::SecurityGroup
     Condition: HasVpcId
     Properties:
-      GroupDescription: !Sub '${FunctionName}-security-group'
+      GroupDescription: !Sub "${FunctionName}-security-group"
       VpcId: !Ref VpcId
-
 
 Outputs:
   FunctionName:
     Value: !Ref Function
-  
+
   FunctionArn:
     Value: !GetAtt Function.Arn
