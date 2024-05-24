@@ -11,11 +11,6 @@ Parameters:
     Type: String
     Description: Lambda unique (logical) name
 
-  AlarmSNSTopicArn:
-    Type: String
-    Default: '-'
-    Description: 'An ARN of an SNS topic where to send alarm when DLQ contain messages'
-
   FunctionBucketName:
     Type: String
     Description: S3 bucket name where the lambda code is stored
@@ -84,92 +79,16 @@ Parameters:
     Default: ''
   
   # Tags
-  Tag1Entry:
-    Description: 1st tag in the form key=value
-    Type: String
-    Default: ''
-
-  Tag2Entry:
-    Description: 2nd tag in the form key=value
-    Type: String
-    Default: ''
-
-  Tag3Entry:
-    Description: 3rd tag in the form key=value
-    Type: String
-    Default: ''
-
-  Tag4Entry:
-    Description: 4th tag in the form key=value
-    Type: String
-    Default: ''
-  
-  Tag5Entry:
-    Description: 5th tag in the form key=value
-    Type: String
-    Default: ''
+  TagList:
+    Description: Comma separated Tag List  in the form key1=value1,key2=value2,....
+    Type: CommaDelimitedList
+    Default: ""
 
   # Function env environment map, maximum 15 entry
-  FunctionEnvEntry1:
-    Description: 1st container environment entry in the form key=value
-    Type: String
-    Default: ''
-  FunctionEnvEntry2:
-    Description: 2nd container environment entry in the form key=value
-    Type: String
-    Default: ''
-  FunctionEnvEntry3:
-    Description: 3rd container environment entry in the form key=value
-    Type: String
-    Default: ''
-  FunctionEnvEntry4:
-    Description: 4th container environment entry in the form key=value
-    Type: String
-    Default: ''
-  FunctionEnvEntry5:
-    Description: 5th container environment entry in the form key=value
-    Type: String
-    Default: ''
-  FunctionEnvEntry6:
-    Description: 6th container environment entry in the form key=value
-    Type: String
-    Default: ''
-  FunctionEnvEntry7:
-    Description: 7th container environment entry in the form key=value
-    Type: String
-    Default: ''
-  FunctionEnvEntry8:
-    Description: 8th container environment entry in the form key=value
-    Type: String
-    Default: ''
-  FunctionEnvEntry9:
-    Description: 9th container environment entry in the form key=value
-    Type: String
-    Default: ''
-  FunctionEnvEntry10:
-    Description: 10th container environment entry in the form key=value
-    Type: String
-    Default: ''
-  FunctionEnvEntry11:
-    Description: 11th container environment entry in the form key=value
-    Type: String
-    Default: ''
-  FunctionEnvEntry12:
-    Description: 12th container environment entry in the form key=value
-    Type: String
-    Default: ''
-  FunctionEnvEntry13:
-    Description: 13th container environment entry in the form key=value
-    Type: String
-    Default: ''
-  FunctionEnvEntry14:
-    Description: 14th container environment entry in the form key=value
-    Type: String
-    Default: ''
-  FunctionEnvEntry15:
-    Description: 15th container environment entry in the form key=value
-    Type: String
-    Default: ''
+  EnvVariables:
+    Description: Comma separated environment entries in the form key1=value1,key2=value2,....
+    Type: CommaDelimitedList
+    Default: ""
     
 Conditions:
   HasVpcId: !Not [ !Equals [ !Ref VpcId, '' ] ]
@@ -181,13 +100,6 @@ Conditions:
 
   # this condition will be overridden by the transform
   LamdaInsightsEnabled: !Equals [ 'true', 'false' ]
-
-  # Tags conditions
-  Tag1Exist: !Not [ !Equals [ !Ref Tag1Entry, '' ] ]
-  Tag2Exist: !Not [ !Equals [ !Ref Tag2Entry, '' ] ]
-  Tag3Exist: !Not [ !Equals [ !Ref Tag3Entry, '' ] ]
-  Tag4Exist: !Not [ !Equals [ !Ref Tag4Entry, '' ] ]
-  Tag5Exist: !Not [ !Equals [ !Ref Tag5Entry, '' ] ]
 
 Resources:
 
@@ -225,31 +137,10 @@ Resources:
           - !Ref Layer5
           - !Ref "AWS::NoValue" 
       Tags:
-        - 'Fn::If':
-          - Tag1Exist
-          - Key: !Select [ 0, !Split [ "=", !Ref Tag1Entry ] ]
-            Value: !Select [ 1, !Split [ "=", !Ref Tag1Entry ] ]
-          - !Ref "AWS::NoValue"
-        - 'Fn::If':
-          - Tag2Exist
-          - Key: !Select [ 0, !Split [ "=", !Ref Tag2Entry ] ]
-            Value: !Select [ 1, !Split [ "=", !Ref Tag2Entry ] ]
-          - !Ref "AWS::NoValue"
-        - 'Fn::If':
-          - Tag3Exist
-          - Key: !Select [ 0, !Split [ "=", !Ref Tag3Entry ] ]
-            Value: !Select [ 1, !Split [ "=", !Ref Tag3Entry ] ]
-          - !Ref "AWS::NoValue"
-        - 'Fn::If':
-          - Tag4Exist
-          - Key: !Select [ 0, !Split [ "=", !Ref Tag4Entry ] ]
-            Value: !Select [ 1, !Split [ "=", !Ref Tag4Entry ] ]
-          - !Ref "AWS::NoValue"
-        - 'Fn::If':
-          - Tag5Exist
-          - Key: !Select [ 0, !Split [ "=", !Ref Tag5Entry ] ]
-            Value: !Select [ 1, !Split [ "=", !Ref Tag5Entry ] ]
-          - !Ref "AWS::NoValue"
+        "Fn::Transform":
+          Name: DynamicTagListMacro
+          Parameters:
+            KeyValue: !Ref TagList
       VpcConfig:
         'Fn::If':
           - HasVpcId
@@ -260,6 +151,13 @@ Resources:
       Code:
         S3Bucket: !Ref FunctionBucketName
         S3Key: !Ref FunctionBucketKey
+      Environment:
+        Variables:
+          "Fn::Transform":
+            Name: DynamicVariableListTransform
+            Parameters:
+              KeyValue: !Ref EnvVariables
+
 
   FunctionSecGroup:
     Type: AWS::EC2::SecurityGroup
