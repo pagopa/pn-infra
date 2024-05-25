@@ -64,6 +64,13 @@ Parameters:
       - NotUsed
     Default: NotUsed
 
+  LambdaInsightEnabled:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "false"
+
   # Function layers
   Layer1:
     Type: String
@@ -111,7 +118,7 @@ Conditions:
   HasLayer5: !Not [!Equals [!Ref Layer5, ""]]
 
   # this condition will be overridden by the transform
-  # LamdaInsightsEnabled: !Equals [ 'true', 'false' ]
+  LambdaInsightsEnabled: !Equals [!Ref LambdaInsightEnabled, 'true' ]
   IsEnabledTracingConfig: !Not [!Equals [!Ref TracingConfigMode, NotUsed]]
 
 Resources:
@@ -132,7 +139,10 @@ Resources:
             !Ref "AWS::NoValue",
           ]
       Layers:
-        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+        - Fn::If:
+            - LambdaInsightsEnabled
+            - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+            - !Ref "AWS::NoValue"
         - Fn::If:
             - HasLayer1
             - !Ref Layer1
