@@ -68,7 +68,7 @@ Parameters:
     Description: Evaluation periods for oncall alarms
 
 Conditions:
-  OnDemandDisabled: !Equals [!Ref StreamShardsCount, 0]
+  OnDemandDisabled: !Not [!Equals [!Ref StreamShardsCount, 0]]
   HasStandardAlarmThresholds: !Not [!Equals [!Ref StandardAlarmThresholdsMs, 0]]
   HasOncallAlarmThresholds: !Not [!Equals [!Ref OnCallAlarmThresholdsMs, 0]]
   HasRequireManagedKey: !Equals [!Ref RequireManagedKey, "true"]
