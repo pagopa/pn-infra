@@ -105,8 +105,7 @@ Resources:
     Properties:
       Name: !Ref StreamName
       RetentionPeriodHours: !Ref StreamRetentionHours
-      ShardCount:
-        !If [OnDemandDisabled, !Ref StreamShardsCount, !Ref "AWS::NoValue"]
+      ShardCount: !If [OnDemandDisabled, !Ref StreamShardsCount, !Ref "AWS::NoValue"]
       StreamEncryption:
         Fn::If:
           - HasRequireManagedKey
