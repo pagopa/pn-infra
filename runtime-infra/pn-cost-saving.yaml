@@ -24,7 +24,7 @@ Parameters:
 
   StartEcsFunctionCronExpression:
     Type: String
-    Default: 'cron(0 5 ? * MON-FRI *)'
+    Default: 'cron(0 4 ? * MON-FRI *)'
     Description: Cron expression when ecs start
 
   ECSClusterName:
@@ -45,7 +45,7 @@ Conditions:
   IsNotProdAccount: !Not [ !Equals [!Ref EnvironmentType, prod ] ]
   IsNotUatAccount: !Not [ !Equals [!Ref EnvironmentType, uat ] ]
   IsStopEcsService: !And [ !Condition IsNotProdAccount, !Condition IsNotUatAccount ]
-  IsTestAccount: !Equals [!Ref EnvironmentType, test ] 
+  IsHotfixAccount: !Equals [!Ref EnvironmentType, hotfix ]
 
 #LAMBDA STOP EC2
 
@@ -250,8 +250,8 @@ Resources:
     Properties:
       ScheduleExpression:
         Fn::If:
-        - IsTestAccount
-        - cron(0 19 ? * FRI *)
+        - IsHotfixAccount
+        - cron(0 19 ? * * *)
         - !Ref StopEcsFunctionCronExpression
       State: ENABLED
       Targets:
@@ -354,8 +354,9 @@ Resources:
     Properties:
       ScheduleExpression:
         Fn::If:
-        - IsTestAccount
-        - cron(0 5 ? * MON *)
+        - IsHotfixAccount
+        #hotfix fake turn-on for only one hour on the first day of the current month:
+        - cron(0 18 1 * ? *)
         - !Ref StartEcsFunctionCronExpression
       State: ENABLED
       Targets:
