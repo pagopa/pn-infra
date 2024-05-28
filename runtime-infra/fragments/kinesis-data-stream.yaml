@@ -84,14 +84,7 @@ Resources:
           - Action: kms:*
             Effect: Allow
             Principal:
-              AWS:
-                Fn::Join:
-                  - ""
-                  - - "arn:"
-                    - Ref: AWS::Partition
-                    - ":iam::"
-                    - Ref: AWS::AccountId
-                    - :root
+              AWS: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
             Resource: "*"
         Version: "2012-10-17"
     UpdateReplacePolicy: Retain
