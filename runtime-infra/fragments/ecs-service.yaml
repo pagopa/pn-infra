@@ -531,7 +531,10 @@ Parameters:
     Description: 75nd container environment entry in the form key=value
     Type: String
     Default: ''
-  
+  ContainerEnvEntry76:
+    Description: 76nd container environment entry in the form key=value
+    Type: String
+    Default: ''
   # Secrets
   ContainerSecret1:
     Description: 1st container secret in the form key=secret arn
@@ -754,6 +757,7 @@ Conditions:
   Env73Exist: !Not [ !Equals [ !Ref ContainerEnvEntry73, '' ] ]
   Env74Exist: !Not [ !Equals [ !Ref ContainerEnvEntry74, '' ] ]
   Env75Exist: !Not [ !Equals [ !Ref ContainerEnvEntry75, '' ] ]
+  Env76Exist: !Not [ !Equals [ !Ref ContainerEnvEntry76, '' ] ]
 
   Secret1Exist: !Not [ !Equals [ !Ref ContainerSecret1, '' ] ]
   Secret2Exist: !Not [ !Equals [ !Ref ContainerSecret2, '' ] ]
@@ -1435,6 +1439,11 @@ Resources:
                 - Env75Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry75 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry75 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env76Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry76 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry76 ] ]
                 - !Ref "AWS::NoValue"
           EnvironmentFiles:
             - Type: s3
