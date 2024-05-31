@@ -896,6 +896,7 @@ Resources:
         - ContainerName: !Sub '${MicroServiceUniqueName}'
           ContainerPort: 8080
           TargetGroupArn: !Ref TargetGroup
+      PropagateTags: SERVICE
       Tags:
         - Key: "pn-eni-related"
           Value: "true"
@@ -1435,6 +1436,9 @@ Resources:
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry75 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry75 ] ]
                 - !Ref "AWS::NoValue"
+          EnvironmentFiles:
+            - Type: s3
+              Value: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/runtime-variable.env'
           PortMappings:
             - ContainerPort: 8080
           LinuxParameters:
@@ -1523,26 +1527,37 @@ Resources:
         - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
         - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
       Policies:
-        Fn::If:
+        - PolicyName: !Sub '${MicroServiceUniqueName}-S3RuntimePolicy'
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/*'
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}'
+        - Fn::If:
           - HasSecrets
-          - - PolicyName: !Sub '${MicroServiceUniqueName}-ExecutionPolicy'
-              PolicyDocument:
-                Statement:
-                  - Effect: Allow
-                    Action:
-                      - secretsmanager:GetSecretValue
-                    Resource:
-                      - Fn::Sub: "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${MicroServiceSecretPrefix}*"
-                  - Effect: Allow
-                    Action:
-                      - kms:Decrypt
-                      - kms:DescribeKey
-                      - kms:GenerateDataKey
-                    Resource:
-                      - '*'
-                    Condition:
-                      StringLike:
-                        "kms:EncryptionContext:SecretARN": !Sub "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${MicroServiceSecretPrefix}*"     
+          - PolicyName: !Sub '${MicroServiceUniqueName}-ExecutionPolicy'
+            PolicyDocument:
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - secretsmanager:GetSecretValue
+                  Resource:
+                    - Fn::Sub: "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${MicroServiceSecretPrefix}*"
+                - Effect: Allow
+                  Action:
+                    - kms:Decrypt
+                    - kms:DescribeKey
+                    - kms:GenerateDataKey
+                  Resource:
+                    - '*'
+                  Condition:
+                    StringLike:
+                      "kms:EncryptionContext:SecretARN": !Sub "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${MicroServiceSecretPrefix}*"
           - !Ref AWS::NoValue
 
   # A role for the containers
@@ -1656,7 +1671,7 @@ Resources:
     Type: AWS::Logs::MetricFilter
     Properties: 
       LogGroupName: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
-      FilterPattern: !If [ LogAlarmErrorFatal, '{ $.level = "ERROR" || $.level = "FATAL" || $.message = "* FATAL *" }', '{ $.level = "FATAL" || $.message = "* FATAL *" }']
+      FilterPattern: !If [ LogAlarmErrorFatal, '{ $.level = "ERROR" || $.level = "FATAL" || $.message = "* FATAL *" || $.message = "ALLARM!" }', '{ $.level = "FATAL" || $.message = "* FATAL *" || $.message = "ALLARM!" }']
       MetricTransformations: 
         - MetricValue: 1
           MetricNamespace: "ErrorFatalLogs"

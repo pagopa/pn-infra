@@ -236,6 +236,13 @@ Parameters:
   F24PaperChannelUser:
     Type: String
     
+  # AddressManager to RaddAlt
+  AddressManagerToRaddAltQueueARN:
+    Type: String
+
+  AddressManagerToRaddAltQueueURL:
+    Type: String
+
   OncallDlqRatio:
     Type: Number
     Default: 0.1
@@ -255,6 +262,9 @@ Resources:
     Type: AWS::Events::EventBus
     Properties: 
       Name: !Sub '${ProjectName}-CoreEventBus'
+      Tags:
+        - Key: Microservice
+          Value: pn-infra-core
   
   # Allow access from partner system
   PnCoreEventBusSafeStoreAccessPolicy: 
@@ -320,12 +330,17 @@ Resources:
                   - !Ref "NationalRegistries2PaperChannelQueueARN"
                   - !Ref "NationalRegistries2SelcPGQueueARN"
                   - !Ref "AddressManagerToDeliveryPushQueueARN"
+                  - !Ref "AddressManagerToRaddAltQueueARN"
                   - !Ref "AcmAlarmsQueueARN"
                   - !Ref "PaperChannelToServiceDeskQueueARN"
                   - !Ref "SafeStorageToF24QueueARN"
                   - !Ref "F24ToPaperChannelQueueARN"
                   - !Ref "F24ToDeliveryPushQueueARN"
                   - !Ref "RaddAltToPaperChannelQueueARN"
+      Tags:
+        - Key: Microservice
+          Value: pn-infra-core
+                  
   
   # Resource based policy to allow EventBridge to publish to CloudWatch Logs
   LogGroupCoreEventBusPolicy:
@@ -376,6 +391,9 @@ Resources:
                 Effect: Allow
                 Resource: 
                   - !GetAtt CoreEventBusEventsLogGroup.Arn
+      Tags:
+        - Key: Microservice
+          Value: pn-infra-logs
 
   ExternalChannelsOutputsQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -393,6 +411,7 @@ Resources:
         - !Ref "NationalRegistries2PaperChannelQueueURL"
         - !Ref "NationalRegistries2SelcPGQueueURL"  
         - !Ref "AddressManagerToDeliveryPushQueueURL"  
+        - !Ref "AddressManagerToRaddAltQueueURL"
         - !Ref "PaperChannelToServiceDeskQueueURL"
         - !Ref "F24ToPaperChannelQueueURL"
         - !Ref "F24ToDeliveryPushQueueURL"
@@ -419,7 +438,8 @@ Resources:
               - !Ref "NationalRegistries2DeliveryPushQueueARN"
               - !Ref "NationalRegistries2PaperChannelQueueARN"
               - !Ref "NationalRegistries2SelcPGQueueARN"        
-              - !Ref "AddressManagerToDeliveryPushQueueARN"   
+              - !Ref "AddressManagerToDeliveryPushQueueARN"  
+              - !Ref "AddressManagerToRaddAltQueueARN" 
               - !Ref "PaperChannelToServiceDeskQueueARN"
               - !Ref "F24ToPaperChannelQueueARN"
               - !Ref "F24ToDeliveryPushQueueARN"
@@ -427,18 +447,27 @@ Resources:
               - !Ref "RaddAltToPaperChannelQueueARN"
 
   # Log all events
+  # pn-infra-logs
   CoreEventBusEventsLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: /aws/events/core-event-bus-input-events
       RetentionInDays: !Ref LogRetention
+      Tags:
+        - Key: Microservice
+          Value: pn-infra-logs
 
+  # pn-infra-logs
   CoreEventBusMatchedEventsLoggerFnLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: /aws/lambda/PnCoreEventBusMatchedEventLogger
       RetentionInDays: !Ref LogRetention
+      Tags:
+        - Key: Microservice
+          Value: pn-infra-logs
 
+  # pn-infra-logs
   PnCoreEventBusToLogGroup:
     Type: AWS::Events::Rule
     Properties: 
@@ -453,6 +482,7 @@ Resources:
           Id: LogTarget
 
   # Send Address Manager Response to pn-delivery-push
+  # pn-address-manager
   PnCoreEventBusToAddressManagerToDeliveryPushResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -461,7 +491,8 @@ Resources:
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "AddressManagerOutcomeEvent" ]
-        source: [ "pn-address-manager" ]
+        detail: 
+          cxId: [ "pn-delivery-push" ]
       Targets: 
         - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
           Id: !Sub ${ProjectName}-Logger-AddressManager2DeliveryPush
@@ -481,7 +512,40 @@ Resources:
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
+  # Send Address Manager Response to pn-radd-alt
+  # pn-address-manager
+  PnCoreEventBusToAddressManagerToRaddAltResponseQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route Address Manager Events to pn-radd-alt
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "AddressManagerOutcomeEvent" ]
+        detail: 
+          cxId: [ "pn-radd-alt" ]
+      Targets: 
+        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
+          Id: !Sub ${ProjectName}-Logger-AddressManager2RaddAlt
+          InputTransformer:
+            InputPathsMap:
+              "timestamp": "$.time"
+            InputTemplate: |
+              {
+                  "timestamp": <timestamp>,
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }       
+        - Id: !Sub '${ProjectName}-CoreEventBus-AddressManager2RaddAlt'
+          Arn: !Ref AddressManagerToRaddAltQueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
   # Send National Registries Response to pn-delivery-push
+  # pn-national-registries
   PnCoreEventBusToNationalRegistries2DeliveryPushResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -513,6 +577,7 @@ Resources:
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Send National Registries Response to pn-paper-channel
+  # pn-national-registries
   PnCoreEventBusToNationalRegistries2PaperChannelResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -544,6 +609,7 @@ Resources:
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Send Safe Storage Response to pn-delivery-push
+  # pn-safe-storage
   PnCoreEventBusToSafeStorageResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -575,6 +641,7 @@ Resources:
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Send Safe Storage Response to radd
+  # pn-safe-storage
   PnCoreEventBusToRaddSafeStorageResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -606,6 +673,7 @@ Resources:
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Send Safe Storage Response to radd
+  # pn-safe-storage
   PnCoreEventBusToRaddAltSafeStorageResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -637,6 +705,7 @@ Resources:
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Send Safe Storage Response to servicedesk
+  # pn-safe-storage
   PnCoreEventBusToServiceDeskSafeStorageResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -668,6 +737,7 @@ Resources:
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Send Safe Storage Response to pn-downtime-logs
+  # pn-safe-storage
   PnCoreEventBusToDowntimeLogsSafeStorageResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -699,6 +769,7 @@ Resources:
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Send ExternalChannel Response to pn-delivery-push
+  # pn-external-channel
   PnCoreEventBusToExtChResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -730,6 +801,7 @@ Resources:
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
   
   # Send ExternalChannel Response to pn-delivery-push
+  # pn-radd-alt
   PnCoreEventBusRaddAltToPaperChannelQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -760,6 +832,7 @@ Resources:
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Send ExternalChannel Response to pn-delivery-push
+  # pn-infra-monitoring
   PnCoreEventBusToACMAlarmsQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -774,6 +847,7 @@ Resources:
           Arn: !Ref AcmAlarmsQueueARN
 
   # Send ExternalChannel Response to pn-user-attributes
+  # pn-external-channel
   PnCoreEventBusToUserAttributesQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -805,6 +879,7 @@ Resources:
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Send ExternalChannel Response to pn-paper-channel
+  # pn-external-channel
   PnCoreEventBusToPaperChannelQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -836,6 +911,7 @@ Resources:
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Send PaperChannel Response to servicedesk
+  # pn-paper-channel
   PnCoreEventBusToServiceDeskPaperChannelResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -867,6 +943,7 @@ Resources:
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Send Safe Storage Response to f24
+  # pn-safe-storage
   PnCoreEventBusToF24SafeStorageResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -898,6 +975,7 @@ Resources:
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Send f24 to paper channel
+  # pn-f24
   PnCoreEventBusToPaperChannelF24ResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -929,6 +1007,7 @@ Resources:
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # Send f24 to delivery push
+  # pn-f24
   PnCoreEventBusToDeliveryPushF24ResponseQueue:
     Type: AWS::Events::Rule
     Properties: 
@@ -959,6 +1038,7 @@ Resources:
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
+  # pn-infra-logs
   MatchedEventLoggerLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -967,6 +1047,7 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/pn-CoreEventBus/*"
 
+  # pn-infra-logs
   MatchedEventsLoggerFunctionExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -995,6 +1076,7 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
   
+  # pn-infra-logs
   MatchedEventsLoggerFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1015,7 +1097,11 @@ Resources:
       Runtime: python3.9
       Role: !GetAtt MatchedEventsLoggerFunctionExecutionRole.Arn
       ReservedConcurrentExecutions : !Ref ReservedConcurrentLambdaExecution
+      Tags:
+        - Key: Microservice
+          Value: pn-infra-logs      
 
+  # pn-address-manager
   PNAddressManagerToDeliveryPushLimiterLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -1024,6 +1110,7 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/pn-CoreEventBus/*"
 
+  # pn-address-manager
   PNAddressManagerToDeliveryPushLimiterExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -1059,6 +1146,7 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
 
+  # pn-address-manager
   PNAddressManagerToDeliveryPushLimiterFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -1090,15 +1178,24 @@ Resources:
       ReservedConcurrentExecutions : !Ref ReservedConcurrentLambdaExecution
       DeadLetterConfig:
         TargetArn: !GetAtt EventBusDeadLetterQueue.Arn
+      Tags:
+        - Key: Microservice
+          Value: pn-address-manager      
 
   # Standard Queue for events Dead Letter Queue
+  # pn-infra-monitoring
   EventBusDeadLetterQueue:
     Type: AWS::SQS::Queue
     Properties:
       MessageRetentionPeriod: !Ref EventBusDeadLetterQueueMaximumRetentionPeriod
       QueueName: !Sub '${ProjectName}-CoreEventBus-DLQ'
+      Tags:
+        - Key: Microservice
+          Value: pn-infra-monitoring      
+      
 
   # Dead Letter Queue policy 
+  # pn-infra-monitoring
   EventBusDeadLetterQueuePolicy:
     Type: AWS::SQS::QueuePolicy
     Properties:
@@ -1117,6 +1214,7 @@ Resources:
               - !GetAtt "EventBusDeadLetterQueue.Arn"
   
   # Alarm for Dead letter queue has messages
+  # pn-infra-monitoring
   DLQHasMessagesAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -1140,6 +1238,7 @@ Resources:
       OKActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
+  # pn-infra-monitoring
   OncallDLQHasMessagesAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -1185,6 +1284,7 @@ Resources:
   ###          Allow  EVENTS FROM CONFIDENTIAL AND HELPDESK         ###
   #####################################################################
   ## Composite alarm event bus and rule
+  # pn-infra-core
   AllowEventsFromConfidentialPolicy: 
     Type: AWS::Events::EventBusPolicy
     Properties: 
@@ -1196,6 +1296,7 @@ Resources:
         Action: "events:PutEvents"
         Resource: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
 
+  # pn-infra-core
   AllowEventsFromHelpdeskPolicy: 
     Type: AWS::Events::EventBusPolicy
     Properties: 
@@ -1210,6 +1311,7 @@ Resources:
   ###            National Registries Pipe                                  ###
   ############################################################################
 
+  # pn-national-registries
   NationalRegistriesPipeRole:
     Type: AWS::IAM::Role
     Properties:
@@ -1243,6 +1345,7 @@ Resources:
                 Resource: 
                   - !GetAtt PnCoreEventBus.Arn
 
+  # pn-national-registries
   NationalRegistriesToEventBridgePipe:
     Type: AWS::Pipes::Pipe
     Properties:
@@ -1263,6 +1366,8 @@ Resources:
                 "body": <$.body>,
                 "source": <$.messageAttributes.clientId.stringValue>
               }
+      Tags:
+        Microservice: pn-national-registries
 
 Outputs:
 

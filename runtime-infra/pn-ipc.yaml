@@ -392,6 +392,9 @@ Resources:
         AlternateDnsName: !Ref AlternateApiDnsName
         CertificateArn: !Ref ApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-infra-networking"
 
   # Custom domain for B2B api selcpg
   SelcpgApiCustomDomain:
@@ -404,6 +407,9 @@ Resources:
         AlternateDnsName: !Ref AlternateSelcpgApiDnsName
         CertificateArn: !Ref SelcpgApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-infra-networking"
 
   # Custom domain for B2B api
   WebApiCustomDomain:
@@ -416,6 +422,9 @@ Resources:
         AlternateDnsName: !Ref AlternateWebApiDnsName
         CertificateArn: !Ref WebApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-infra-networking"
 
   # Custom domain for IO api
   IoApiCustomDomain:
@@ -428,6 +437,9 @@ Resources:
         AlternateDnsName: !Ref AlternateIoApiDnsName
         CertificateArn: !Ref IoApiCertificateArn
         HostedZoneId: !Ref HostedZoneId
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-infra-networking"
 
   ###                    QUEUES BETWEEN MICRO SERVICES                    ###
   ###########################################################################
@@ -445,6 +457,9 @@ Resources:
         VisibilityTimeout: 60
         MaxReceiveCount: 10
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-delivery-push"
 
   ### Communication FROM SafeStorage TO pn-radd ###
   SafeStorageToRaddQueue:
@@ -459,6 +474,9 @@ Resources:
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
         QueueOldestAgeLimit: 1296000 # 15 days
         OncallQueueOldestAgeLimit: 1296000 # 15 days
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-radd-fsu"
 
   ### Communication FROM SafeStorage TO pn-service-desk ###
   SafeStorageToServiceDeskQueue:
@@ -471,6 +489,9 @@ Resources:
         QueueName: !Sub '${ProjectName}-safestore_to_servicedesk'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-service-desk"
 
   ### Communication FROM SafeStorage TO pn-radd-alt ###
   SafeStorageToRaddAltQueue:
@@ -482,7 +503,11 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-safestore_to_raddalt'
         DelaySeconds: 1
+        VisibilityTimeout: 240
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-radd-alt"
 
   ### Communication between PN-DELIVERY and PN-DELIVERY-PUSH ###
   DeliveryPushInputsQueue:
@@ -496,6 +521,9 @@ Resources:
         DelaySeconds: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
         FifoQueue: true
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-delivery-push"
 
   ### Communication FROM EXTERNAL-CHANNELS ###
   ExternalChannelsOutputsQueue:
@@ -510,6 +538,9 @@ Resources:
         VisibilityTimeout: 60
         MaxReceiveCount: 10
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-ec"
   
   ExternalChannels2UserAttributesQueue:
     Type: AWS::CloudFormation::Stack
@@ -521,6 +552,9 @@ Resources:
         QueueName: !Sub '${ProjectName}-external_channel_to_user_attributes'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-user-attributes"
 
   ExternalChannels2PaperChannelQueue:
     Type: AWS::CloudFormation::Stack
@@ -532,6 +566,9 @@ Resources:
         QueueName: !Sub '${ProjectName}-external_channel_to_paper_channel'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-paper-channel"
 
   ### Communication FROM KAFKA-BRIDGE
   KafkaBridgeOnboardingQueue:
@@ -544,6 +581,9 @@ Resources:
         QueueName: !Sub '${ProjectName}-kafka_bridge_onboarding'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-external-registries"
 
   ### Queue that receive composite alarm information for DOWNTIME LOGS ###
   CompositeAlarmQueue:
@@ -556,6 +596,9 @@ Resources:
         QueueName: !Sub '${ProjectName}-composite_alarms_for_downtime'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-downtime-logs"
   
   ### Queue that receive safe-storage notification to DOWNTIME LOGS ###
   SafeStorageToDowntimeLogsQueue:
@@ -567,7 +610,10 @@ Resources:
       Parameters:
         QueueName: !Sub '${ProjectName}-safestore_to_downtime_logs'
         DelaySeconds: 1
-        AlarmSNSTopicName: !Ref AlarmSNSTopicName     
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName 
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-downtime-logs"
   
   ### Communications FROM the Gateway Service of NATIONAL-REGISTRY ###
   NationalRegistryGatewayOutputsQueue:
@@ -580,6 +626,9 @@ Resources:
         QueueName: !Sub '${ProjectName}-national_registry_gateway_outputs'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-national-registries"
 
   ### Communication FROM pn-national-registries TO pn-delivery-push ###
   NationalRegistries2DeliveryPushQueue:
@@ -594,6 +643,9 @@ Resources:
         VisibilityTimeout: 60
         MaxReceiveCount: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-delivery-push"
   
   ### Communication FROM pn-national-registries TO pn-paper-channel ###
   NationalRegistries2PaperChannelQueue:
@@ -606,6 +658,9 @@ Resources:
         QueueName: !Sub '${ProjectName}-nationalregistries_to_paperchannel'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-paper-channel"
   
   ### Communication FROM pn-national-registries TO Self Care PG ###
   ### Queue to be exposed to Selfcare PG (Azure) see issue PN-3837 ###
@@ -619,6 +674,9 @@ Resources:
         QueueName: !Sub '${ProjectName}-nationalregistries_to_selcpg'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-selfcare-pg"
   
   ### Communication FROM pn-mandate TO pn-delivery ###
   Mandate2DeliveryQueue:
@@ -631,6 +689,9 @@ Resources:
         QueueName: !Sub '${ProjectName}-mandate_to_delivery'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-delivery"
 
   ### Communication FROM pn-address-manager TO pn-delivery-push ###
   AddressManagerToDeliveryPushQueue:
@@ -645,6 +706,9 @@ Resources:
         VisibilityTimeout: 60
         MaxReceiveCount: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-delivery-push"
 
   ### Communication FROM pn-address-manager TO pn-radd-alt ###
   AddressManagerToRaddAltQueue:
@@ -659,6 +723,9 @@ Resources:
         VisibilityTimeout: 60
         MaxReceiveCount: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-radd-alt"
 
   ### Communication FROM pn-safe-storage TO pn-f24 ###
   SafeStorageToF24Queue:
@@ -673,6 +740,9 @@ Resources:
         VisibilityTimeout: 60
         MaxReceiveCount: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-f24"
 
   ### Communication FROM pn-f24 TO pn-delivery-push ###
   F24ToDeliveryPushQueue:
@@ -687,6 +757,9 @@ Resources:
         VisibilityTimeout: 60
         MaxReceiveCount: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-delivery-push"
 
   ### Communication FROM pn-f24 TO pn-paper-channel ###
   F24ToPaperChannelQueue:
@@ -701,6 +774,9 @@ Resources:
         VisibilityTimeout: 60
         MaxReceiveCount: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-paper-channel"
 
   ### Communication FROM pn-f24 TO pn-paper-channel ###
   RaddAltToPaperChannelQueue:
@@ -715,6 +791,9 @@ Resources:
         VisibilityTimeout: 60
         MaxReceiveCount: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-paper-channel"
 
   ### Queue that receive safe-storage notification to DOWNTIME LOGS ###
   AcmAlarmsQueue:
@@ -730,6 +809,9 @@ Resources:
         HasDLQ:  "false"
         OncallDLQLimit: '1'
         QueueHasAlarm:  "true"
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-infra-monitoring"
 
   ### Communication FROM pn-paper-channel TO pn-service-desk ###
   PaperChannelToServiceDeskQueue:
@@ -744,6 +826,9 @@ Resources:
         VisibilityTimeout: 60
         MaxReceiveCount: 10        
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-service-desk"
 
   ### Communication FROM pn-delivery-push TO pn-external-registries ###
   DeliveryPushToExternalRegistriesQueue:
@@ -752,6 +837,9 @@ Resources:
     DeletionPolicy: Retain      
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-external-registries"
       Parameters:
         QueueName: !Sub '${ProjectName}-deliverypush_to_externalregistries'
         DelaySeconds: 1
@@ -760,6 +848,8 @@ Resources:
   ###                             ELASTIC FILE SYSTEM                     ###
   ###########################################################################
 
+  # tutte pn-infra-monitoring
+  
   FargateEFSFileSystem:
     Type: AWS::EFS::FileSystem
     Properties:
@@ -767,13 +857,14 @@ Resources:
         Encrypted: true
         ThroughputMode: bursting
         FileSystemTags: 
-          - 
-            Key: Name
+          - Key: Name
             Value: Fargate-EFS
           - Key: "pn-eni-related"
             Value: "true"
           - Key: "pn-eni-related-groupName-regexp"
             Value: !Base64 "^infra-prod-EFSSecurityGroup.*$"
+          - Key: Microservice
+            Value: pn-infra-monitoring
 
   # create each mountpoint for internal subnet:
   MountFargateEfsTarget1:
@@ -805,6 +896,9 @@ Resources:
     Properties:
       VpcId: !Ref VpcId
       GroupDescription: EFS Security Group
+      Tags:
+        - Key: Microservice
+          Value: pn-infra-monitoring
       SecurityGroupIngress:
         # All Subnet can mount EFS:
         - CidrIp: 0.0.0.0/0
