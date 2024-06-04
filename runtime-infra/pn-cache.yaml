@@ -1,4 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::LanguageExtensions
 
 Description: |
   CloudFormation definition of elasticache cluster
@@ -63,6 +64,37 @@ Parameters:
     MinValue: 0
     MaxValue: 65000
     Default: 60000
+
+  AccessStringDefaultUser:
+    Type: String
+    Description: "AccessString for elasticache redis default user"
+    Default: "on ~* +@all"
+
+  UserIdDefaultUser:
+    Type: String
+    Description: "UserId for elasticache redis default user"
+    Default: "default-redis"
+
+  UsernameDefaultUser:
+    Type: String
+    Description: "Username for elasticache redis default user"
+    Default: "default"
+
+  AccessStringUser1:
+    Type: String
+    Description: "AccessString for elasticache redis user"
+    Default: "on ~auth::* +@all"
+
+  UserIdUser1:
+    Type: String
+    Description: "UserId for elasticache redis user"
+    Default: "iam-user-radd-auth"
+
+  UsernameUser1:
+    Type: String
+    Description: "Username for elasticache redis user"
+    Default: "iam-user-radd-auth"
+
 Conditions:
   IsServerless: !Equals [!Ref ElasticacheType, "serverless"]
   IsManaged: !Equals [!Ref ElasticacheType, "managed"]
@@ -238,6 +270,35 @@ Resources:
       Threshold: !Ref CurrentConnectionsThreshold
       TreatMissingData: missing
 
+  ElastiCacheUserGroup:
+    Type: AWS::ElastiCache::UserGroup
+    Properties:
+      Engine: redis
+      UserGroupId: !Sub ${ProjectName}-redis-user-group
+      UserIds: 
+        - DefaultElasticCacheUser
+        - ElasticCacheUser1
+
+  DefaultElasticCacheUser:
+    Type: AWS::ElastiCache::User
+    Properties:
+      AccessString: !Ref AccessStringDefaultUser
+      AuthenticationMode: 
+        Type: no-password-required
+      Engine: redis
+      UserId: !Ref UserIdDefaultUser
+      UserName: !Ref UsernameDefaultUser
+
+  ElasticCacheUser1:
+    Type: AWS::ElastiCache::User
+    Properties:
+      AccessString: !Ref AccessStringUser1
+      AuthenticationMode: 
+        Type: iam
+      Engine: redis
+      UserId: !Ref UserIdUser1
+      UserName: !Ref UsernameUser1
+
 Outputs:
   AllowedSecurityGroupId:
     Description: The id of the security group that can access the cache cluster
@@ -282,3 +343,15 @@ Outputs:
         - IsServerless
         - ""
         - !GetAtt RedisEngineCPUAlarm.Arn
+
+  RedisServerlessArn:
+    Description: The Redis serverless Arn
+    Value: !GetAtt RedisServerless.Arn
+
+  RedisServerlessName:
+    Description: The Redis serverless Arn
+    Value: !Ref RedisServerless
+
+  ElasticCacheUser1Arn:
+    Description: ElasticCacheUser1 Arn
+    Value: !GetAtt ElasticCacheUser1.Arn

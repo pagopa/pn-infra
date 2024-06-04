@@ -136,6 +136,12 @@ Parameters:
     Type: String
   SafestorageLoggerLogGroupName:
     Type: String
+  RedisServerlessArn:
+    Type: String
+  RedisServerlessName:
+    Type: String
+  ElasticCacheUser1Arn:
+    Type: String
 
   LogsKinesisMaxAgeInMilliseconds:
     Type: Number
@@ -385,7 +391,13 @@ Outputs:
     Value: !Ref SafestorageLoggerLogGroupName
   VpcEgressSubnetsIds:
     Value: !If [ IsEgressDefined, !Ref VpcEgressSubnetsIds, !Ref VpcSubnets ]
-  
+  RedisServerlessArn:
+    Value: !Ref RedisServerlessArn
+  RedisServerlessName:
+    Value: !Ref RedisServerlessName
+  ElasticCacheUser1Arn:
+    Value: !Ref ElasticCacheUser1Arn
+    
   # Data Monitoring pass-through params
   DynamoDbExportTableNames:
     Value: !Ref DynamoDbExportTableNames
