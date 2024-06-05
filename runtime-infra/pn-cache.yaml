@@ -111,6 +111,7 @@ Resources:
         - !GetAtt SecurityGroup.GroupId
       SubnetIds: !Ref VpcSubnets
       KmsKeyId: !Ref RedisServerlessEncryptionKey
+      UserGroupId: !Sub ${ProjectName}-redis-user-group
 
   RedisServerlessEncryptionKey:
     Type: AWS::KMS::Key
