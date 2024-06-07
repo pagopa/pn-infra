@@ -38,7 +38,7 @@ Parameters:
   DataMonitoringIndexCronExpression:
     Type: String
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
-    Default: 'cron(30 6 * * ? *)'
+    Default: 'cron(30 5 * * ? *)'
 
   #Dynamodb export parameters:
 
@@ -463,7 +463,11 @@ Resources:
     Properties:
       Description: "pn-data-monitoring-codebuild-scheduled-rule"
       # every day at 9 am
-      ScheduleExpression: !Ref DataMonitoringIndexCronExpression 
+      ScheduleExpression:
+        Fn::If: 
+          - IsConfinfoAccount
+          - 'cron(00 5 * * ? *)'
+          - !Ref DataMonitoringIndexCronExpression 
       State: "ENABLED"
       RoleArn: !GetAtt "DataMonitoringScheduleRole.Arn"
       Targets: 
