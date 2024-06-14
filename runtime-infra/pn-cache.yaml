@@ -63,6 +63,37 @@ Parameters:
     MinValue: 0
     MaxValue: 65000
     Default: 60000
+
+  AccessStringDefaultUser:
+    Type: String
+    Description: "AccessString for elasticache redis default user"
+    Default: "on ~* +@all"
+
+  UserIdDefaultUser:
+    Type: String
+    Description: "UserId for elasticache redis default user"
+    Default: "default-redis"
+
+  UsernameDefaultUser:
+    Type: String
+    Description: "Username for elasticache redis default user"
+    Default: "default"
+
+  AccessStringUser1:
+    Type: String
+    Description: "AccessString for elasticache redis user"
+    Default: "on ~b2bauth::* +@all"
+
+  UserIdUser1:
+    Type: String
+    Description: "UserId for elasticache redis user"
+    Default: "iam-user-b2b-auth"
+
+  UsernameUser1:
+    Type: String
+    Description: "Username for elasticache redis user"
+    Default: "iam-user-b2b-auth"
+
 Conditions:
   IsServerless: !Equals [!Ref ElasticacheType, "serverless"]
   IsManaged: !Equals [!Ref ElasticacheType, "managed"]
@@ -80,6 +111,7 @@ Resources:
         - !GetAtt SecurityGroup.GroupId
       SubnetIds: !Ref VpcSubnets
       KmsKeyId: !Ref RedisServerlessEncryptionKey
+      UserGroupId: !Ref ElastiCacheUserGroup
 
   RedisServerlessEncryptionKey:
     Type: AWS::KMS::Key
@@ -238,8 +270,37 @@ Resources:
       Threshold: !Ref CurrentConnectionsThreshold
       TreatMissingData: missing
 
+  ElastiCacheUserGroup:
+    Type: AWS::ElastiCache::UserGroup
+    Properties:
+      Engine: redis
+      UserGroupId: !Sub ${ProjectName}-redis-user-group
+      UserIds: 
+        - !Ref DefaultElasticCacheUser
+        - !Ref ElasticCacheUser1
+
+  DefaultElasticCacheUser:
+    Type: AWS::ElastiCache::User
+    Properties:
+      AccessString: !Ref AccessStringDefaultUser
+      AuthenticationMode: 
+        Type: no-password-required
+      Engine: redis
+      UserId: !Ref UserIdDefaultUser
+      UserName: !Ref UsernameDefaultUser
+
+  ElasticCacheUser1:
+    Type: AWS::ElastiCache::User
+    Properties:
+      AccessString: !Ref AccessStringUser1
+      AuthenticationMode: 
+        Type: iam
+      Engine: redis
+      UserId: !Ref UserIdUser1
+      UserName: !Ref UsernameUser1
+
 Outputs:
-  AllowedSecurityGroupId:
+  ElasticacheSecurityGroup:
     Description: The id of the security group that can access the cache cluster
     Value: !GetAtt AllowedSecurityGroup.GroupId
 
@@ -282,3 +343,19 @@ Outputs:
         - IsServerless
         - ""
         - !GetAtt RedisEngineCPUAlarm.Arn
+
+  RedisServerlessArn:
+    Description: The Redis serverless Arn
+    Value: !GetAtt RedisServerless.ARN
+
+  RedisServerlessName:
+    Description: The Redis serverless name
+    Value: !Ref RedisServerless
+
+  ElasticacheUserArn1:
+    Description: ElasticCacheUser1 Arn
+    Value: !GetAtt ElasticCacheUser1.Arn
+
+  ElasticacheUserId1:
+    Description: Id of the User1
+    Value: !Ref UserIdUser1
