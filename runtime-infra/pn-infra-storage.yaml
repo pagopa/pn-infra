@@ -7,7 +7,7 @@ Parameters:
     Type: String
     Default: pn
     Description: Base name for pn project
-
+  
   TemplateBucketBaseUrl:
     Type: String
     Description: cfn template bucket base url
@@ -18,7 +18,7 @@ Parameters:
   BucketSuffix:
     Type: String
     Description: Suffix to the log bucket name
-
+  
   SafeStorageAccountId:
     Type: String
     Default: '-'
@@ -66,7 +66,7 @@ Parameters:
 
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
-
+  
   HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
 
   ActivateSafeStorageCondition: !And [ !Condition MakeBucketCondition, !Condition HasStorageStorageAccountId]
@@ -90,10 +90,10 @@ Resources:
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-              KMSMasterKeyID: !Ref LogsBucketKmsKey
+              KMSMasterKeyID: !Ref LogsBucketKmsKey              
               SSEAlgorithm: 'aws:kms'
             BucketKeyEnabled: true
-      PublicAccessBlockConfiguration:
+      PublicAccessBlockConfiguration: 
         BlockPublicAcls: true
         BlockPublicPolicy: true
         IgnorePublicAcls: true
@@ -101,14 +101,14 @@ Resources:
       NotificationConfiguration:
         QueueConfigurations:
           - Event: 's3:ObjectCreated:*'
-            Filter:
+            Filter: 
               S3Key:
                 Rules:
                   - Name: prefix
                     Value: 'diagnosticTrail'
             Queue: !GetAtt DiagnosticCloudTrailFileQueue.Outputs.QueueARN
 
-  # - Log storage cryptography key
+  # - Log storage cryptography key 
   LogsBucketKmsKey:
     Condition: MakeBucketCondition
     Type: AWS::KMS::Key
@@ -154,22 +154,22 @@ Resources:
               - kms:DescribeKey
             Resource: "*"
           - Fn::If:
-              - ActivateSafeStorageCondition
-              - Sid: Allow safe storage kms usage
-                Effect: Allow
-                Action:
-                  - kms:Encrypt
-                  - kms:Decrypt
-                  - kms:GenerateDataKey*
-                Principal:
-                  Service: "cloudtrail.amazonaws.com"
-                Resource: "*"
-                Condition:
-                  ArnLike:
-                    aws:SourceArn:
-                      - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
-                      - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/*"
-              - !Ref AWS::NoValue
+            - ActivateSafeStorageCondition
+            - Sid: Allow safe storage kms usage
+              Effect: Allow
+              Action:
+                - kms:Encrypt
+                - kms:Decrypt
+                - kms:GenerateDataKey*
+              Principal:
+                Service: "cloudtrail.amazonaws.com"
+              Resource: "*"
+              Condition:
+                ArnLike: 
+                  aws:SourceArn: 
+                    - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                    - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/*"
+            - !Ref AWS::NoValue
 
   RuntimeEnvironmentVariablesBucket:
     Type: AWS::S3::Bucket
@@ -185,7 +185,7 @@ Resources:
 
   ## KINESIS SOURCE STREAM FOR Change Data Capture
 
-  ### AWS KMS / Server-side encryption for Kinesis Stream
+  ### AWS KMS / Server-side encryption for Kinesis Stream 
   CdcKinesisServerSideEncryptionKey:
     Type: AWS::KMS::Key
     Properties:
@@ -207,7 +207,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
 
-  ### Kinesis Data Stream
+  ### Kinesis Data Stream 
   CdcKinesisStream:
     Type: AWS::Kinesis::Stream
     DeletionPolicy: Retain
@@ -223,7 +223,7 @@ Resources:
             - CdcKinesisServerSideEncryptionKey
             - Arn
       StreamModeDetails:
-        StreamMode: !Ref CdcStreamMode
+        StreamMode: !Ref CdcStreamMode   
 
   ## KINESIS SOURCE STREAM FOR Logs
   LogsKinesisServerSideEncryptionKey:
@@ -247,7 +247,7 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
 
-  ### Kinesis Data Stream
+  ### Kinesis Data Stream 
   LogsKinesisStream:
     Type: AWS::Kinesis::Stream
     DeletionPolicy: Retain
@@ -263,8 +263,8 @@ Resources:
             - LogsKinesisServerSideEncryptionKey
             - Arn
       StreamModeDetails:
-        StreamMode: !Ref LogsStreamMode
-
+        StreamMode: !Ref LogsStreamMode   
+        
   # KMS AWS managed key for SSE pn-apikey-manager DynamoDB tables
   ApiKeyTablesEncryptKey:
     Type: 'AWS::KMS::Key'
@@ -287,7 +287,7 @@ Resources:
   SafestorageLoggerLogGroup:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
+    DeletionPolicy: Retain    
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
       Parameters:
@@ -300,7 +300,7 @@ Resources:
   DiagnosticLambdaLoggerName:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
+    DeletionPolicy: Retain    
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
       Parameters:
@@ -312,28 +312,28 @@ Resources:
   DiagnosticCloudTrailFileQueue:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
+    DeletionPolicy: Retain      
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub '${ProjectName}-diagnostic-cloudtrail-file'
         DelaySeconds: 1
-        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName    
 
   # Export new safestorage cloudtrail file events
   DiagnosticCloudTrailFileQueueResourcePolicy:
     Type: AWS::SQS::QueuePolicy
-    Properties:
-      Queues:
+    Properties: 
+      Queues: 
         - !GetAtt DiagnosticCloudTrailFileQueue.Outputs.QueueURL
       PolicyDocument:
-        Statement:
+        Statement: 
           - Sid: pnCoreAccountGet
             Effect: "Allow"
-            Principal:
+            Principal:  
               AWS:
                 - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
-            Action:
+            Action: 
               - "sqs:ReceiveMessage"
               - "sqs:DeleteMessage"
               - "sqs:GetQueueAttributes"
@@ -342,10 +342,10 @@ Resources:
             Resource: !GetAtt DiagnosticCloudTrailFileQueue.Outputs.QueueARN
           - Sid: s3ServicePut
             Effect: "Allow"
-            Principal:
-              Service:
+            Principal:  
+              Service: 
                 - "s3.amazonaws.com"
-            Action:
+            Action: 
               - "sqs:SendMessage"
               - "sqs:GetQueueAttributes"
               - "sqs:ChangeMessageVisibility"
@@ -358,14 +358,14 @@ Resources:
                 "aws:SourceAccount": !Ref AWS::AccountId
 Outputs:
   LogsBucketKmsKeyArn:
-    Value:
+    Value: 
       Fn::If:
         - MakeBucketCondition
         - !GetAtt LogsBucketKmsKey.Arn
         - ''
-
+  
   LogsBucketName:
-    Value:
+    Value: 
       Fn::If:
         - MakeBucketCondition
         - !Ref LogsBucket
@@ -374,7 +374,7 @@ Outputs:
   CdcKinesisStreamName:
     Value: !Ref CdcKinesisStream
     Description: 'Kinesis source stream name'
-
+  
   CdcKinesisStreamArn:
     Value: !GetAtt CdcKinesisStream.Arn
     Description: 'Kinesis source stream name ARN'
@@ -386,7 +386,7 @@ Outputs:
   LogsKinesisStreamName:
     Value: !Ref LogsKinesisStream
     Description: 'Kinesis source stream name'
-
+  
   LogsKinesisStreamArn:
     Value: !GetAtt LogsKinesisStream.Arn
     Description: 'Kinesis source stream name ARN'
@@ -396,7 +396,7 @@ Outputs:
     Description: 'Arn of the KMS key used to encrypt the Kinesis source stream'
 
   BucketSuffix: # used to generate kms alias
-    Value: !Ref BucketSuffix
+    Value: !Ref BucketSuffix 
 
   # Pass through parameters
   AlarmSNSTopicArn:
@@ -404,7 +404,7 @@ Outputs:
 
   AlarmSNSTopicName:
     Value: !Ref AlarmSNSTopicName
-
+  
   SafeStorageAccountId:
     Value: !Ref SafeStorageAccountId
 
