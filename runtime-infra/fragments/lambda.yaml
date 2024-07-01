@@ -1,0 +1,200 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Add an ECS Service to an exsisting ECS cluster
+
+Transform:
+  - AddLambdaContextTransform
+
+Parameters:
+  # Logical parameters
+  FunctionName:
+    Type: String
+    Description: Lambda unique (logical) name
+
+  FunctionBucketName:
+    Type: String
+    Description: S3 bucket name where the lambda code is stored
+
+  FunctionBucketKey:
+    Type: String
+    Description: S3 object key where the lambda code is stored
+
+  MemorySize:
+    Type: Number
+    Description: Memory amount reserved to the task pod
+    Default: 256
+    MinValue: 256
+    MaxValue: 10240
+
+  Timeout:
+    Type: String
+    Default: 10
+    Description: timeout for the lambda function
+
+  Runtime:
+    Type: String
+    Default: "nodejs18.x"
+
+  RoleArn:
+    Type: String
+    Description: Lambda role arn
+
+  Handler:
+    Type: String
+    Description: Lambda Handler
+    Default: "index.handler"
+
+  # Technical parameters
+  VpcId:
+    # Type: AWS::EC2::VPC::Id
+    Type: String
+    Default: ''
+    Description: the VPC id of the vpc where's the cluster containing the current service is deployed
+
+  Subnets:
+    # Type: List<AWS::EC2::Subnet::Id>
+    Type: String
+    Default: ''
+    Description: the subnets where the service is going to be deployed
+
+  TracingConfigMode:
+    Type: String
+    AllowedValues:
+      - Active
+      - PassThrough
+      - NotUsed
+    Default: NotUsed
+
+  LambdaInsightEnabled:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "false"
+
+  # Function layers
+  Layer1:
+    Type: String
+    Description: ARN of the first layer
+    Default: ""
+
+  Layer2:
+    Type: String
+    Description: ARN of the second layer
+    Default: ""
+
+  Layer3:
+    Type: String
+    Description: ARN of the third layer
+    Default: ""
+
+  Layer4:
+    Type: String
+    Description: ARN of the fourth layer
+    Default: ""
+
+  Layer5:
+    Type: String
+    Description: ARN of the fifth layer
+    Default: ""
+
+  # Tags
+  TagList:
+    Description: Comma separated Tag List  in the form key1=value1,key2=value2,....
+    Type: CommaDelimitedList
+    Default: ""
+
+  # Function env environment map, maximum 15 entry
+  EnvVariables:
+    Description: Comma separated environment entries in the form key1=value1,key2=value2,....
+    Type: CommaDelimitedList
+    Default: ""
+
+Conditions:
+  HasVpcId: !Not [!Equals [!Ref VpcId, ""]]
+  HasLayer1: !Not [!Equals [!Ref Layer1, ""]]
+  HasLayer2: !Not [!Equals [!Ref Layer2, ""]]
+  HasLayer3: !Not [!Equals [!Ref Layer3, ""]]
+  HasLayer4: !Not [!Equals [!Ref Layer4, ""]]
+  HasLayer5: !Not [!Equals [!Ref Layer5, ""]]
+
+  # this condition will be overridden by the transform
+  LambdaInsightsEnabled: !Equals [!Ref LambdaInsightEnabled, 'true' ]
+  IsEnabledTracingConfig: !Not [!Equals [!Ref TracingConfigMode, NotUsed]]
+
+Resources:
+  Function:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref FunctionName
+      Runtime: !Ref Runtime
+      Role: !Ref RoleArn
+      Handler: !Ref Handler
+      MemorySize: !Ref MemorySize
+      Timeout: !Ref Timeout
+      TracingConfig:
+        Mode:
+          !If [
+            IsEnabledTracingConfig,
+            !Ref TracingConfigMode,
+            !Ref "AWS::NoValue",
+          ]
+      Layers:
+        - Fn::If:
+            - LambdaInsightsEnabled
+            - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+            - !Ref "AWS::NoValue"
+        - Fn::If:
+            - HasLayer1
+            - !Ref Layer1
+            - !Ref "AWS::NoValue"
+        - Fn::If:
+            - HasLayer2
+            - !Ref Layer2
+            - !Ref "AWS::NoValue"
+        - Fn::If:
+            - HasLayer3
+            - !Ref Layer3
+            - !Ref "AWS::NoValue"
+        - Fn::If:
+            - HasLayer4
+            - !Ref Layer4
+            - !Ref "AWS::NoValue"
+        - Fn::If:
+            - HasLayer5
+            - !Ref Layer5
+            - !Ref "AWS::NoValue"
+      Tags:
+        "Fn::Transform":
+          Name: DynamicTagListMacro
+          Parameters:
+            KeyValue: !Ref TagList
+      VpcConfig:
+        "Fn::If":
+          - HasVpcId
+          - SecurityGroupIds:
+              - !GetAtt FunctionSecGroup.GroupId
+            SubnetIds: !Ref Subnets
+          - !Ref "AWS::NoValue"
+      Code:
+        S3Bucket: !Ref FunctionBucketName
+        S3Key: !Ref FunctionBucketKey
+      Environment:
+        Variables:
+          "Fn::Transform":
+            Name: DynamicVariableListTransform
+            Parameters:
+              KeyValue: !Ref EnvVariables
+
+  FunctionSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: HasVpcId
+    Properties:
+      GroupDescription: !Sub "${FunctionName}-security-group"
+      VpcId: !Ref VpcId
+
+Outputs:
+  FunctionName:
+    Value: !Ref Function
+
+  FunctionArn:
+    Value: !GetAtt Function.Arn
