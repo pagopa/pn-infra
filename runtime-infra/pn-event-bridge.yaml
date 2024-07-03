@@ -223,6 +223,9 @@ Parameters:
 
   DeliveryPushValidationInputsQueueARN:
     Type: String
+  
+  DeliveryPushValidationInputsQueueURL:
+    Type: String
 
   # SafeStorage to F24
   SafeStorageToF24QueueURL:
@@ -420,6 +423,7 @@ Resources:
         - !Ref "F24ToDeliveryPushQueueURL"
         - !Ref "RaddAltToPaperChannelQueueURL"
         - !Ref "SafeStorageToF24QueueURL"
+        - !Ref "DeliveryPushValidationInputsQueueURL"
       PolicyDocument:
         Statement:
           - Sid: "SendEventsToDLQ"
@@ -448,6 +452,7 @@ Resources:
               - !Ref "F24ToDeliveryPushQueueARN"
               - !Ref "SafeStorageToF24QueueARN"
               - !Ref "RaddAltToPaperChannelQueueARN"
+              - !Ref "DeliveryPushValidationInputsQueueARN"
 
   # Log all events
   # pn-infra-logs
