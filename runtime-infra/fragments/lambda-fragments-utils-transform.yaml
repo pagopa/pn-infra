@@ -53,7 +53,8 @@ Resources:
       Code:
         ZipFile: |
           async function handler(event, context) {
-              let envVars = event.params?.KeyValue?(event.params?.KeyValue):[];
+              const breakpoint = /###/;
+              let envVars = event.params?.KeyValue?(event.params?.KeyValue.split(breakpoint)):[];
               const resFragment = {};
               for (let i = 0; i < envVars.length; i++) {
                 const keyPair = envVars[i].split("=");
