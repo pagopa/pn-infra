@@ -199,19 +199,27 @@ Parameters:
     Default: main
 
 Conditions:
-  IsAlbArnEmpty: !Equals [ !Ref ApplicationLoadBalancerArn, '-' ]
-  IsAlbArnDnsEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDns, '-' ]
-  IsAlbArnDnsZoneIdEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDnsZoneId, '-' ]
-  IsAlbListenerArnEmpty: !Equals [ !Ref ApplicationLoadBalancerListenerArn, '-' ]
-  IsNetworkLoadBalancerLinkEmpty: !Equals [ !Ref NetworkLoadBalancerLink, '-' ]
-  IsWebappSecurityGroupIdEmpty: !Equals [ !Ref WebappSecurityGroupId, '-' ]
-  RequiresAlbCreation: !Or [ !Condition IsAlbArnEmpty, !Condition IsAlbArnDnsEmpty, !Condition IsAlbArnDnsZoneIdEmpty, !Condition IsAlbListenerArnEmpty, !Condition IsNetworkLoadBalancerLinkEmpty, !Condition IsWebappSecurityGroupIdEmpty ]
-  
-  RequiresVpcEndpoints: !Equals [ !Ref VpcEndpointsRequired, true ]
+  IsAlbArnEmpty: !Equals [!Ref ApplicationLoadBalancerArn, "-"]
+  IsAlbArnDnsEmpty: !Equals [!Ref ApplicationLoadBalancerAwsDns, "-"]
+  IsAlbArnDnsZoneIdEmpty:
+    !Equals [!Ref ApplicationLoadBalancerAwsDnsZoneId, "-"]
+  IsAlbListenerArnEmpty: !Equals [!Ref ApplicationLoadBalancerListenerArn, "-"]
+  IsNetworkLoadBalancerLinkEmpty: !Equals [!Ref NetworkLoadBalancerLink, "-"]
+  IsWebappSecurityGroupIdEmpty: !Equals [!Ref WebappSecurityGroupId, "-"]
+  RequiresAlbCreation:
+    !Or [
+      !Condition IsAlbArnEmpty,
+      !Condition IsAlbArnDnsEmpty,
+      !Condition IsAlbArnDnsZoneIdEmpty,
+      !Condition IsAlbListenerArnEmpty,
+      !Condition IsNetworkLoadBalancerLinkEmpty,
+      !Condition IsWebappSecurityGroupIdEmpty,
+    ]
 
-  IsEgressDefined: !Not [ !Equals [ !Ref VpcEgressSubnetsIds, '-' ] ]
+  RequiresVpcEndpoints: !Equals [!Ref VpcEndpointsRequired, true]
+
+  IsEgressDefined: !Not [!Equals [!Ref VpcEgressSubnetsIds, "-"]]
 Resources:
-
   ###                       VPC BASE CONFIGURATIONS                       ###
   ###########################################################################
 
@@ -259,9 +267,9 @@ Resources:
     Properties:
       Name: !Sub 'alb.core.${ProjectName}.internal'
       Type: A
-      HostedZoneId: !Ref PrivateHostedZone  
+      HostedZoneId: !Ref PrivateHostedZone
       AliasTarget:
-        DNSName: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain 
+        DNSName: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain
         EvaluateTargetHealth: false
         HostedZoneId: !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomainZone
 
@@ -303,6 +311,11 @@ Resources:
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-cloudwatch-dashboard-transform.yaml"
 
+  FragmentUtilitiesTransform:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-fragments-utils-transform.yaml"
+
 Outputs:
 
   # VPC outputs
@@ -316,19 +329,39 @@ Outputs:
 
   # Load balancers outputs
   NetworkLoadBalancerLink:
-    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink, !Ref NetworkLoadBalancerLink ]
+    Value:
+      !If [
+        RequiresAlbCreation,
+        !GetAtt LoadBalancer.Outputs.NetworkLoadBalancerLink,
+        !Ref NetworkLoadBalancerLink,
+      ]
     Description: Used by API-Gw to connect into VPC
 
   ApplicationLoadBalancerListenerArn:
-    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerListenerArn, !Ref ApplicationLoadBalancerListenerArn ]
+    Value:
+      !If [
+        RequiresAlbCreation,
+        !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerListenerArn,
+        !Ref ApplicationLoadBalancerListenerArn,
+      ]
     Description: Application Load Balancerlistener Arn
 
   ApplicationLoadBalancerDomain:
-    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain, !Ref ApplicationLoadBalancerAwsDns ]
+    Value:
+      !If [
+        RequiresAlbCreation,
+        !GetAtt LoadBalancer.Outputs.ApplicationLoadBalancerDomain,
+        !Ref ApplicationLoadBalancerAwsDns,
+      ]
     Description: Application Load Balancer Domain to use for http URL
 
   AlbSecurityGroup:
-    Value: !If [ RequiresAlbCreation, !GetAtt LoadBalancer.Outputs.AlbSecurityGroup, !Ref WebappSecurityGroupId ]
+    Value:
+      !If [
+        RequiresAlbCreation,
+        !GetAtt LoadBalancer.Outputs.AlbSecurityGroup,
+        !Ref WebappSecurityGroupId,
+      ]
 
   # ECS Cluster
   ECSClusterName:
@@ -362,7 +395,7 @@ Outputs:
   CdcKinesisStreamName:
     Value: !Ref CdcKinesisStreamName
   CdcKinesisMaxAgeInMilliseconds:
-    Value: !Ref CdcKinesisMaxAgeInMilliseconds    
+    Value: !Ref CdcKinesisMaxAgeInMilliseconds
   CdcKinesisMaxAgeInMillisecondsOncall:
     Value: !Ref CdcKinesisMaxAgeInMillisecondsOncall    
   CdcKinesisStreamArn:
