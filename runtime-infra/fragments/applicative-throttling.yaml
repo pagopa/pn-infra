@@ -43,7 +43,7 @@ Resources:
     Properties: 
       ResourceArn: !Ref ApplicationLoadBalancerArn
       WebACLArn: !GetAtt ApplicativeThrottlingWebACL.Arn
-      
+
   ApplicativeThrottlingWebACL:
     Type: AWS::WAFv2::WebACL
     Properties:
@@ -89,7 +89,7 @@ Resources:
           VisibilityConfig:
             SampledRequestsEnabled: true
             CloudWatchMetricsEnabled: true
-            MetricName: !Sub 'applicative-throttling-${ThrottlingGroupString}-rule-allow-nonmatching-uris-metric'
+            MetricName: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}-rule-allow-nonmatching-uris-metric'
         - Name: BlockTooBigHeaders
           Priority: 1
           Action:
@@ -115,7 +115,7 @@ Resources:
           VisibilityConfig:
             SampledRequestsEnabled: true
             CloudWatchMetricsEnabled: true
-            MetricName: !Sub 'applicative-throttling-${ThrottlingGroupString}-rule-block-toobig-headers-metric'
+            MetricName: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}-rule-block-toobig-headers-metric'
         - Name: ThrottlingStatement
           Priority: 2
           Action:
@@ -159,4 +159,4 @@ Resources:
           VisibilityConfig:
             SampledRequestsEnabled: true
             CloudWatchMetricsEnabled: true
-            MetricName: !Sub 'applicative-throttling-${ThrottlingGroupString}-rule-throttling-metric'
+            MetricName: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}-rule-throttling-metric'
