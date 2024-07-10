@@ -1,0 +1,162 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys the WAF for an ALB'
+Parameters:
+
+  ApplicationLoadBalancerArn:
+    Type: String
+    Description: The ARN of the Application Load Balancer to attach the WebACL to
+
+  ThrottledPathsRegexp:
+    Type: String
+    Default: '(/throttled/.*)|(/TH/.*)'
+    Description: | 
+      This parameter is used twice.
+       - First of all IF the request path DO NOT MATCH this regexp the ACL ALLOW that request
+       - IF the request path MATCH this regexp the ACL apply headers dimension check and throttling
+
+  ThrottlingGroupString:
+    Type: String
+    Default: 'radd-alt'
+    Description: | 
+      This parameter is used twice.
+       - First of all IF the request path DO NOT MATCH this regexp the ACL ALLOW that request
+       - IF the request path MATCH this regexp the ACL apply headers dimension check and throttling
+
+  MaxRequestPerThrottlingPeriod:
+    Type: Number
+    MinValue: 100
+    MaxValue: 2000000000
+    Description: |
+      Number of request allowed in a duration of ThrottlingPeriodSeconds for each aggregation key
+      provided in the header x-pagopa-pn-throttling-value
+
+  ThrottlingPeriodSeconds:
+    Type: Number
+    AllowedValues: [60, 120, 300, 600]
+    Description: Throttling period duration
+
+Resources:
+
+  ######### WEB ACL ########
+  ThrottlingWebACLForALBAttach:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties: 
+      ResourceArn: !Ref ApplicationLoadBalancerArn
+      WebACLArn: !GetAtt ApplicativeThrottlingWebACL.Arn
+      
+  ApplicativeThrottlingWebACL:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}'
+      Scope: REGIONAL
+      Description: !Sub 'WebACL che permette di limitare il numero di invocazioni alle API del gruppo ${ThrottlingGroupString}'
+      DefaultAction:
+        Allow:
+          CustomRequestHandling:
+            InsertHeaders:
+              - Name: !Sub 'x-pagopa-pn-waf-applicative-throttling-${ThrottlingGroupString}'
+                Value: passed
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub 'applicative-throttling-${ThrottlingGroupString}-webacl-metric'
+      CustomResponseBodies:
+        BlockThrottling:
+          ContentType: TEXT_PLAIN
+          Content: To many request
+        BlockTooBig:
+          ContentType: TEXT_PLAIN
+          Content: Too Big
+      Rules:
+        - Name: AllowNotMatchingUris
+          Priority: 0
+          Action:
+            Allow:
+              CustomRequestHandling:
+                InsertHeaders:
+                  - Name: !Sub 'x-pagopa-pn-waf-applicative-throttling-${ThrottlingGroupString}'
+                    Value: passed
+          Statement:
+            NotStatement:
+                 Statement:          
+                  RegexMatchStatement: # Match URI
+                    TextTransformations:
+                      - Priority: 0
+                        Type: NONE
+                    RegexString: !Ref ThrottledPathsRegexp
+                    FieldToMatch:
+                      UriPath: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub 'applicative-throttling-${ThrottlingGroupString}-rule-allow-nonmatching-uris-metric'
+        - Name: BlockTooBigHeaders
+          Priority: 1
+          Action:
+            Block:
+              CustomResponse:
+                ResponseCode: 400
+                CustomResponseBodyKey: BlockTooBig
+          Statement:
+            RegexMatchStatement: # MATCH ONLY IF THE HEADERS ARE TOO BIG
+              TextTransformations:
+                - Priority: 0
+                  Type: NONE
+              RegexString: '^no-matching-header-regexp--$'
+              FieldToMatch:
+                Headers:
+                  MatchPattern:
+                    All: {}
+                    #IncludedHeaders:
+                    #  - "x-pagopa-pn-throttling-group"
+                    #  - "x-pagopa-pn-throttling-value"
+                  MatchScope: KEY 
+                  OversizeHandling: MATCH 
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub 'applicative-throttling-${ThrottlingGroupString}-rule-block-toobig-headers-metric'
+        - Name: ThrottlingStatement
+          Priority: 2
+          Action:
+            Block:
+              CustomResponse:
+                ResponseCode: 412
+                CustomResponseBodyKey: BlockThrottling
+          Statement:
+            RateBasedStatement:
+              AggregateKeyType: CUSTOM_KEYS
+              CustomKeys:
+                - Header: 
+                    Name: x-pagopa-pn-throttling-value
+                    TextTransformations:
+                      - Priority: 0
+                        Type: NONE
+              Limit: !Ref MaxRequestPerThrottlingPeriod
+              EvaluationWindowSec: !Ref ThrottlingPeriodSeconds
+              ScopeDownStatement:
+                AndStatement:
+                  Statements:
+                    - RegexMatchStatement: # Match URI
+                        TextTransformations:
+                          - Priority: 0
+                            Type: NONE
+                        RegexString: !Ref ThrottledPathsRegexp
+                        FieldToMatch:
+                          UriPath: {}
+                    -  RegexMatchStatement: # MATCH HEADER
+                        TextTransformations:
+                          - Priority: 0
+                            Type: NONE
+                        RegexString: !Ref ThrottlingGroupString
+                        FieldToMatch:
+                          Headers:
+                            MatchPattern:
+                              IncludedHeaders:
+                                - "x-pagopa-pn-throttling-group"
+                            MatchScope: VALUE 
+                            OversizeHandling: MATCH 
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub 'applicative-throttling-${ThrottlingGroupString}-rule-throttling-metric'
