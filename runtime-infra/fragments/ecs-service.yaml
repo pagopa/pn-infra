@@ -1828,7 +1828,7 @@ Resources:
       ScalingTargetId: !Ref AutoScalingTarget
       StepScalingPolicyConfiguration:
         AdjustmentType: ChangeInCapacity
-        Cooldown: 120  #PN-11773 ScaleDown policy optimization
+        Cooldown: !Ref AutoscalingCheckPeriod
         MetricAggregationType: Average
         StepAdjustments:
           - MetricIntervalUpperBound: 0
