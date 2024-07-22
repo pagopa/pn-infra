@@ -1,0 +1,186 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Kinesis Data Stream and alarms
+
+Parameters:
+  StreamName:
+    Type: String
+    Description: Stream name
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: SNS topic ARN for alarms
+
+  RequireManagedKey:
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
+  StreamShardsCount:
+    Type: Number
+    Default: 0
+    Description: Number of shards for the stream, 0 for OnDemand
+
+  StreamRetentionHours:
+    Type: Number
+    Default: 24
+    Description: Number of hours to retain data records in the stream
+
+  StandardAlarmThresholdsMs:
+    Type: Number
+    Default: 0
+    Description: Threshold for standard alarms in milliseconds
+
+  OnCallAlarmThresholdsMs:
+    Type: Number
+    Default: 0
+    Description: Threshold for oncall alarms in milliseconds
+
+  DatapointsToAlarmStandard:
+    Type: Number
+    Default: 10
+    Description: Number of datapoints to alarm for standard alarms
+
+  StandardAlarmPeriodSeconds:
+    Type: Number
+    Default: 60
+    Description: Period to alarm for standard alarms
+
+  StandardAlarmEvaluationPeriods:
+    Type: Number
+    Default: 60
+    Description: Evaluation periods for standard alarms
+
+  DatapointsToAlarmOncall:
+    Type: Number
+    Default: 10
+    Description: Number of datapoints to alarm for oncall alarms
+
+  OncallAlarmPeriodSeconds:
+    Type: Number
+    Default: 60
+    Description: Period to alarm for oncall alarms
+
+  OncallAlarmEvaluationPeriods:
+    Type: Number
+    Default: 60
+    Description: Evaluation periods for oncall alarms
+
+Conditions:
+  OnDemandDisabled: !Not [!Equals [!Ref StreamShardsCount, 0]]
+  HasStandardAlarmThresholds: !Not [!Equals [!Ref StandardAlarmThresholdsMs, 0]]
+  HasOncallAlarmThresholds: !Not [!Equals [!Ref OnCallAlarmThresholdsMs, 0]]
+  HasRequireManagedKey: !Equals [!Ref RequireManagedKey, "true"]
+
+Resources:
+  ### AWS KMS / Server-side encryption for Kinesis Stream
+  KinesisServerSideEncryptionKey:
+    Condition: HasRequireManagedKey
+    Type: AWS::KMS::Key
+    Properties:
+      KeyPolicy:
+        Statement:
+          - Action: kms:*
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+            Resource: "*"
+        Version: "2012-10-17"
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+
+  ### Kinesis Data Stream
+  KinesisStream:
+    Type: AWS::Kinesis::Stream
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: !Ref StreamName
+      RetentionPeriodHours: !Ref StreamRetentionHours
+      ShardCount: !If [OnDemandDisabled, !Ref StreamShardsCount, !Ref "AWS::NoValue"]
+      StreamEncryption:
+        Fn::If:
+          - HasRequireManagedKey
+          - EncryptionType: KMS
+            KeyId: !GetAtt KinesisServerSideEncryptionKey.Arn
+          - !Ref "AWS::NoValue"
+      StreamModeDetails:
+        StreamMode: !If [OnDemandDisabled, "PROVISIONED", "ON_DEMAND"]
+
+  # Kinesis GetRecords.IteratorAgeMilliseconds alarm
+  KinesisGetRecordsIteratorAgeStandardAlarm:
+    Condition: HasStandardAlarmThresholds
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${StreamName}-IteratorAge-Alarm"
+      AlarmDescription: "CloudWatch alarm for when kinesis GetRecords.IteratorAgeMilliseconds is too high."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      Dimensions:
+        - Value: !Ref KinesisStream
+          Name: StreamName
+      DatapointsToAlarm: !Ref DatapointsToAlarmStandard
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref StandardAlarmEvaluationPeriods
+      Period: !Ref StandardAlarmPeriodSeconds
+      Namespace: AWS/Kinesis
+      MetricName: GetRecords.IteratorAgeMilliseconds
+      Statistic: Maximum
+      Threshold: !Ref StandardAlarmThresholdsMs
+
+  KinesisGetRecordsIteratorAgeStandardOncallAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasOncallAlarmThresholds
+    Properties:
+      AlarmName: !Sub "oncall-${StreamName}-IteratorAge-Alarm"
+      AlarmDescription: "CloudWatch alarm for when Kinesis GetRecords.IteratorAgeMilliseconds is too high."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      Dimensions:
+        - Value: !Ref KinesisStream
+          Name: StreamName
+      DatapointsToAlarm: !Ref DatapointsToAlarmOncall
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref OncallAlarmEvaluationPeriods
+      Period: !Ref OncallAlarmPeriodSeconds
+      Namespace: AWS/Kinesis
+      MetricName: GetRecords.IteratorAgeMilliseconds
+      Statistic: Maximum
+      Threshold: !Ref OnCallAlarmThresholdsMs
+
+Outputs:
+  KinesisStreamName:
+    Value: !Ref KinesisStream
+    Description: "Kinesis source stream name"
+
+  KinesisStreamArn:
+    Value: !GetAtt KinesisStream.Arn
+    Description: "Kinesis source stream name ARN"
+
+  KinesisStreamKeyArn:
+    Value:
+      !If [
+        HasRequireManagedKey,
+        !GetAtt KinesisServerSideEncryptionKey.Arn,
+        "",
+      ]
+    Description: "Arn of the KMS key used to encrypt the Kinesis source stream"
+
+  StandardAlarmArn:
+    Value:
+      !If [
+        HasStandardAlarmThresholds,
+        !GetAtt KinesisGetRecordsIteratorAgeStandardAlarm.Arn,
+        "",
+      ]
+
+  OncallAlarmArn:
+    Value:
+      !If [
+        HasOncallAlarmThresholds,
+        !GetAtt KinesisGetRecordsIteratorAgeStandardOncallAlarm.Arn,
+        "",
+      ]
