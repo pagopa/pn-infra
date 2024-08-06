@@ -63,6 +63,16 @@ Parameters:
   LogRetention:
     Type: Number
     Default: 14
+  
+  BucketLogRetentionDays:
+    Type: Number
+    Default: 1095 # 3 years
+    Description: Number of days to retain logs in the bucket
+
+  BucketLogPrefix:
+    Type: String
+    Default: 'logsTos3/'
+    Description: Prefix for the logs in the bucket
 
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
@@ -98,6 +108,13 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      # lifecycle configuration to delete objects after {BucketLogRetention} days
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteLogs
+            Status: Enabled
+            Prefix: !Ref BucketLogPrefix
+            ExpirationInDays: !Ref BucketLogRetentionDays
       NotificationConfiguration:
         QueueConfigurations:
           - Event: 's3:ObjectCreated:*'
