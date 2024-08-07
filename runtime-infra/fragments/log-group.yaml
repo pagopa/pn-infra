@@ -33,6 +33,7 @@ Parameters:
   
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
+  IsLogMasking: !Equals [ !Ref LogGroupName, 'pn-tokenExchangeLambda' ]
 
 Resources:
 
@@ -47,7 +48,29 @@ Resources:
       KmsKeyId:
         Fn::GetAtt:
           - LogGroupKmsKey
-          - Arn
+          - Arn   
+      DataProtectionPolicy:
+        Condition: IsLogMasking
+        Name: "data-protection-policy"
+        Description: "Jwt Token Mask in cloudwatch log"
+        Version: "2021-06-01"
+        Configuration:
+          CustomDataIdentifier:
+            - Name: "JWTTokenMask"
+              Regex: "JWT token: \\[eyJ[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+\\]"
+        Statement:
+          - Sid: "audit-policy"
+            DataIdentifier:
+              - "JWTTokenMask"
+            Operation:
+              Audit:
+                FindingsDestination: {}
+          - Sid: "redact-policy"
+            DataIdentifier:
+              - "JWTTokenMask"
+            Operation:
+              Deidentify:
+                MaskConfig: {}
 
   # KMS Key for Encrypt log data in CloudWatch Logs
   LogGroupKmsKey:
