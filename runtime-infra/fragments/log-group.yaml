@@ -6,6 +6,14 @@ Parameters:
   LogGroupName:
     Type: String
     Description: Log group name
+  
+  LogEnableMasking:
+    Type: String
+    Default: false
+    Description: Enable log masking
+    AllowedValues:
+      - true
+      - false
 
   LogGroupPrefix:
     Type: String
@@ -33,6 +41,7 @@ Parameters:
   
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
+  IsLogMasking: !Equals [ !Ref LogEnableMasking, 'true' ]
 
 Resources:
 
@@ -48,6 +57,30 @@ Resources:
         Fn::GetAtt:
           - LogGroupKmsKey
           - Arn
+      DataProtectionPolicy:
+        Fn::If:
+          - IsLogMasking
+          - Name: "Mask-log-policy"
+            Description: "Jwt Token Mask in cloudwatch log"
+            Version: "2021-06-01"
+            Configuration:
+              CustomDataIdentifier:
+                - Name: "JWTTokenMask"
+                  Regex: "eyJ[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+|header:\\s*'.*?'[^}]*\\}"
+            Statement:
+              - Sid: "audit-policy"
+                DataIdentifier:
+                  - "JWTTokenMask"
+                Operation:
+                  Audit:
+                    FindingsDestination: {}
+              - Sid: "redact-policy"
+                DataIdentifier:
+                  - "JWTTokenMask"
+                Operation:
+                  Deidentify:
+                    MaskConfig: {}
+          - !Ref "AWS::NoValue"
 
   # KMS Key for Encrypt log data in CloudWatch Logs
   LogGroupKmsKey:

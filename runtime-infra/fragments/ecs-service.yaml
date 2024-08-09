@@ -551,7 +551,27 @@ Parameters:
     Description: 80th container environment entry in the form key=value
     Type: String
     Default: ''
-  
+  ContainerEnvEntry81:
+    Description: 81th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry82:
+    Description: 82th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry83:
+    Description: 83th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry84:
+    Description: 84th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry85:
+    Description: 85th container environment entry in the form key=value
+    Type: String
+    Default: ''
+    
   # Secrets
   ContainerSecret1:
     Description: 1st container secret in the form key=secret arn
@@ -779,6 +799,11 @@ Conditions:
   Env78Exist: !Not [ !Equals [ !Ref ContainerEnvEntry78, '' ] ]
   Env79Exist: !Not [ !Equals [ !Ref ContainerEnvEntry79, '' ] ]
   Env80Exist: !Not [ !Equals [ !Ref ContainerEnvEntry80, '' ] ]
+  Env81Exist: !Not [ !Equals [ !Ref ContainerEnvEntry81, '' ] ]
+  Env82Exist: !Not [ !Equals [ !Ref ContainerEnvEntry82, '' ] ]
+  Env83Exist: !Not [ !Equals [ !Ref ContainerEnvEntry83, '' ] ]
+  Env84Exist: !Not [ !Equals [ !Ref ContainerEnvEntry84, '' ] ]
+  Env85Exist: !Not [ !Equals [ !Ref ContainerEnvEntry85, '' ] ]
 
   Secret1Exist: !Not [ !Equals [ !Ref ContainerSecret1, '' ] ]
   Secret2Exist: !Not [ !Equals [ !Ref ContainerSecret2, '' ] ]
@@ -1485,6 +1510,31 @@ Resources:
                 - Env80Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry80 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry80 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env81Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry81 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry81 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env82Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry82 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry82 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env83Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry83 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry83 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env84Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry84 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry84 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env85Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry85 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry85 ] ]
                 - !Ref "AWS::NoValue"
           EnvironmentFiles:
             - Type: s3
