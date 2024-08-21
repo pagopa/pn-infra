@@ -90,15 +90,6 @@ Parameters:
     Type: String
     Description: 'The DNS name used for PG B2B API rest'
 
-  AlternatePgApiDnsName:
-    Type: String
-    Default: ''
-    Description: 'The alternate DNS name used for PG B2B API rest.'
-
-  PgApiCertificateArn:
-    Type: String
-    Description: 'The certificate used for browser rest PG B2B API.'
-
   RaddApiDnsName:
     Type: String
     Description: Radd Api DNS Name
@@ -454,21 +445,6 @@ Resources:
         - Key: "Microservice"
           Value: "pn-infra-networking"
   
-  # Custom domain for B2B api PG
-  PgApiCustomDomain:
-    Type: AWS::CloudFormation::Stack
-    Condition: RequiresCustomDomains
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/api-gw-custom-domain.yaml"
-      Parameters:
-        DnsName: !Ref PgApiDnsName
-        AlternateDnsName: !Ref AlternatePgApiDnsName
-        CertificateArn: !Ref PgApiCertificateArn
-        HostedZoneId: !Ref HostedZoneId
-      Tags:
-        - Key: "Microservice"
-          Value: "pn-infra-networking"
-
   ###                    QUEUES BETWEEN MICRO SERVICES                    ###
   ###########################################################################
 
@@ -968,6 +944,8 @@ Outputs:
     Value: !Ref CNApiDnsName
   RaddApiDnsName:
     Value: !Ref RaddApiDnsName
+  PgApiDnsName:
+    Value: !Ref PgApiDnsName
     
   # SafeStorage to DeliveryPush
   SafeStorageToDeliveryPushQueueName:
