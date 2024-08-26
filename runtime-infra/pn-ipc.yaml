@@ -94,9 +94,9 @@ Parameters:
     Description: "Hosted Zone Id in which you want to add record"
     Type: String
   
-  Version:
-    Type: String
-    Description: 'keep track of used projects commitIds'
+  # Version:
+  #   Type: String
+  #   Description: 'keep track of used projects commitIds'
 
   CustomDomainsRequired:
     Type: String
@@ -105,46 +105,46 @@ Parameters:
       - true
       - false
 
-  LogRetention:
-    Type: Number
-    Default: 14
-    Description: Default log retention in days
+  # LogRetention:
+  #   Type: Number
+  #   Default: 14
+  #   Description: Default log retention in days
 
   # pass-though parameters
   LambdasBucketName:
     Type: String
   LambdasBasePath:
     Type: String
-  NetworkLoadBalancerLink:
-    Type: String
-  ApplicationLoadBalancerListenerArn:
-    Type: String
-  ApplicationLoadBalancerDomain:
-    Type: String
-  AlarmSNSTopicArn:
-    Type: String
+  # NetworkLoadBalancerLink:
+  #   Type: String
+  # ApplicationLoadBalancerListenerArn:
+  #   Type: String
+  # ApplicationLoadBalancerDomain:
+  #   Type: String
+  # AlarmSNSTopicArn:
+  #   Type: String
   AlarmSNSTopicName:
     Type: String
   VpcId:
     Type: String
   SubnetsIds:
     Type: String
-  ECSClusterName:
-    Type: String
+  # ECSClusterName:
+  #   Type: String
   CorsAllowedDomains:
     Type: String
-  EcsDefaultSecurityGroup:
-    Type: String
-  LogsBucketName:
-    Type: String
-  LogsBucketKmsKeyArn:
-    Type: String
-  LogsExporterRoleArn:
-    Type: String
-  LogsExporterPolicyArn:
-    Type: String
-  AlbSecurityGroup:
-    Type: String
+  # EcsDefaultSecurityGroup:
+  #   Type: String
+  # LogsBucketName:
+  #   Type: String
+  # LogsBucketKmsKeyArn:
+  #   Type: String
+  # LogsExporterRoleArn:
+  #   Type: String
+  # LogsExporterPolicyArn:
+  #   Type: String
+  # AlbSecurityGroup:
+  #   Type: String
   CognitoUserPoolArn:
     Type: String
     Default: ''
@@ -175,13 +175,13 @@ Parameters:
     Type: String
   LogsKinesisStreamKeyArn:
     Type: String
-  SafeStorageAccountId:
-    Type: String
-  ApiKeyTablesEncryptKeyId:
-    Type: String
+  # SafeStorageAccountId:
+  #   Type: String
+  # ApiKeyTablesEncryptKeyId:
+  #   Type: String
 
-  VpcEgressSubnetsIds:
-    Type: String
+  # VpcEgressSubnetsIds:
+  #   Type: String
 
   ElasticacheEndpoint:
     Type: String
@@ -265,8 +265,8 @@ Parameters:
     Type: String
     Description: Pdnd Audience for ApikeyAuthorizerV2
 
-  SafestorageLoggerLogGroupName:
-    Type: String
+  # SafestorageLoggerLogGroupName:
+  #   Type: String
 
   ExternalChannelBaseUrl:
     Type: String
@@ -297,54 +297,58 @@ Parameters:
     Type: String    
     Default: 'pn-paper-channel-f24'
 
-  LogsKinesisMaxAgeInMilliseconds:
-    Type: Number
-    Description: 'MaxAgeInMilliseconds for Kinesis Logs GetRecords'
+  # LogsKinesisMaxAgeInMilliseconds:
+  #   Type: Number
+  #   Description: 'MaxAgeInMilliseconds for Kinesis Logs GetRecords'
 
-  LogsKinesisMaxAgeInMillisecondsOncall:
-    Type: Number
-    Description: 'MaxAgeInMilliseconds for Kinesis Logs GetRecords (oncall alarm)'
+  # LogsKinesisMaxAgeInMillisecondsOncall:
+  #   Type: Number
+  #   Description: 'MaxAgeInMilliseconds for Kinesis Logs GetRecords (oncall alarm)'
 
-  CdcKinesisMaxAgeInMilliseconds:
-    Type: Number
-    Description: 'MaxAgeInMilliseconds for Kinesis Cdc GetRecords'
+  # CdcKinesisMaxAgeInMilliseconds:
+  #   Type: Number
+  #   Description: 'MaxAgeInMilliseconds for Kinesis Cdc GetRecords'
 
-  CdcKinesisMaxAgeInMillisecondsOncall:
-    Type: Number
-    Description: 'MaxAgeInMilliseconds for Kinesis Cdc GetRecords (oncall alarm)'
+  # CdcKinesisMaxAgeInMillisecondsOncall:
+  #   Type: Number
+  #   Description: 'MaxAgeInMilliseconds for Kinesis Cdc GetRecords (oncall alarm)'
 
   # Data Monitoring pass-through params
-  DynamoDbExportTableNames:
-    Type: String
-    Description: 'Comma separated list of DynamoDB tables to export'
+  # DynamoDbExportTableNames:
+  #   Type: String
+  #   Description: 'Comma separated list of DynamoDB tables to export'
 
-  DynamoDbExportPrefix:
-    Type: String
-    Description: 'Prefix for the DynamoDB export'
+  # DynamoDbExportPrefix:
+  #   Type: String
+  #   Description: 'Prefix for the DynamoDB export'
 
-  ConfinfoDynamoDbExportBucketName:
-    Type: String
-    Description: 'Bucket name for the DynamoDB export for Confinfo Account'
+  # ConfinfoDynamoDbExportBucketName:
+  #   Type: String
+  #   Description: 'Bucket name for the DynamoDB export for Confinfo Account'
 
-  ParquetBucketPath:
-    Type: String
-    Description: parquet files s3 bucket path
+  # ParquetBucketPath:
+  #   Type: String
+  #   Description: parquet files s3 bucket path
 
-  DataMonitoringCodebuildComputeType:
-    Type: String
-    Description: Codebuild compute type (https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-compute-types.html)
+  # DataMonitoringCodebuildComputeType:
+  #   Type: String
+  #   Description: Codebuild compute type (https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-compute-types.html)
 
-  DataMonitoringIndexCronExpression:
-    Type: String
-    Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
+  # DataMonitoringIndexCronExpression:
+  #   Type: String
+  #   Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
 
-  DataMonitoringScriptVersion:
-    Type: String
-    Description: 'Version of the script biOrNotBiEcMetadata'
+  # DataMonitoringScriptVersion:
+  #   Type: String
+  #   Description: 'Version of the script biOrNotBiEcMetadata'
 
-  DataLakeAccountId:
-    Type: String
-    Description: 'Datalake AWS Account ID'
+  # DataMonitoringPrototypeVersion:
+  #  Type: String
+  #  Description: Version of the pn-prototype scripts
+
+  # DataLakeAccountId:
+  #  Type: String
+  #  Description: 'Datalake AWS Account ID'
 
 Conditions:
   RequiresCustomDomains: !Equals [ !Ref CustomDomainsRequired, true ]
@@ -505,7 +509,7 @@ Resources:
         - Key: "Microservice"
           Value: "pn-radd-alt"
 
-  ### Communication between PN-DELIVERY and PN-DELIVERY-PUSH ###
+  ### Communication between PN-DELIVERY and PN-DELIVERY-PUSH - FOR NOTIFICATION_VIEWED AND NOTIFICATION_PAID EVENTS###
   DeliveryPushInputsQueue:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
@@ -520,7 +524,7 @@ Resources:
       Tags:
         - Key: "Microservice"
           Value: "pn-delivery-push"
-
+  
   ### Communication FROM EXTERNAL-CHANNELS ###
   ExternalChannelsOutputsQueue:
     Type: AWS::CloudFormation::Stack
@@ -841,6 +845,22 @@ Resources:
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
+
+  ### Communication between PN-DELIVERY and PN-DELIVERY-PUSH - FOR NEW NOTIFICATION EVENT ###
+  DeliveryPushValidationInputsQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-delivery_push_validation_inputs'
+        DelaySeconds: 10
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-delivery-push"
+
   ###                             ELASTIC FILE SYSTEM                     ###
   ###########################################################################
 
@@ -1005,8 +1025,7 @@ Outputs:
   DeliveryPushInputsQueueAgeAlarmARN:
     Value: !GetAtt DeliveryPushInputsQueue.Outputs.SqsAgeAlarmArn
     Description: pn-delivery-push input queue age alarm ARN
-
-
+  
   # External channels outputs
   ExternalChannelsOutputsQueueName:
     Value: !GetAtt ExternalChannelsOutputsQueue.Outputs.QueueName
@@ -1276,6 +1295,24 @@ Outputs:
     Value: !GetAtt DeliveryPushToExternalRegistriesQueue.Outputs.SqsAgeAlarmArn
     Description: paperchannel-to-servicedesk queue age alarm ARN
 
+
+  # Delivery to ValidationQueue events
+  DeliveryPushValidationInputsQueueName:
+    Value: !GetAtt DeliveryPushValidationInputsQueue.Outputs.QueueName
+    Description: DeliveryPushValidationInputsQueue queue name
+  DeliveryPushValidationInputsQueueURL:
+    Value: !GetAtt DeliveryPushValidationInputsQueue.Outputs.QueueURL
+    Description: DeliveryPushValidationInputsQueue queue URL
+  DeliveryPushValidationInputsQueueARN:
+    Value: !GetAtt DeliveryPushValidationInputsQueue.Outputs.QueueARN
+    Description: DeliveryPushValidationInputsQueue queue ARN
+  DeliveryPushValidationInputsQueueAlarmARN:
+    Value: !GetAtt DeliveryPushValidationInputsQueue.Outputs.SqsDLQAlarmArn
+    Description: DeliveryPushValidationInputsQueue alarm ARN
+  DeliveryPushValidationInputsQueueAgeAlarmARN:
+    Value: !GetAtt DeliveryPushValidationInputsQueue.Outputs.SqsAgeAlarmArn
+    Description:  DeliveryPushValidationInputsQueue age alarm ARN
+
   # SafeStorage to F24 events
   SafeStorageToF24QueueName:
     Value: !GetAtt SafeStorageToF24Queue.Outputs.QueueName
@@ -1354,10 +1391,10 @@ Outputs:
   CdcKinesisSourceStreamKeyArn:
     Description: 'Kinesis source CDC stream crypto key ARN'
     Value: !Ref CdcKinesisStreamKeyArn
-  CdcKinesisMaxAgeInMilliseconds:
-    Value: !Ref CdcKinesisMaxAgeInMilliseconds    
-  CdcKinesisMaxAgeInMillisecondsOncall:
-    Value: !Ref CdcKinesisMaxAgeInMillisecondsOncall    
+  # CdcKinesisMaxAgeInMilliseconds:
+  #   Value: !Ref CdcKinesisMaxAgeInMilliseconds    
+  # CdcKinesisMaxAgeInMillisecondsOncall:
+  #   Value: !Ref CdcKinesisMaxAgeInMillisecondsOncall    
 
   # Kinesis Source Stream containing the CloudWatch Logs
   LogsKinesisSourceStreamName:
@@ -1369,44 +1406,44 @@ Outputs:
   LogsKinesisSourceStreamKeyArn:
     Description: 'Kinesis source Logs stream crypto key ARN'
     Value: !Ref LogsKinesisStreamKeyArn
-  LogsKinesisMaxAgeInMilliseconds:
-    Value: !Ref LogsKinesisMaxAgeInMilliseconds
-  LogsKinesisMaxAgeInMillisecondsOncall:
-    Value: !Ref LogsKinesisMaxAgeInMillisecondsOncall
+  # LogsKinesisMaxAgeInMilliseconds:
+  #   Value: !Ref LogsKinesisMaxAgeInMilliseconds
+  # LogsKinesisMaxAgeInMillisecondsOncall:
+  #   Value: !Ref LogsKinesisMaxAgeInMillisecondsOncall
 
   # pass-thought parameters
-  NetworkLoadBalancerLink:
-    Value: !Ref NetworkLoadBalancerLink
-  ApplicationLoadBalancerListenerArn:
-    Value: !Ref ApplicationLoadBalancerListenerArn
-  ApplicationLoadBalancerDomain:
-    Value: !Ref ApplicationLoadBalancerDomain
-  AlarmSNSTopicArn:
-    Value: !Ref AlarmSNSTopicArn
-  AlarmSNSTopicName:
-    Value: !Ref AlarmSNSTopicName
-  VpcId:
-    Value: !Ref VpcId
-  SubnetsIds:
-    Value: !Ref SubnetsIds
-  ECSClusterName:
-    Value: !Ref ECSClusterName
+  # NetworkLoadBalancerLink:
+  #   Value: !Ref NetworkLoadBalancerLink
+  # ApplicationLoadBalancerListenerArn:
+  #   Value: !Ref ApplicationLoadBalancerListenerArn
+  # ApplicationLoadBalancerDomain:
+  #   Value: !Ref ApplicationLoadBalancerDomain
+  # AlarmSNSTopicArn:
+  #   Value: !Ref AlarmSNSTopicArn
+  # AlarmSNSTopicName:
+  #   Value: !Ref AlarmSNSTopicName
+  # VpcId:
+  #   Value: !Ref VpcId
+  # SubnetsIds:
+  #   Value: !Ref SubnetsIds
+  # ECSClusterName:
+  #   Value: !Ref ECSClusterName
   FargateEFSFileSystemID:
     Value: !Ref FargateEFSFileSystem
   CorsAllowedDomains:
     Value: !Ref CorsAllowedDomains
-  EcsDefaultSecurityGroup:
-    Value: !Ref EcsDefaultSecurityGroup
-  LogsBucketName:
-    Value: !Ref LogsBucketName
-  LogsBucketKmsKeyArn:
-    Value: !Ref LogsBucketKmsKeyArn
-  LogsExporterRoleArn:
-    Value: !Ref LogsExporterRoleArn
-  LogsExporterPolicyArn:
-    Value: !Ref LogsExporterPolicyArn
-  AlbSecurityGroup:
-    Value: !Ref AlbSecurityGroup
+  # EcsDefaultSecurityGroup:
+  #   Value: !Ref EcsDefaultSecurityGroup
+  # LogsBucketName:
+  #   Value: !Ref LogsBucketName
+  # LogsBucketKmsKeyArn:
+  #   Value: !Ref LogsBucketKmsKeyArn
+  # LogsExporterRoleArn:
+  #   Value: !Ref LogsExporterRoleArn
+  # LogsExporterPolicyArn:
+  #   Value: !Ref LogsExporterPolicyArn
+  # AlbSecurityGroup:
+  #   Value: !Ref AlbSecurityGroup
   CognitoUserPoolArn:
     Value: !Ref CognitoUserPoolArn
   CognitoClientId:
@@ -1425,16 +1462,16 @@ Outputs:
     Value: !Ref LambdasBasePath
   EnvironmentType:
     Value: !Ref EnvironmentType
-  Version:
-    Value: !Ref Version
-  SafeStorageAccountId:
-    Value: !Ref SafeStorageAccountId
+  # Version:
+  #   Value: !Ref Version
+  # SafeStorageAccountId:
+  #   Value: !Ref SafeStorageAccountId
   SandboxSafeStorageBaseUrl:
     Value: !Ref SandboxSafeStorageBaseUrl
-  ApiKeyTablesEncryptKeyId:
-    Value: !Ref ApiKeyTablesEncryptKeyId
-  VpcEgressSubnetsIds:
-    Value: !Ref VpcEgressSubnetsIds
+  # ApiKeyTablesEncryptKeyId:
+  #   Value: !Ref ApiKeyTablesEncryptKeyId
+  # VpcEgressSubnetsIds:
+  #   Value: !Ref VpcEgressSubnetsIds
   ElasticacheEndpoint:
     Value: !Ref ElasticacheEndpoint
   ElasticacheSecurityGroup:
@@ -1490,14 +1527,14 @@ Outputs:
     Value: !Ref TokenExchangeLambdaEnvironmentAudience
   ApikeyAuthorizerV2PDNDAudience:
     Value: !Ref ApikeyAuthorizerV2PDNDAudience
-  SafestorageLoggerLogGroupName:
-    Value: !Ref SafestorageLoggerLogGroupName
+  # SafestorageLoggerLogGroupName:
+  #   Value: !Ref SafestorageLoggerLogGroupName
   ExternalChannelBaseUrl:
     Value: !Ref ExternalChannelBaseUrl
   BackupCronExpression:
     Value: !Ref BackupCronExpression
-  LogRetention:
-    Value: !Ref LogRetention
+  # LogRetention:
+  #   Value: !Ref LogRetention
   ApplicationLoadBalancerMetricsDimensionName:
     Value: !Ref ApplicationLoadBalancerMetricsDimensionName
   IOBackendCidrs:
@@ -1512,19 +1549,21 @@ Outputs:
     Value: !Ref F24PaperChannelUser
   
   # Data Monitoring pass-through params
-  DynamoDbExportTableNames:
-    Value: !Ref DynamoDbExportTableNames
-  DynamoDbExportPrefix:
-    Value: !Ref DynamoDbExportPrefix
-  ConfinfoDynamoDbExportBucketName:
-    Value: !Ref ConfinfoDynamoDbExportBucketName
-  ParquetBucketPath:
-    Value: !Ref ParquetBucketPath
-  DataMonitoringCodebuildComputeType:
-    Value: !Ref DataMonitoringCodebuildComputeType
-  DataMonitoringIndexCronExpression:
-    Value: !Ref DataMonitoringIndexCronExpression
-  DataMonitoringScriptVersion:
-    Value: !Ref DataMonitoringScriptVersion
-  DataLakeAccountId:
-    Value: !Ref DataLakeAccountId
+  # DynamoDbExportTableNames:
+  #   Value: !Ref DynamoDbExportTableNames
+  # DynamoDbExportPrefix:
+  #   Value: !Ref DynamoDbExportPrefix
+  # ConfinfoDynamoDbExportBucketName:
+  #   Value: !Ref ConfinfoDynamoDbExportBucketName
+  # ParquetBucketPath:
+  #   Value: !Ref ParquetBucketPath
+  # DataMonitoringCodebuildComputeType:
+  #   Value: !Ref DataMonitoringCodebuildComputeType
+  # DataMonitoringIndexCronExpression:
+  #   Value: !Ref DataMonitoringIndexCronExpression
+  # DataMonitoringScriptVersion:
+  #   Value: !Ref DataMonitoringScriptVersion
+  # DataLakeAccountId:
+  #   Value: !Ref DataLakeAccountId
+  # DataMonitoringPrototypeVersion:
+  #  Value: !Ref DataMonitoringPrototypeVersion

@@ -24,6 +24,18 @@ Resources:
     Properties:
       BackupVaultName: !Sub 'BackupVault_Dynamodb_${AWS::StackName}'
 
+  BackupVaultS3:
+    Type: "AWS::Backup::BackupVault"
+    Properties:
+      BackupVaultName: !Sub 'BackupVault_S3_${AWS::AccountId}'
+
+  AwsS3BatchOperationBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub pn-s3-batch-operation-${AWS::Region}-${AWS::AccountId}
+
   BackupPlan:
     Type: "AWS::Backup::BackupPlan"
     Properties:
@@ -56,6 +68,52 @@ Resources:
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup"
 
+  BackupRoleS3:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Sub pn-backup-s3-role-${AWS::AccountId}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "backup.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AWSBackupServiceRolePolicyForS3Backup"
+        - "arn:aws:iam::aws:policy/AWSBackupServiceRolePolicyForS3Restore"
+
+  S3batchOperation:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Sub pn-S3BatchOperation-role-${AWS::AccountId}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "batchoperations.s3.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: pn-S3BatchOperationPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:RestoreObject
+                Resource: "arn:aws:s3:::*"
+              - Effect: Allow
+                Action: 
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:PutObject
+                Resource: !Sub "arn:aws:s3:::${AwsS3BatchOperationBucket}/*"
+
   TagBasedBackupSelection:
     Type: "AWS::Backup::BackupSelection"
     Properties:
@@ -81,4 +139,5 @@ Resources:
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-addressManager-ShedLock
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-legal-conservation-request
           - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-legal-conservation-request-history
+          - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-SsScadenzaDocumenti
       BackupPlanId: !Ref BackupPlan
