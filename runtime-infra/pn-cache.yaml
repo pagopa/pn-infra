@@ -86,6 +86,16 @@ Parameters:
     Description: "Username for elasticache redis user"
     Default: "iam-user-b2b-auth"
 
+  UserIdLogExtractor:
+    Type: String
+    Description: "UserId for elasticache redis user"
+    Default: "iam-user-logextractor"
+
+  UsernameLogExtractor:
+    Type: String
+    Description: "Username for elasticache redis user"
+    Default: "iam-user-logextractor"
+
 Resources:
 
   RedisServerless:
@@ -199,6 +209,16 @@ Resources:
       UserId: !Ref UserIdUser1
       UserName: !Ref UsernameUser1
 
+  ElasticCacheLogExtractorUser:
+    Type: AWS::ElastiCache::User
+    Properties:
+      AccessString: !Ref AccessStringDefaultUser
+      AuthenticationMode: 
+        Type: iam
+      Engine: redis
+      UserId: !Ref UserIdLogExtractor
+      UserName: !Ref UsernameLogExtractor
+
 Outputs:
   ElasticacheSecurityGroup:
     Description: The id of the security group that can access the cache cluster
@@ -226,3 +246,11 @@ Outputs:
   ElasticacheUserId1:
     Description: Id of the User1
     Value: !Ref UserIdUser1
+
+  ElasticCacheLogExtractorUserArn:
+    Description: ElasticCacheLogExtractorUser Arn
+    Value: !GetAtt ElasticCacheLogExtractorUser.Arn
+
+  ElasticCacheLogExtractorUserId:
+    Description: Id of the LogExtractorUser
+    Value: !Ref UsernameLogExtractor
