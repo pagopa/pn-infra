@@ -28,48 +28,10 @@ Parameters:
     Type: "AWS::EC2::VPC::Id"
     Description: VPC id for the cluster
 
-  CPUUtilizationThreshold:
-    Type: Number
-    Description: The threshold percentage of CPU usage.
-    MinValue: 0
-    MaxValue: 100
-    Default: 60
-
-  EngineCPUUtilizationThreshold:
-    Type: Number
-    Description: The threshold percentage of CPU utilization of the Redis engine thread
-    MinValue: 0
-    MaxValue: 100
-    Default: 60
-
-  RedisMemoryUsedThreshold:
-    Type: Number
-    Description: The threshold percentage for the amount of memory utilized.
-    MinValue: 0
-    MaxValue: 100
-    Default: 60
-
-  CurrentConnectionsThreshold:
-    Type: Number
-    Description: "The threshold number of concurrent and active connections. (Max connections: 65000)."
-    MinValue: 0
-    MaxValue: 65000
-    Default: 60000
-
-  AccessStringDefaultUser:
+  AccessStringLogExtractorUser:
     Type: String
     Description: "AccessString for elasticache redis default user"
     Default: "on ~* +@all"
-
-  UserIdDefaultUser:
-    Type: String
-    Description: "UserId for elasticache redis default user"
-    Default: "default-redis"
-
-  UsernameDefaultUser:
-    Type: String
-    Description: "Username for elasticache redis default user"
-    Default: "default"
 
   AccessStringUser1:
     Type: String
@@ -188,16 +150,17 @@ Resources:
       UserIds: 
         - !Ref DefaultElasticCacheUser
         - !Ref ElasticCacheUser1
+        - !Ref ElasticCacheLogExtractorUser
 
   DefaultElasticCacheUser:
     Type: AWS::ElastiCache::User
     Properties:
-      AccessString: !Ref AccessStringDefaultUser
+      AccessString: "off ~* -@all"
       AuthenticationMode: 
         Type: no-password-required
       Engine: redis
-      UserId: !Ref UserIdDefaultUser
-      UserName: !Ref UsernameDefaultUser
+      UserId: default-redis
+      UserName: default
 
   ElasticCacheUser1:
     Type: AWS::ElastiCache::User
@@ -212,7 +175,7 @@ Resources:
   ElasticCacheLogExtractorUser:
     Type: AWS::ElastiCache::User
     Properties:
-      AccessString: !Ref AccessStringDefaultUser
+      AccessString: !Ref AccessStringLogExtractorUser
       AuthenticationMode: 
         Type: iam
       Engine: redis
