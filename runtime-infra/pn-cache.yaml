@@ -8,10 +8,6 @@ Parameters:
     Type: String
     Description: Name of the project
 
-  AlarmSNSTopicName:
-    Type: String
-    Description: "A name of an SNS topic where to send alarm." 
-
   NodeType:
     Type: String
     Description: Cache node type (i.e. cache.t2.micro)
@@ -189,10 +185,7 @@ Outputs:
 
   RedisEndpoint:
     Description: The endpoint Address for Redis serverless
-    Value:
-        - Fn::GetAtt:
-          - RedisServerless
-          - Endpoint.Address
+    Value: !GetAtt RedisServerless.Endpoint.Address
 
   RedisServerlessArn:
     Description: The Redis serverless Arn
