@@ -28,7 +28,7 @@ Parameters:
     MaxValue: 2000000000
     Description: |
       Number of request allowed in a duration of ThrottlingPeriodSeconds for each aggregation key
-      provided in the header x-pagopa-pn-throttling-value
+      provided in the header x-pagopa-pn-custom-throttling-value
 
   ThrottlingPeriodSeconds:
     Type: Number
@@ -63,10 +63,10 @@ Resources:
       CustomResponseBodies:
         BlockThrottling:
           ContentType: TEXT_PLAIN
-          Content: To many request
+          Content: Too many requests
         BlockTooBig:
           ContentType: TEXT_PLAIN
-          Content: Too Big
+          Content: Request too Big
       Rules:
         - Name: AllowNotMatchingUris
           Priority: 0
@@ -107,9 +107,6 @@ Resources:
                 Headers:
                   MatchPattern:
                     All: {}
-                    #IncludedHeaders:
-                    #  - "x-pagopa-pn-throttling-group"
-                    #  - "x-pagopa-pn-throttling-value"
                   MatchScope: KEY 
                   OversizeHandling: MATCH 
           VisibilityConfig:
@@ -128,7 +125,7 @@ Resources:
               AggregateKeyType: CUSTOM_KEYS
               CustomKeys:
                 - Header: 
-                    Name: x-pagopa-pn-throttling-value
+                    Name: x-pagopa-pn-custom-throttling-value
                     TextTransformations:
                       - Priority: 0
                         Type: NONE
@@ -153,7 +150,7 @@ Resources:
                           Headers:
                             MatchPattern:
                               IncludedHeaders:
-                                - "x-pagopa-pn-throttling-group"
+                                - "x-pagopa-pn-custom-throttling-group"
                             MatchScope: VALUE 
                             OversizeHandling: MATCH 
           VisibilityConfig:
