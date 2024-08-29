@@ -8,14 +8,6 @@ Parameters:
     Type: String
     Description: Name of the project
 
-  NodeType:
-    Type: String
-    Description: Cache node type (i.e. cache.t2.micro)
-
-  Replicas:
-    Type: Number
-    Description: Number of nodes
-
   VpcSubnets:
     Type: "List<AWS::EC2::Subnet::Id>"
     Description: Private subnets to deploy resources into
@@ -119,24 +111,6 @@ Resources:
           SourceSecurityGroupId: !GetAtt AllowedSecurityGroup.GroupId
           ToPort: 6380
       VpcId: !Ref VpcId
-
-  RedisReplicationGroup:
-    Type: "AWS::ElastiCache::ReplicationGroup"
-    Properties:
-      AtRestEncryptionEnabled: true
-      TransitEncryptionEnabled: false
-      CacheNodeType: !Ref NodeType
-      AutoMinorVersionUpgrade: true
-      AutomaticFailoverEnabled: false
-      CacheSubnetGroupName: !Ref SubnetGroup
-      Engine: redis
-      ReplicationGroupDescription:
-        Fn::Sub: ${ProjectName}-redis-replication-group
-      ReplicasPerNodeGroup: !Ref Replicas
-      SecurityGroupIds:
-         - "Fn::GetAtt":
-            - SecurityGroup
-            - GroupId
 
   ElastiCacheUserGroup:
     Type: AWS::ElastiCache::UserGroup
