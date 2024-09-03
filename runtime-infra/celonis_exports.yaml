@@ -366,7 +366,7 @@ Resources:
   KeyRotationSchedule:
     Type: AWS::Events::Rule
     Properties:
-      ScheduleExpression: cron(* * * * ? *)
+      ScheduleExpression: cron(0 8 * * ? *)
       State: ENABLED
       Targets:
         - Arn: !GetAtt KeyRotationFunction.Arn
@@ -551,7 +551,8 @@ Resources:
                     echo " - Copy report $folder to history $dest_folder"
                     aws s3 cp --recursive --no-progress --endpoint-url https://s3.eu-south-1.amazonaws.com \
                             s3://${SourceBucketName}/reports/${year}/${month_unpadded}/${day_unpadded}/${folder} \
-                            history/${folder} 
+                            history/${folder}
+                    aws s3 rm --recursive ${full_dest}
                     aws s3 cp --recursive --no-progress history/${folder} ${full_dest}
                     
                     num_out=$( aws s3 ls s3://${HistoryBucketName}/${HistoryBucketBasePath}sd_${year}${month}${day}/${dest_folder}/ | wc -l )
@@ -673,16 +674,11 @@ Resources:
                   - "s3:PutObject"
                   - "s3:ListBucket"
                   - "s3:GetObjectTagging"
+                  - "s3:DeleteObject"
                 Resource:
                   - !Sub "arn:${AWS::Partition}:s3:::${CelonisHistoryBucket}"
                   - !Sub "arn:${AWS::Partition}:s3:::${CelonisHistoryBucket}/${HistoryBucketBasePath}*"
                   - !Sub "arn:${AWS::Partition}:s3:::${CelonisCurrentDataBucket}"
-                  - !Sub "arn:${AWS::Partition}:s3:::${CelonisCurrentDataBucket}/${CurrentBucketBasePath}*"
-              - Sid: CanCleanCurrentData
-                Effect: Allow
-                Action:
-                  - "s3:DeleteObject"
-                Resource:
                   - !Sub "arn:${AWS::Partition}:s3:::${CelonisCurrentDataBucket}/${CurrentBucketBasePath}*"
               - Sid: EncryptDecryptS3Object
                 Effect: Allow
