@@ -118,9 +118,6 @@ Resources:
 ###            USER FOR BUCKET ACCESS WITH SECRET CONTAINING KEYS           ###
 ###############################################################################
 
-  CelonisReadOnlyGroup:
-    Type: AWS::IAM::Group
-
   CelonisReadOnlyUser:
     Type: AWS::IAM::User
     Properties:
@@ -131,8 +128,8 @@ Resources:
     Type: 'AWS::IAM::Policy'
     Properties:
       PolicyName: CelonisS3ReadOnlyPolicy
-      Groups:
-        - !Ref CelonisReadOnlyGroup
+      Users:
+        - !Ref CelonisReadOnlyUser
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
