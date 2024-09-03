@@ -3,7 +3,7 @@ Description: 'Example for celonis export resources'
 
 Parameters:
   
-  EnvName:
+  EnvironmentType:
     Type: String
     Description: dev test uat hotfix prod
   
@@ -34,7 +34,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Sub 'pn-cel-exp-history-${AWS::Region}-${EnvName}-${BucketSuffix}'
+      BucketName: !Sub 'pn-cel-exp-history-${AWS::Region}-${EnvironmentType}-${BucketSuffix}'
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
@@ -52,7 +52,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Sub 'pn-cel-exp-current-data-${AWS::Region}-${EnvName}-${BucketSuffix}'
+      BucketName: !Sub 'pn-cel-exp-current-data-${AWS::Region}-${EnvironmentType}-${BucketSuffix}'
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
