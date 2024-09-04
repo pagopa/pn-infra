@@ -154,15 +154,16 @@ Resources:
               - secretsmanager:GetSecretValue
               - secretsmanager:DescribeSecret
               - secretsmanager:ListSecretVersionIds
-              - secretsmanager:ListSecrets
             Resource:
               - !Ref UserKeysSecret
-          - Sid: ListSecrets
+          - Sid: ReadStackOutputs
             Effect: Allow
             Action:
-              - secretsmanager:ListSecrets
+              - cloudformation:DescribeStacks
             Resource:
-              - !Sub "arn:aws:secretsmanager:eu-central-1:${AWS::AccountId}:secret:*"
+              - !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/pn-celonis-exports-${EnvironmentType}/*"
+
+              
                 
   UserKeysSecret:
     Type: AWS::SecretsManager::Secret
@@ -734,3 +735,10 @@ Resources:
                 Effect: Allow
                 Resource: 
                   - !GetAtt CopyToFrankfurtCodebuildProject.Arn
+
+Outputs:
+  
+  UserKeySecretArn:
+    Description: ARN del secret contenente le chiavi per l'accesso da parte di hesplora
+    Value: !Ref UserKeysSecret
+  
