@@ -1,0 +1,744 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Example for celonis export resources'
+
+Parameters:
+  
+  EnvironmentType:
+    Type: String
+    Description: dev test uat hotfix prod
+  
+  BucketSuffix:
+    Type: String
+    Default: '-001'
+  
+  KeyTtlMonths:
+    Type: Number
+    Default: 3
+  
+  CurrentBucketBasePath:
+    Type: String
+    Default: 'lastExport/'
+
+  HistoryBucketBasePath:
+    Type: String
+    Default: 'history/'
+
+Resources:
+
+###############################################################################
+###                        DATA STORAGE IN FRANKFURT                        ###
+###############################################################################
+
+  CelonisHistoryBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub 'pn-cel-exp-history-${AWS::Region}-${EnvironmentType}-${BucketSuffix}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !Ref CelonisBucketsKmsKey              
+              SSEAlgorithm: 'aws:kms'
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration: 
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  
+  CelonisCurrentDataBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub 'pn-cel-exp-current-data-${AWS::Region}-${EnvironmentType}-${BucketSuffix}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !Ref CelonisBucketsKmsKey              
+              SSEAlgorithm: 'aws:kms'
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration: 
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      
+  # - Storage cryptography key 
+  CelonisBucketsKmsKey:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: Used by Assumed Roles to Encrypt/Decrypt raw data
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: !Ref AWS::StackName
+        Statement:
+          - Sid: Allow data account to do everything
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action:
+              - "kms:Create*"
+              - "kms:Describe*"
+              - "kms:Enable*"
+              - "kms:List*"
+              - "kms:Put*"
+              - "kms:Update*"
+              - "kms:Revoke*"
+              - "kms:Disable*"
+              - "kms:Get*"
+              - "kms:Delete*"
+              - "kms:ScheduleKeyDeletion"
+              - "kms:CancelKeyDeletion"
+              - kms:*Tag*
+              - kms:*tag*
+            Resource: "*"
+          - Sid: Allow target accounts to use key for encrypt/decrypt
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+            Resource: "*"
+
+
+
+###############################################################################
+###            USER FOR BUCKET ACCESS WITH SECRET CONTAINING KEYS           ###
+###############################################################################
+
+  CelonisReadOnlyUser:
+    Type: AWS::IAM::User
+
+  CelonisS3ReadOnlyPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: CelonisS3ReadOnlyPolicy
+      Users:
+        - !Ref CelonisReadOnlyUser
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ReadAndListBucketObjects
+            Effect: Allow
+            Action:
+              - "s3:GetBucketAcl"
+              - "s3:GetObject"
+              - "s3:ListBucket"
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::${CelonisHistoryBucket}"
+              - !Sub "arn:${AWS::Partition}:s3:::${CelonisHistoryBucket}/*"
+              - !Sub "arn:${AWS::Partition}:s3:::${CelonisCurrentDataBucket}"
+              - !Sub "arn:${AWS::Partition}:s3:::${CelonisCurrentDataBucket}/*"
+          - Sid: DecryptS3ObjectsAndSecret
+            Effect: Allow
+            Action:
+              - kms:Decrypt
+              - kms:DescribeKey
+            Resource:
+              - !Sub "${CelonisBucketsKmsKey.Arn}"
+          - Sid: GetSecret
+            Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+              - secretsmanager:DescribeSecret
+              - secretsmanager:ListSecretVersionIds
+            Resource:
+              - !Ref UserKeysSecret
+          - Sid: ReadStackOutputs
+            Effect: Allow
+            Action:
+              - cloudformation:DescribeStacks
+            Resource:
+              - !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/pn-celonis-exports-${EnvironmentType}/*"
+
+              
+                
+  UserKeysSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Delete
+    UpdateReplacePolicy : Delete
+    Properties:
+      Description: 'Memorize keys for celonis access'
+      KmsKeyId: !Ref CelonisBucketsKmsKey
+      SecretString: |
+        { 
+          "key0" : null,
+          "key1" : null
+        }
+      Tags: 
+        - Key: CelonisAccessInfo
+          Value: userKeys
+
+
+
+###############################################################################
+###                        USER ACCESS KEYS ROTATION                        ###
+###############################################################################
+
+  KeyRotationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      FunctionName: Lambda-Celonis-KeyRotationFunction
+      Code:
+        ZipFile: |
+          import boto3
+          import os
+          import logging
+          import json
+          from datetime import datetime
+          from datetime import timedelta
+          from dateutil import parser
+
+          def get_secret(client, secret_name):
+              get_secret_value_response = client.get_secret_value(SecretId=secret_name)
+              
+              # If there's no exception, process the retrieved secret
+              if 'SecretString' in get_secret_value_response:
+                  secret = get_secret_value_response['SecretString']
+              else:
+                  # For binary secrets, decode them before using
+                  secret = get_secret_value_response['SecretBinary'].decode('utf-8')
+              return secret
+
+          def put_secret(client, secret_name, new_value):
+              client.put_secret_value( SecretId=secret_name, SecretString=new_value )
+              
+
+          def create_key(client, user):
+              create_access_key_response = client.create_access_key(UserName=user)
+              new_key = create_access_key_response['AccessKey']
+              
+              info = {
+                  'AccessKeyId': new_key['AccessKeyId'],
+                  'SecretAccessKey': new_key['SecretAccessKey']
+              }
+              
+              return info
+
+          def delete_key(client, user, key_id):
+              client.delete_access_key( UserName=user, AccessKeyId=key_id)
+              
+
+          def compute_next_expiration_date( now, months_offset, month_duration):
+              current_month = now.year * 12 + now.month - 1
+              current_month += months_offset
+              
+              expiration_month = int(current_month / month_duration) * month_duration + month_duration
+              expiration_month -= months_offset
+              
+              expiration_date = f"{int(expiration_month/12):04}-{(expiration_month%12 +1):02}-01T01:01:01.000Z"
+              return expiration_date
+              
+
+          def lambda_handler(event, context):
+              user_name = os.getenv('UserName','')
+              secret_name = os.getenv('SecretName','')
+              key_ttl_months = int(os.getenv('KeyTtlMonths'))
+              
+              secret_manager = boto3.client('secretsmanager')
+              iam = boto3.client('iam')
+              
+              # Read metadata stored in the secret
+              secret_value = get_secret( secret_manager, secret_name)
+              json_keys = json.loads( secret_value )
+              
+              secret_modified = False
+              
+              now_time = datetime.now()
+              now_string = f"{now_time.year:04}-{(now_time.month):02}-{(now_time.day):02}T{(now_time.hour):02}:{(now_time.minute):02}:{(now_time.second):02}.000Z"
+              print(f"NOW TIME STRING: {now_string}")
+                  
+              # Evict expired keys
+              for idx in range(2):
+                  key_attribute = 'key' + str(idx)
+                  key_info = json_keys[ key_attribute ]
+                  
+                  if key_info is not None:
+                      if now_string > key_info['expiration_date']:
+                          key_id = key_info['AccessKeyId']
+                          print(f"Removing key {idx} having id {key_id}")
+                          delete_key( iam, user_name, key_id )
+                          json_keys[ key_attribute ] = None
+                          secret_modified = True
+                  
+              # Create new keys
+              for idx in range(2):
+                  key_attribute = 'key' + str(idx)
+                  key_info = json_keys[ key_attribute ]
+                  
+                  if key_info is None:
+                      print(f"Create key {idx}")
+                      expiration_date = compute_next_expiration_date( datetime.now(), idx, key_ttl_months )
+                      print(f"Computed expiration date {expiration_date}")
+                      new_key_info = create_key( iam, user_name )
+                      print(f"KeyId: {new_key_info['AccessKeyId']}")
+                      new_key_info['expiration_date'] = expiration_date
+                      json_keys[ key_attribute ] = new_key_info
+                      secret_modified = True
+              
+              # Update metadata if necessary
+              if secret_modified:
+                  new_secret_value = json.dumps( json_keys, sort_keys=True, indent=4 )
+                  print(f"UPDATE SECRET TO: {new_secret_value}")
+                  put_secret( secret_manager, secret_name, new_secret_value )
+                  
+              
+              # For debug purpose
+              for o in range(key_ttl_months):
+                  for da in ['20240101','20240202', '20240303', '20240404', '20240505', '20240606', '20240707', '20240808', '20240909', '20241001', '20241101', '20241201']:
+                    expiration_date = compute_next_expiration_date( parser.parse(da), o, key_ttl_months )
+                    print(f"{da} has expiration date {expiration_date} with offset {o}")
+                  print(f"-------------")
+      Environment:
+        Variables:
+          UserName: !Sub '${CelonisReadOnlyUser}'
+          SecretName: !Ref UserKeysSecret
+          KeyTtlMonths: !Ref KeyTtlMonths
+      Timeout: 30
+      Role: !Sub '${KeyRotationFunctionRole.Arn}'
+
+  KeyRotationFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: KeyRotationFunctionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: AlterCelonisUserKeys
+                Effect: Allow
+                Action:
+                  - iam:CreateAccessKey
+                  - iam:DeleteAccessKey
+                  - iam:ListAccessKeys
+                Resource: !Sub '${CelonisReadOnlyUser.Arn}'
+              - Sid: ReadWriteKeysSecret
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:PutSecretValue
+                Resource:
+                  - !Sub '${UserKeysSecret}'
+              - Sid: EncryptDecryptKeysSecret
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:Encrypt
+                  - kms:DescribeKey
+                  - kms:ReEncrypt*
+                  - kms:GenerateDataKey*
+                Resource:
+                  - !Sub "${CelonisBucketsKmsKey.Arn}"
+              - Sid: AllowLog
+                Effect: Allow
+                Action:
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: 
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/Lambda-Celonis-KeyRotationFunction:*"
+
+  KeyRotationSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: cron(0 8 * * ? *)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt KeyRotationFunction.Arn
+          Id: KeyRotationFunction
+
+  PermissionForEventsToInvokeKeyRotationLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref KeyRotationFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt KeyRotationSchedule.Arn
+
+  KeyRotationFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy : Delete
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${KeyRotationFunction}"
+      RetentionInDays: 5
+
+
+
+###############################################################################
+###           DELETE "current" EXPORT DATA AT EACH MIDNIGHT (UTC)           ###
+###############################################################################
+
+  CleanCurrentBucketFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      FunctionName: Lambda-Celonis-CleanCurrentBucketFunction
+      Code:
+        ZipFile: |
+          import boto3
+          import os
+          import logging
+          
+          def delete_s3_objects_by_prefix( client, bucket_name, prefix):
+            paginator = client.get_paginator('list_objects_v2')
+            pages = paginator.paginate( Bucket=bucket_name, Prefix=prefix)
+
+            for item in pages.search('Contents'):
+                print(item['Key'])
+                client.delete_object(Bucket=bucket_name, Key=item['Key'])
+          
+          def lambda_handler(event, context):
+              bucket_name = os.getenv('BucketName')
+              prefix = os.getenv('BasePath')
+              print(f"Cleaning current bucket=[{bucket_name}] folder=[{prefix}]")
+
+              if not prefix.endswith("/"):
+                  raise Exception("prefix must ends with /")
+
+              s3 = boto3.client('s3')
+              delete_s3_objects_by_prefix( s3, bucket_name, prefix)
+              # Recreate empty root folder 
+              s3.put_object(Bucket=bucket_name, Key=prefix)
+              
+      Environment:
+        Variables:
+          BucketName: !Ref CelonisCurrentDataBucket
+          BasePath: !Ref CurrentBucketBasePath
+      Timeout: 10
+      Role: !Sub '${CleanCurrentBucketFunctionRole.Arn}'
+
+  CleanCurrentBucketFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CleanCurrentBucketFunctionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: ListAndDeleteBucketObjects
+                Effect: Allow
+                Action:
+                  - "s3:DeleteObject"
+                  - "s3:ListBucket"
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${CelonisCurrentDataBucket}"
+                  - !Sub "arn:${AWS::Partition}:s3:::${CelonisCurrentDataBucket}/${CurrentBucketBasePath}*"
+              - Sid: PutFolder
+                Effect: Allow
+                Action:
+                  - "s3:PutObject"
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${CelonisCurrentDataBucket}/${CurrentBucketBasePath}"
+              - Sid: EncryptFolder
+                Effect: Allow
+                Action:
+                  - kms:Encrypt
+                  - kms:DescribeKey
+                  - kms:ReEncrypt*
+                  - kms:GenerateDataKey*
+                Resource:
+                  - !Sub "${CelonisBucketsKmsKey.Arn}"
+              - Sid: AllowLog
+                Effect: Allow
+                Action:
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: 
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/Lambda-Celonis-CleanCurrentBucketFunction:*"
+
+  CleanCurrentBucketSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: cron(0 0 * * ? *)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt CleanCurrentBucketFunction.Arn
+          Id: CleanCurrentBucketFunction
+
+  PermissionForEventsToInvokeCleanCurrentBucketLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CleanCurrentBucketFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CleanCurrentBucketSchedule.Arn
+
+  CleanCurrentBucketFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy : Delete
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${CleanCurrentBucketFunction}"
+      RetentionInDays: 5
+
+
+
+###############################################################################
+###        COPY NEW DATA TO eu-central-1 AFTER REPORT EXTRACTION END        ###
+###############################################################################
+
+  CopyToFrankfurtCodebuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: "Celonis-CopyExportToFrankfurt"
+      ServiceRole: !GetAtt CopyToFrankfurtCodebuildServiceRole.Arn
+      ConcurrentBuildLimit: 1
+      TimeoutInMinutes: 60
+      Source: 
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - |
+                  echo "Date parameter [${DATE}]"
+                  if ( [ -z "$DATE" ] ) then
+                    DATE=$( date -I)
+                  fi
+            build:
+              commands:
+                - export year=$( echo $DATE | sed -e 's/-.*//')
+                - export month=$( echo $DATE | sed -e 's/[0-9][0-9][0-9][0-9]-\([0-9]*\)-.*/\1/')
+                - export day=$( echo $DATE | sed -e 's/.*-//')
+                - export month_unpadded=$( echo $month | sed -e 's/^0//' )
+                - export day_unpadded=$( echo $day | sed -e 's/^0//' )
+                - echo "Execution for date $DATE year=${year} month=${month} day=${day}  month_unpadded=${month_unpadded} day_unpadded=${day_unpadded}"
+                - |
+                  one_folder_to_history () 
+                  {
+                    folder=$1
+                    dest_folder=$2
+
+                    full_dest=s3://${HistoryBucketName}/${HistoryBucketBasePath}sd_${year}${month}${day}/${dest_folder}
+                    
+                    echo ""
+                    echo "-------------------------------------------------"
+                    echo " - Copy report $folder to history $dest_folder"
+                    aws s3 cp --recursive --no-progress --endpoint-url https://s3.eu-south-1.amazonaws.com \
+                            s3://${SourceBucketName}/reports/${year}/${month_unpadded}/${day_unpadded}/${folder} \
+                            history/${folder}
+                    aws s3 rm --recursive ${full_dest}
+                    aws s3 cp --recursive --no-progress history/${folder} ${full_dest}
+                    
+                    num_out=$( aws s3 ls s3://${HistoryBucketName}/${HistoryBucketBasePath}sd_${year}${month}${day}/${dest_folder}/ | wc -l )
+                    if( [ "$num_out" -gt "0" ] ) then
+                      echo " - Create folder object ${full_dest}"
+                      aws s3api put-object --bucket ${HistoryBucketName} \
+                                           --key ${HistoryBucketBasePath}sd_${year}${month}${day}/${dest_folder}/ \
+                                           --content-length 0
+                    fi
+                  }
+
+                  one_folder_to_history "celonis_export_paper_requests.csv" "paper_requests.csv"
+                  one_folder_to_history "celonis_export_event_list.csv" "event_list.csv"
+                  one_folder_to_history "celonis_export_event_list_document_type.csv" "event_list_document_type.csv"
+                - |
+                  echo ""
+                  echo ""
+                  echo ""
+                  echo "--------------------------------------------------------------------------"
+                  echo " - Clean current folder"
+                  aws s3 rm --recursive s3://${CurrentBucketName}/${CurrentBucketBasePath}
+                  aws s3api put-object --bucket ${CurrentBucketName} \
+                                           --key ${CurrentBucketBasePath} \
+                                           --content-length 0
+                  echo ""
+                  echo ""
+                  echo ""
+                - |
+                  one_folder_from_history_to_current () 
+                  {
+                    folder=$1
+
+                    full_src=s3://${HistoryBucketName}/${HistoryBucketBasePath}sd_${year}${month}${day}/${folder}
+                    full_dest=s3://${CurrentBucketName}/${CurrentBucketBasePath}${folder}
+
+                    echo ""
+                    echo "-------------------------------------------------"
+                    echo " - Copy report history $folder to current "
+                    aws s3 cp --recursive --no-progress ${full_src} ${full_dest}
+                    
+                    num_out=$( aws s3 ls ${full_dest}/ | wc -l )
+                    if( [ "$num_out" -gt "0" ] ) then
+                      echo " - Create folder object ${full_dest}"
+                      aws s3api put-object --bucket ${CurrentBucketName} \
+                                           --key ${CurrentBucketBasePath}${folder}/ \
+                                           --content-length 0
+                    fi
+                  }
+
+                  one_folder_from_history_to_current "paper_requests.csv"
+                  one_folder_from_history_to_current "event_list.csv"
+                  one_folder_from_history_to_current "event_list_document_type.csv"
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Type: LINUX_CONTAINER
+        Image: "aws/codebuild/standard:7.0"
+        EnvironmentVariables:
+          - Name: SourceBucketName
+            Type: PLAINTEXT
+            Value: !Sub 'pn-datamonitoring-eu-south-1-${AWS::AccountId}'
+          - Name: HistoryBucketName
+            Type: PLAINTEXT
+            Value: !Ref CelonisHistoryBucket
+          - Name: HistoryBucketBasePath
+            Type: PLAINTEXT
+            Value: !Ref HistoryBucketBasePath
+          - Name: CurrentBucketName
+            Type: PLAINTEXT
+            Value: !Ref CelonisCurrentDataBucket
+          - Name: CurrentBucketBasePath
+            Type: PLAINTEXT
+            Value: !Ref CurrentBucketBasePath
+          - Name: DATE
+            Type: PLAINTEXT
+            Value: ''
+          
+  CopyToFrankfurtCodebuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: pn-celonis-copy-to-frankfurt-codebuild-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: pn-celonis-copy-to-frankfurt-codebuild-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: CanLog
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: 
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*
+              - Sid: CanReadFromSource   
+                Effect: Allow
+                Action:
+                  - "s3:GetBucketAcl"
+                  - "s3:GetObject"
+                  - "s3:ListBucket"
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::pn-datamonitoring-eu-south-1-${AWS::AccountId}"
+                  - !Sub "arn:${AWS::Partition}:s3:::pn-datamonitoring-eu-south-1-${AWS::AccountId}/reports/*"
+              - Sid: CanReadAndWriteToDestination
+                Effect: Allow
+                Action:
+                  - "s3:GetBucketAcl"
+                  - "s3:GetObject"
+                  - "s3:PutObject"
+                  - "s3:ListBucket"
+                  - "s3:GetObjectTagging"
+                  - "s3:DeleteObject"
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${CelonisHistoryBucket}"
+                  - !Sub "arn:${AWS::Partition}:s3:::${CelonisHistoryBucket}/${HistoryBucketBasePath}*"
+                  - !Sub "arn:${AWS::Partition}:s3:::${CelonisCurrentDataBucket}"
+                  - !Sub "arn:${AWS::Partition}:s3:::${CelonisCurrentDataBucket}/${CurrentBucketBasePath}*"
+              - Sid: EncryptDecryptS3Object
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:Encrypt
+                  - kms:DescribeKey
+                  - kms:ReEncrypt*
+                  - kms:GenerateDataKey*
+                Resource:
+                  - !Sub "${CelonisBucketsKmsKey.Arn}"
+
+  InterceptPnCoreDataMonitoringReportsEndEventBridgeRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Intercept when pn-core data-monitoring ends with success.
+      RoleArn: !GetAtt "EventBusRunCodeBuildRole.Arn"
+      EventPattern:
+        source:  [ "aws.codebuild", "test.codebuild" ]
+        detail-type: [ "CodeBuild Build State Change" ]
+        detail: 
+          build-status: [ "SUCCEEDED" ]
+          project-name: [ "pn-data-monitoring-codebuild" ]
+      Targets: 
+        - Id: "CoreDataMonitoringReportsEndEventBridgeRule-CbTarget"
+          Arn: !GetAtt CopyToFrankfurtCodebuildProject.Arn
+          RoleArn: !GetAtt "EventBusRunCodeBuildRole.Arn"
+          InputTransformer:
+            InputPathsMap:
+              "project": "$.detail.project-name"
+              "status": "$.detail.build-status"
+            InputTemplate: |
+              {
+                "environmentVariablesOverride": [{
+                    "name": "DATE",
+                    "type": "PLAINTEXT",
+                    "value": ""
+                  }
+                ]
+              }
+  # - Role and policy used to activate CodeBuild from EventBridge rule
+  EventBusRunCodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: runCodeBuild
+          PolicyDocument:
+            Statement:
+              - Sid: startProjectRun
+                Action:
+                  - "codebuild:*"
+                Effect: Allow
+                Resource: 
+                  - !GetAtt CopyToFrankfurtCodebuildProject.Arn
+
+Outputs:
+  
+  UserKeySecretArn:
+    Description: ARN del secret contenente le chiavi per l'accesso da parte di hesplora
+    Value: !Ref UserKeysSecret
+  
