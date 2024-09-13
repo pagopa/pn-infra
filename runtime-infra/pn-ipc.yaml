@@ -85,6 +85,10 @@ Parameters:
   IoApiCertificateArn:
     Type: String
     Description: 'The certificate used for browser rest IO API.'
+  
+  PgApiDnsName:
+    Type: String
+    Description: 'The DNS name used for PG B2B API rest'
 
   RaddApiDnsName:
     Type: String
@@ -440,7 +444,7 @@ Resources:
       Tags:
         - Key: "Microservice"
           Value: "pn-infra-networking"
-
+  
   ###                    QUEUES BETWEEN MICRO SERVICES                    ###
   ###########################################################################
 
@@ -940,6 +944,8 @@ Outputs:
     Value: !Ref CNApiDnsName
   RaddApiDnsName:
     Value: !Ref RaddApiDnsName
+  PgApiDnsName:
+    Value: !Ref PgApiDnsName
     
   # SafeStorage to DeliveryPush
   SafeStorageToDeliveryPushQueueName:
