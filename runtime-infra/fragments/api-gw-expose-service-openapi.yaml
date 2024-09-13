@@ -29,6 +29,7 @@ Parameters:
       - PNPG
       - CN_BE
       - RADD
+      - B2BPG
     Description: B2B, WEB, BACKOFFICE, RADD, PNPG or IO usage. Used from other back-end system or used from a browser
 
   ServiceApiPath:
@@ -109,6 +110,7 @@ Conditions:
   IsBackoffice: !Equals [ !Ref IntendedUsage, 'BACKOFFICE' ]
   IsRADD: !Equals [ !Ref IntendedUsage, 'RADD' ]
   IsCNBE: !Equals [ !Ref IntendedUsage, 'CN_BE' ]
+  IsB2BPG: !Equals [ !Ref IntendedUsage, 'B2BPG' ]
   IsRADDorB2B: !Or [ !Condition IsRADD, !Condition IsB2B ]
   SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
   HasOpenApiBucketName: !Not [ !Equals [ !Ref OpenApiBucketName, '' ] ]
@@ -222,6 +224,17 @@ Resources:
   # B2B Authorizer
   B2BLambdaPermission:
     Condition: IsRADD
+    Type: AWS::Lambda::Permission
+    DependsOn: PublicRestApiOpenapi
+    Properties:
+      FunctionName: !Sub '${ProjectName}-b2bAuthorizerLambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
+  
+  # B2B PG Authorizer
+  B2BPGLambdaPermission:
+    Condition: IsB2BPG
     Type: AWS::Lambda::Permission
     DependsOn: PublicRestApiOpenapi
     Properties:
