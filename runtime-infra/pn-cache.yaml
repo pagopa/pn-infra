@@ -8,26 +8,6 @@ Parameters:
     Type: String
     Description: Name of the project
 
-  AlarmSNSTopicName:
-    Type: String
-    Description: "A name of an SNS topic where to send alarm." 
-
-  ElasticacheType: 
-    Type: String
-    Description: Which type of elasticache to deploy (serverless or managed)
-    Default: managed
-    AllowedValues:
-      - serverless
-      - managed
-
-  NodeType:
-    Type: String
-    Description: Cache node type (i.e. cache.t2.micro)
-
-  Replicas:
-    Type: Number
-    Description: Number of nodes
-
   VpcSubnets:
     Type: "List<AWS::EC2::Subnet::Id>"
     Description: Private subnets to deploy resources into
@@ -36,48 +16,10 @@ Parameters:
     Type: "AWS::EC2::VPC::Id"
     Description: VPC id for the cluster
 
-  CPUUtilizationThreshold:
-    Type: Number
-    Description: The threshold percentage of CPU usage.
-    MinValue: 0
-    MaxValue: 100
-    Default: 60
-
-  EngineCPUUtilizationThreshold:
-    Type: Number
-    Description: The threshold percentage of CPU utilization of the Redis engine thread
-    MinValue: 0
-    MaxValue: 100
-    Default: 60
-
-  RedisMemoryUsedThreshold:
-    Type: Number
-    Description: The threshold percentage for the amount of memory utilized.
-    MinValue: 0
-    MaxValue: 100
-    Default: 60
-
-  CurrentConnectionsThreshold:
-    Type: Number
-    Description: "The threshold number of concurrent and active connections. (Max connections: 65000)."
-    MinValue: 0
-    MaxValue: 65000
-    Default: 60000
-
-  AccessStringDefaultUser:
+  AccessStringLogExtractorUser:
     Type: String
     Description: "AccessString for elasticache redis default user"
     Default: "on ~* +@all"
-
-  UserIdDefaultUser:
-    Type: String
-    Description: "UserId for elasticache redis default user"
-    Default: "default-redis"
-
-  UsernameDefaultUser:
-    Type: String
-    Description: "Username for elasticache redis default user"
-    Default: "default"
 
   AccessStringUser1:
     Type: String
@@ -94,9 +36,15 @@ Parameters:
     Description: "Username for elasticache redis user"
     Default: "iam-user-b2b-auth"
 
-Conditions:
-  IsServerless: !Equals [!Ref ElasticacheType, "serverless"]
-  IsManaged: !Equals [!Ref ElasticacheType, "managed"]
+  UserIdLogExtractor:
+    Type: String
+    Description: "UserId for elasticache redis user"
+    Default: "iam-user-logextractor"
+
+  UsernameLogExtractor:
+    Type: String
+    Description: "Username for elasticache redis user"
+    Default: "iam-user-logextractor"
 
 Resources:
 
@@ -164,112 +112,6 @@ Resources:
           ToPort: 6380
       VpcId: !Ref VpcId
 
-  RedisReplicationGroup:
-    Type: "AWS::ElastiCache::ReplicationGroup"
-    Properties:
-      AtRestEncryptionEnabled: true
-      TransitEncryptionEnabled: false
-      CacheNodeType: !Ref NodeType
-      AutoMinorVersionUpgrade: true
-      AutomaticFailoverEnabled: false
-      CacheSubnetGroupName: !Ref SubnetGroup
-      Engine: redis
-      ReplicationGroupDescription:
-        Fn::Sub: ${ProjectName}-redis-replication-group
-      ReplicasPerNodeGroup: !Ref Replicas
-      SecurityGroupIds:
-         - "Fn::GetAtt":
-            - SecurityGroup
-            - GroupId
-
-  RedisEngineCPUAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${ProjectName}-core-redis-EngineCPUUtilization
-      AlarmDescription: "CloudWatch alarm for Redis Engine CPU Unilization."
-      AlarmActions: 
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      DatapointsToAlarm: 1
-      Dimensions: 
-        - Name: CacheClusterId
-          Value: !Ref RedisReplicationGroup
-      MetricName: EngineCPUUtilization
-      Namespace: AWS/ElastiCache
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
-      Period: 60
-      Statistic: Sum
-      Threshold: !Ref EngineCPUUtilizationThreshold
-      TreatMissingData: missing
-
-  RedisCPUUtilizationAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${ProjectName}-core-redis-CPUUtilization
-      AlarmDescription: "CloudWatch alarm for Redis  CPU Unilization."
-      AlarmActions: 
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      DatapointsToAlarm: 1
-      Dimensions: 
-        - Name: CacheClusterId
-          Value: !Ref RedisReplicationGroup
-      MetricName: CPUUtilization
-      Namespace: AWS/ElastiCache
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
-      Period: 60
-      Statistic: Sum
-      Threshold: !Ref CPUUtilizationThreshold
-      TreatMissingData: missing
-
-  RedisMemoryUtilizationAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${ProjectName}-core-redis-MemoryUsage
-      AlarmDescription: "CloudWatch alarm for Redis  Memory usage."
-      AlarmActions: 
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      DatapointsToAlarm: 1
-      Dimensions: 
-        - Name: CacheClusterId
-          Value: !Ref RedisReplicationGroup
-      MetricName: DatabaseMemoryUsagePercentage
-      Namespace: AWS/ElastiCache
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
-      Period: 60
-      Statistic: Sum
-      Threshold: !Ref RedisMemoryUsedThreshold
-      TreatMissingData: missing
-
-  RedisCurrentConnectionsAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${ProjectName}-core-redis-CurrentConnections
-      AlarmDescription: "CloudWatch alarm for concurrent and active connections."
-      AlarmActions: 
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      DatapointsToAlarm: 1
-      Dimensions: 
-        - Name: CacheClusterId
-          Value: !Ref RedisReplicationGroup
-      MetricName: CurrConnections
-      Namespace: AWS/ElastiCache
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
-      Period: 60
-      Statistic: Sum
-      Threshold: !Ref CurrentConnectionsThreshold
-      TreatMissingData: missing
-
   ElastiCacheUserGroup:
     Type: AWS::ElastiCache::UserGroup
     Properties:
@@ -278,16 +120,17 @@ Resources:
       UserIds: 
         - !Ref DefaultElasticCacheUser
         - !Ref ElasticCacheUser1
+        - !Ref ElasticCacheLogExtractorUser
 
   DefaultElasticCacheUser:
     Type: AWS::ElastiCache::User
     Properties:
-      AccessString: !Ref AccessStringDefaultUser
+      AccessString: "off ~* -@all"
       AuthenticationMode: 
         Type: no-password-required
       Engine: redis
-      UserId: !Ref UserIdDefaultUser
-      UserName: !Ref UsernameDefaultUser
+      UserId: default-redis
+      UserName: default
 
   ElasticCacheUser1:
     Type: AWS::ElastiCache::User
@@ -299,6 +142,16 @@ Resources:
       UserId: !Ref UserIdUser1
       UserName: !Ref UsernameUser1
 
+  ElasticCacheLogExtractorUser:
+    Type: AWS::ElastiCache::User
+    Properties:
+      AccessString: !Ref AccessStringLogExtractorUser
+      AuthenticationMode: 
+        Type: iam
+      Engine: redis
+      UserId: !Ref UserIdLogExtractor
+      UserName: !Ref UsernameLogExtractor
+
 Outputs:
   ElasticacheSecurityGroup:
     Description: The id of the security group that can access the cache cluster
@@ -306,43 +159,7 @@ Outputs:
 
   RedisEndpoint:
     Description: The endpoint Address for Redis serverless
-    Value:
-      Fn::If:
-        - IsServerless
-        - Fn::GetAtt:
-          - RedisServerless
-          - Endpoint.Address
-        - Fn::GetAtt:
-          - RedisReplicationGroup
-          - PrimaryEndPoint.Address
-
-  RedisCurrentConnectionsAlarmArn:
-    Value: 
-      Fn::If:
-        - IsServerless
-        - ""
-        - !GetAtt RedisCurrentConnectionsAlarm.Arn
-
-  RedisMemoryUtilizationAlarm:
-    Value: 
-      Fn::If:
-        - IsServerless
-        - ""
-        - !GetAtt RedisMemoryUtilizationAlarm.Arn
-
-  RedisCPUUtilizationAlarm:
-    Value: 
-      Fn::If:
-        - IsServerless
-        - ""
-        - !GetAtt RedisCPUUtilizationAlarm.Arn
-
-  RedisEngineCPUAlarm:
-    Value: 
-      Fn::If:
-        - IsServerless
-        - ""
-        - !GetAtt RedisEngineCPUAlarm.Arn
+    Value: !GetAtt RedisServerless.Endpoint.Address
 
   RedisServerlessArn:
     Description: The Redis serverless Arn
@@ -359,3 +176,11 @@ Outputs:
   ElasticacheUserId1:
     Description: Id of the User1
     Value: !Ref UserIdUser1
+
+  ElasticCacheLogExtractorUserArn:
+    Description: ElasticCacheLogExtractorUser Arn
+    Value: !GetAtt ElasticCacheLogExtractorUser.Arn
+
+  ElasticCacheLogExtractorUserId:
+    Description: Id of the LogExtractorUser
+    Value: !Ref UsernameLogExtractor
