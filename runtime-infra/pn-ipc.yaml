@@ -866,6 +866,20 @@ Resources:
       Tags:
         - Key: "Microservice"
           Value: "pn-delivery-push"
+  
+  ### Send Some Paper event to pn-paper-events-enricher ###
+  PnPaperEventEnricherInputQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain   
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-paper-event-enrichment-input'
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName        
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10
+        DelaySeconds: 1
 
   ###                             ELASTIC FILE SYSTEM                     ###
   ###########################################################################
@@ -1318,6 +1332,24 @@ Outputs:
   DeliveryPushValidationInputsQueueAgeAlarmARN:
     Value: !GetAtt DeliveryPushValidationInputsQueue.Outputs.SqsAgeAlarmArn
     Description:  DeliveryPushValidationInputsQueue age alarm ARN
+
+  # pn-paper-enrichment-input-queue
+  PnPaperEventEnricherInputQueueName:
+    Value: !GetAtt PnPaperEventEnricherInputQueue.Outputs.QueueName
+    Description: PnPaperEventEnricherInputQueue queue name
+  PnPaperEventEnricherInputQueueURL:
+    Value: !GetAtt PnPaperEventEnricherInputQueue.Outputs.QueueURL
+    Description: PnPaperEventEnricherInputQueue queue URL
+  PnPaperEventEnricherInputQueueARN:
+    Value: !GetAtt PnPaperEventEnricherInputQueue.Outputs.QueueARN
+    Description: PnPaperEventEnricherInputQueue queue ARN
+  PnPaperEventEnricherInputQueueAlarmARN:
+    Value: !GetAtt PnPaperEventEnricherInputQueue.Outputs.SqsDLQAlarmArn
+    Description: PnPaperEventEnricherInputQueue alarm ARN
+  PnPaperEventEnricherInputQueueAgeAlarmARN:
+    Value: !GetAtt PnPaperEventEnricherInputQueue.Outputs.SqsAgeAlarmArn
+    Description:  PnPaperEventEnricherInputQueue age alarm ARN
+
 
   # SafeStorage to F24 events
   SafeStorageToF24QueueName:
