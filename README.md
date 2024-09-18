@@ -5,3 +5,4 @@
 # "Piattaforma Notifiche" cloud infrastructure definition
 - [PN runtime infrastructure definition](runtime-infra/)
 
+

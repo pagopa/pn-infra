@@ -80,11 +80,7 @@ const coreMapping = {
         'pn-opensearch-cluster-red',
         'pn-opensearch-writes-blocked',
         'pn-opensearch-low-storage',
-        'pn-opensearch-cluster-yellow',
-        'pn-core-redis-MemoryUsage',
-        'pn-core-redis-CPUUtilization',
-        'pn-core-redis-EngineCPUUtilization',
-        'pn-core-redis-CurrentConnections'
+        'pn-opensearch-cluster-yellow'
     ],
     'pn-mandate': [
         'oncall-pn-mandate-ErrorFatalLogs-Alarm',
