@@ -152,6 +152,11 @@ Parameters:
     Type: Number
     Description: minimum autoscaling number of tasks\
 
+  DownscalingCheckPeriod:
+    Default: 300
+    Type: Number
+    Description: minimum autoscaling number of tasks only for Downscale
+
   AutoscalingDataPointN:
     Default: 1
     Type: Number
@@ -1853,7 +1858,7 @@ Resources:
       StepScalingPolicyConfiguration:
         AdjustmentType: PercentChangeInCapacity
         MinAdjustmentMagnitude: 1
-        Cooldown: !Ref AutoscalingCheckPeriod
+        Cooldown: !Ref DownscalingCheckPeriod
         MetricAggregationType: Average
         StepAdjustments:
           - MetricIntervalLowerBound: 0
