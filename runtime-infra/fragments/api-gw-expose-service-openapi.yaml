@@ -112,6 +112,7 @@ Conditions:
   IsCNBE: !Equals [ !Ref IntendedUsage, 'CN_BE' ]
   IsB2BPG: !Equals [ !Ref IntendedUsage, 'B2BPG' ]
   IsRADDorB2B: !Or [ !Condition IsRADD, !Condition IsB2B ]
+  IsRADDorB2BPG: !Or [ !Condition IsRADD, !Condition IsB2BPG ]
   SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
   HasOpenApiBucketName: !Not [ !Equals [ !Ref OpenApiBucketName, '' ] ]
   HasOpenApiBucketKey: !Not [ !Equals [ !Ref OpenApiBucketKey, '' ] ]
@@ -223,18 +224,7 @@ Resources:
 
   # B2B Authorizer
   B2BLambdaPermission:
-    Condition: IsRADD
-    Type: AWS::Lambda::Permission
-    DependsOn: PublicRestApiOpenapi
-    Properties:
-      FunctionName: !Sub '${ProjectName}-b2bAuthorizerLambda'
-      Action: lambda:InvokeFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
-  
-  # B2B PG Authorizer
-  B2BPGLambdaPermission:
-    Condition: IsB2BPG
+    Condition: IsRADDorB2BPG
     Type: AWS::Lambda::Permission
     DependsOn: PublicRestApiOpenapi
     Properties:
