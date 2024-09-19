@@ -64,6 +64,11 @@ Parameters:
     Default: ''
     Description: 'The DNS name user for CN API'
 
+  DestApiDnsName:
+    Type: String
+    Default: ''
+    Description: 'The DNS name user for B2B Dest API'
+
   AlternateWebApiDnsName:
     Type: String
     Default: ''
@@ -85,6 +90,7 @@ Parameters:
   IoApiCertificateArn:
     Type: String
     Description: 'The certificate used for browser rest IO API.'
+
 
   RaddApiDnsName:
     Type: String
@@ -440,7 +446,7 @@ Resources:
       Tags:
         - Key: "Microservice"
           Value: "pn-infra-networking"
-
+  
   ###                    QUEUES BETWEEN MICRO SERVICES                    ###
   ###########################################################################
 
@@ -1543,6 +1549,8 @@ Outputs:
     Value: !Ref ReactAppUrlApi
   BoApiDnsName: 
     Value: !Ref BoApiDnsName
+  DestApiDnsName:
+    Value: !Ref DestApiDnsName
   HubLoginDomain:
     Value: !Ref HubLoginDomain
   TokenExchangeLambdaEnvironmentIssuer:
