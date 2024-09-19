@@ -162,6 +162,20 @@ Resources:
               - cloudformation:DescribeStacks
             Resource:
               - !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/pn-celonis-exports-${EnvironmentType}/*"
+          - Sid: RunHistoryAggregatorCodeBuild
+            Effect: Allow
+            Action:
+              - codebuild:StartBuild
+              - codebuild:BatchGetBuilds
+            Resource:
+              - !GetAtt "HistoryAggregatorCodebuildProject.Arn"
+          - Sid: ReadHistoryAggregatorCodeBuildLogs
+            Effect: Allow
+            Action:
+              - logs:GetLogEvents
+            Resource:
+              - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${HistoryAggregatorCodebuildProject}:log-stream:*"
+              - !Sub "${HistoryAggregatorCodebuildProject.Arn}"          
 
               
                 
@@ -735,6 +749,210 @@ Resources:
                 Effect: Allow
                 Resource: 
                   - !GetAtt CopyToFrankfurtCodebuildProject.Arn
+
+
+  ###############################################################################
+  ###                 ON DEMAND BUILD OF HISTORY AGGREGATIONS                 ###
+  ###############################################################################
+
+  HistoryAggregatorCodebuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: "Celonis-HistoryAggregator"
+      ServiceRole: !GetAtt HistoryAggregatorCodebuildServiceRole.Arn
+      ConcurrentBuildLimit: 1
+      TimeoutInMinutes: 60
+      Source: 
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - echo "No prebuild"
+            build:
+              commands:
+                - |
+                  usage() {
+                        cat <<EOF
+                      Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] [-p <aws-profile>] -r <aws-region> -e <env-type> -i <github-commitid> [-c <custom_config_dir>] -b <artifactBucketName>
+                      [-h]                      : this help message
+                      -e <env-type>             : one of dev / uat / svil / coll / cert / prod
+                      --from                    : start from day inclusive (YYYY-MM-DD format)
+                      [--to]                    : stop to day inclusive (YYYY-MM-DD format) today if not set
+                      --dest                    : destination subfolder                      
+                  EOF
+                    exit 1
+                  }
+                  dump_params(){
+                    if ( [ -z "${to_date-}" ] ) then
+                      to_date=$(date -I)
+                    fi
+                    echo ""
+                    echo "######      PARAMETERS      ######"
+                    echo "##################################"
+                    echo "Env Name:              ${env_type}"
+                    echo "From Date:             ${from_date}"
+                    echo "To Date:               ${to_date}"
+                    echo "Destination subfolder: ${destination_subfolder}"
+
+                    if ( [ -z "${env_type-}" ] ) then
+                      usage
+                    fi
+                    if ( [ -z "${destination_subfolder-}" ] ) then
+                      usage
+                    fi
+                    if ( [ -z "${from_date-}" ] ) then
+                      usage
+                    fi
+                  }
+                  dump_params
+
+                  # START SCRIPT
+                  script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+                - |
+                  echo ""
+                  echo ""
+                  echo "=== Base AWS command parameters"
+                  aws_command_base_args=""
+                  echo "- AWS cli base arguments \"$aws_command_base_args\""
+                - |
+                  history_bucket_name="pn-cel-exp-history-eu-central-1-${env_type}-001"
+                  destination_folder="history/aggregations/${destination_subfolder}/"
+                  echo "- Destination URI s3://${history_bucket_name}/${destination_folder}"
+                - |
+                  echo ""
+                  echo "=== Clean destination folder"
+                  aws ${aws_command_base_args} s3 rm --recursive s3://${history_bucket_name}/${destination_folder}
+                  aws ${aws_command_base_args} s3api put-object --content-length 0 \
+                      --bucket ${history_bucket_name} --key ${destination_folder}
+                  aws ${aws_command_base_args} s3api put-object --content-length 0 \
+                      --bucket ${history_bucket_name} --key ${destination_folder}paper_requests.csv/
+                  aws ${aws_command_base_args} s3api put-object --content-length 0 \
+                      --bucket ${history_bucket_name} --key ${destination_folder}event_list.csv/
+                  aws ${aws_command_base_args} s3api put-object --content-length 0 \
+                      --bucket ${history_bucket_name} --key ${destination_folder}event_list_document_type.csv/
+                - |                                            
+                  current_day=$from_date
+                  while ( [ \( "$to_date" \> "$current_day" \) -o \( "$to_date" = "$current_day" \) ] ); do 
+                    echo ""
+                    echo " === Copy single day $current_day "
+                    single_day_path="history/sd_$(echo $current_day | tr -d '\n-')/"
+
+                    for s3_object in $( \
+                        aws ${aws_command_base_args} s3 ls --recursive s3://${history_bucket_name}/${single_day_path} \
+                            | sed 's/.* //' | grep -E '.csv$'
+                      )
+                    do
+                      table_name=$( echo $s3_object | sed -e 's|history/sd_[0-9]*/\([^/]*\)/.*|\1|' )
+                      day_part=$( echo $s3_object | sed -e 's|history/\(sd_[0-9]*\)/.*|\1|' )
+                      file_name=$( echo $s3_object | sed -e 's|.*/||' )
+                      s3_object_copy="${destination_folder}${table_name}/${day_part}_${file_name}"
+
+                      echo " - Copy $s3_object to $s3_object_copy"
+                      aws ${aws_command_base_args} s3 cp --no-progress \
+                            s3://${history_bucket_name}/${s3_object} \
+                            s3://${history_bucket_name}/${s3_object_copy} 
+                    done
+
+                    current_day=$(date -I -d "$current_day + 1 day")
+                  done
+                - |
+                  echo ""
+                  echo ""
+                  echo ""
+                  echo " ======================================================================= "
+                  echo " ||                                                                   || "
+                  echo " ||                 History aggregation DONE !!!!!!!                  || "
+                  echo " ||                                                                   || "
+                  echo " ||===================================================================|| "
+                  echo " || "
+                  echo " || Output bucket is: ${history_bucket_name}"
+                  echo " || Output folder is: ${destination_folder} wtih 3 subfolder: "
+                  echo " ||     - paper_requests.csv"
+                  echo " ||     - event_list.csv"
+                  echo " ||     - event_list_document_type.csv"
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Type: LINUX_CONTAINER
+        Image: "aws/codebuild/standard:7.0"
+        EnvironmentVariables:
+          - Name: env_type
+            Type: PLAINTEXT
+            Value: !Ref EnvironmentType
+          - Name: from_date
+            Type: PLAINTEXT
+            Value: '2024-09-01'
+          - Name: to_date
+            Type: PLAINTEXT
+            Value: ''
+          - Name: destination_subfolder
+            Type: PLAINTEXT
+            Value: 'from_september_1st'
+          - Name: history_bucket_name
+            Type: PLAINTEXT
+            Value: !Ref CelonisHistoryBucket
+
+  HistoryAggregatorCodebuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: pn-celonis-history-aggregator-codebuild-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: pn-celonis-history-aggregator-codebuild-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: CanLog
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: 
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*
+              - Sid: CanReadFromSource   
+                Effect: Allow
+                Action:
+                  - "s3:GetBucketAcl"
+                  - "s3:GetObject"
+                  - "s3:GetObjectTagging"
+                  - "s3:ListBucket"
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${CelonisHistoryBucket}"
+                  - !Sub "arn:${AWS::Partition}:s3:::${CelonisHistoryBucket}/*"
+              - Sid: CanReadAndWriteToDestination
+                Effect: Allow
+                Action:
+                  - "s3:GetBucketAcl"
+                  - "s3:GetObject"
+                  - "s3:PutObject"
+                  - "s3:ListBucket"
+                  - "s3:GetObjectTagging"
+                  - "s3:DeleteObject"
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${CelonisHistoryBucket}"
+                  - !Sub "arn:${AWS::Partition}:s3:::${CelonisHistoryBucket}/${HistoryBucketBasePath}aggregations/*"
+              - Sid: EncryptDecryptS3Object
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:Encrypt
+                  - kms:DescribeKey
+                  - kms:ReEncrypt*
+                  - kms:GenerateDataKey*
+                Resource:
+                  - !Sub "${CelonisBucketsKmsKey.Arn}"
 
 Outputs:
   
