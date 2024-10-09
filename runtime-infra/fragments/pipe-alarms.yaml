@@ -1,0 +1,218 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic for alarms
+
+  PipeName:
+    Type: String
+    Description: Pipe name
+
+  DataPointsToAlarm:
+    Type: Number
+    Default: 5
+
+  EvaluationPeriods:
+    Type: Number
+    Default: 10
+  
+  Threshold:
+    Type: Number
+    Default: 1
+
+  OnCallThreshold:
+    Type: Number
+    Default: 1
+  
+  OnCallDataPointsToAlarm:
+    Type: Number
+    Default: 5
+
+  OnCallEvaluationPeriods:
+    Type: Number
+    Default: 10
+
+  OnCallErrorRatio:
+    Type: Number
+    Default: 0.2
+  
+  OnCallMinimumInvocations:
+    Type: Number
+    Default: 20
+
+  ErrorRatio:
+    Type: Number
+    Default: 0.1
+  
+  MinimumInvocations:
+    Type: Number
+    Default: 0
+
+Resources:
+  
+  PipeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${PipeName}-alarm"
+      AlarmDescription: !Sub "Alarm on pipe ${PipeName} failure"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      DatapointsToAlarm: !Ref DataPointsToAlarm
+      EvaluationPeriods: !Ref EvaluationPeriods
+      Threshold: !Ref Threshold
+      TreatMissingData: notBreaching
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: PipeName
+                  Value: !Ref PipeName
+              MetricName: ExecutionThrottled
+              Namespace: AWS/SQS
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m2
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: PipeName
+                  Value: !Ref PipeName
+              MetricName: ExecutionTimeout
+              Namespace: AWS/SQS
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m3
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: PipeName
+                  Value: !Ref PipeName
+              MetricName: ExecutionFailed
+              Namespace: AWS/SQS
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m4
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: PipeName
+                  Value: !Ref PipeName
+              MetricName: ExecutionPartiallyFailed
+              Namespace: AWS/SQS
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m5
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: PipeName
+                  Value: !Ref PipeName
+              MetricName: Invocations
+              Namespace: AWS/SQS
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: e1
+          Expression: ( m1 + m2 + m3 + m4 ) / m5
+          Label: !Sub "${PipeName}-ratio"
+          ReturnData: False
+        - Id: e2
+          Expression: !Sub IF( e1 > ${ErrorRatio} AND m5 > ${MinimumInvocations}, 1, 0)
+          Label: !Sub "${PipeName}-metric"
+      AlarmActions:
+        - !Sub '${AlarmSNSTopicArn}'
+      OKActions:
+        - !Sub '${AlarmSNSTopicArn}'
+
+  OnCallPipeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "oncall-${PipeName}-alarm"
+      AlarmDescription: !Sub "OnCall Alarm on pipe ${PipeAlarm} failure"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      DatapointsToAlarm: !Ref OnCallDataPointsToAlarm
+      EvaluationPeriods: !Ref OnCallEvaluationPeriods
+      Threshold: !Ref OnCallThreshold
+      TreatMissingData: notBreaching
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: PipeName
+                  Value: !Ref PipeName
+              MetricName: ExecutionThrottled
+              Namespace: AWS/SQS
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m2
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: PipeName
+                  Value: !Ref PipeName
+              MetricName: ExecutionTimeout
+              Namespace: AWS/SQS
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m3
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: PipeName
+                  Value: !Ref PipeName
+              MetricName: ExecutionFailed
+              Namespace: AWS/SQS
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m4
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: PipeName
+                  Value: !Ref PipeName
+              MetricName: ExecutionPartiallyFailed
+              Namespace: AWS/SQS
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m5
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: PipeName
+                  Value: !Ref PipeName
+              MetricName: Invocations
+              Namespace: AWS/SQS
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: e1
+          Expression: ( m1 + m2 + m3 + m4 ) / m5
+          Label: !Sub "OnCall-${PipeName}-ratio"
+          ReturnData: False
+        - Id: e2
+          Expression: !Sub IF( e1 > ${OnCallErrorRatio} AND m5 > ${OnCallMinimumInvocations}, 1, 0)
+          Label: !Sub "OnCall-${PipeName}-metric"
+      AlarmActions:
+        - !Sub '${AlarmSNSTopicArn}'
+      OKActions:
+        - !Sub '${AlarmSNSTopicArn}'
+
+Outputs:
+  PipeAlarmArn:
+    Description: "Pipe alarm ARN"
+    Value: !GetAtt PipeAlarm.Arn
+
+  OnCallPipeAlarmArn:
+    Description: "OnCall Pipe alarm ARN"
+    Value: !GetAtt OnCallPipeAlarm.Arn
