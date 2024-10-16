@@ -14,6 +14,17 @@ Parameters:
   LogsBucketKmsKeyArn:
     Type: String
     Description: Arn of logs bucket KMS key
+  
+  GlueCrawlerSchedule:
+    Type: String
+    Default: ''
+    Description: Cron expression for the Glue Crawler schedule. #e.g. 'cron(0 1 * * ? *)'
+
+Conditions:
+  IsGlueCrawlerScheduled: !Not
+    - !Equals
+      - !Ref GlueCrawlerSchedule
+      - ''
 
 Resources:
   GlueDatabase:
@@ -470,8 +481,10 @@ Resources:
           }
         }
       TablePrefix: ''
-      # Schedule:
-      #   ScheduleExpression: cron(0 1 * * ? *)
+      Schedule: !If
+        - IsGlueCrawlerScheduled
+        - ScheduleExpression: !Ref GlueCrawlerSchedule
+        - !Ref AWS::NoValue
 
   AthenaWorkGroup:
     Type: AWS::Athena::WorkGroup
