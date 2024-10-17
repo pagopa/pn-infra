@@ -10,6 +10,10 @@ Parameters:
   LogsBucketName:
     Type: String
     Description: Logs bucket name
+  
+  BucketSuffix:
+    Type: String
+    Description: Suffix for the athena result bucket name
 
   LogsBucketKmsKeyArn:
     Type: String
@@ -501,7 +505,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Sub '${ProjectName}-log-analytics-athena-results-${AWS::Region}-${AWS::AccountId}'
+      BucketName: !Sub '${ProjectName}-log-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}'
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
