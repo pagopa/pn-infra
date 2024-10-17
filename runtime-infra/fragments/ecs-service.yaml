@@ -1771,7 +1771,7 @@ Resources:
     Type: AWS::Logs::MetricFilter
     Properties: 
       LogGroupName: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
-      FilterPattern: !If [ LogAlarmErrorFatal, '{ $.level = "ERROR" || $.level = "FATAL" || $.message = "* FATAL *" || $.message = "*ALLARM!* " }', '{ $.level = "FATAL" || $.message = "* FATAL *" || $.message = "*ALLARM!*" }']
+      FilterPattern: !If [ LogAlarmErrorFatal, '{ $.level = "ERROR" || $.level = "FATAL" || $.message = "* FATAL *" || $.message = "*ALLARM!*" }', '{ $.level = "FATAL" || $.message = "* FATAL *" || $.message = "*ALLARM!*" }']
       MetricTransformations: 
         - MetricValue: 1
           MetricNamespace: "ErrorFatalLogs"
