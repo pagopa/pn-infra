@@ -232,7 +232,7 @@ Parameters:
   EphemeralStorageValueGB:
     Type: Number
     Description: Ephemeral storage value in GB
-    Default: '' # this way the default will be 20 Gig
+    Default: '21'
 
   # Container environment map, maximum 40 entry
   ContainerEnvEntry1:
@@ -822,8 +822,6 @@ Conditions:
 
   HasSecrets: !Or [ !Condition Secret1Exist, !Condition Secret2Exist, !Condition Secret3Exist, !Condition Secret4Exist, !Condition Secret5Exist, !Condition Secret6Exist ]
 
-  HasEphemeralStorage: !Not [ !Equals [ !Ref EphemeralStorageValueGB, '' ] ]
-
 Resources:
   
   ## Fallback log group
@@ -1013,7 +1011,7 @@ Resources:
       ExecutionRoleArn: !GetAtt ExecutionRole.Arn
       # "The Amazon Resource Name (ARN) of an AWS Identity and Access Management (IAM) role that grants containers in the task permission to call AWS APIs on your behalf."
       TaskRoleArn: !Ref TaskRole
-      EphemeralStorage: !If [ HasEphemeralStorage, { SizeInGiB: !Ref EphemeralStorageValueGB }, !Ref AWS::NoValue ]
+      EphemeralStorage: !Ref EphemeralStorageValueGB
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
