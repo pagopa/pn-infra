@@ -61,6 +61,10 @@ Parameters:
     Type: Number
     Default: '43000'
     Description: 'Oldest job age (in seconds) before raising an oncall alarm'
+  WorkdayQueueDlqOldestAgeLimit:
+    Type: Number
+    Default: '864000'
+    Description: 'Oldest job age in dlq queue (in seconds) before raising an oncall only in workday alarm'
   VisibilityTimeout:
     Type: Number
     Default: 30
@@ -263,6 +267,52 @@ Resources:
       OKActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
+  WorkdayDlqOldMessagesAlarm:
+    Condition: IsDLQHasMessagesAlarm
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "workday-${QueueName}-DLQ-HasOldMessage"
+      AlarmDescription: "Alarm messages when the oldest message in queue is older than limit QueueOldestAgeLimit"
+      Namespace: "AWS/SQS"
+      MetricName: "ApproximateAgeOfOldestMessage"
+      Dimensions:
+        - Name: "QueueName"
+          Value: !If [ IsNotFifo, !Sub '${DeadLetterQueue.QueueName}', !Sub '${DeadLetterQueueFifo.QueueName}' ]
+      Statistic: "Maximum"
+      Period: 60  
+      Threshold: !Ref WorkdayQueueDlqOldestAgeLimit
+      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 1       
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      InsufficientDataActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+
+  WorkdayOldMessagesAlarm:
+    Condition: IsWithAlarm
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "workday-${QueueName}-HasOldMessage"
+      AlarmDescription: "Alarm messages when the oldest message in queue is older than limit QueueOldestAgeLimit"
+      Namespace: "AWS/SQS"
+      MetricName: "ApproximateAgeOfOldestMessage"
+      Dimensions:
+        - Name: "QueueName"
+          Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
+      Statistic: "Maximum"
+      Period: 60  
+      Threshold: !Ref WorkdayQueueDlqOldestAgeLimit
+      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 1       
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      InsufficientDataActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+
   QueueHasOldMessagesAlarm:
     Condition: IsWithDLQ
     Type: AWS::CloudWatch::Alarm
@@ -379,7 +429,7 @@ Outputs:
     Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.Arn , !GetAtt DeadLetterQueueFifo.Arn ], "" ]
 
   SqsDLQAlarmArn:
-    Description: ARN of the SQS DLA alarm
+    Description: ARN of the SQS DLQ alarm
     Value:
       !If
       - IsDLQHasMessagesAlarm
@@ -396,3 +446,14 @@ Outputs:
       - IsWithDLQ
       - !GetAtt QueueHasOldMessagesAlarm.Arn
       - ''
+
+  SqsDLQAgeAlarmArn:
+    Description: ARN of the SQS DLQ Age alarm
+    Value:
+      !If
+      - IsDLQHasMessagesAlarm
+      - !GetAtt WorkdayDlqOldMessagesAlarm.Arn
+      - !If
+        - IsWithAlarm
+        - !GetAtt WorkdayOldMessagesAlarm.Arn
+        - ''
