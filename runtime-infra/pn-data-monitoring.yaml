@@ -22,11 +22,6 @@ Parameters:
     Description: reports files bucket path
     Default: 'reports'
 
-  DataMonitoringCodebuildComputeType:
-    Type: String
-    Description: Codebuild compute type (https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-compute-types.html)
-    Default: BUILD_GENERAL1_LARGE
-
   LogsBucketName:
     Type: String
     Description: Name of the logs bucket
@@ -210,7 +205,7 @@ Resources:
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
-        ComputeType: !Ref DataMonitoringCodebuildComputeType
+        ComputeType: BUILD_GENERAL1_XLARGE
         Type: LINUX_CONTAINER
         Image: "aws/codebuild/standard:7.0"
         EnvironmentVariables:
@@ -609,8 +604,47 @@ Resources:
     Properties:
       LogGroupName: !Sub "/aws/lambda/${DynamoDbExportFunction}"
       RetentionInDays: 3
+  
+
+  # Send codebuild events to Frankfurt; Needed by celonis :(
+  SendCodeBuildEventsToFrankfurt: 
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: "Routes datamonitoring ends to eu-central-1"
+      State: "ENABLED"
+      EventPattern:
+        source:  [ "aws.codebuild" ]
+        detail-type: [ "CodeBuild Build State Change" ]
+        detail: 
+          project-name: [ "pn-data-monitoring-codebuild" ]
+      Targets: 
+        - Arn: !Sub "arn:${AWS::Partition}:events:eu-central-1:${AWS::AccountId}:event-bus/default"
+          Id: "CrossRegionDestinationBus"
+          RoleArn: !GetAtt SendCodeBuildEventsToFrankfurtRole.Arn
+  
+  SendCodeBuildEventsToFrankfurtRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: events.amazonaws.com
+          Action: sts:AssumeRole
+      Path: /
+      Policies:
+      - PolicyName: PutEventsDestinationBus
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - events:PutEvents
+            Resource:
+            - !Sub "arn:${AWS::Partition}:events:eu-central-1:${AWS::AccountId}:event-bus/default"
       
 Outputs:
   DataMonitoringBucketName: 
     Value: !Ref DataMonitoringBucket
-    Description: Name of the bucket created for the data monitoring   
+    Description: Name of the bucket created for the data monitoring

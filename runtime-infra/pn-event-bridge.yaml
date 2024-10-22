@@ -129,7 +129,16 @@ Parameters:
   ExternalChannels2UserAttributesQueueURL:
     Type: String
 
-  # External channels to pn-paper-channel
+  # External channels to pn-paper-event-enricher
+  PnPaperEventEnricherInputQueueARN:
+    Type: String
+    Description: pn-external-channels output to pn-paper-event-enricher queue ARN
+  
+  PnPaperEventEnricherInputQueueURL:
+    Type: String
+    Description: pn-external-channels output to pn-paper-event-enricher queue URL
+  
+# External channels to pn-paper-channel
   ExternalChannels2PaperChannelQueueARN:
     Type: String
     Description: pn-external-channels output to pn-paper-channel queue ARN
@@ -325,6 +334,7 @@ Resources:
                 Effect: Allow
                 Resource: 
                   - !Ref ExternalChannelsOutputsQueueARN
+                  - !Ref "PnPaperEventEnricherInputQueueARN"
                   - !Ref ExternalChannels2UserAttributesQueueARN
                   - !Ref SafeStorageToDeliveryPushQueueARN
                   - !Ref SafeStorageToRaddQueueARN
@@ -408,6 +418,7 @@ Resources:
         - !Ref "ExternalChannelsOutputsQueueURL"
         - !Ref "ExternalChannels2UserAttributesQueueURL"
         - !Ref "ExternalChannels2PaperChannelQueueURL"
+        - !Ref "PnPaperEventEnricherInputQueueURL"
         - !Ref "SafeStorageToDeliveryPushQueueURL"
         - !Ref "SafeStorageToRaddQueueURL"
         - !Ref "SafeStorageToRaddAltQueueURL"
@@ -437,6 +448,7 @@ Resources:
               - !Ref "ExternalChannelsOutputsQueueARN"
               - !Ref "ExternalChannels2UserAttributesQueueARN"
               - !Ref "ExternalChannels2PaperChannelQueueARN"
+              - !Ref "PnPaperEventEnricherInputQueueARN"
               - !Ref "SafeStorageToDeliveryPushQueueARN"
               - !Ref "SafeStorageToRaddQueueARN"
               - !Ref "SafeStorageToRaddAltQueueARN"
@@ -898,6 +910,8 @@ Resources:
         detail-type: [ "ExternalChannelOutcomeEvent" ]
         detail:
           clientId: [ !Ref PaperChannelExtChUser ]
+          analogMail:
+            statusCode: [ { "anything-but": "CON020" } ]
       Targets: 
         - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
           Id: !Sub ${ProjectName}-Logger-ExtCh2PaperChannel  
@@ -914,6 +928,39 @@ Resources:
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2PaperChannel'
           Arn: !Ref ExternalChannels2PaperChannelQueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
+  # Send ExternalChannel Response to pn-paper-event-enricher
+  PnCoreEventBusToPaperEventEnricherQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route some ExternalChannel Events to pn-paper-event-enricher
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "ExternalChannelOutcomeEvent" ]
+        source: [ "NOTIFICATION TRACKER" ]
+        detail: 
+          analogMail:
+            statusCode: [ "CON020" ]
+      Targets: 
+        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
+          Id: !Sub ${ProjectName}-Logger-ExtCh2PaperChannel  
+          InputTransformer:
+            InputPathsMap:
+              "timestamp": "$.time"
+            InputTemplate: |
+              {
+                  "timestamp": <timestamp>,
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }       
+        - Id: !Sub '${ProjectName}-CoreEventBus-to-paper-evt-enricher'
+          Arn: !Ref PnPaperEventEnricherInputQueueARN
           InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
@@ -1077,6 +1124,39 @@ Resources:
          InputPath: $.detail.body
          DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
+            
+  #rule CON020 to externalChannel2paperChannel queue         
+  PnCoreEventBusCon020ToPaperChannelQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route CON020 Events from PAPER ENRICHER to pn-paper-channel
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "ExternalChannelOutcomeEvent" ]
+        source: [ "PAPER ENRICHER" ]
+        detail: 
+          analogMail:
+            statusCode: [ "CON020" ]
+      Targets: 
+        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
+          Id: !Sub ${ProjectName}-Logger-Con020ToPaperChannel  
+          InputTransformer:
+            InputPathsMap:
+              "timestamp": "$.time"
+            InputTemplate: |
+              {
+                  "timestamp": <timestamp>,
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }       
+        - Id: !Sub '${ProjectName}-CoreEventBus-Con020ToPaperChannel'
+          Arn: !Ref ExternalChannels2PaperChannelQueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn         
    
   # pn-infra-logs
   MatchedEventLoggerLambdaPermission:
