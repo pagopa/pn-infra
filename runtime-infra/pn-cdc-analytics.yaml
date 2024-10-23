@@ -1,0 +1,130 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create base resources for CDC files analysis
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: pn
+    Description: Base name for pn project
+  LogsBucketName:
+    Type: String
+    Description: Logs bucket name
+  BucketSuffix:
+    Type: String
+    Description: Suffix for the athena result bucket name
+  LogsBucketKmsKeyArn:
+    Type: String
+    Description: Arn of logs bucket KMS key
+
+Resources:
+  GlueServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: GlueS3AccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${LogsBucketName}
+                  - !Sub arn:aws:s3:::${LogsBucketName}/*
+                  - !Sub arn:aws:s3:::${AthenaResultsBucket}
+                  - !Sub arn:aws:s3:::${AthenaResultsBucket}/*
+
+  AthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    DependsOn: GlueServiceRole
+    Properties:
+      Name: cdc_analytics_workgroup
+      Description: Workgroup for querying data in Athena
+      State: ENABLED
+      WorkGroupConfiguration:
+        ResultConfiguration:
+          OutputLocation: !Sub s3://${AthenaResultsBucket}/
+
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    DependsOn: AthenaWorkGroup
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: cdc_analytics_database
+
+  AthenaResultsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub ${ProjectName}-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  AthenaResultsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AthenaResultsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: athena.amazonaws.com
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+            Resource:
+              - !Sub arn:aws:s3:::${AthenaResultsBucket}/*
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+          - Effect: Allow
+            Principal:
+              Service: athena.amazonaws.com
+            Action:
+              - s3:ListBucket
+            Resource:
+              - !Sub arn:aws:s3:::${AthenaResultsBucket}
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+
+Outputs:
+  GlueDatabaseName:
+    Description: Name of the Glue Database
+    Value: !Ref GlueDatabase
+    Export:
+      Name: !Sub ${AWS::StackName}-GlueDatabaseName
+
+  GlueDatabaseArn:
+    Description: ARN of the Glue Database
+    Value: !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabase}
+    Export:
+      Name: !Sub ${AWS::StackName}-GlueDatabaseArn
+  
+  GlueServiceRoleArn:
+    Description: ARN of the Glue Service Role
+    Value: !GetAtt GlueServiceRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-GlueServiceRoleArn"
