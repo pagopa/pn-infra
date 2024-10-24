@@ -211,6 +211,7 @@ Resources:
   CdcKinesisServerSideEncryptionKey:
     Type: AWS::KMS::Key
     Properties:
+      EnableKeyRotation: true
       KeyPolicy:
         Statement:
           - Action: kms:*
@@ -251,6 +252,7 @@ Resources:
   LogsKinesisServerSideEncryptionKey:
     Type: AWS::KMS::Key
     Properties:
+      EnableKeyRotation: true
       KeyPolicy:
         Statement:
           - Action: kms:*
@@ -294,6 +296,7 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       Description: Symmetric default key to encrypt apikey manager tables
+      EnableKeyRotation: true
       KeySpec: SYMMETRIC_DEFAULT
       KeyUsage: ENCRYPT_DECRYPT
       KeyPolicy:
