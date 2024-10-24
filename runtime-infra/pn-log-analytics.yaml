@@ -116,7 +116,7 @@ Resources:
             - Name: event_id
               Type: string
             - Name: event_timestamp
-              Type: bigint
+              Type: timestamp
             - Name: requesttime
               Type: string
             - Name: requestid
@@ -169,7 +169,7 @@ Resources:
               Fn::Sub:
                 - |
                   {
-                    "originalSql": "SELECT year, month, day, hour, messageType, owner, logGroup, logStream, subscriptionFilters, e.id AS event_id, e.timestamp AS event_timestamp, JSON_EXTRACT_SCALAR(e.message, '$.requestTime') AS requestTime, JSON_EXTRACT_SCALAR(e.message, '$.requestId') AS requestId, JSON_EXTRACT_SCALAR(e.message, '$.httpMethod') AS httpMethod, JSON_EXTRACT_SCALAR(e.message, '$.path') AS path, TRY(CAST(JSON_EXTRACT_SCALAR(e.message, '$.status') AS INTEGER)) AS status, TRY(CAST(JSON_EXTRACT_SCALAR(e.message, '$.responseLatency') AS DOUBLE)) AS responseLatency, JSON_EXTRACT_SCALAR(e.message, '$.xrayTraceId') AS xrayTraceId, JSON_EXTRACT_SCALAR(e.message, '$.integrationRequestId') AS integrationRequestId, JSON_EXTRACT_SCALAR(e.message, '$.functionResponseStatus') AS functionResponseStatus, TRY(CAST(JSON_EXTRACT_SCALAR(e.message, '$.integrationLatency') AS DOUBLE)) AS integrationLatency, JSON_EXTRACT_SCALAR(e.message, '$.integrationServiceStatus') AS integrationServiceStatus, JSON_EXTRACT_SCALAR(e.message, '$.authorizeStatus') AS authorizeStatus, JSON_EXTRACT_SCALAR(e.message, '$.authorizerStatus') AS authorizerStatus, TRY(CAST(JSON_EXTRACT_SCALAR(e.message, '$.authorizerLatency') AS DOUBLE)) AS authorizerLatency, JSON_EXTRACT_SCALAR(e.message, '$.authorizerRequestId') AS authorizerRequestId, JSON_EXTRACT_SCALAR(e.message, '$.ip') AS ip, JSON_EXTRACT_SCALAR(e.message, '$.userAgent') AS userAgent, JSON_EXTRACT_SCALAR(e.message, '$.principalId') AS principalId, JSON_EXTRACT_SCALAR(e.message, '$.cxId') AS cxId, JSON_EXTRACT_SCALAR(e.message, '$.cxType') AS cxType, JSON_EXTRACT_SCALAR(JSON_EXTRACT(e.message, '$.sourceChannelDetails'), '$.channel') AS sourceChannel, JSON_EXTRACT_SCALAR(JSON_EXTRACT(e.message, '$.sourceChannelDetails'), '$.version') AS sourceVersion, JSON_EXTRACT_SCALAR(e.message, '$.uid') AS uid FROM ${DatabaseName}.${TableName} CROSS JOIN UNNEST(logEvents) AS t(e) WHERE logGroup LIKE 'pn-%'",
+                    "originalSql": "SELECT year, month, day, hour, messagetype, owner, loggroup, logstream, subscriptionfilters, e.id AS event_id, from_unixtime(e.timestamp / 1000) AS event_timestamp, JSON_EXTRACT_SCALAR(e.message, '$.requestTime') AS requesttime, JSON_EXTRACT_SCALAR(e.message, '$.requestId') AS requestid, JSON_EXTRACT_SCALAR(e.message, '$.httpMethod') AS httpmethod, JSON_EXTRACT_SCALAR(e.message, '$.path') AS path, TRY(CAST(JSON_EXTRACT_SCALAR(e.message, '$.status') AS INTEGER)) AS status, TRY(CAST(JSON_EXTRACT_SCALAR(e.message, '$.responseLatency') AS DOUBLE)) AS responselatency, JSON_EXTRACT_SCALAR(e.message, '$.xrayTraceId') AS xraytraceid, JSON_EXTRACT_SCALAR(e.message, '$.integrationRequestId') AS integrationrequestid, JSON_EXTRACT_SCALAR(e.message, '$.functionResponseStatus') AS functionresponsestatus, TRY(CAST(JSON_EXTRACT_SCALAR(e.message, '$.integrationLatency') AS DOUBLE)) AS integrationlatency, JSON_EXTRACT_SCALAR(e.message, '$.integrationServiceStatus') AS integrationservicestatus, JSON_EXTRACT_SCALAR(e.message, '$.authorizeStatus') AS authorizestatus, JSON_EXTRACT_SCALAR(e.message, '$.authorizerStatus') AS authorizerstatus, TRY(CAST(JSON_EXTRACT_SCALAR(e.message, '$.authorizerLatency') AS DOUBLE)) AS authorizerlatency, JSON_EXTRACT_SCALAR(e.message, '$.authorizerRequestId') AS authorizerrequestid, JSON_EXTRACT_SCALAR(e.message, '$.ip') AS ip, JSON_EXTRACT_SCALAR(e.message, '$.userAgent') AS useragent, JSON_EXTRACT_SCALAR(e.message, '$.principalId') AS principalid, JSON_EXTRACT_SCALAR(e.message, '$.cxId') AS cxid, JSON_EXTRACT_SCALAR(e.message, '$.cxType') AS cxtype, JSON_EXTRACT_SCALAR(JSON_EXTRACT(e.message, '$.sourceChannelDetails'), '$.channel') AS sourcechannel, JSON_EXTRACT_SCALAR(JSON_EXTRACT(e.message, '$.sourceChannelDetails'), '$.version') AS sourceversion, JSON_EXTRACT_SCALAR(e.message, '$.uid') AS uid FROM ${DatabaseName}.${TableName} CROSS JOIN UNNEST(logEvents) AS t(e) WHERE logGroup LIKE 'pn-%'",
                     "catalog": "awsdatacatalog",
                     "schema": "${DatabaseName}",
                     "columns": [
@@ -183,7 +183,7 @@ Resources:
                       {"name": "logstream", "type": "varchar"},
                       {"name": "subscriptionfilters", "type": "array(varchar)"},
                       {"name": "event_id", "type": "varchar"},
-                      {"name": "event_timestamp", "type": "bigint"},
+                      {"name": "event_timestamp", "type": "timestamp"},
                       {"name": "requesttime", "type": "varchar"},
                       {"name": "requestid", "type": "varchar"},
                       {"name": "httpmethod", "type": "varchar"},
@@ -268,13 +268,15 @@ Resources:
               Type: string
             - Name: log_message
               Type: string
+            - Name: aud_type
+              Type: string
         ViewOriginalText: !Sub
           - '/* Presto View: ${View} */'
           - View: !Base64
               Fn::Sub:
                 - |
                   {
-                    "originalSql": "SELECT year, month, day, hour, messageType, owner, logGroup, logStream, subscriptionFilters, e.id AS event_id, from_unixtime(e.timestamp / 1000) AS event_timestamp, JSON_EXTRACT_SCALAR(e.message, '$[\"@timestamp\"]') AS message_timestamp_string, JSON_EXTRACT_SCALAR(e.message, '$[\"logger_name\"]') AS logger_name, JSON_EXTRACT_SCALAR(e.message, '$[\"thread_name\"]') AS thread_name, JSON_EXTRACT_SCALAR(e.message, '$[\"level\"]') AS level, CAST(JSON_EXTRACT(e.message, '$[\"level_value\"]') AS INTEGER) AS level_value, JSON_EXTRACT_SCALAR(e.message, '$[\"trace_id\"]') AS trace_id, JSON_EXTRACT_SCALAR(e.message, '$[\"iun\"]') AS iun, JSON_EXTRACT_SCALAR(e.message, '$[\"ctx_awsMessageId\"]') AS ctx_awsmessageid, JSON_EXTRACT_SCALAR(e.message, '$[\"AWS-XRAY-TRACE-ID\"]') AS aws_xray_trace_id, JSON_EXTRACT_SCALAR(e.message, '$[\"message\"]') AS log_message FROM ${DatabaseName}.${TableName} CROSS JOIN UNNEST(logEvents) AS t(e) WHERE logGroup LIKE '/aws/ecs/pn-%'",
+                    "originalSql": "SELECT year, month, day, hour, messageType, owner, logGroup, logStream, subscriptionFilters, e.id AS event_id, from_unixtime(e.timestamp / 1000) AS event_timestamp, JSON_EXTRACT_SCALAR(e.message, '$[\"@timestamp\"]') AS message_timestamp_string, JSON_EXTRACT_SCALAR(e.message, '$[\"logger_name\"]') AS logger_name, JSON_EXTRACT_SCALAR(e.message, '$[\"thread_name\"]') AS thread_name, JSON_EXTRACT_SCALAR(e.message, '$[\"level\"]') AS level, CAST(JSON_EXTRACT(e.message, '$[\"level_value\"]') AS INTEGER) AS level_value, JSON_EXTRACT_SCALAR(e.message, '$[\"trace_id\"]') AS trace_id, JSON_EXTRACT_SCALAR(e.message, '$[\"iun\"]') AS iun, JSON_EXTRACT_SCALAR(e.message, '$[\"ctx_awsMessageId\"]') AS ctx_awsmessageid, JSON_EXTRACT_SCALAR(e.message, '$[\"AWS-XRAY-TRACE-ID\"]') AS aws_xray_trace_id, JSON_EXTRACT_SCALAR(e.message, '$[\"message\"]') AS log_message, TRY(JSON_EXTRACT_SCALAR(e.message, '$[\"aud_type\"]')) AS aud_type FROM ${DatabaseName}.${TableName} CROSS JOIN UNNEST(logEvents) AS t(e) WHERE logGroup LIKE '/aws/ecs/pn-%'",
                     "catalog": "awsdatacatalog",
                     "schema": "${DatabaseName}",
                     "columns": [
@@ -298,20 +300,21 @@ Resources:
                       {"name": "iun", "type": "varchar"},
                       {"name": "ctx_awsmessageid", "type": "varchar"},
                       {"name": "aws_xray_trace_id", "type": "varchar"},
-                      {"name": "log_message", "type": "varchar"}
+                      {"name": "log_message", "type": "varchar"},
+                      {"name": "aud_type", "type": "varchar"}
                     ]
                   }
                 - DatabaseName: !Ref GlueDatabase
                   TableName: !Ref GlueTable
 
-  LambdaSafeStorageLoggerView:
+  LambdaView:
     Type: AWS::Glue::Table
     DependsOn: GlueTable
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Ref GlueDatabase
       TableInput:
-        Name: lambda_safestorage_logger_view
+        Name: lambda_view
         TableType: VIRTUAL_VIEW
         Parameters:
           presto_view: 'true'
@@ -326,21 +329,21 @@ Resources:
               Type: string
             - Name: hour
               Type: string
-            - Name: messageType
+            - Name: messagetype
               Type: string
             - Name: owner
               Type: string
-            - Name: logGroup
+            - Name: loggroup
               Type: string
-            - Name: logStream
+            - Name: logstream
               Type: string
-            - Name: subscriptionFilters
+            - Name: subscriptionfilters
               Type: array<string>
             - Name: event_id
               Type: string
             - Name: event_timestamp
-              Type: string
-            - Name: message_text
+              Type: timestamp
+            - Name: log_message
               Type: string
             - Name: message_id
               Type: string
@@ -372,13 +375,15 @@ Resources:
               Type: string
             - Name: s3_object_version_id
               Type: string
+            - Name: aud_type
+              Type: string
         ViewOriginalText: !Sub
           - '/* Presto View: ${View} */'
           - View: !Base64
               Fn::Sub:
                 - |
                   {
-                    "originalSql": "SELECT year, month, day, hour, messagetype AS messageType, owner, loggroup AS logGroup, logstream AS logStream, subscriptionfilters AS subscriptionFilters, e.id AS event_id, from_unixtime(e.timestamp / 1000) AS event_timestamp, IF(position('{' IN e.message) > 0, substr(e.message, 1, position('{' IN e.message) - 1), e.message) AS message_text, json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].messageId') AS message_id, json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].eventSource') AS sqs_event_source, json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].eventSourceARN') AS sqs_event_source_arn, json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].awsRegion') AS sqs_region, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].eventVersion') AS s3_event_version, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].eventSource') AS s3_event_source, TRY(cast(json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].eventTime') AS timestamp)) AS s3_event_time, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].eventName') AS s3_event_name, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].userIdentity.principalId') AS s3_user_identity, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].requestParameters.sourceIPAddress') AS s3_source_ip, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].s3.bucket.name') AS s3_bucket_name, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].s3.object.key') AS s3_object_key, TRY(cast(json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].s3.object.size') AS bigint)) AS s3_object_size, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].s3.object.eTag') AS s3_object_etag, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].s3.object.versionId') AS s3_object_version_id FROM ${DatabaseName}.${TableName} CROSS JOIN UNNEST(logevents) AS t(e)",
+                    "originalSql": "SELECT year, month, day, hour, messagetype, owner, loggroup, logstream, subscriptionfilters, e.id AS event_id, from_unixtime(e.timestamp / 1000) AS event_timestamp, IF(position('{' IN e.message) > 0, substr(e.message, 1, position('{' IN e.message) - 1), e.message) AS log_message, json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].messageId') AS message_id, json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].eventSource') AS sqs_event_source, json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].eventSourceARN') AS sqs_event_source_arn, json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].awsRegion') AS sqs_region, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].eventVersion') AS s3_event_version, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].eventSource') AS s3_event_source, TRY(cast(json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].eventTime') AS timestamp)) AS s3_event_time, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].eventName') AS s3_event_name, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].userIdentity.principalId') AS s3_user_identity, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].requestParameters.sourceIPAddress') AS s3_source_ip, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].s3.bucket.name') AS s3_bucket_name, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].s3.object.key') AS s3_object_key, TRY(cast(json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].s3.object.size') AS bigint)) AS s3_object_size, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].s3.object.eTag') AS s3_object_etag, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].s3.object.versionId') AS s3_object_version_id, TRY(JSON_EXTRACT_SCALAR(JSON_PARSE(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL)), '$[\"aud_type\"]')) AS aud_type FROM ${DatabaseName}.${TableName} CROSS JOIN UNNEST(logevents) AS t(e) WHERE logGroup LIKE '/aws/lambda/pn-%'",
                     "catalog": "awsdatacatalog",
                     "schema": "${DatabaseName}",
                     "columns": [
@@ -386,14 +391,14 @@ Resources:
                       {"name": "month", "type": "varchar"},
                       {"name": "day", "type": "varchar"},
                       {"name": "hour", "type": "varchar"},
-                      {"name": "messageType", "type": "varchar"},
+                      {"name": "messagetype", "type": "varchar"},
                       {"name": "owner", "type": "varchar"},
-                      {"name": "logGroup", "type": "varchar"},
-                      {"name": "logStream", "type": "varchar"},
-                      {"name": "subscriptionFilters", "type": "array(varchar)"},
+                      {"name": "loggroup", "type": "varchar"},
+                      {"name": "logstream", "type": "varchar"},
+                      {"name": "subscriptionfilters", "type": "array(varchar)"},
                       {"name": "event_id", "type": "varchar"},
                       {"name": "event_timestamp", "type": "timestamp"},
-                      {"name": "message_text", "type": "varchar"},
+                      {"name": "log_message", "type": "varchar"},
                       {"name": "message_id", "type": "varchar"},
                       {"name": "sqs_event_source", "type": "varchar"},
                       {"name": "sqs_event_source_arn", "type": "varchar"},
@@ -408,7 +413,8 @@ Resources:
                       {"name": "s3_object_key", "type": "varchar"},
                       {"name": "s3_object_size", "type": "bigint"},
                       {"name": "s3_object_etag", "type": "varchar"},
-                      {"name": "s3_object_version_id", "type": "varchar"}
+                      {"name": "s3_object_version_id", "type": "varchar"},
+                      {"name": "aud_type", "type": "varchar"}
                     ]
                   }
                 - DatabaseName: !Ref GlueDatabase
