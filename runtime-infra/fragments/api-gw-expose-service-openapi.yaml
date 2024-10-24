@@ -476,7 +476,7 @@ Outputs:
 
   # Rest API ARN used for WAF Configuration
   APIGatewayARN:
-    Value: !If [ RequiresStageCreation, !Sub 'arn:aws:apigateway:${AWS::Region}::/restapis/${PublicRestApiOpenapi}/stages/${PublicRestApiStage}', !Ref AWS::NoValue ]
+    Value: !If [ RequiresStageCreation, !Sub 'arn:aws:apigateway:${AWS::Region}::/restapis/${PublicRestApiOpenapi}/stages/${PublicRestApiStage}', '' ]
     Description: "Rest API ARN" 
 
   # Rest API definition
@@ -494,7 +494,7 @@ Outputs:
     Description: "Name of the Rest API"
 
   RestApiStageArn:
-    Value: !If [ RequiresStageCreation, !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/${PublicRestApiOpenapi}/stages/${PublicRestApiStage}", !Ref AWS::NoValue ]
+    Value: !If [ RequiresStageCreation, !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/${PublicRestApiOpenapi}/stages/${PublicRestApiStage}", '' ]
     Description: "Stage ARN of the Rest API"
 
   RestApiErrorAlarmArn:
