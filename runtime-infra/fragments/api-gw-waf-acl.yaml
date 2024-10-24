@@ -99,15 +99,17 @@ Conditions:
 
   IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
   IsBackoffice: !Equals [ !Ref IntendedUsage, 'BACKOFFICE' ]
+  IsPublic: !Equals [ !Ref IntendedUsage, 'PUBLIC' ]
   IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
   IsIO: !Equals [ !Ref IntendedUsage, 'IO' ]
   IsPNPG: !Equals [ !Ref IntendedUsage, 'PNPG' ]
   IsCNBE: !Equals [ !Ref IntendedUsage, 'CN_BE' ]
 
   IsServerToServer: !Or [ !Condition IsB2B,  !Condition IsIO, !Condition IsPNPG, !Condition IsCNBE ]
-  IsEndUser: !Or [ !Condition IsWeb,  !Condition IsBackoffice ]
+  IsEndUser: !Or [ !Condition IsWeb,  !Condition IsBackoffice, !Condition IsPublic ]
   HasIntendedUsage: !Not [ !Equals [ !Ref IntendedUsage, '' ] ]
-
+  IsWebOrPublic: !Or [ !Condition IsWeb,  !Condition IsPublic ]
+  
   AddRateRuleCondition: !Not [ !Equals [!Ref 'Limit', '0']]
 
   HasAllowedCidrs: !Not [!Equals [!Ref AllowedCidrs, '']]
@@ -595,7 +597,7 @@ Resources:
                 MetricName: AWSManagedRulesAmazonIpReputationList
                 SampledRequestsEnabled: true
             - !If 
-              - IsWeb
+              - IsWebOrPublic
               - Name: AWSManagedRulesKnownBadInputsRuleSet
                 Priority: 2
                 OverrideAction: 
@@ -613,7 +615,7 @@ Resources:
                   SampledRequestsEnabled: true
               - !Ref "AWS::NoValue"                
             - !If 
-              - IsWeb
+              - IsWebOrPublic
               - Name: AWSManagedRulesSQLiRuleSet
                 Priority: 3
                 OverrideAction: 
