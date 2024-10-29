@@ -23,6 +23,14 @@ Parameters:
   DynamoDBNewImageStructure:
     Description: Structure of the dynamodb column
     Type: String
+  CdcRecordFilter:
+    Description: Filter technical dynamo table record
+    Type: String
+    Default: ""
+  GenerateCdcView:
+    Description: Set to false to disable view generation
+    Type: String
+    Default: "true"
   GlueCrawlerSchedule:
     Type: String
     Default: ''
@@ -30,11 +38,14 @@ Parameters:
   GlueServiceRoleArn:
     Type: String
     Description: Service role for the Glue Crawler.
+
 Conditions:
   IsGlueCrawlerScheduled: !Not
     - !Equals
       - !Ref GlueCrawlerSchedule
       - ''
+  HasCdcView: !Equals [ "true", !Ref GenerateCdcView ]
+
 Resources:
   GlueTable:
     Type: AWS::Glue::Table
@@ -107,6 +118,48 @@ Resources:
         - IsGlueCrawlerScheduled
         - ScheduleExpression: !Ref GlueCrawlerSchedule
         - !Ref AWS::NoValue
+  
+  CdcGlueView:
+    Condition: HasCdcView
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabaseName
+      TableInput:
+        Name: !Sub '${TableName}_view'
+        TableType: VIRTUAL_VIEW
+        Parameters:
+          presto_view: 'true'
+          comment: !Sub "Presto View for ${TableName} cdc"
+        StorageDescriptor:
+          Columns:
+            'Fn::Transform':
+              Name: 'GenerateCdcViewMacro'
+              Parameters:
+                DatabaseName: !Ref GlueDatabaseName
+                CatalogName : 'awsdatacatalog'
+                CdcTableName: !Ref TableName
+                CdcViewName: !Sub '${TableName}_view'
+                CdcKeysType: !Ref DynamoDBKeysStructure
+                CdcNewImageType: !Ref DynamoDBNewImageStructure
+                CdcRecordFilter: !Ref CdcRecordFilter
+                OutputType: 'StorageDescriptor-Columns'
+          Location: ""
+          SerdeInfo: {}
+        ViewExpandedText: "/* Presto View */"
+        ViewOriginalText:
+          'Fn::Transform':
+            Name: 'GenerateCdcViewMacro'
+            Parameters:
+              DatabaseName: !Ref GlueDatabaseName
+              CatalogName : 'awsdatacatalog'
+              CdcTableName: !Ref CdcTableName
+              CdcViewName: !Sub '${TableName}_view'
+              CdcKeysType: !Ref DynamoDBKeysStructure
+              CdcNewImageType: !Ref DynamoDBNewImageStructure
+              CdcRecordFilter: !Ref CdcRecordFilter
+              OutputType: 'ViewOriginalText'
+  
 Outputs:
   GlueTableName:
     Description: Name of the created Glue Table
@@ -114,3 +167,11 @@ Outputs:
   GlueCrawlerName:
     Description: Name of the created Glue Crawler
     Value: !Ref GlueCrawler
+  GlueViewName:
+    Description: Name of the created Glue View
+    Value: 
+      Fn::If:
+        - HasCdcView
+        - !Sub '${TableName}_view'
+        - "-"
+
