@@ -234,6 +234,10 @@ Parameters:
   LoadbalancerRulePriority:
     Type: Number
     Description: Routing rules in the dame load balancer listener must have different priorities
+  EphemeralStorageValueGB:
+    Type: Number
+    Description: Ephemeral storage value in GB
+    Default: '21'
 
   # Container environment map, maximum 40 entry
   ContainerEnvEntry1:
@@ -843,6 +847,7 @@ Resources:
     Type: AWS::KMS::Key
     Condition: RequiresLogGroupCreation
     Properties:
+      EnableKeyRotation: true
       KeyPolicy:
         Statement:
           - Action: kms:*
@@ -1012,6 +1017,8 @@ Resources:
       ExecutionRoleArn: !GetAtt ExecutionRole.Arn
       # "The Amazon Resource Name (ARN) of an AWS Identity and Access Management (IAM) role that grants containers in the task permission to call AWS APIs on your behalf."
       TaskRoleArn: !Ref TaskRole
+      EphemeralStorage: 
+        SizeInGiB: !Ref EphemeralStorageValueGB
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
@@ -1776,7 +1783,7 @@ Resources:
     Type: AWS::Logs::MetricFilter
     Properties: 
       LogGroupName: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
-      FilterPattern: !If [ LogAlarmErrorFatal, '{ $.level = "ERROR" || $.level = "FATAL" || $.message = "* FATAL *" || $.message = "*ALLARM!* " }', '{ $.level = "FATAL" || $.message = "* FATAL *" || $.message = "*ALLARM!*" }']
+      FilterPattern: !If [ LogAlarmErrorFatal, '{ $.level = "ERROR" || $.level = "FATAL" || $.message = "* FATAL *" || $.message = "*ALLARM!*" }', '{ $.level = "FATAL" || $.message = "* FATAL *" || $.message = "*ALLARM!*" }']
       MetricTransformations: 
         - MetricValue: 1
           MetricNamespace: "ErrorFatalLogs"

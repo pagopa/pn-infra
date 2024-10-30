@@ -29,6 +29,8 @@ Parameters:
       - PNPG
       - CN_BE
       - RADD
+      - B2BPG
+      - PUBLIC
     Description: B2B, WEB, BACKOFFICE, RADD, PNPG or IO usage. Used from other back-end system or used from a browser
 
   ServiceApiPath:
@@ -102,6 +104,13 @@ Parameters:
       - S3
       - INCLUDE
 
+  SkipStageCreation:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
 Conditions:
   IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
   IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
@@ -109,7 +118,9 @@ Conditions:
   IsBackoffice: !Equals [ !Ref IntendedUsage, 'BACKOFFICE' ]
   IsRADD: !Equals [ !Ref IntendedUsage, 'RADD' ]
   IsCNBE: !Equals [ !Ref IntendedUsage, 'CN_BE' ]
+  IsB2BPG: !Equals [ !Ref IntendedUsage, 'B2BPG' ]
   IsRADDorB2B: !Or [ !Condition IsRADD, !Condition IsB2B ]
+  IsRADDorB2BPG: !Or [ !Condition IsRADD, !Condition IsB2BPG ]
   SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
   HasOpenApiBucketName: !Not [ !Equals [ !Ref OpenApiBucketName, '' ] ]
   HasOpenApiBucketKey: !Not [ !Equals [ !Ref OpenApiBucketKey, '' ] ]
@@ -118,6 +129,8 @@ Conditions:
   IsNotBackoffice: !Not [ !Condition IsBackoffice ]
   HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
   IsIncludeMode: !Equals [ !Ref OpenApiMode, 'INCLUDE' ]
+  HasSkipStageCreation: !Equals [ !Ref SkipStageCreation, 'true' ]
+  RequiresStageCreation: !Not [ !Condition HasSkipStageCreation ]
 
 Resources:
 
@@ -173,6 +186,7 @@ Resources:
   # Stage
   PublicRestApiStage:
     Type: AWS::ApiGateway::Stage
+    Condition: RequiresStageCreation
     Properties:
       RestApiId: !Ref PublicRestApiOpenapi
       StageName: unique
@@ -221,7 +235,7 @@ Resources:
 
   # B2B Authorizer
   B2BLambdaPermission:
-    Condition: IsRADD
+    Condition: IsRADDorB2BPG
     Type: AWS::Lambda::Permission
     DependsOn: PublicRestApiOpenapi
     Properties:
@@ -261,6 +275,7 @@ Resources:
   # Expose API to custom domain
   APIMapping:
     Type: AWS::ApiGateway::BasePathMapping
+    Condition: RequiresStageCreation
     Properties:
       BasePath: !Ref ServiceApiPath
       DomainName: !Ref DnsName
@@ -461,7 +476,7 @@ Outputs:
 
   # Rest API ARN used for WAF Configuration
   APIGatewayARN:
-    Value: !Sub 'arn:aws:apigateway:${AWS::Region}::/restapis/${PublicRestApiOpenapi}/stages/${PublicRestApiStage}'
+    Value: !If [ RequiresStageCreation, !Sub 'arn:aws:apigateway:${AWS::Region}::/restapis/${PublicRestApiOpenapi}/stages/${PublicRestApiStage}', '' ]
     Description: "Rest API ARN" 
 
   # Rest API definition
@@ -479,7 +494,7 @@ Outputs:
     Description: "Name of the Rest API"
 
   RestApiStageArn:
-    Value: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/${PublicRestApiOpenapi}/stages/${PublicRestApiStage}"
+    Value: !If [ RequiresStageCreation, !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/${PublicRestApiOpenapi}/stages/${PublicRestApiStage}", '' ]
     Description: "Stage ARN of the Rest API"
 
   RestApiErrorAlarmArn:
@@ -489,3 +504,11 @@ Outputs:
   RestApiLatencyAlarmArn:
     Value: !GetAtt APIGatewayApiLatencyAlarm.Arn
     Description: "ARN of the latency alarm"
+
+  DeploymentId:
+    Value: !Ref PublicRestApiDeploymentPnPlaceholderEpochSeconds
+    Description: "Deployment ID"
+  
+  RestApiLogGroupArn:
+    Value: !GetAtt PublicApiLogGroup.Arn
+    Description: "Log group for the API"
