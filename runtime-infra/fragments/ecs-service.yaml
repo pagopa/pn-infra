@@ -152,6 +152,11 @@ Parameters:
     Type: Number
     Description: minimum autoscaling number of tasks\
 
+  DownscalingCheckPeriod:
+    Default: 300
+    Type: Number
+    Description: minimum autoscaling number of tasks only for Downscale
+
   AutoscalingDataPointN:
     Default: 1
     Type: Number
@@ -1860,7 +1865,7 @@ Resources:
       StepScalingPolicyConfiguration:
         AdjustmentType: PercentChangeInCapacity
         MinAdjustmentMagnitude: 1
-        Cooldown: !Ref AutoscalingCheckPeriod
+        Cooldown: !Ref DownscalingCheckPeriod
         MetricAggregationType: Average
         StepAdjustments:
           - MetricIntervalLowerBound: 0
@@ -1885,13 +1890,16 @@ Resources:
       ScalingTargetId: !Ref AutoScalingTarget
       StepScalingPolicyConfiguration:
         AdjustmentType: ChangeInCapacity
-        Cooldown: !Ref AutoscalingCheckPeriod
+        Cooldown: 300
         MetricAggregationType: Average
         StepAdjustments:
           - MetricIntervalUpperBound: 0
-            MetricIntervalLowerBound: -30
+            MetricIntervalLowerBound: -10
+            ScalingAdjustment: 0
+          - MetricIntervalUpperBound: -10
+            MetricIntervalLowerBound: -50
             ScalingAdjustment: -1
-          - MetricIntervalUpperBound: -30
+          - MetricIntervalUpperBound: -50
             ScalingAdjustment: -2
   
   #### Alarm for Rest-API metric Autoscaling
