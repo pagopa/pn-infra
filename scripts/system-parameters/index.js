@@ -61,8 +61,10 @@ const values = {
   },
 });  
 
+
 _checkingParameters(args, values)
 
+const timestamp = new Date().toISOString()
 const awsClient = new AwsClientsWrapper( envName );
 
 function sanitizeFile(systemParameter){
@@ -127,8 +129,8 @@ async function executeCommand(accountName){
 
         const valueBackup = await awsClient._getSSMParameter(accountName, data.paramName)
         const paramToSync = fs.readFileSync(`${syncBasePath}/${data.localName}`, 'utf-8')
-        _writeInFile(`backup/${envName}`, data.localName, valueBackup)
-        console.log(`Backup available in ./backup/${envName}/${data.localName}`)
+        _writeInFile(`backup/${envName}/${timestamp}`, data.localName, valueBackup)
+        console.log(`Backup available in ./backup/${envName}/${timestamp}/${data.localName}`)
         await awsClient._updateSSMParameter(accountName, data.paramName, data.tier, paramToSync)
         console.log(`DataStore ${data.paramName} updated successfully!!!`)
         return;
