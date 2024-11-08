@@ -144,6 +144,11 @@ Resources:
                 CdcNewImageType: !Ref DynamoDBNewImageStructure
                 CdcRecordFilter: !Ref CdcRecordFilter
                 OutputType: 'StorageDescriptor-Columns'
+                Enabled: # Enable or disable heavy transformation computation if not needed
+                  Fn::If:
+                    - HasCdcView
+                    - "true"
+                    - "false"
           Location: ""
           SerdeInfo: {}
         ViewExpandedText: "/* Presto View */"
@@ -159,6 +164,11 @@ Resources:
               CdcNewImageType: !Ref DynamoDBNewImageStructure
               CdcRecordFilter: !Ref CdcRecordFilter
               OutputType: 'ViewOriginalText'
+              Enabled: # Enable or disable heavy transformation computation if not needed
+                Fn::If:
+                  - HasCdcView
+                  - "true"
+                  - "false"
   
 Outputs:
   GlueTableName:
