@@ -66,7 +66,7 @@ class AwsClientsWrapper {
     }
   }
 
-  async _updateSSMParameter(name, tier, value) {
+  async _updateSSMParameter(accountName, name, tier, value) {
     const input = { // PutParameterRequest
       Name: name, // required
       Value: value, // required
@@ -116,4 +116,3 @@ class AwsClientsWrapper {
 }
 
 exports.AwsClientsWrapper = AwsClientsWrapper;
-
