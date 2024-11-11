@@ -1,6 +1,6 @@
-import { HiveType } from "./HiveType.js";
+const { HiveType } = require("./HiveType.js");
 
-export class HiveTypeBuilder {
+class HiveTypeBuilder {
 
   #category;
   #simpleType;
@@ -46,4 +46,4 @@ export class HiveTypeBuilder {
   }
 }
 
-
+exports.HiveTypeBuilder = HiveTypeBuilder;

@@ -1,9 +1,9 @@
-import { BaseHiveTypeVisitor } from '../hive-type-parser/BaseHiveTypeVisitor.js';
-import { SimplifiedCdcViewGeneratorContext } from './SimplifiedCdcViewGeneratorContext.js'
+const { BaseHiveTypeVisitor } = require('../hive-type-parser/BaseHiveTypeVisitor.js');
+const { SimplifiedCdcViewGeneratorContext } = require('./SimplifiedCdcViewGeneratorContext.js');
 
 const DYNAMODB_NULL_SUFFIX = "NULL";
 
-export class CdcViewGeneratorHiveTypeVisitor extends BaseHiveTypeVisitor {
+class CdcViewGeneratorHiveTypeVisitor extends BaseHiveTypeVisitor {
   #simpleTypeTranslator;
   #aliasCustomizer;
   #useDdlOrDqlSyntax;
@@ -71,3 +71,5 @@ export class CdcViewGeneratorHiveTypeVisitor extends BaseHiveTypeVisitor {
 }
 
 CdcViewGeneratorHiveTypeVisitor.DYNAMODB_NULL_SUFFIX = DYNAMODB_NULL_SUFFIX;
+
+exports.CdcViewGeneratorHiveTypeVisitor = CdcViewGeneratorHiveTypeVisitor;

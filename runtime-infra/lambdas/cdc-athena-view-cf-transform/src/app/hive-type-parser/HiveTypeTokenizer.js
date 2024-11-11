@@ -1,6 +1,6 @@
-import { HiveTypeToken } from "./HiveTypeToken.js"
+const { HiveTypeToken } = require("./HiveTypeToken.js");
 
-export class HiveTypeTokenizer {
+class HiveTypeTokenizer {
   #hiveTypeString;
   #tokens;
   #isInWord;
@@ -96,3 +96,4 @@ export class HiveTypeTokenizer {
   
 }
 
+exports.HiveTypeTokenizer = HiveTypeTokenizer;

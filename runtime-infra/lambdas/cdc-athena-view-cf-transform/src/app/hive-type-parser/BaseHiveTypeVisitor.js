@@ -1,6 +1,6 @@
-import { HiveType } from "./HiveType.js"
+const { HiveType } = require("./HiveType.js");
 
-export class BaseHiveTypeVisitor {
+class BaseHiveTypeVisitor {
 
   constructor() { }
 
@@ -8,6 +8,9 @@ export class BaseHiveTypeVisitor {
     const nodes = []
     if( rootHiveType ) {
       nodes.unshift( rootHiveType )
+    }
+    else {
+      throw new Error("rootHiveType parameter is required")
     }
     
     while( nodes.length > 0 ) {
@@ -43,3 +46,4 @@ export class BaseHiveTypeVisitor {
 
 }
 
+exports.BaseHiveTypeVisitor = BaseHiveTypeVisitor;

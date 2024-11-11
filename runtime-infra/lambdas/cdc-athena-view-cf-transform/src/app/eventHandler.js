@@ -1,6 +1,6 @@
-import { CdcViewGenerator } from "./view-generator/CdcViewGenerator.js";
+const { CdcViewGenerator } = require("./view-generator/CdcViewGenerator.js");
 
-export async function handleEvent(event) {
+async function handleEvent(event) {
   const params = event["params"]
   const outputType = params.OutputType;
   const enabled = params.Enabled == "true";
@@ -64,3 +64,4 @@ export async function handleEvent(event) {
   }
 }
 
+exports.handleEvent = handleEvent;

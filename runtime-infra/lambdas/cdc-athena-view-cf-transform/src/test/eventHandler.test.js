@@ -1,5 +1,5 @@
-import { handleEvent } from "../app/eventHandler.js";
-import { expect } from 'chai';
+const { handleEvent } = require("../app/eventHandler.js");
+const { expect } = require('chai');
 
 async function makeOneTest( baseEvent, expectedCloudformationColumns, expectedViewData ) {
   const columnEvent = JSON.parse(JSON.stringify( baseEvent ));
@@ -248,6 +248,62 @@ describe("eventHandler tests", function () {
     };
 
     await makeOneTest( baseEvent, expectedCloudformationColumns, expectedViewData );
+  });
+
+  it("correct output type is required", async () => { 
+    const evt = {
+      requestId: 'evtId1',
+      params: {
+        CatalogName : 'awsdatacatalog',
+        DatabaseName: 'cdc_analytics_database',
+        CdcTableName: 'pn_notifications_table',
+        CdcViewName: 'pn_notifications_view',
+        CdcKeysType: 'struct<iun:struct<S:string>>',
+        CdcNewImageType: `struct<
+                            iun:struct<S:string>,
+                            taxonomyCode:struct<S:string>
+                          >`,
+        CdcRecordFilter: "",
+        Enabled: "true",
+        OutputType: "WrongOutputType"
+      }
+    };
+
+    try {
+      await handleEvent( evt )
+      expect( "FAIL" ).to.be.equal("NEVER");
+    }
+    catch( err ) {
+      expect( "CATCH" ).to.be.equal("CATCH");
+    }
+  });
+
+  it("correct output type is required also if disabled", async () => { 
+    const evt = {
+      requestId: 'evtId1',
+      params: {
+        CatalogName : 'awsdatacatalog',
+        DatabaseName: 'cdc_analytics_database',
+        CdcTableName: 'pn_notifications_table',
+        CdcViewName: 'pn_notifications_view',
+        CdcKeysType: 'struct<iun:struct<S:string>>',
+        CdcNewImageType: `struct<
+                            iun:struct<S:string>,
+                            taxonomyCode:struct<S:string>
+                          >`,
+        CdcRecordFilter: "",
+        Enabled: "false",
+        OutputType: "WrongOutputType"
+      }
+    };
+
+    try {
+      await handleEvent( evt )
+      expect( "FAIL" ).to.be.equal("NEVER");
+    }
+    catch( err ) {
+      expect( "CATCH" ).to.be.equal("CATCH");
+    }
   });
 })
 

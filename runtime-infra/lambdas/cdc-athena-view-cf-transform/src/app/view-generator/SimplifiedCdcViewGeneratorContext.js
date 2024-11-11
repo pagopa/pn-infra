@@ -1,9 +1,9 @@
-import { HiveType } from '../hive-type-parser/HiveType.js'
+const { HiveType } = require('../hive-type-parser/HiveType.js');
 
 const DYNAMODB_SUFFIXES = ["S", "N", "BOOL", "L", "M"];
 const TABLE_ALIAS = "t"
 
-export class SimplifiedCdcViewGeneratorContext {
+class SimplifiedCdcViewGeneratorContext {
   #useDdlOrDqlSyntax;
   #arrayKeyword;
   #rowKeyword;
@@ -335,3 +335,5 @@ export class SimplifiedCdcViewGeneratorContext {
 
 SimplifiedCdcViewGeneratorContext.DYNAMODB_SUFFIXES = DYNAMODB_SUFFIXES;
 SimplifiedCdcViewGeneratorContext.TABLE_ALIAS = TABLE_ALIAS;
+
+exports.SimplifiedCdcViewGeneratorContext = SimplifiedCdcViewGeneratorContext;

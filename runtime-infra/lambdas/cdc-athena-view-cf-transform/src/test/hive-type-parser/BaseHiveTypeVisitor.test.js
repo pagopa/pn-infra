@@ -1,3 +1,4 @@
+import { HiveType } from '../../app/hive-type-parser/HiveType.js';
 import { HiveTypeParser } from '../../app/hive-type-parser/HiveTypeParser.js';
 import { BaseHiveTypeVisitor } from '../../app/hive-type-parser/BaseHiveTypeVisitor.js';
 import { expect } from 'chai';
@@ -6,7 +7,9 @@ class TestingHiveTypeVisitor extends BaseHiveTypeVisitor {
 
   enterNodeVisit( ht, context ) {
     context.visitNodeStart.push( ht.path )
-    return this.#checkDescend( ht, context )
+    return context.doNotDescendPath 
+           ? this.#checkDescend( ht, context ) 
+           : super.enterNodeVisit( ht, context);
   }
 
   exitNodeVisit( ht, context ) {
@@ -31,7 +34,7 @@ class TestingHiveTypeVisitor extends BaseHiveTypeVisitor {
 
 function makeOneTest( typeString, expectedPathsStart, expectedPathsEnd, doNotDescendPath ) {
   let parser = new HiveTypeParser();
-  let visitor = new TestingHiveTypeVisitor();
+  let visitor =  new TestingHiveTypeVisitor();
     
   let ht = parser.parse( typeString );
 
@@ -45,7 +48,6 @@ function makeOneTest( typeString, expectedPathsStart, expectedPathsEnd, doNotDes
   expect( context.visitNodeStart ).to.be.deep.equal( expectedPathsStart );
   expect( context.visitNodeEnd ).to.be.deep.equal( expectedPathsEnd );
 }
-
 
 describe("BaseHiveTypeVisitor tests", function () {
   
@@ -103,5 +105,21 @@ describe("BaseHiveTypeVisitor tests", function () {
     makeOneTest( typeString, expectedPathsStart, expectedPathsEnd, ["field2"] )
 
   });
+
+  it("should throw error if type is not supported", async () => {
+    const ht = new HiveType("WRONG_CATEGORY", null, null, null, null);
+
+    let visitor =  new BaseHiveTypeVisitor();
+    
+    expect( () => visitor.visit( ht, {} ) ).to.throw(Error)
+
+  })
+
+  it("should throw error if type is empty", async () => {
+    let visitor =  new BaseHiveTypeVisitor();
+    
+    expect( () => visitor.visit( null, {} ) ).to.throw(Error)
+
+  })
 
 })

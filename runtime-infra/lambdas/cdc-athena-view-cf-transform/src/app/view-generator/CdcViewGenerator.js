@@ -1,9 +1,9 @@
-import { HiveTypeParser } from "../hive-type-parser/HiveTypeParser.js";
-import { CdcViewGeneratorHiveTypeVisitor } from './CdcViewGeneratorHiveTypeVisitor.js'
+const { HiveTypeParser } = require("../hive-type-parser/HiveTypeParser.js");
+const { CdcViewGeneratorHiveTypeVisitor } = require ('./CdcViewGeneratorHiveTypeVisitor.js');
 
 const INDENT = 4;
 
-export class CdcViewGenerator {
+class CdcViewGenerator {
   #fullTableType;
   #catalogName;
   #databaseName;
@@ -175,3 +175,5 @@ export class CdcViewGenerator {
   }
 
 }
+
+exports.CdcViewGenerator = CdcViewGenerator;

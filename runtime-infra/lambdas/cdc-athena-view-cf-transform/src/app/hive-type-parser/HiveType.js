@@ -1,6 +1,6 @@
 const ARRAY_DESCEND_PATH_STEP = "[*]";
 
-export class HiveType {
+class HiveType {
 
   #category;
   #simpleType;
@@ -122,3 +122,4 @@ export class HiveType {
 
 HiveType.ARRAY_DESCEND_PATH_STEP = ARRAY_DESCEND_PATH_STEP;
 
+exports.HiveType = HiveType;

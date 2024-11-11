@@ -1,7 +1,7 @@
-import { HiveTypeBuilder } from "./HiveTypeBuilder.js"
-import { HiveTypeTokenizer } from "./HiveTypeTokenizer.js"
+const { HiveTypeBuilder } = require("./HiveTypeBuilder.js");
+const { HiveTypeTokenizer } = require("./HiveTypeTokenizer.js");
 
-export class HiveTypeParser {
+class HiveTypeParser {
 
   constructor() { }
 
@@ -58,3 +58,5 @@ export class HiveTypeParser {
     return typeBuilder.build()
   }
 }
+
+exports.HiveTypeParser = HiveTypeParser;

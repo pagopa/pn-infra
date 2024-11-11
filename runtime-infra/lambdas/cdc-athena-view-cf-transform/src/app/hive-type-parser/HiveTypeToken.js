@@ -4,7 +4,7 @@ const FIXED_TOKENS = [ ... PUNCTUATION, ... KEYWORDS ];
 
 
 
-export class HiveTypeToken {
+class HiveTypeToken {
   #value;
   #position;
   #isFixed;
@@ -41,3 +41,5 @@ export class HiveTypeToken {
 }
 
 HiveTypeToken.PUNCTUATION = PUNCTUATION
+
+exports.HiveTypeToken = HiveTypeToken;
