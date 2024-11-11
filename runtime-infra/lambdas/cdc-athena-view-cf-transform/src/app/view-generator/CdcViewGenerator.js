@@ -141,7 +141,7 @@ class CdcViewGenerator {
 
   buildCloudFormationStorageDescriptorColumns() {
     const columns = this.#ddlVisitor.getViewColumns( this.#fullTableType );
-    const result = columns.map( el => ({ "Name": el.name, "Type": el.type }));
+    const result = columns.map( el => ({ "Name": el.name, "Type": el.type.replace(/ /g, '') }));
     return result;
   }
 

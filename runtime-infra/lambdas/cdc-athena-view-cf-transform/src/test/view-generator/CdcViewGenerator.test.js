@@ -106,7 +106,7 @@ describe("CdcViewGenerator tests", function () {
         },
         {
           "Name": "recipients",
-          "Type": "array<struct< \"recipientId\":string, \"recipientType\":string, \"payments\":array<struct< \"applyCost\":boolean, \"creditorTaxId\":string, \"f24_applyCost\":boolean, \"f24_title\":string, \"noticeCode\":string >> >>"
+          "Type": "array<struct<\"recipientId\":string,\"recipientType\":string,\"payments\":array<struct<\"applyCost\":boolean,\"creditorTaxId\":string,\"f24_applyCost\":boolean,\"f24_title\":string,\"noticeCode\":string>>>>"
         }
       ];
     
