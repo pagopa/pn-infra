@@ -1,5 +1,5 @@
-import { CdcViewGenerator } from '../../app/view-generator/CdcViewGenerator.js';
-import { expect } from 'chai';
+const { CdcViewGenerator } = require('../../app/view-generator/CdcViewGenerator.js');
+const { expect } = require('chai');
 
 describe("CdcViewGenerator tests", function () {
   

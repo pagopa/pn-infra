@@ -1,6 +1,6 @@
-import { HiveTypeParser } from '../../app/hive-type-parser/HiveTypeParser.js';
-import { CdcViewGeneratorHiveTypeVisitor } from '../../app/view-generator/CdcViewGeneratorHiveTypeVisitor.js';
-import { expect } from 'chai';
+const { HiveTypeParser } = require('../../app/hive-type-parser/HiveTypeParser.js');
+const { CdcViewGeneratorHiveTypeVisitor } = require('../../app/view-generator/CdcViewGeneratorHiveTypeVisitor.js');
+const { expect } = require('chai');
 
 
 function testOneType( 

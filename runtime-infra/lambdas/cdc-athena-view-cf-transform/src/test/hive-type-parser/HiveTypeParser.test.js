@@ -1,5 +1,5 @@
-import { HiveTypeParser } from '../../app/hive-type-parser/HiveTypeParser.js';
-import { expect } from 'chai';
+const { HiveTypeParser } = require('../../app/hive-type-parser/HiveTypeParser.js');
+const { expect } = require('chai');
 
 describe("HiveTypeParser tests", function () {
   

@@ -1,5 +1,5 @@
-import { HiveTypeTokenizer } from '../../app/hive-type-parser/HiveTypeTokenizer.js';
-import { expect } from 'chai';
+const { HiveTypeTokenizer } = require('../../app/hive-type-parser/HiveTypeTokenizer.js');
+const { expect } = require('chai');
 
 describe("HiveTypeTokenizer tests", function () {
   it("should generate one single fixed token", async () => {

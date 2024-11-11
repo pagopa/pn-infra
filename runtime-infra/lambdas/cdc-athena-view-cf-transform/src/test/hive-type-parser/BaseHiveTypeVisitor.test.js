@@ -1,7 +1,7 @@
-import { HiveType } from '../../app/hive-type-parser/HiveType.js';
-import { HiveTypeParser } from '../../app/hive-type-parser/HiveTypeParser.js';
-import { BaseHiveTypeVisitor } from '../../app/hive-type-parser/BaseHiveTypeVisitor.js';
-import { expect } from 'chai';
+const { HiveType } = require('../../app/hive-type-parser/HiveType.js');
+const { HiveTypeParser } = require('../../app/hive-type-parser/HiveTypeParser.js');
+const { BaseHiveTypeVisitor } = require('../../app/hive-type-parser/BaseHiveTypeVisitor.js');
+const { expect } = require('chai');
 
 class TestingHiveTypeVisitor extends BaseHiveTypeVisitor {
 
