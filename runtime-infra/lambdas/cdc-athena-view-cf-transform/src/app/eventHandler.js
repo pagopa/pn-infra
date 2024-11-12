@@ -1,6 +1,11 @@
 const { CdcViewGenerator } = require("./view-generator/CdcViewGenerator.js");
 
 async function handleEvent(event) {
+  console.debug(
+    '{ "handleEvent_event":\n' + 
+    + JSON.stringify( event, null, 2 )
+    + "\n}"
+  )
   const params = event["params"]
   const outputType = params.OutputType;
   const enabled = params.Enabled == "true";
