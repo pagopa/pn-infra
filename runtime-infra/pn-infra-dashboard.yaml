@@ -89,6 +89,11 @@ Parameters:
     Default: ""
     Description: Name of the OpenSearch cluster
 
+  OpenSearchEbsSizeValue:
+    Type: Number
+    Default: ""
+    Description: Opensearch Ebs Storage Volume Size for all nodes in GB
+
 Conditions:
   HasOpenSearchCluster: !Not [ !Equals [ !Ref OpenSearchClusterName, "" ] ]
 Resources:
@@ -163,7 +168,7 @@ Resources:
               MetricName: FreeStorageSpace
               Namespace: AWS/ES
             Period: 60
-            Stat: Maximum
+            Stat: Sum
           ReturnData: False
         - Id: m2
           MetricStat:
@@ -177,7 +182,7 @@ Resources:
               MetricName: ClusterUsedSpace
               Namespace: AWS/ES
             Period: 60
-            Stat: Maximum
+            Stat: Sum
           ReturnData: False
         - Id: e1
           Expression: (m1*100)/(m1+m2)
@@ -185,6 +190,41 @@ Resources:
       ComparisonOperator: LessThanOrEqualToThreshold
       Threshold: 30
       TreatMissingData: ignore    
+      EvaluationPeriods: 1
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+
+  FreeStorageSpaceNodeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasOpenSearchCluster
+    Properties:
+      AlarmName: !Sub "${ProjectName}-opensearch-low-storage-one-node"
+      AlarmDescription: "Email when FreeStorageSpace <= 30%, 1 time within 1 minute"
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: ClientId
+                  Value: !Ref AWS::AccountId
+                - Name: DomainName
+                  Value: !Ref OpenSearchClusterName
+              MetricName: FreeStorageSpace
+              Namespace: AWS/ES
+            Period: 60
+            Stat: Minimum 
+          ReturnData: False
+        - Id: e1
+          Expression: 
+            Fn::Sub:
+              - "(m1 * 100) / (${OpenSearchEbsSizeValue} * 1024 * 1024 * 1024)" # Because OpenSearchEbsSizeValue is in GB
+              - OpenSearchEbsSizeValue: !Ref OpenSearchEbsSizeValue
+          Label: !Sub "${ProjectName}-avg-free-space-single-node"
+      ComparisonOperator: LessThanOrEqualToThreshold
+      Threshold: 30
+      TreatMissingData: ignore
       EvaluationPeriods: 1
       OKActions:
         - !Ref AlarmSNSTopicArn
