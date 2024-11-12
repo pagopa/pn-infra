@@ -18,6 +18,7 @@ class HiveTypeToken {
 
   }
 
+  /* istanbul ignore next */
   toString() {
     return `Token(type=${this.#type},value=${this.#value},position=${this.#position})`
   }

@@ -319,6 +319,7 @@ class SimplifiedCdcViewGeneratorContext {
     return result;
   }
 
+  /* istanbul ignore next */
   dump() {
     const data = {
       rootPath : this.#rootPath,

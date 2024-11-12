@@ -35,6 +35,7 @@ class HiveTypeTokenizer {
     this.#addCurrentWord( position );
   }
 
+  /* istanbul ignore next */
   toString() {
     return `Tokenizer[\n    ${this.#tokens.join(',\n    ')}\n]`
   }
