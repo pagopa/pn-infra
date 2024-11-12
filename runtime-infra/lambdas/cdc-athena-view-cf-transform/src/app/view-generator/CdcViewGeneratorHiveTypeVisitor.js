@@ -63,7 +63,7 @@ class CdcViewGeneratorHiveTypeVisitor extends BaseHiveTypeVisitor {
     let accept = ht.path.length > 0;
     if ( accept ) {
       const lastPathStep = ht.path[ ht.path.length - 1 ];
-      accept = lastPathStep != this.constructor.DYNAMODB_NULL_SUFFIX;
+      accept = lastPathStep !== this.constructor.DYNAMODB_NULL_SUFFIX;
     }
     return accept;
   }

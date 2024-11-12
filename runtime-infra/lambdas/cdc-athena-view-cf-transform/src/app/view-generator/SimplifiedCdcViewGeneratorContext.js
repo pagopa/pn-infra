@@ -91,7 +91,7 @@ class SimplifiedCdcViewGeneratorContext {
   #joinPath( path ) {
     const contextualPath = [ ... path].splice( this.#rootPath.length, path.length );
     const resultSteps = contextualPath
-                      .filter( el => el != HiveType.ARRAY_DESCEND_PATH_STEP )
+                      .filter( el => el !== HiveType.ARRAY_DESCEND_PATH_STEP )
                       .map( el => `"${el}"` )
                       ;
     const result = resultSteps.join(".");
@@ -102,7 +102,7 @@ class SimplifiedCdcViewGeneratorContext {
     const contextualPath = [ ... path].splice( this.#rootPath.length, path.length );
     const resultSteps = contextualPath
                       .filter( el => ! this.constructor.DYNAMODB_SUFFIXES.includes( el ) )
-                      .filter( el => el != HiveType.ARRAY_DESCEND_PATH_STEP )
+                      .filter( el => el !== HiveType.ARRAY_DESCEND_PATH_STEP )
                       ;
     const alias = resultSteps.join("_");
     const customizedAlias = this.#aliasCustomize( alias );

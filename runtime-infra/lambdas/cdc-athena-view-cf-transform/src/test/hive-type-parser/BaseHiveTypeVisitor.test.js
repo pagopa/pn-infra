@@ -22,7 +22,7 @@ class TestingHiveTypeVisitor extends BaseHiveTypeVisitor {
 
     let hasFilter = context.doNotDescendPath
     if ( hasFilter ) {
-      haveToDescend =  JSON.stringify( ht.path ) !=  JSON.stringify( context.doNotDescendPath )
+      haveToDescend =  JSON.stringify( ht.path ) !==  JSON.stringify( context.doNotDescendPath )
     } 
     else {
       haveToDescend = true;
