@@ -21,9 +21,9 @@ class HiveTypeBuilder {
     return this;
   }
 
-  arrayType( elementTypeString ) {
+  arrayType( elementType ) {
     this.#category = "ARRAY";
-    this.#arrayElementType = elementTypeString
+    this.#arrayElementType = elementType
                              .withPositionIntoParent( HiveType.ARRAY_DESCEND_PATH_STEP );
     return this;
   }
