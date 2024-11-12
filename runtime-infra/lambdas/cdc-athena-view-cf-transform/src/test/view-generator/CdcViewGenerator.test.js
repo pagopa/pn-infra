@@ -106,7 +106,7 @@ describe("CdcViewGenerator tests", function () {
         },
         {
           "Name": "recipients",
-          "Type": "array<struct<\"recipientId\":string,\"recipientType\":string,\"payments\":array<struct<\"applyCost\":boolean,\"creditorTaxId\":string,\"f24_applyCost\":boolean,\"f24_title\":string,\"noticeCode\":string>>>>"
+          "Type": "array<struct<recipientId:string,recipientType:string,payments:array<struct<applyCost:boolean,creditorTaxId:string,f24_applyCost:boolean,f24_title:string,noticeCode:string>>>>"
         }
       ];
     
@@ -148,13 +148,13 @@ describe("CdcViewGenerator tests", function () {
                                     "f24_applyCost" BOOLEAN,
                                     "f24_title" VARCHAR,
                                     "noticeCode" VARCHAR
-                                )
+                                ))
                             )
                         ) AS row(
                             "recipientId" VARCHAR,
                             "recipientType" VARCHAR,
                             "payments" array(row( "applyCost" BOOLEAN, "creditorTaxId" VARCHAR, "f24_applyCost" BOOLEAN, "f24_title" VARCHAR, "noticeCode" VARCHAR ))
-                        )
+                        ))
                     ) AS "recipients"
                 FROM
                     "cdc_analytics_database"."pn_notifications_table" t

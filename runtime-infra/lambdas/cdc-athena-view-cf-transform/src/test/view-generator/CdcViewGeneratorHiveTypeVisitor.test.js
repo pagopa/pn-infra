@@ -94,7 +94,7 @@ describe("CdcViewGeneratorHiveTypeVisitor tests", function () {
             elem0."field3_1"
           ) AS row(
             "field3_1" number
-          )
+          ))
         ) AS "field3"
       FROM
         source_table t
@@ -181,7 +181,7 @@ describe("CdcViewGeneratorHiveTypeVisitor tests", function () {
             elem0."field2_1"
           ) AS row(
             "Ffield2_1F" TnumberT
-          )
+          ))
         ) AS "Ffield2F"
       FROM
         source_table t

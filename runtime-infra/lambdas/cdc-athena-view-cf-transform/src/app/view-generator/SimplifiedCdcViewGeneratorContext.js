@@ -206,7 +206,7 @@ class SimplifiedCdcViewGeneratorContext {
     const signatures = this.#buildOnlySignaturesListForArrayCast( baseIndent, indentStepSize );
     const result = `${baseIndent}cast(${this.#rowKeyword}${this.#openComplexType}\n`
                  + `${values}\n`
-                 + `${baseIndent}) AS ${signatures}`;
+                 + `${baseIndent}${this.#closeComplexType} AS ${signatures})`;
     return result;
   }
 
