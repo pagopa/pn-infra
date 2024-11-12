@@ -305,5 +305,33 @@ describe("eventHandler tests", function () {
       expect( "CATCH" ).to.be.equal("CATCH");
     }
   });
+
+
+  it("when disabled the only required parameter should be OutputType", async () => {
+    const baseEvent = {
+      requestId: 'evtId2',
+      params: {
+        
+      }
+    };
+  
+    const expectedCloudformationColumns = [{
+        "Name": "fake_column",
+        "Type": "string"
+      }];
+
+    const expectedViewData = {
+      originalSql: "SELECT 'a_value' AS fake_column",
+      catalog: "awsdatacatalog",
+      schema: "database_name",
+      columns: [{
+          "name": "fake_column",
+          "type": "VARCHAR"
+        }]
+    };
+
+    await makeOneTest( baseEvent, expectedCloudformationColumns, expectedViewData );
+  })
+
 })
 

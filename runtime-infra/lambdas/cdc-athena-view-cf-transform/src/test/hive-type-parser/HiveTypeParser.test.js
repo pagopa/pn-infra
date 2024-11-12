@@ -118,4 +118,30 @@ describe("HiveTypeParser tests", function () {
     expect( ht.sql() ).to.be.equal( "struct<field1:string,field2:array<struct<field2_1:number>>>" );
   });
 
+  it("should detect premature end of string", async () => {
+    
+    const typeString = "struct < field2: number, field1 : string ";
+    
+    let parser = new HiveTypeParser();
+    
+    expect( () => parser.parse( typeString ) ).to.throws(Error);
+  });
+
+  it("should detect unused characters after type definition", async () => {
+    
+    const typeString = "struct < field2: number, field1 : string > a";
+    
+    let parser = new HiveTypeParser();
+    
+    expect( () => parser.parse( typeString ) ).to.throws(Error);
+  });
+
+  it("should detect wrong syntax", async () => {
+    
+    let parser = new HiveTypeParser();
+    
+    expect( () => parser.parse( "struct < field2 number>" ) ).to.throws(Error);
+    expect( () => parser.parse( "struct > field2: number>" ) ).to.throws(Error);
+  });
+
 })

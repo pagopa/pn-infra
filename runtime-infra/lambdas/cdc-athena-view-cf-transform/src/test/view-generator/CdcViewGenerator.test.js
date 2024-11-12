@@ -2,7 +2,7 @@ const { CdcViewGenerator } = require('../../app/view-generator/CdcViewGenerator.
 const { expect } = require('chai');
 
 describe("CdcViewGenerator tests", function () {
-  
+
   it("should support pn-Notification table", async () => {
     const params = {
       DatabaseName: 'cdc_analytics_database',
@@ -258,8 +258,42 @@ describe("CdcViewGenerator tests", function () {
     expect( reversedViewStringData ).to.be.deep.equals( expectedViewData )    
   });
 
-  
 })
+
+it("should support string and long translation", async () => {
+  const params = {
+    DatabaseName: 'cdc_analytics_database',
+    CatalogName : 'awsdatacatalog',
+    CdcTableName: 'aa',
+    CdcViewName: 'aa_view',
+    CdcKeysType: 'struct<iun:struct<S:string>>',
+    CdcNewImageType: `
+      struct<
+        iun:struct<S:string>,
+        quantity:struct<N:long>
+      >`,
+    CdcRecordFilter: ""
+  };
+
+  const expectedColumns = [
+      {
+        name: "iun",
+        type: "VARCHAR"
+      },
+      {
+        name: "quantity",
+        type: "BIGINT"
+      }
+    ];
+  const interestingColumns = expectedColumns.map( el => el.name );
+
+  const viewGenerator = new CdcViewGenerator( params );
+  const cloudformationColumns = viewGenerator.buildCloudFormationStorageDescriptorColumns();
+  const actualMappedColumns = viewGenerator.buildPrestoViewData().columns
+                            .filter( el => interestingColumns.includes( el.name ) );
+
+  expect( actualMappedColumns ).to.be.deep.equals( expectedColumns );
+});
 
 function trimCodeIndent( codeIndentSize, str ) {
   const result = str.split("\n")
