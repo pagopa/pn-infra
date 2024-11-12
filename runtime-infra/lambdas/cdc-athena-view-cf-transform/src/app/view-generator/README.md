@@ -1,11 +1,11 @@
-# Package scope
+# Package abstract
 
 Generate hive schema information and view SQL for athena
 
 Starting from dynamo record key structure definition and full dynamo record structure definition generate 
 a view with the following structure:
 - ```stream_awsregion:string```: dynamo table AWS region,
-- ```stream_eventid:string```: dynamo stream event id: usefull for deduplicatiomn,
+- ```stream_eventid:string```: dynamo stream event id: useful for deduplication,
 - ```stream_eventname:string```: 'INSERT', 'UPDATE', 'REMOVE',
 - ```stream_useridentity:string```: useful to distinguish from ttl REMOVE and application REMOVE,
 - ```stream_recordformat:string```: usually "application/json",
@@ -29,7 +29,7 @@ The more important classes of this package are
 
 There are also some helper classes:
 - [```SimplifiedCdcViewGeneratorContext```](./SimplifiedCdcViewGeneratorContext.js): memoize 
-  hive type structure with un-nested struct and generate the view sql query.
+  hive type structure with un-nested ```struct``` and generate the view sql query.
 - [```CdcViewGeneratorHiveTypeVisitor```](./CdcViewGeneratorHiveTypeVisitor.js): visit the 
   hive type and fill the context
 
@@ -84,5 +84,4 @@ classDiagram
     +getViewColumns() Array~Name: string, Type: string~
   }
 
-  
 ```

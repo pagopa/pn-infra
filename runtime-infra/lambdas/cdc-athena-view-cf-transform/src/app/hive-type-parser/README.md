@@ -1,4 +1,4 @@
-# Package scope
+# Package abstract
 
 Other packages can use class [```HiveTypeParser```](./HiveTypeParser.js) to translate a 
 type string into an object tree of [```HiveType```](./HiveType.js) class instances.
