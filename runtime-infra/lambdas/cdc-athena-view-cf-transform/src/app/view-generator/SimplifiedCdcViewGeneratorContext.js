@@ -45,14 +45,14 @@ class SimplifiedCdcViewGeneratorContext {
   }
 
   #initializeKeywords( useDdlOrDqlSyntax ) {
-    if ( "DDL" == useDdlOrDqlSyntax ) {
+    if ( "DDL" === useDdlOrDqlSyntax ) {
       this.#arrayKeyword = "array";
       this.#rowKeyword = "struct";
       this.#nameTypeSep = ":";
       this.#openComplexType = "<";
       this.#closeComplexType = ">";
     }
-    else if ( "DQL" == useDdlOrDqlSyntax ) {
+    else if ( "DQL" === useDdlOrDqlSyntax ) {
       this.#arrayKeyword = "array";
       this.#rowKeyword = "row";
       this.#nameTypeSep = " ";
@@ -65,7 +65,7 @@ class SimplifiedCdcViewGeneratorContext {
   }
 
   isContextRootNode( ht ) {
-    return JSON.stringify( ht.path ) == JSON.stringify( this.#rootPath )
+    return JSON.stringify( ht.path ) === JSON.stringify( this.#rootPath )
   }
 
   addAlias( path, type) {
@@ -291,7 +291,7 @@ class SimplifiedCdcViewGeneratorContext {
   }
                 
   #generateOneNonArrayValue( fields ) {
-    const result = ( fields.length == 1 )
+    const result = ( fields.length === 1 )
                  ? fields[ 0 ]
                  : `coalesce(${ fields.join(",") })`
                  ;
@@ -299,7 +299,7 @@ class SimplifiedCdcViewGeneratorContext {
   }
                 
   #generateOneNonArrayType( fields ) {
-    const type = ( fields.length == 1 )
+    const type = ( fields.length === 1 )
                  ? this.#fieldTypes[ fields[ 0 ] ]
                  : "string"
                  ;

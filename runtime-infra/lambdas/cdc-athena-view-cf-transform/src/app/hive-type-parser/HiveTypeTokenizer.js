@@ -16,7 +16,7 @@ class HiveTypeTokenizer {
     let position = 0;
     while ( position < this.#hiveTypeString.length ) {
       let currentChar = this.#hiveTypeString.charAt( position );
-      if ( currentChar.trim().length == 0 ) {
+      if ( currentChar.trim().length === 0 ) {
         this.#addCurrentWord( position );
       }
       else if ( HiveTypeToken.PUNCTUATION.includes( currentChar) ) {
@@ -69,7 +69,7 @@ class HiveTypeTokenizer {
   }
   
   topTokenTypeIs( type ) {
-    return this.hasNext() && type == this.top().type
+    return this.hasNext() && type === this.top().type
   }
 
   assertTopTokenType( type ) {

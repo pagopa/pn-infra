@@ -24,7 +24,7 @@ class HiveTypeParser {
     const typeBuilder = new HiveTypeBuilder();
     const t = tokenizer.next();
 
-    if ( t.type == "FIXEDstruct" ) {
+    if ( t.type === "FIXEDstruct" ) {
       tokenizer.assertTopTokenTypeAndConsumeToken( "FIXED<")
       while ( ! tokenizer.topTokenTypeIs( "FIXED>" )) {
         tokenizer.assertTopTokenType( "WORD" )
@@ -43,13 +43,13 @@ class HiveTypeParser {
       }
       tokenizer.assertTopTokenTypeAndConsumeToken( "FIXED>")
     }
-    else if ( t.type == "FIXEDarray" ) {
+    else if ( t.type === "FIXEDarray" ) {
       tokenizer.assertTopTokenTypeAndConsumeToken( "FIXED<")
       const elementType = this.#parseType( tokenizer )
       typeBuilder.arrayType( elementType )
       tokenizer.assertTopTokenTypeAndConsumeToken( "FIXED>")
     }
-    else if( t.type == "WORD") {
+    else if( t.type === "WORD") {
       typeBuilder.simpleType( t.value )
     }
     else {

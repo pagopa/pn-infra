@@ -78,7 +78,7 @@ class CdcViewGenerator {
   #normalizeTrimNotEmpty( params, paramName ) {
     const value = params[ paramName ];
     const trimmedValue = ( value ? value.trim() : value );
-    if( trimmedValue.length == 0 ) {
+    if( trimmedValue.length === 0 ) {
       throw new Error("Parameter " + paramName + " is required ");
     }
     return trimmedValue;
@@ -98,25 +98,25 @@ class CdcViewGenerator {
     else if ( originalAlias.startsWith( "dynamodb_Keys_" )) {
       newAlias = "dynamodb_keys_" + originalAlias.substring( "dynamodb_Keys_".length);
     } 
-    else if ( originalAlias == "dynamodb_ApproximateCreationDateTime" ) {
+    else if ( originalAlias === "dynamodb_ApproximateCreationDateTime" ) {
       newAlias = "kinesis_dynamodb_ApproximateCreationDateTime"
     }
-    else if ( originalAlias == "awsregion" ) {
+    else if ( originalAlias === "awsregion" ) {
       newAlias = "stream_awsregion"
     }
-    else if ( originalAlias == "eventid" ) {
+    else if ( originalAlias === "eventid" ) {
       newAlias = "stream_eventid"
     }
-    else if ( originalAlias == "eventname" ) {
+    else if ( originalAlias === "eventname" ) {
       newAlias = "stream_eventname"
     }
-    else if ( originalAlias == "useridentity" ) {
+    else if ( originalAlias === "useridentity" ) {
       newAlias = "stream_useridentity"
     }
-    else if ( originalAlias == "recordformat" ) {
+    else if ( originalAlias === "recordformat" ) {
       newAlias = "stream_recordformat"
     }
-    else if ( originalAlias == "tablename" ) {
+    else if ( originalAlias === "tablename" ) {
       newAlias = "stream_tablename"
     }
     else {
@@ -127,10 +127,10 @@ class CdcViewGenerator {
 
   translateSimpleTypeFromDdlToDql( ddlType ) {
     let dqlType;
-    if ( ddlType == "string" ) {
+    if ( ddlType === "string" ) {
       dqlType = "VARCHAR";
     }
-    else if ( ddlType == "long" ) {
+    else if ( ddlType === "long" ) {
       dqlType = "BIGINT";
     }
     else {

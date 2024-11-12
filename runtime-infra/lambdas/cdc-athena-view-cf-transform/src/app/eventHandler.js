@@ -11,7 +11,7 @@ async function handleEvent(event) {
   )
   const params = event["params"]
   const outputType = params.OutputType;
-  const enabled = params.Enabled == "true";
+  const enabled = params.Enabled === "true";
 
   let fragmentResult;
   
@@ -20,10 +20,10 @@ async function handleEvent(event) {
   //   fail if it is not needed
   if ( enabled ) {
     const cdcViewGenerator = new CdcViewGenerator( params );
-    if ( outputType == OUTPUT_TYPE__STORAGE_COLUMNS ) {
+    if ( outputType === OUTPUT_TYPE__STORAGE_COLUMNS ) {
       fragmentResult = cdcViewGenerator.buildCloudFormationStorageDescriptorColumns();
     }
-    else if ( outputType == OUTPUT_TYPE__PRESTO_VIEW_DEF ) {
+    else if ( outputType === OUTPUT_TYPE__PRESTO_VIEW_DEF ) {
       const viewData = cdcViewGenerator.buildPrestoViewData();
       console.debug("QUERY:\n" + viewData.originalSql )
       console.debug(
@@ -40,13 +40,13 @@ async function handleEvent(event) {
 
   // - Do nothing but return some well-structured cloudformation fragment
   else {
-    if ( outputType == OUTPUT_TYPE__STORAGE_COLUMNS ) {
+    if ( outputType === OUTPUT_TYPE__STORAGE_COLUMNS ) {
       fragmentResult = [{
           "Name": "fake_column",
           "Type": "string"
         }];
     }
-    else if ( outputType == OUTPUT_TYPE__PRESTO_VIEW_DEF ) {
+    else if ( outputType === OUTPUT_TYPE__PRESTO_VIEW_DEF ) {
       const fakeViewData = {
           originalSql: "SELECT 'a_value' AS fake_column",
           catalog: params.CatalogName || "awsdatacatalog",

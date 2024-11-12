@@ -40,7 +40,7 @@ class CdcViewGeneratorHiveTypeVisitor extends BaseHiveTypeVisitor {
   enterNodeVisit( ht, context ) {
     let descend;
 
-    if ( ! context.isContextRootNode( ht ) && ht.category == "ARRAY" ) {
+    if ( ! context.isContextRootNode( ht ) && ht.category === "ARRAY" ) {
       const childCtx = context.addArray( ht.path )
       this.visit( ht, childCtx )
       descend = false
@@ -52,7 +52,7 @@ class CdcViewGeneratorHiveTypeVisitor extends BaseHiveTypeVisitor {
   }
 
   exitNodeVisit( ht, context ) {
-    if ( ht.category == "SIMPLE" ) {
+    if ( ht.category === "SIMPLE" ) {
       if( this.#acceptSimpleProperty( ht ) ) {
         context.addAlias( ht.path, ht.simpleType )
       }

@@ -95,13 +95,13 @@ class HiveType {
 
   sql() {
     let result;
-    if( "SIMPLE" == this.#category ) {
+    if( "SIMPLE" === this.#category ) {
       result = this.#simpleType;
     }
-    else if( "ARRAY" == this.#category ) {
+    else if( "ARRAY" === this.#category ) {
       result = "array<" + this.#arrayElementType.sql() + ">"
     }
-    else if( "STRUCT" == this.#category ) {
+    else if( "STRUCT" === this.#category ) {
       const oneFieldDeclLambda = (key) => {
         const childTypeStr = this.#structChildren[key].sql()
         return key + ":" + childTypeStr;

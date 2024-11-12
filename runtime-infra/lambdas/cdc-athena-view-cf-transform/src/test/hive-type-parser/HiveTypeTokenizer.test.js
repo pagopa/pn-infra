@@ -93,7 +93,7 @@ describe("HiveTypeTokenizer tests", function () {
     let nextResult = tokenizer.next();
     expect(tokenizer.hasNext()).to.be.false;
     
-    expect( topResult == nextResult ).to.be.true;
+    expect( topResult === nextResult ).to.be.true;
   });
 
 
