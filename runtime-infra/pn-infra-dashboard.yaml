@@ -90,8 +90,8 @@ Parameters:
     Description: Name of the OpenSearch cluster
 
   OpenSearchEbsSizeValue:
-    Type: Number
-    Default: 50
+    Type: String
+    Default: ""
     Description: Opensearch Ebs Storage Volume Size for all nodes in GB
 
 Conditions:
@@ -172,8 +172,8 @@ Resources:
         - Id: e1
           Expression: 
             Fn::Sub:
-              - "(m1 * 100) / (${OpenSearchEbsSizeValue} * 1024 * 1024 * 1024)" # Because OpenSearchEbsSizeValue is in GB
-              - OpenSearchEbsSizeValue: !Ref OpenSearchEbsSizeValue
+              - "(m1 * 100) / (${OpenSearchEbsSizeValue} * 1024 * 1024 * 1024)"
+              - OpenSearchEbsSizeValue: !Ref OpenSearchEbsSizeValue  
           Label: !Sub "${ProjectName}-avg free space"
       ComparisonOperator: LessThanOrEqualToThreshold
       Threshold: 30
