@@ -6,7 +6,7 @@ type string into an object tree of [```HiveType```](./HiveType.js) class instanc
 After that they can use [```BaseHiveTypeVisitor```](./BaseHiveTypeVisitor.js) or a subclass 
 to visit the syntax tree of the type definition.
 
-The syntax supported by the [```HiveTypeParser::parse```](./HiveTypeParser.js#8)<!-- ./HiveTypeParser.js::parse-->
+The syntax supported by the [```HiveTypeParser::parse```](./HiveTypeParser.js#L8)<!-- ./HiveTypeParser.js::parse-->
 is documented in _data_type_ grammar rule of the 
 ["_Create Table_" statement LanguageManualDDL](https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=27362034#LanguageManualDDL-CreateTable)
 with a lot of limitations:
