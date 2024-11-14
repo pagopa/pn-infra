@@ -139,6 +139,35 @@ const coreMapping = {
         'oncall-pn-logextractor-be-BACKOFFICE-ApiGwLatencyAlarm',
         'pn-logextractor-be-BACKOFFICE-ApiGwAlarm'
     ],
+    'pn-bff': [
+        'oncall-pn-bff-WEB-ApiGwAlarm',
+        'oncall-pn-bff-ErrorFatalLogs-Alarm',
+        'pn-bff-RaddStoreRegistryLambda-DurationAlarm',
+        'pn-bff-SenderDashboardDataIndexerDurationAlarm',
+        'pn-bff-SenderDashboardDataIndexer-LogInvocationErrors-Alarm',
+        'pn-bff-WEB-ApiGwAlarm',
+        'oncall-pn-bff-WEB-ApiGwLatencyAlarm'
+    ],
+    'pn-f24': [
+        'oncall-pn-f24-ErrorFatalLogs-Alarm',
+        'oncall-pn-f24_internal-HasDLQMessage',
+        'oncall-pn-f24_internal-HasOldMessage',
+        'pn-f24_internal-HasOldMessage',
+        'pn-f24_internal-DLQ-HasMessage',
+        'pn-bff-WEB-ApiGwAlarm'
+    ],
+    'pn-radd-alt': [
+        'pn-radd-alt-RADD-ApiGwAlarm',
+        'oncall-pn-radd-alt-RADD-ApiGwLatencyAlarm',
+        'oncall-pn-radd-alt-RADD-ApiGwAlarm',
+        'oncall-pn-radd-alt-ErrorFatalLogs-Alarm'
+    ],
+    'pn-zendesk-authorization': [
+        'pn-zendesk-authorization-WEB-ApiGwAlarm',
+        'pn-zendesk-authorization-lambda-LogInvocationErrors-Alarm',
+        'oncall-pn-zendesk-authorization-WEB-ApiGwAlarm',
+        'oncall-pn-zendesk-authorization-WEB-ApiGwLatencyAlarm'
+    ],
     'pn-service-desk': [
         'oncall-pn-service-desk-ErrorFatalLogs-Alarm',
         'oncall-pn-service-desk-alb-alarm',
