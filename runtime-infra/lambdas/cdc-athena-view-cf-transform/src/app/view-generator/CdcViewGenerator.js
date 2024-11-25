@@ -81,7 +81,7 @@ class CdcViewGenerator {
     if( trimmedValue.length === 0 ) {
       throw new Error("Parameter " + paramName + " is required ");
     }
-    return trimmedValue;
+    return trimmedValue.toLowerCase();
   }
 
   #normalizeTrim( params, paramName ) {
