@@ -155,7 +155,7 @@ Resources:
               DatabaseName: !Ref GlueDatabaseName
               CatalogName : 'awsdatacatalog'
               CdcTableName: !Ref GlueTableName
-              CdcViewName: !Join [ "_", [ !Ref GlueTableName, "view" ] ]
+              CdcViewName: !Sub '${GlueTableName}_view'
               CdcKeysType: !Ref DynamoDBKeysStructure
               CdcNewImageType: !Ref DynamoDBNewImageStructure
               CdcRecordFilter: !Ref CdcRecordFilter
