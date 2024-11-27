@@ -275,6 +275,7 @@ Resources:
       AlarmDescription: "Alarm messages when the oldest message in queue is older than limit QueueOldestAgeLimit"
       Namespace: "AWS/SQS"
       MetricName: "ApproximateAgeOfOldestMessage"
+      TreatMissingData: "notBreaching"
       Dimensions:
         - Name: "QueueName"
           Value: !If [ IsNotFifo, !Sub '${DeadLetterQueue.QueueName}', !Sub '${DeadLetterQueueFifo.QueueName}' ]
@@ -298,6 +299,7 @@ Resources:
       AlarmDescription: "Alarm messages when the oldest message in queue is older than limit QueueOldestAgeLimit"
       Namespace: "AWS/SQS"
       MetricName: "ApproximateAgeOfOldestMessage"
+      TreatMissingData: "notBreaching"
       Dimensions:
         - Name: "QueueName"
           Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
