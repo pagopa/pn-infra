@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Template for the MonitoringGroupsTransform macro
+
+Parameters:
+  LambdasBucketName:
+    Type: String
+    Description: Bucket name where lambdas zip are saved
+
+  LambdasBasePath:
+    Type: String
+    Description: bucket path that contains the lambdas zip
+    
+  MicroServiceUniqueName:
+    Type: String
+    Description: Nome univoco del microservizio
+
+  IntendedUsage:
+    Type: String
+    Description: 'Usage previsto (es: dev, prod)'
+
+  AlarmOn4xx:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Abilita allarmi per errori 4XX
+
+  StandardApiErrorDataPointsToAlarm:
+    Type: Number
+    Default: 1
+    Description: Numero di datapoints per attivare l'allarme standard
+
+  StandardApiErrorEvaluationPeriods:
+    Type: Number
+    Default: 5
+    Description: Periodi di valutazione per l'allarme standard
+
+  OncallApiErrorDataPointsToAlarm:
+    Type: Number
+    Default: 20
+    Description: Numero di datapoints per attivare l'allarme oncall
+
+  OncallApiErrorEvaluationPeriods:
+    Type: Number
+    Default: 60
+    Description: Periodi di valutazione per l'allarme oncall
+
+Resources:
+
+  ApiAlarmsSegmenationTransformFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/${ApiAlarmsSegmenationTransform}
+      RetentionInDays: 14
+
+    ApiAlarmsSegmenationTransformFunctionRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        Policies:
+          - PolicyName: S3Access
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                  Resource: 
+                    - !Sub "arn:aws:s3:::${LambdasBucketName}/*"
+          - PolicyName: ApiGatewayAccess
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - apigateway:GET
+                    - apigateway:GetRestApi
+                  Resource: 
+                    - !Sub "arn:aws:apigateway:${AWS::Region}:${AWS::AccountId}:/restapis/*"
+
+  ApiAlarmsSegmenationTransformFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: ApiAlarmsSegmenationTransformFunctionLogGroup
+    Properties:
+      Runtime: python3.10
+      Handler: main.handler
+      Role: !GetAtt ApiAlarmsSegmenationTransformFunctionRole.Arn
+      FunctionName: ApiAlarmsTrasform
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/api-alarms-segmentation-transform.zip
+
+  ApiAlarmsSegmenationTransformMacro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Name: ApiAlarmsMacro
+      FunctionName: !GetAtt ApiAlarmsSegmenationTransformFunction.Arn
+
+Outputs:
+  ApiAlarmsSegmenationTransformFunctionArn:
+    Description: ARN of the Transform Lambda function
+    Value: !GetAtt ApiAlarmsSegmenationTransformFunction.Arn
+  ApiAlarmsSegmenationTransformFunctionName:
+    Description: Name of the Transform Lambda function
+    Value: !Ref ApiAlarmsSegmenationTransformFunction
