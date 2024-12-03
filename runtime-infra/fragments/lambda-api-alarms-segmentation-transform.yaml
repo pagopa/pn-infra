@@ -12,13 +12,13 @@ Parameters:
     
 Resources:
 
-  ApiAlarmsSegmenationTransformFunctionLogGroup:
+  ApiAlarmsSegmentationFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: /aws/lambda/${ApiAlarmsSegmenationTransform}
+      LogGroupName: /aws/lambda/${ApiAlarmsSegmentationFunction}
       RetentionInDays: 14
 
-    ApiAlarmsSegmenationTransformFunctionRole:
+    ApiAlarmsSegmentationFunctionRole:
       Type: AWS::IAM::Role
       Properties:
         AssumeRolePolicyDocument:
@@ -51,28 +51,28 @@ Resources:
                   Resource: 
                     - !Sub "arn:aws:apigateway:${AWS::Region}:${AWS::AccountId}:/restapis/*"
 
-  ApiAlarmsSegmenationTransformFunction:
+  ApiAlarmsSegmentationFunction:
     Type: AWS::Lambda::Function
-    DependsOn: ApiAlarmsSegmenationTransformFunctionLogGroup
+    DependsOn: ApiAlarmsSegmentationFunctionLogGroup
     Properties:
       Runtime: python3.10
       Handler: main.handler
-      Role: !GetAtt ApiAlarmsSegmenationTransformFunctionRole.Arn
-      FunctionName: ApiAlarmsTrasform
+      Role: !GetAtt ApiAlarmsSegmentationFunctionRole.Arn
+      FunctionName: AlarmsSegmentationTransform
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/api-alarms-segmentation-transform.zip
 
-  ApiAlarmsSegmenationTransformMacro:
+  ApiAlarmsSegmentationMacro:
     Type: AWS::CloudFormation::Macro
     Properties:
       Name: ApiAlarmsMacro
-      FunctionName: !GetAtt ApiAlarmsSegmenationTransformFunction.Arn
+      FunctionName: !GetAtt ApiAlarmsSegmentationFunction.Arn
 
 Outputs:
-  ApiAlarmsSegmenationTransformFunctionArn:
+  ApiAlarmsSegmentationFunctionArn:
     Description: ARN of the Transform Lambda function
-    Value: !GetAtt ApiAlarmsSegmenationTransformFunction.Arn
-  ApiAlarmsSegmenationTransformFunctionName:
+    Value: !GetAtt ApiAlarmsSegmentationFunction.Arn
+  ApiAlarmsSegmentationFunctionName:
     Description: Name of the Transform Lambda function
-    Value: !Ref ApiAlarmsSegmenationTransformFunction
+    Value: !Ref ApiAlarmsSegmentationFunction
