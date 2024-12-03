@@ -18,38 +18,38 @@ Resources:
       LogGroupName: /aws/lambda/${ApiAlarmsSegmentationFunction}
       RetentionInDays: 14
 
-    ApiAlarmsSegmentationFunctionRole:
-      Type: AWS::IAM::Role
-      Properties:
-        AssumeRolePolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service: lambda.amazonaws.com
-              Action: sts:AssumeRole
-        ManagedPolicyArns:
-          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-        Policies:
-          - PolicyName: S3Access
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - s3:GetObject
-                  Resource: 
-                    - !Sub "arn:aws:s3:::${LambdasBucketName}/*"
-          - PolicyName: ApiGatewayAccess
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - apigateway:GET
-                    - apigateway:GetRestApi
-                  Resource: 
-                    - !Sub "arn:aws:apigateway:${AWS::Region}:${AWS::AccountId}:/restapis/*"
+  ApiAlarmsSegmentationFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: 
+                  - !Sub "arn:aws:s3:::${LambdasBucketName}/*"
+        - PolicyName: ApiGatewayAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - apigateway:GET
+                  - apigateway:GetRestApi
+                Resource: 
+                  - !Sub "arn:aws:apigateway:${AWS::Region}:${AWS::AccountId}:/restapis/*"
 
   ApiAlarmsSegmentationFunction:
     Type: AWS::Lambda::Function
