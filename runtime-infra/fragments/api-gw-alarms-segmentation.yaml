@@ -43,7 +43,7 @@ Parameters:
   AlarmOn4xx:
     Type: String
     Default: "false"
-    AllowedValues: 
+    AllowedValues:
       - "true"
       - "false"
     Description: "Enable alarms for 4XX errors"
@@ -57,7 +57,7 @@ Parameters:
     Type: Number
     Default: 5
     Description: "Evaluation periods for standard alarm"
-    
+
   StandardApiErrorThreshold:
     Type: Number
     Default: 1
@@ -87,6 +87,7 @@ Parameters:
     Type: Number
     Default: 20
     Description: "Number of datapoints to trigger oncall alarm"
+    
   OncallApiErrorEvaluationPeriods:
     Type: Number
     Default: 60
@@ -110,12 +111,12 @@ Parameters:
   OncallApiError5xxThreshold:
     Type: Number
     Default: 0.1
-    Description: "Threshold for oncall API 5xx errors"
+    Description: "Threshold for oncall 5xx errors"
 
   OncallApiError4xxThreshold:
     Type: Number
     Default: 0.9
-    Description: "Threshold for oncall API 4xx errors"
+    Description: "Threshold for oncall 4xx errors"
 
   OncallApiErrorPeriod:
     Type: Number
@@ -141,7 +142,7 @@ Parameters:
     Type: String
     Default: "notBreaching"
     Description: "Missing data behavior for oncall API errors"
-    
+
   OncallApiErrorThreshold:
     Type: Number
     Default: 0
@@ -161,8 +162,24 @@ Resources:
       AlarmOn4xx: !Ref AlarmOn4xx
       StandardApiErrorDataPointsToAlarm: !Ref StandardApiErrorDataPointsToAlarm
       StandardApiErrorEvaluationPeriods: !Ref StandardApiErrorEvaluationPeriods
+      StandardApiErrorThreshold: !Ref StandardApiErrorThreshold
+      StandardApiErrorPeriod: !Ref StandardApiErrorPeriod
+      StandardApiErrorStat: !Ref StandardApiErrorStat
+      StandardApiErrorComparisonOperator: !Ref StandardApiErrorComparisonOperator
+      StandardApiErrorMissingData: !Ref StandardApiErrorMissingData
       OncallApiErrorDataPointsToAlarm: !Ref OncallApiErrorDataPointsToAlarm
       OncallApiErrorEvaluationPeriods: !Ref OncallApiErrorEvaluationPeriods
+      OncallApiError4xxDataPointsToAlarm: !Ref OncallApiError4xxDataPointsToAlarm
+      OncallApiError4xxEvaluationPeriods: !Ref OncallApiError4xxEvaluationPeriods
+      OncallApiErrorCountThreshold: !Ref OncallApiErrorCountThreshold
+      OncallApiError5xxThreshold: !Ref OncallApiError5xxThreshold
+      OncallApiError4xxThreshold: !Ref OncallApiError4xxThreshold
+      OncallApiErrorPeriod: !Ref OncallApiErrorPeriod
+      OncallApiErrorStat: !Ref OncallApiErrorStat
+      OncallApiErrorCountStat: !Ref OncallApiErrorCountStat
+      OncallApiErrorComparisonOperator: !Ref OncallApiErrorComparisonOperator
+      OncallApiErrorMissingData: !Ref OncallApiErrorMissingData
+      OncallApiErrorThreshold: !Ref OncallApiErrorThreshold
 
 Outputs:
   # Invocation to generate Outputs
@@ -179,5 +196,21 @@ Outputs:
       AlarmOn4xx: !Ref AlarmOn4xx
       StandardApiErrorDataPointsToAlarm: !Ref StandardApiErrorDataPointsToAlarm
       StandardApiErrorEvaluationPeriods: !Ref StandardApiErrorEvaluationPeriods
+      StandardApiErrorThreshold: !Ref StandardApiErrorThreshold
+      StandardApiErrorPeriod: !Ref StandardApiErrorPeriod
+      StandardApiErrorStat: !Ref StandardApiErrorStat
+      StandardApiErrorComparisonOperator: !Ref StandardApiErrorComparisonOperator
+      StandardApiErrorMissingData: !Ref StandardApiErrorMissingData
       OncallApiErrorDataPointsToAlarm: !Ref OncallApiErrorDataPointsToAlarm
       OncallApiErrorEvaluationPeriods: !Ref OncallApiErrorEvaluationPeriods
+      OncallApiError4xxDataPointsToAlarm: !Ref OncallApiError4xxDataPointsToAlarm
+      OncallApiError4xxEvaluationPeriods: !Ref OncallApiError4xxEvaluationPeriods
+      OncallApiErrorCountThreshold: !Ref OncallApiErrorCountThreshold
+      OncallApiError5xxThreshold: !Ref OncallApiError5xxThreshold
+      OncallApiError4xxThreshold: !Ref OncallApiError4xxThreshold
+      OncallApiErrorPeriod: !Ref OncallApiErrorPeriod
+      OncallApiErrorStat: !Ref OncallApiErrorStat
+      OncallApiErrorCountStat: !Ref OncallApiErrorCountStat
+      OncallApiErrorComparisonOperator: !Ref OncallApiErrorComparisonOperator
+      OncallApiErrorMissingData: !Ref OncallApiErrorMissingData
+      OncallApiErrorThreshold: !Ref OncallApiErrorThreshold
