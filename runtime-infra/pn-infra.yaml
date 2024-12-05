@@ -333,6 +333,14 @@ Resources:
         LambdasBucketName: !Ref LambdasBucketName
         LambdasBasePath: !Ref LambdasBasePath
   
+  ApiAlarmsSegmentationTransform:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-api-alarms-segmentation-transform.yaml"
+      Parameters:
+        LambdasBucketName: !Ref LambdasBucketName
+        LambdasBasePath: !Ref LambdasBasePath
+  
 
 Outputs:
 
