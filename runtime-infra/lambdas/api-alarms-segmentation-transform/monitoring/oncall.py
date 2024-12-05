@@ -175,81 +175,80 @@ def create_oncall_base_alarms(
             }
             alarm_names_5xx.append(oncall_alarm_full_name)
 
-            if alarm_on_4xx.lower() == "true":
-                oncall_4xx_metrics = []
-                condition_ids_4xx = []
-                for i, endpoint in enumerate(chunk):
-                    operation_id = endpoint.get("operationId", f"{endpoint['method']}{endpoint['path']}")
-                    operation_id_clean = "".join(c for c in operation_id if c.isalnum())
-                    if not operation_id_clean:
-                        operation_id_clean = f"op"
-                    oncall_4xx_metrics.append({
-                        "Id": f"error4xx_{operation_id_clean}",
-                        "MetricStat": {
-                            "Metric": {
-                                "Namespace": "AWS/ApiGateway",
-                                "MetricName": "4XXError",
-                                "Dimensions": [
-                                    {"Name": "ApiName", "Value": api_name},
-                                    {"Name": "Stage", "Value": api_stage},
-                                    {"Name": "Resource", "Value": endpoint["path"]},
-                                    {"Name": "Method", "Value": endpoint["method"]},
-                                ],
-                            },
-                            "Period": oncall_api_error_period,
-                            "Stat": oncall_api_error_stat,
-                        },
-                        "ReturnData": False,
-                    })
-                    oncall_4xx_metrics.append({
-                        "Id": f"count4xx_{operation_id_clean}",
-                        "MetricStat": {
-                            "Metric": {
-                                "Namespace": "AWS/ApiGateway",
-                                "MetricName": "Count",
-                                "Dimensions": [
-                                    {"Name": "ApiName", "Value": api_name},
-                                    {"Name": "Stage", "Value": api_stage},
-                                    {"Name": "Resource", "Value": endpoint["path"]},
-                                    {"Name": "Method", "Value": endpoint["method"]},
-                                ],
-                            },
-                            "Period": oncall_api_error_period,
-                            "Stat": oncall_api_error_count_stat,
-                        },
-                        "ReturnData": False,
-                    })
-                    oncall_4xx_metrics.append({
-                        "Id": f"e_{operation_id_clean}",
-                        "Expression": f"((FILL(count4xx_{operation_id_clean},0) > {oncall_api_error_count_threshold}) * (FILL(error4xx_{operation_id_clean},0) > {oncall_api_error_4xx_threshold}))",
-                        "Label": operation_id if operation_id else f"Operation {i}",
-                        "ReturnData": False,
-                    })
-                    condition_ids_4xx.append(f"e_{operation_id_clean}")
-
+            oncall_4xx_metrics = []
+            condition_ids_4xx = []
+            for i, endpoint in enumerate(chunk):
+                operation_id = endpoint.get("operationId", f"{endpoint['method']}{endpoint['path']}")
+                operation_id_clean = "".join(c for c in operation_id if c.isalnum())
+                if not operation_id_clean:
+                    operation_id_clean = f"op"
                 oncall_4xx_metrics.append({
-                    "Id": "error_condition",
-                    "Expression": f"MAX([{', '.join(condition_ids_4xx)}])",
-                    "Label": "4XX Error Condition",
-                    "ReturnData": True,
-                })
-
-                oncall_4xx_alarm_name = f"oncall4xxAlarm{cleaned_group_name}"
-                oncall_4xx_alarm_full_name = f"childOC-{microservice_name}-{intended_usage}-{current_group_name}-4xx-ApiGwAlarm"
-                oncall_alarms[oncall_4xx_alarm_name] = {
-                    "Type": "AWS::CloudWatch::Alarm",
-                    "Properties": {
-                        "AlarmName": oncall_4xx_alarm_full_name,
-                        "AlarmDescription": f"On-call 4XX alarm for {current_group_name} endpoints",
-                        "Metrics": oncall_4xx_metrics,
-                        "EvaluationPeriods": oncall_4xx_periods,
-                        "DatapointsToAlarm": oncall_4xx_datapoints,
-                        "Threshold": oncall_api_error_threshold,
-                        "ComparisonOperator": oncall_api_error_comparison_operator,
-                        "TreatMissingData": oncall_api_error_missing_data,
+                    "Id": f"error4xx_{operation_id_clean}",
+                    "MetricStat": {
+                        "Metric": {
+                            "Namespace": "AWS/ApiGateway",
+                            "MetricName": "4XXError",
+                            "Dimensions": [
+                                {"Name": "ApiName", "Value": api_name},
+                                {"Name": "Stage", "Value": api_stage},
+                                {"Name": "Resource", "Value": endpoint["path"]},
+                                {"Name": "Method", "Value": endpoint["method"]},
+                            ],
+                        },
+                        "Period": oncall_api_error_period,
+                        "Stat": oncall_api_error_stat,
                     },
-                }
-                alarm_names_4xx.append(oncall_4xx_alarm_full_name)
+                    "ReturnData": False,
+                })
+                oncall_4xx_metrics.append({
+                    "Id": f"count4xx_{operation_id_clean}",
+                    "MetricStat": {
+                        "Metric": {
+                            "Namespace": "AWS/ApiGateway",
+                            "MetricName": "Count",
+                            "Dimensions": [
+                                {"Name": "ApiName", "Value": api_name},
+                                {"Name": "Stage", "Value": api_stage},
+                                {"Name": "Resource", "Value": endpoint["path"]},
+                                {"Name": "Method", "Value": endpoint["method"]},
+                            ],
+                        },
+                        "Period": oncall_api_error_period,
+                        "Stat": oncall_api_error_count_stat,
+                    },
+                    "ReturnData": False,
+                })
+                oncall_4xx_metrics.append({
+                    "Id": f"e_{operation_id_clean}",
+                    "Expression": f"((FILL(count4xx_{operation_id_clean},0) > {oncall_api_error_count_threshold}) * (FILL(error4xx_{operation_id_clean},0) > {oncall_api_error_4xx_threshold}))",
+                    "Label": operation_id if operation_id else f"Operation {i}",
+                    "ReturnData": False,
+                })
+                condition_ids_4xx.append(f"e_{operation_id_clean}")
+
+            oncall_4xx_metrics.append({
+                "Id": "error_condition",
+                "Expression": f"MAX([{', '.join(condition_ids_4xx)}])",
+                "Label": "4XX Error Condition",
+                "ReturnData": True,
+            })
+
+            oncall_4xx_alarm_name = f"oncall4xxAlarm{cleaned_group_name}"
+            oncall_4xx_alarm_full_name = f"childOC-{microservice_name}-{intended_usage}-{current_group_name}-4xx-ApiGwAlarm"
+            oncall_alarms[oncall_4xx_alarm_name] = {
+                "Type": "AWS::CloudWatch::Alarm",
+                "Properties": {
+                    "AlarmName": oncall_4xx_alarm_full_name,
+                    "AlarmDescription": f"On-call 4XX alarm for {current_group_name} endpoints",
+                    "Metrics": oncall_4xx_metrics,
+                    "EvaluationPeriods": oncall_4xx_periods,
+                    "DatapointsToAlarm": oncall_4xx_datapoints,
+                    "Threshold": oncall_api_error_threshold,
+                    "ComparisonOperator": oncall_api_error_comparison_operator,
+                    "TreatMissingData": oncall_api_error_missing_data,
+                },
+            }
+            alarm_names_4xx.append(oncall_4xx_alarm_full_name)
         oncall_alarm_names_map[group_name] = {
             "5xx": alarm_names_5xx,
             "4xx": alarm_names_4xx,

@@ -106,8 +106,8 @@ def create_composite_alarms(
                 "InsufficientDataActions": [topic_arn],
             },
         }
+        # Standard 4XX composite alarms: only if alarm_on_4xx is true
         if alarm_on_4xx.lower() == "true":
-            # Similar logic for 4XX alarms
             standard_4xx_alarm_names = []
             standard_4xx_dependencies = []
             for subgroup in subgroups:
@@ -135,34 +135,33 @@ def create_composite_alarms(
                     "InsufficientDataActions": [topic_arn],
                 },
             }
-            # On-call composite 4XX alarms
-            oncall_4xx_alarm_names = []
-            oncall_4xx_dependencies = []
-            for subgroup in subgroups:
-                alarm_names = oncall_alarm_names_map.get(subgroup, {}).get("4xx", [])
-                oncall_4xx_alarm_names.extend(alarm_names)
-                cleaned_subgroup_name = "".join(c for c in subgroup if c.isalnum())
-                for j in range(len(alarm_names)):
-                    suffix = f"{str(j).zfill(2)}" if j > 0 else ""
-                    oncall_4xx_dependencies.append(
-                        f"oncall4xxAlarm{cleaned_subgroup_name}{suffix}"
-                    )
-            oncall_alarm_rules_4xx = [f'ALARM("{name}")' for name in oncall_4xx_alarm_names]
-            oncall_alarm_rule_4xx = f"({' OR '.join(oncall_alarm_rules_4xx)})"
-            composite_oncall_alarm_name_4xx = f"oncallComposite4xxAlarm{cleaned_composite_name}"
-            composite_alarms[composite_oncall_alarm_name_4xx] = {
-                "Type": "AWS::CloudWatch::CompositeAlarm",
-                "DependsOn": oncall_4xx_dependencies,
-                "Properties": {
-                    "AlarmName": f"oncall-{microservice_name}-{intended_usage}-{composite_group}-comp-4xx-ApiGwAlarm",
-                    "AlarmDescription": f"On-call composite 4XX alarm for {composite_group} group",
-                    "AlarmRule": oncall_alarm_rule_4xx,
-                    "ActionsEnabled": True,
-                    "AlarmActions": [topic_arn],
-                    "OKActions": [topic_arn],
-                    "InsufficientDataActions": [topic_arn],
-                },
-            }
+        oncall_4xx_alarm_names = []
+        oncall_4xx_dependencies = []
+        for subgroup in subgroups:
+            alarm_names = oncall_alarm_names_map.get(subgroup, {}).get("4xx", [])
+            oncall_4xx_alarm_names.extend(alarm_names)
+            cleaned_subgroup_name = "".join(c for c in subgroup if c.isalnum())
+            for j in range(len(alarm_names)):
+                suffix = f"{str(j).zfill(2)}" if j > 0 else ""
+                oncall_4xx_dependencies.append(
+                    f"oncall4xxAlarm{cleaned_subgroup_name}{suffix}"
+                )
+        oncall_alarm_rules_4xx = [f'ALARM("{name}")' for name in oncall_4xx_alarm_names]
+        oncall_alarm_rule_4xx = f"({' OR '.join(oncall_alarm_rules_4xx)})"
+        composite_oncall_alarm_name_4xx = f"oncallComposite4xxAlarm{cleaned_composite_name}"
+        composite_alarms[composite_oncall_alarm_name_4xx] = {
+            "Type": "AWS::CloudWatch::CompositeAlarm",
+            "DependsOn": oncall_4xx_dependencies,
+            "Properties": {
+                "AlarmName": f"oncall-{microservice_name}-{intended_usage}-{composite_group}-comp-4xx-ApiGwAlarm",
+                "AlarmDescription": f"On-call composite 4XX alarm for {composite_group} group",
+                "AlarmRule": oncall_alarm_rule_4xx,
+                "ActionsEnabled": True,
+                "AlarmActions": [topic_arn],
+                "OKActions": [topic_arn],
+                "InsufficientDataActions": [topic_arn],
+            },
+        }
     logger.info(
         f"Created composite alarms structure: {json.dumps(composite_alarms, indent=2)}"
     )
