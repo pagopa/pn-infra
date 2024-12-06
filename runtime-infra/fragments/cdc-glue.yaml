@@ -11,11 +11,14 @@ Parameters:
   LogsBucketName:
     Type: String
     Description: Logs bucket name
-  TableName:
-    Description: Name of the Glue table
+  GlueTableName:
     Type: String
-  TableS3Prefix:
-    Description: Name of the Glue table
+    AllowedPattern: '^[a-z_-]+$'
+    ConstraintDescription: | 
+       Glue table name for, to valorize in data-quality-<env>-cfg.json file,
+       accept only lowercase values.
+  DynamoTableName:
+    Description: Name of dynamoDb table
     Type: String
   DynamoDBKeysStructure:
     Description: Structure of the dynamodb column
@@ -53,7 +56,7 @@ Resources:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Ref GlueDatabaseName
       TableInput:
-        Name: !Ref TableName
+        Name: !Ref GlueTableName
         TableType: EXTERNAL_TABLE
         PartitionKeys:
           - Name: p_year
@@ -92,7 +95,7 @@ Resources:
                     - !Split
                       - "\n"
                       - !Sub "struct<ApproximateCreationDateTime:bigint,SizeBytes:bigint,Keys:${DynamoDBKeysStructure},NewImage:${DynamoDBNewImageStructure}>"
-          Location: !Sub s3://${LogsBucketName}/cdcTos3/${TableS3Prefix}/
+          Location: !Sub s3://${LogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}/
           InputFormat: org.apache.hadoop.mapred.TextInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
           Compressed: false
@@ -103,13 +106,13 @@ Resources:
     Type: AWS::Glue::Crawler
     Properties:
       DatabaseName: !Ref GlueDatabaseName
-      Name: !Sub ${TableName}_crawler
+      Name: !Sub ${GlueTableName}_crawler
       Role: !Ref GlueServiceRoleArn
       Targets:
         CatalogTargets:
           - DatabaseName: !Ref GlueDatabaseName
             Tables:
-              - !Ref TableName
+              - !Ref GlueTableName
       SchemaChangePolicy:
         UpdateBehavior: LOG
         DeleteBehavior: LOG
@@ -126,11 +129,11 @@ Resources:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Ref GlueDatabaseName
       TableInput:
-        Name: !Sub '${TableName}_view'
+        Name: !Sub '${GlueTableName}_view'
         TableType: VIRTUAL_VIEW
         Parameters:
           presto_view: 'true'
-          comment: !Sub "Presto View for ${TableName} cdc"
+          comment: !Sub "Presto View for ${GlueTableName} cdc"
         StorageDescriptor:
           Columns:
             'Fn::Transform':
@@ -138,8 +141,8 @@ Resources:
               Parameters:
                 DatabaseName: !Ref GlueDatabaseName
                 CatalogName : 'awsdatacatalog'
-                CdcTableName: !Ref TableName
-                CdcViewName: !Sub '${TableName}_view'
+                CdcTableName: !Ref GlueTableName
+                CdcViewName: !Sub '${GlueTableName}_view'
                 CdcKeysType: !Ref DynamoDBKeysStructure
                 CdcNewImageType: !Ref DynamoDBNewImageStructure
                 CdcRecordFilter: !Ref CdcRecordFilter
@@ -154,8 +157,8 @@ Resources:
             Parameters:
               DatabaseName: !Ref GlueDatabaseName
               CatalogName : 'awsdatacatalog'
-              CdcTableName: !Ref TableName
-              CdcViewName: !Sub '${TableName}_view'
+              CdcTableName: !Ref GlueTableName
+              CdcViewName: !Sub '${GlueTableName}_view'
               CdcKeysType: !Ref DynamoDBKeysStructure
               CdcNewImageType: !Ref DynamoDBNewImageStructure
               CdcRecordFilter: !Ref CdcRecordFilter
@@ -165,7 +168,7 @@ Resources:
 Outputs:
   GlueTableName:
     Description: Name of the created Glue Table
-    Value: !Ref TableName
+    Value: !Ref GlueTableName
   GlueCrawlerName:
     Description: Name of the created Glue Crawler
     Value: !Ref GlueCrawler
@@ -174,6 +177,6 @@ Outputs:
     Value: 
       Fn::If:
         - HasCdcView
-        - !Sub '${TableName}_view'
+        - !Sub '${GlueTableName}_view'
         - "-"
 
