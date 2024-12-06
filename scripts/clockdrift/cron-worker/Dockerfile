@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/alpine:latest
+FROM public.ecr.aws/docker/library/alpine:latest@sha256:21dc6063fd678b478f57c0e13f47560d0ea4eeba26dfc947b2a4f81f686b9f45
 
 # Upgrade and install the required packages
 RUN apk update && apk add jq aws-cli
