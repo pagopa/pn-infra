@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Template for the MonitoringGroupsTransform macro
+
+Parameters:
+  LambdasBucketName:
+    Type: String
+    Description: Bucket name where lambdas zip are saved
+
+  LambdasBasePath:
+    Type: String
+    Description: bucket path that contains the lambdas zip
+    
+Resources:
+
+  ApiAlarmsSegmentationFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        !Sub [
+          "/aws/lambda/${groupName}",
+          { groupName: !Ref ApiAlarmsSegmentationFunction }
+        ]
+      RetentionInDays: 14
+
+  ApiAlarmsSegmentationFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: 
+                  - !Sub "arn:aws:s3:::${LambdasBucketName}/*"
+        - PolicyName: ApiGatewayAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - apigateway:GET
+                  - apigateway:GetRestApi
+                Resource: 
+                  - !Sub "arn:aws:apigateway:${AWS::Region}::/restapis/*"
+
+  ApiAlarmsSegmentationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.10
+      Handler: main.handler
+      Timeout: 30
+      Role: !GetAtt ApiAlarmsSegmentationFunctionRole.Arn
+      FunctionName: AlarmsSegmentationTransform
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/api-alarms-segmentation-transform.zip
+
+  ApiAlarmsSegmentationMacro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Name: ApiAlarmsSegmentationMacro
+      FunctionName: !GetAtt ApiAlarmsSegmentationFunction.Arn
+
+Outputs:
+  ApiAlarmsSegmentationFunctionArn:
+    Description: ARN of the Transform Lambda function
+    Value: !GetAtt ApiAlarmsSegmentationFunction.Arn
+  ApiAlarmsSegmentationFunctionName:
+    Description: Name of the Transform Lambda function
+    Value: !Ref ApiAlarmsSegmentationFunction
