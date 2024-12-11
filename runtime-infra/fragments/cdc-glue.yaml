@@ -71,6 +71,26 @@ Resources:
           - Name: p_hour
             Type: string
             Comment: Kinesis stream partition hour
+        Parameters:
+          projection.enabled: 'true'
+          projection.p_year.type: integer
+          projection.p_year.range: 2022,2025
+          projection.p_month.type: integer
+          projection.p_month.range: 1,12
+          projection.p_month.digits: '2'
+          projection.p_day.type: integer
+          projection.p_day.range: 1,31
+          projection.p_day.digits: '2'
+          projection.p_hour.type: integer
+          projection.p_hour.range: 0,23
+          projection.p_hour.digits: '2'
+          storage.location.template: !Join
+            - ''
+            - - 's3://'
+              - !Ref LogsBucketName
+              - '/cdcTos3/TABLE_NAME_'
+              - !Ref DynamoTableName
+              - '/${p_year}/${p_month}/${p_day}/${p_hour}/'
         StorageDescriptor:
           Columns:
             - Name: awsRegion
