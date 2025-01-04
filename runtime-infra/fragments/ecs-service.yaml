@@ -1022,7 +1022,11 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
-          Memory: !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
+          Memory:  
+            'Fn::If':
+              - ShouldEnableOtelXRay
+              - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
+              - !Ref MemoryAmount
           MountPoints:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
@@ -1031,6 +1035,11 @@ Resources:
               - SourceVolume: "efs-volume"
                 ContainerPath: "/mnt/efs"
               - !Ref AWS::NoValue
+          DependsOn:
+            - ContainerName: sidecar-injector
+              Condition: COMPLETE
+            - ContainerName: aws-collector
+              Condition: START
           Secrets:
             - 'Fn::If':
               - Secret1Exist
