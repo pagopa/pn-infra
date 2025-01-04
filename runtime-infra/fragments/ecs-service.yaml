@@ -1023,11 +1023,7 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
-          Memory:  
-            'Fn::If':
-              - ShouldEnableOtelXRay
-              - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
-              - !Ref MemoryAmount
+          Memory: !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
           MountPoints:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
@@ -1037,10 +1033,14 @@ Resources:
                 ContainerPath: "/mnt/efs"
               - !Ref AWS::NoValue
           DependsOn:
-            - ContainerName: sidecar-injector
-              Condition: COMPLETE
-            - ContainerName: aws-collector
-              Condition: START
+            'Fn::If':
+              - ShouldDisableOtelXRay
+              - !Ref AWS::NoValue
+              - 
+                - ContainerName: sidecar-injector
+                  Condition: COMPLETE
+                - ContainerName: aws-collector
+                  Condition: START
           Secrets:
             - 'Fn::If':
               - Secret1Exist
@@ -1112,7 +1112,7 @@ Resources:
             - Name: 'MICROSERVICE_NAME'
               Value: !Ref MicroServiceUniqueName
             - 'Fn::If':
-              - ShouldDisableOtelXRay
+              - ShouldEnableOtelXRay
               - 'Fn::If':
                 - HasJavaToolOptions
                 - Name: 'JAVA_TOOL_OPTIONS'
