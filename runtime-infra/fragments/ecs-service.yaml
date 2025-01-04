@@ -1110,8 +1110,8 @@ Resources:
               Value: 'none'
             - Name: 'MICROSERVICE_NAME'
               Value: !Ref MicroServiceUniqueName
-            - 'Fn::If':
-              - !Not [ShouldEnableOtelXRay]
+              - !If
+                - !Not [ShouldEnableOtelXRay]
               - 'Fn::If':
                 - HasJavaToolOptions
                 - Name: 'JAVA_TOOL_OPTIONS'
