@@ -1564,7 +1564,7 @@ Resources:
               awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
               awslogs-stream-prefix: ecs
         - 'Fn::If':
-          - ShouldDisableOtelXRay
+          - ShouldEnableOtelXRay
           - Name: aws-collector
             Image: !Ref ContainerImageOtelURI
             Command: [!Ref AwsCollectorCommand]
@@ -1579,7 +1579,7 @@ Resources:
                 awslogs-stream-prefix: ecs
           - !Ref "AWS::NoValue"
         - 'Fn::If':
-          - ShouldDisableOtelXRay
+          - ShouldEnableOtelXRay
           - Name: sidecar-injector
             Image: !Ref ContainerImageInjectorURI
             #Command: !Ref CommandSidecarInjector
