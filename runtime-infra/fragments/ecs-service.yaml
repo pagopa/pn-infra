@@ -719,7 +719,8 @@ Conditions:
      - Condition: AutoscalingCustom
 
   ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, 'True' ] ]
-  
+  ShouldDisableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'True' ]
+
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
   HasKinesisStreamArn: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
@@ -1024,7 +1025,7 @@ Resources:
           Image: !Ref ContainerImageURI
           Memory:  
             'Fn::If':
-              - ShouldEnableOtelXRay
+              - ShouldDisableOtelXRay
               - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
               - !Ref MemoryAmount
           MountPoints:
@@ -1111,7 +1112,7 @@ Resources:
             - Name: 'MICROSERVICE_NAME'
               Value: !Ref MicroServiceUniqueName
             - 'Fn::If':
-              - ShouldEnableOtelXRay
+              - ShouldDisableOtelXRay
               - 'Fn::If':
                 - HasJavaToolOptions
                 - Name: 'JAVA_TOOL_OPTIONS'
@@ -1563,7 +1564,7 @@ Resources:
               awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
               awslogs-stream-prefix: ecs
         - 'Fn::If':
-          - ShouldEnableOtelXRay
+          - ShouldDisableOtelXRay
           - Name: aws-collector
             Image: !Ref ContainerImageOtelURI
             Command: [!Ref AwsCollectorCommand]
@@ -1578,7 +1579,7 @@ Resources:
                 awslogs-stream-prefix: ecs
           - !Ref "AWS::NoValue"
         - 'Fn::If':
-          - ShouldEnableOtelXRay
+          - ShouldDisableOtelXRay
           - Name: sidecar-injector
             Image: !Ref ContainerImageInjectorURI
             #Command: !Ref CommandSidecarInjector
