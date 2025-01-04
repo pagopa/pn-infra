@@ -718,7 +718,8 @@ Conditions:
      - Condition: AutoscalingBySQS
      - Condition: AutoscalingCustom
 
-  ShouldEnableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'True' ] 
+  ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, 'True' ] ]
+  HasEnableXRay:  !Not [ShouldEnableOtelXRay] 
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
@@ -1111,7 +1112,7 @@ Resources:
             - Name: 'MICROSERVICE_NAME'
               Value: !Ref MicroServiceUniqueName
             - 'Fn::If':
-              - ShouldEnableOtelXRay
+              - HasEnableXRay
               - 'Fn::If':
                 - HasJavaToolOptions
                 - Name: 'JAVA_TOOL_OPTIONS'
