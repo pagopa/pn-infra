@@ -1112,7 +1112,7 @@ Resources:
             - Name: 'MICROSERVICE_NAME'
               Value: !Ref MicroServiceUniqueName
             - 'Fn::If':
-              - ShouldEnableOtelXRay
+              - ShouldDisableOtelXRay
               - 'Fn::If':
                 - HasJavaToolOptions
                 - Name: 'JAVA_TOOL_OPTIONS'
@@ -1564,7 +1564,7 @@ Resources:
               awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
               awslogs-stream-prefix: ecs
         - 'Fn::If':
-          - ShouldEnableOtelXRay
+          - ShouldDisableOtelXRay
           - Name: aws-collector
             Image: !Ref ContainerImageOtelURI
             Command: [!Ref AwsCollectorCommand]
@@ -1579,7 +1579,7 @@ Resources:
                 awslogs-stream-prefix: ecs
           - !Ref "AWS::NoValue"
         - 'Fn::If':
-          - ShouldEnableOtelXRay
+          - ShouldDisableOtelXRay
           - Name: sidecar-injector
             Image: !Ref ContainerImageInjectorURI
             #Command: !Ref CommandSidecarInjector
