@@ -1033,9 +1033,9 @@ Resources:
               - !Ref AWS::NoValue
           DependsOn:
             - ContainerName: sidecar-injector
-              Condition: !If [ShouldEnableOtelXRay, COMPLETE, !Ref "AWS::NoValue"]
+              Condition: COMPLETE
             - ContainerName: aws-collector
-              Condition: !If [ShouldEnableOtelXRay, START, !Ref "AWS::NoValue"]
+              Condition: START
           Secrets:
             - 'Fn::If':
               - Secret1Exist
