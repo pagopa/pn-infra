@@ -1031,11 +1031,6 @@ Resources:
               - SourceVolume: "efs-volume"
                 ContainerPath: "/mnt/efs"
               - !Ref AWS::NoValue
-          DependsOn:
-            - ContainerName: sidecar-injector
-              Condition: COMPLETE
-            - ContainerName: aws-collector
-              Condition: START
           Secrets:
             - 'Fn::If':
               - Secret1Exist
