@@ -718,7 +718,7 @@ Conditions:
      - Condition: AutoscalingBySQS
      - Condition: AutoscalingCustom
 
-  ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, 'True' ] ]
+  ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, '' ] ]
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
@@ -1022,11 +1022,7 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
-          Memory:  
-            'Fn::If':
-              - ShouldEnableOtelXRay
-              - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
-              - !Ref MemoryAmount
+          Memory: !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
           MountPoints:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
@@ -1037,9 +1033,9 @@ Resources:
               - !Ref AWS::NoValue
           DependsOn:
             - ContainerName: sidecar-injector
-              Condition: COMPLETE
+              Condition: !If [ShouldEnableOtelXRay, COMPLETE, !Ref "AWS::NoValue"]
             - ContainerName: aws-collector
-              Condition: START
+              Condition: !If [ShouldEnableOtelXRay, START, !Ref "AWS::NoValue"]
           Secrets:
             - 'Fn::If':
               - Secret1Exist
