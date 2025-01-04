@@ -1025,7 +1025,7 @@ Resources:
           Image: !Ref ContainerImageURI
           Memory:  
             'Fn::If':
-              - ShouldDisableOtelXRay
+              - ShouldEnableOtelXRay
               - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
               - !Ref MemoryAmount
           MountPoints:
@@ -1579,7 +1579,7 @@ Resources:
                 awslogs-stream-prefix: ecs
           - !Ref "AWS::NoValue"
         - 'Fn::If':
-          - ShouldDisableOtelXRay
+          - ShouldEnableOtelXRay
           - Name: sidecar-injector
             Image: !Ref ContainerImageInjectorURI
             #Command: !Ref CommandSidecarInjector
