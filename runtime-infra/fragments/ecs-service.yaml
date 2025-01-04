@@ -718,7 +718,7 @@ Conditions:
      - Condition: AutoscalingBySQS
      - Condition: AutoscalingCustom
 
-  ShouldEnableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'True' ] 
+  ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, '' ] ]
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
