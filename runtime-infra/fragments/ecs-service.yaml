@@ -47,11 +47,11 @@ Parameters:
   # Open Telemetry X-Ray configuration
   DisableOtelXRay:
     Type: String
-    Description: Enable Open Telemetry agent and sidecar containers
+    Description: Enable or Disable Open Telemetry agent and sidecar containers
     AllowedValues:
-      - "True"
-      - "False"
-    Default: "True"
+      - "true"
+      - "false"
+    Default: "true"
 
   ContainerImageClockdriftURI:
     Type: String
@@ -720,8 +720,8 @@ Conditions:
      - Condition: AutoscalingBySQS
      - Condition: AutoscalingCustom
 
-  ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, 'True' ] ]
-  HasShouldEnableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'True' ]
+  ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, 'true' ] ]
+  HasShouldEnableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'true' ]
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
@@ -1112,16 +1112,16 @@ Resources:
             - 'Fn::If':
               - ShouldEnableOtelXRay
               - 'Fn::If':
-                - HasJavaToolOptions
-                - Name: 'JAVA_TOOL_OPTIONS'
-                  Value: !Sub '-javaagent:/xray/aws-opentelemetry-agent.jar ${JavaToolOptions}'
-                - Name: 'JAVA_TOOL_OPTIONS'
-                  Value: '-javaagent:/xray/aws-opentelemetry-agent.jar'
+                  - HasJavaToolOptions
+                  - !Ref "AWS::NoValue"
+                  - Name: 'JAVA_TOOL_OPTIONS'
+                    Value: !Sub '${JavaToolOptions}'
               - 'Fn::If':
                   - HasJavaToolOptions
                   - Name: 'JAVA_TOOL_OPTIONS'
-                    Value: !Sub '${JavaToolOptions}'
-                  - !Ref "AWS::NoValue"
+                    Value: !Sub '-javaagent:/xray/aws-opentelemetry-agent.jar ${JavaToolOptions}'
+                  - Name: 'JAVA_TOOL_OPTIONS'
+                    Value: '-javaagent:/xray/aws-opentelemetry-agent.jar'
             - 'Fn::If':
                 - Env1Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry1 ] ]
