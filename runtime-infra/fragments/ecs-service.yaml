@@ -1112,13 +1112,13 @@ Resources:
               - ShouldEnableOtelXRay
               - 'Fn::If':
                   - HasJavaToolOptions
-                  - !Ref "AWS::NoValue"
                   - Name: 'JAVA_TOOL_OPTIONS'
                     Value: !Sub '${JavaToolOptions}'
+                  - !Ref "AWS::NoValue"
               - 'Fn::If':
                   - HasJavaToolOptions
                   - Name: 'JAVA_TOOL_OPTIONS'
-                    Value: !Sub '-javaagent:/xray/aws-opentelemetry-agent.jar ${JavaToolOptions}'
+                    Value: !Sub '${JavaToolOptions} -javaagent:/xray/aws-opentelemetry-agent.jar'
                   - Name: 'JAVA_TOOL_OPTIONS'
                     Value: '-javaagent:/xray/aws-opentelemetry-agent.jar'
             - 'Fn::If':
