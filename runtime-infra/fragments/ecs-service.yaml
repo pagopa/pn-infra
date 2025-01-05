@@ -48,9 +48,11 @@ Parameters:
   DisableOtelXRay:
     Type: String
     Description: Enable Open Telemetry agent and sidecar containers
-    AllowedValues: [false, true]
-    Default: true
-
+    AllowedValues:
+      - "True"
+      - "False"
+    Default: "True"
+    
   ContainerImageClockdriftURI:
     Type: String
     Description: Container image URI for Clockdrift
@@ -718,8 +720,8 @@ Conditions:
      - Condition: AutoscalingBySQS
      - Condition: AutoscalingCustom
 
-  ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, 'true' ] ]
-  HasShouldEnableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'true' ]
+  ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, 'True' ] ]
+  HasShouldEnableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'True' ]
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
