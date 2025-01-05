@@ -52,7 +52,7 @@ Parameters:
       - "True"
       - "False"
     Default: "True"
-    
+
   ContainerImageClockdriftURI:
     Type: String
     Description: Container image URI for Clockdrift
@@ -1110,7 +1110,7 @@ Resources:
             - Name: 'MICROSERVICE_NAME'
               Value: !Ref MicroServiceUniqueName
             - 'Fn::If':
-              - HasShouldEnableOtelXRay
+              - ShouldEnableOtelXRay
               - 'Fn::If':
                 - HasJavaToolOptions
                 - Name: 'JAVA_TOOL_OPTIONS'
