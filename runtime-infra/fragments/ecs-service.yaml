@@ -48,8 +48,8 @@ Parameters:
   DisableOtelXRay:
     Type: String
     Description: Enable Open Telemetry agent and sidecar containers
-    AllowedValues: [True, '']
-    Default: ''
+    AllowedValues: [false, true]
+    Default: true
 
   ContainerImageClockdriftURI:
     Type: String
@@ -718,8 +718,8 @@ Conditions:
      - Condition: AutoscalingBySQS
      - Condition: AutoscalingCustom
 
-  ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, 'True' ] ]
-  HasShouldEnableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'True' ]
+  ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, 'true' ] ]
+  HasShouldEnableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'true' ]
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
@@ -1023,11 +1023,7 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
-          Memory:  
-            'Fn::If':
-              - ShouldEnableOtelXRay
-              - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
-              - !Ref MemoryAmount
+          Memory: !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
           MountPoints:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
@@ -1563,41 +1559,35 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
               awslogs-stream-prefix: ecs
-        - 'Fn::If':
-          - ShouldEnableOtelXRay
-          - Name: aws-collector
-            Image: !Ref ContainerImageOtelURI
-            Command: [!Ref AwsCollectorCommand]
-            Cpu: '256'
-            Memory: !FindInMap [ ContainerMemory, !Ref MemoryAmount, awsCollector ]
-            LogConfiguration:
-              LogDriver: awslogs
-              Options:
-                awslogs-create-group: 'True'
-                awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
-                awslogs-region: !Ref 'AWS::Region'
-                awslogs-stream-prefix: ecs
-          - !Ref "AWS::NoValue"
-        - 'Fn::If':
-          - ShouldEnableOtelXRay
-          - Name: sidecar-injector
-            Image: !Ref ContainerImageInjectorURI
-            #Command: !Ref CommandSidecarInjector
-            #EntryPoint: [!Ref EntrypointSidecarInjector]
-            Essential: false
-            MountPoints:
-              - SourceVolume: "my-vol"
-                ContainerPath: "/xray/"
-            Cpu: '128'
-            Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
-            LogConfiguration:
-              LogDriver: awslogs
-              Options:
-                awslogs-create-group: 'True'
-                awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
-                awslogs-region: !Ref 'AWS::Region'
-                awslogs-stream-prefix: ecs
-          - !Ref "AWS::NoValue"
+        - Name: aws-collector
+          Image: !Ref ContainerImageOtelURI
+          Command: [!Ref AwsCollectorCommand]
+          Cpu: '256'
+          Memory: !FindInMap [ ContainerMemory, !Ref MemoryAmount, awsCollector ]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-create-group: 'True'
+              awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: ecs
+        - Name: sidecar-injector
+          Image: !Ref ContainerImageInjectorURI
+          #Command: !Ref CommandSidecarInjector
+          #EntryPoint: [!Ref EntrypointSidecarInjector]
+          Essential: false
+          MountPoints:
+            - SourceVolume: "my-vol"
+              ContainerPath: "/xray/"
+          Cpu: '128'
+          Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-create-group: 'True'
+              awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: ecs
         - Name: clockdrift
           Image: !Ref ContainerImageClockdriftURI
           Essential: false
