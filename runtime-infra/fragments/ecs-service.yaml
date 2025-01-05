@@ -51,7 +51,7 @@ Parameters:
     AllowedValues:
       - "true"
       - "false"
-    Default: "true"
+    Default: "false"
 
   ContainerImageClockdriftURI:
     Type: String
@@ -720,8 +720,7 @@ Conditions:
      - Condition: AutoscalingBySQS
      - Condition: AutoscalingCustom
 
-  ShouldEnableOtelXRay: !Not [ !Equals [ !Ref DisableOtelXRay, 'true' ] ]
-  HasShouldEnableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'true' ]
+  ShouldEnableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'true' ] 
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
@@ -1110,7 +1109,7 @@ Resources:
             - Name: 'MICROSERVICE_NAME'
               Value: !Ref MicroServiceUniqueName
             - 'Fn::If':
-              - HasShouldEnableOtelXRay
+              - ShouldEnableOtelXRay
               - 'Fn::If':
                   - HasJavaToolOptions
                   - !Ref "AWS::NoValue"
