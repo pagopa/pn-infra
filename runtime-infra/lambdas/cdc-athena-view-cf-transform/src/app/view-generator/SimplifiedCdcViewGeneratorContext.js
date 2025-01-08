@@ -100,10 +100,13 @@ class SimplifiedCdcViewGeneratorContext {
   
   #buildAlias( path ) {
     const contextualPath = [ ... path].splice( this.#rootPath.length, path.length );
-    const resultSteps = contextualPath
+    let resultSteps = contextualPath
                       .filter( el => ! this.constructor.DYNAMODB_SUFFIXES.includes( el ) )
                       .filter( el => el !== HiveType.ARRAY_DESCEND_PATH_STEP )
                       ;
+    if( resultSteps.length == 0 ) {
+      resultSteps = [ "_elem_value" ]
+    }
     const alias = resultSteps.join("_");
     const customizedAlias = this.#aliasCustomize( alias );
     return customizedAlias;
