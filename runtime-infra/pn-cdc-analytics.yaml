@@ -25,26 +25,44 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: glue.amazonaws.com
-            Action: sts:AssumeRole
-      Path: /
+              Service:
+                - glue.amazonaws.com
+            Action:
+              - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
       Policies:
-        - PolicyName: GlueS3AccessPolicy
+        - PolicyName: S3Access
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
-                  - s3:GetObject
-                  - s3:PutObject
+                  - s3:GetBucketLocation
                   - s3:ListBucket
+                  - s3:GetObject
                 Resource:
                   - !Sub arn:aws:s3:::${LogsBucketName}
                   - !Sub arn:aws:s3:::${LogsBucketName}/*
-                  - !Sub arn:aws:s3:::${AthenaResultsBucket}
-                  - !Sub arn:aws:s3:::${AthenaResultsBucket}/*
+        - PolicyName: S3EncryptionAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetEncryptionConfiguration
+                Resource:
+                  - !Sub arn:aws:s3:::${LogsBucketName}
+        - PolicyName: KMSEncryptionAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                Resource:
+                  - !Ref LogsBucketKmsKeyArn
 
   AthenaWorkGroup:
     Type: AWS::Athena::WorkGroup
