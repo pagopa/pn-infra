@@ -695,6 +695,20 @@ Mappings:
       sidecarInjector: 256
       clockdrift: 256
       microservice: 7680
+  ContainerMemoryNoXray:
+    2GB:
+      clockdrift: 256
+      microservice: 2048
+    4GB:
+      clockdrift: 256
+      microservice: 4096
+    6GB:
+      clockdrift: 256
+      microservice: 6144
+    8GB:
+      clockdrift: 256
+      microservice: 8192
+
 
 Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
@@ -1024,7 +1038,11 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
-          Memory: !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
+          Memory: 
+            'Fn::If':
+              - ShouldEnableOtelXRay
+              - !FindInMap [ ContainerMemoryNoXray, !Ref MemoryAmount, microservice ]
+              - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
           MountPoints:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
