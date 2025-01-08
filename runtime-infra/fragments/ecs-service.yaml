@@ -1040,8 +1040,8 @@ Resources:
           Memory: 
             'Fn::If':
               - ShouldEnableOtelXRay
-              - !FindInMap [ ContainerMemoryNoXray, !Ref MemoryAmount, microservice ]
               - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
+              - !FindInMap [ ContainerMemoryNoXray, !Ref MemoryAmount, microservice ]
           MountPoints:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
