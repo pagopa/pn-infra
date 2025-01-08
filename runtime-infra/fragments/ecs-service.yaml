@@ -735,6 +735,7 @@ Conditions:
      - Condition: AutoscalingCustom
 
   ShouldEnableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'true' ] 
+  NotShouldEnableOtelXRay: !Not [ !Condition ShouldEnableOtelXRay ]
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
@@ -1052,17 +1053,15 @@ Resources:
                   SourceVolume: "efs-volume"
                   ContainerPath: "/mnt/efs"
                 - !Ref AWS::NoValue
-          'Fn::If':
-            - ShouldEnableOtelXRay
-            - # X-Ray Abilitato: Escludi DependsOn
-              - 
-            - # X-Ray Disabilitato: Includi DependsOn
-              - 
-                DependsOn:
-                  - ContainerName: sidecar-injector
-                    Condition: COMPLETE
-                  - ContainerName: aws-collector
-                    Condition: START
+          DependsOn:
+            'Fn::If':
+              - ShouldEnableOtelXRay
+              - !Ref AWS::NoValue  # Se NotShouldEnableOtelXRay è vera, escludi DependsOn
+              - # Se NotShouldEnableOtelXRay è falsa, includi DependsOn
+                - ContainerName: sidecar-injector
+                  Condition: COMPLETE
+                - ContainerName: aws-collector
+                  Condition: START
           Secrets:
             - 'Fn::If':
               - Secret1Exist
