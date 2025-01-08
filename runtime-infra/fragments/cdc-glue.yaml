@@ -11,18 +11,25 @@ Parameters:
   LogsBucketName:
     Type: String
     Description: Logs bucket name
-  TableName:
-    Description: Name of the Glue table
+  GlueTableName:
     Type: String
-  TableS3Prefix:
-    Description: Name of the Glue table
+    AllowedPattern: '^[a-z_]+$'
+    ConstraintDescription: |
+       Glue table name for data-quality-<env>-cfg.json file,
+       accept only lowercase letters and underscores.
+  DynamoTableName:
+    Description: Name of dynamoDb table
     Type: String
   DynamoDBKeysStructure:
     Description: Structure of the dynamodb column
     Type: String
   DynamoDBNewImageStructure:
-    Description: Structure of the dynamodb column
+    Description: First part of the dynamodb column structure
     Type: String
+  DynamoDBNewImageStructurePart2:
+    Description: Second part of the dynamodb column structure (optional)
+    Type: String
+    Default: ""
   CdcRecordFilter:
     Description: Filter technical dynamo table record
     Type: String
@@ -45,6 +52,10 @@ Conditions:
       - !Ref GlueCrawlerSchedule
       - ''
   HasCdcView: !Equals [ "true", !Ref GenerateCdcView ]
+  HasNewImagePart2: !Not 
+    - !Equals 
+      - !Ref DynamoDBNewImageStructurePart2
+      - ''
 
 Resources:
   GlueTable:
@@ -53,7 +64,7 @@ Resources:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Ref GlueDatabaseName
       TableInput:
-        Name: !Ref TableName
+        Name: !Ref GlueTableName
         TableType: EXTERNAL_TABLE
         PartitionKeys:
           - Name: p_year
@@ -91,25 +102,29 @@ Resources:
                     - ''
                     - !Split
                       - "\n"
-                      - !Sub "struct<ApproximateCreationDateTime:bigint,SizeBytes:bigint,Keys:${DynamoDBKeysStructure},NewImage:${DynamoDBNewImageStructure}>"
-          Location: !Sub s3://${LogsBucketName}/cdcTos3/${TableS3Prefix}/
+                      - !If 
+                        - HasNewImagePart2
+                        - !Sub "struct<ApproximateCreationDateTime:bigint,SizeBytes:bigint,Keys:${DynamoDBKeysStructure},NewImage:${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}>"
+                        - !Sub "struct<ApproximateCreationDateTime:bigint,SizeBytes:bigint,Keys:${DynamoDBKeysStructure},NewImage:${DynamoDBNewImageStructure}>"
+          Location: !Sub s3://${LogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}/
           InputFormat: org.apache.hadoop.mapred.TextInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
           Compressed: false
           SerdeInfo:
             SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
           StoredAsSubDirectories: false
+
   GlueCrawler:
     Type: AWS::Glue::Crawler
     Properties:
       DatabaseName: !Ref GlueDatabaseName
-      Name: !Sub ${TableName}_crawler
+      Name: !Sub ${GlueTableName}_crawler
       Role: !Ref GlueServiceRoleArn
       Targets:
         CatalogTargets:
           - DatabaseName: !Ref GlueDatabaseName
             Tables:
-              - !Ref TableName
+              - !Ref GlueTableName
       SchemaChangePolicy:
         UpdateBehavior: LOG
         DeleteBehavior: LOG
@@ -126,11 +141,11 @@ Resources:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Ref GlueDatabaseName
       TableInput:
-        Name: !Sub '${TableName}_view'
+        Name: !Sub '${GlueTableName}_view'
         TableType: VIRTUAL_VIEW
         Parameters:
           presto_view: 'true'
-          comment: !Sub "Presto View for ${TableName} cdc"
+          comment: !Sub "Presto View for ${GlueTableName} cdc"
         StorageDescriptor:
           Columns:
             'Fn::Transform':
@@ -138,10 +153,10 @@ Resources:
               Parameters:
                 DatabaseName: !Ref GlueDatabaseName
                 CatalogName : 'awsdatacatalog'
-                CdcTableName: !Ref TableName
-                CdcViewName: !Sub '${TableName}_view'
+                CdcTableName: !Ref GlueTableName
+                CdcViewName: !Sub '${GlueTableName}_view'
                 CdcKeysType: !Ref DynamoDBKeysStructure
-                CdcNewImageType: !Ref DynamoDBNewImageStructure
+                CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
                 CdcRecordFilter: !Ref CdcRecordFilter
                 OutputType: 'StorageDescriptor-Columns'
                 Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
@@ -154,10 +169,10 @@ Resources:
             Parameters:
               DatabaseName: !Ref GlueDatabaseName
               CatalogName : 'awsdatacatalog'
-              CdcTableName: !Ref TableName
-              CdcViewName: !Sub '${TableName}_view'
+              CdcTableName: !Ref GlueTableName
+              CdcViewName: !Sub '${GlueTableName}_view'
               CdcKeysType: !Ref DynamoDBKeysStructure
-              CdcNewImageType: !Ref DynamoDBNewImageStructure
+              CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
               CdcRecordFilter: !Ref CdcRecordFilter
               OutputType: 'ViewOriginalText'
               Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
@@ -165,7 +180,7 @@ Resources:
 Outputs:
   GlueTableName:
     Description: Name of the created Glue Table
-    Value: !Ref TableName
+    Value: !Ref GlueTableName
   GlueCrawlerName:
     Description: Name of the created Glue Crawler
     Value: !Ref GlueCrawler
@@ -174,6 +189,6 @@ Outputs:
     Value: 
       Fn::If:
         - HasCdcView
-        - !Sub '${TableName}_view'
+        - !Sub '${GlueTableName}_view'
         - "-"
 
