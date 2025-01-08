@@ -735,7 +735,6 @@ Conditions:
      - Condition: AutoscalingCustom
 
   ShouldEnableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'true' ] 
-  NotShouldEnableOtelXRay: !Not [ !Condition ShouldEnableOtelXRay ]
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
@@ -1596,11 +1595,10 @@ Resources:
               awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
-
-        # aws-collector con Fn::If
         - 'Fn::If':
-            - NotShouldEnableOtelXRay
-            - # Se ShouldEnableOtelXRay è vero, restituisce la definizione del contenitore
+            - ShouldEnableOtelXRay
+            - !Ref AWS::NoValue
+            - 
               Name: aws-collector
               Image: !Ref ContainerImageOtelURI
               Command: [!Ref AwsCollectorCommand]
@@ -1613,20 +1611,20 @@ Resources:
                   awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
                   awslogs-region: !Ref 'AWS::Region'
                   awslogs-stream-prefix: ecs
-            - !Ref "AWS::NoValue"  # Se ShouldEnableOtelXRay è falso, non include aws-collector
-
-        # sidecar-injector con Fn::If
         - 'Fn::If':
-            - NotShouldEnableOtelXRay
-            - # Se ShouldEnableOtelXRay è vero, restituisce la definizione del contenitore
+            - ShouldEnableOtelXRay
+            - !Ref AWS::NoValue
+            - 
               Name: sidecar-injector
               Image: !Ref ContainerImageInjectorURI
-              Essential: false  # Se questa è falsa, assicurati che ci sia almeno un contenitore essenziale
+              #Command: !Ref CommandSidecarInjector
+              #EntryPoint: [!Ref EntrypointSidecarInjector]
+              Essential: false
               MountPoints:
                 - SourceVolume: "my-vol"
                   ContainerPath: "/xray/"
               Cpu: '128'
-              Memory: !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
+              Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
               LogConfiguration:
                 LogDriver: awslogs
                 Options:
@@ -1634,7 +1632,6 @@ Resources:
                   awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
                   awslogs-region: !Ref 'AWS::Region'
                   awslogs-stream-prefix: ecs
-            - !Ref "AWS::NoValue"  # Se ShouldEnableOtelXRay è falso, non include sidecar-injector
               
       Volumes:
         - Name: "my-vol"
