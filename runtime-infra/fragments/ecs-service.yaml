@@ -1574,9 +1574,8 @@ Resources:
               awslogs-stream-prefix: ecs
             'Fn::If':
               - ShouldEnableOtelXRay
-              - !Ref AWS::NoValue
-              - 
-                - Name: aws-collector
+              - !Ref AWS::NoValue 
+              - - Name: aws-collector
                   Image: !Ref ContainerImageOtelURI
                   Command: [!Ref AwsCollectorCommand]
                   Cpu: '256'
