@@ -1038,24 +1038,33 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
-          Memory: 
-            'Fn::If':
-              - ShouldEnableOtelXRay
-              - !FindInMap [ ContainerMemoryNoXray, !Ref MemoryAmount, microservice ]
-              - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
-          MountPoints:
-            - SourceVolume: "my-vol"
-              ContainerPath: "/xray/"
-            - 'Fn::If':
-              - RequiresEfsMount
-              - SourceVolume: "efs-volume"
-                ContainerPath: "/mnt/efs"
-              - !Ref AWS::NoValue
-          DependsOn:
-            - ContainerName: sidecar-injector
-              Condition: COMPLETE
-            - ContainerName: aws-collector
-              Condition: START
+          'Fn::If':
+            - ShouldEnableOtelXRay
+            - # Caso X-Ray abilitato: Usa ContainerMemoryNoXray e rimuovi DependsOn
+              - Memory: !FindInMap [ ContainerMemoryNoXray, !Ref MemoryAmount, microservice ]
+                MountPoints:
+                  - SourceVolume: "my-vol"
+                    ContainerPath: "/xray/"
+                  - 'Fn::If':
+                      - RequiresEfsMount
+                      - SourceVolume: "efs-volume"
+                        ContainerPath: "/mnt/efs"
+                      - !Ref AWS::NoValue
+            - # Caso X-Ray disabilitato: Usa ContainerMemory e aggiungi DependsOn
+              - Memory: !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
+                MountPoints:
+                  - SourceVolume: "my-vol"
+                    ContainerPath: "/xray/"
+                  - 'Fn::If':
+                      - RequiresEfsMount
+                      - SourceVolume: "efs-volume"
+                        ContainerPath: "/mnt/efs"
+                      - !Ref AWS::NoValue
+                DependsOn:
+                  - ContainerName: sidecar-injector
+                    Condition: COMPLETE
+                  - ContainerName: aws-collector
+                    Condition: START
           Secrets:
             - 'Fn::If':
               - Secret1Exist
