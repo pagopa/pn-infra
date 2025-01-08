@@ -1040,8 +1040,8 @@ Resources:
           Memory: 
             'Fn::If':
               - ShouldEnableOtelXRay
-              - !FindInMap [ ContainerMemoryNoXray, !Ref MemoryAmount, microservice ]
               - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
+              - !FindInMap [ ContainerMemoryNoXray, !Ref MemoryAmount, microservice ]
           MountPoints:
             - SourceVolume: "my-vol"
               ContainerPath: "/xray/"
@@ -1050,14 +1050,6 @@ Resources:
               - SourceVolume: "efs-volume"
                 ContainerPath: "/mnt/efs"
               - !Ref AWS::NoValue
-          'Fn::If':
-            - ShouldEnableOtelXRay
-            - DependsOn:
-                - ContainerName: sidecar-injector
-                  Condition: COMPLETE
-                - ContainerName: aws-collector
-                  Condition: START
-            - !Ref AWS::NoValue
           Secrets:
             - 'Fn::If':
               - Secret1Exist
