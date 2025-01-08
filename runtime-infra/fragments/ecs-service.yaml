@@ -1584,35 +1584,6 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
               awslogs-stream-prefix: ecs
-        - Name: aws-collector
-          Image: !Ref ContainerImageOtelURI
-          Command: [!Ref AwsCollectorCommand]
-          Cpu: '256'
-          Memory: !FindInMap [ ContainerMemory, !Ref MemoryAmount, awsCollector ]
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-create-group: 'True'
-              awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
-              awslogs-region: !Ref 'AWS::Region'
-              awslogs-stream-prefix: ecs
-        - Name: sidecar-injector
-          Image: !Ref ContainerImageInjectorURI
-          #Command: !Ref CommandSidecarInjector
-          #EntryPoint: [!Ref EntrypointSidecarInjector]
-          Essential: false
-          MountPoints:
-            - SourceVolume: "my-vol"
-              ContainerPath: "/xray/"
-          Cpu: '128'
-          Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-create-group: 'True'
-              awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
-              awslogs-region: !Ref 'AWS::Region'
-              awslogs-stream-prefix: ecs
         - Name: clockdrift
           Image: !Ref ContainerImageClockdriftURI
           Essential: false
@@ -1625,6 +1596,40 @@ Resources:
               awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
+          'Fn::If':
+            - NotShouldEnableOtelXRay
+            - !Ref AWS::NoValue  # Escludi i contenitori se NotShouldEnableOtelXRay è vera
+            - 
+              - Name: aws-collector
+                Image: !Ref ContainerImageOtelURI
+                Command: [!Ref AwsCollectorCommand]
+                Cpu: '256'
+                Memory: !FindInMap [ ContainerMemory, !Ref MemoryAmount, awsCollector ]
+                LogConfiguration:
+                  LogDriver: awslogs
+                  Options:
+                    awslogs-create-group: 'True'
+                    awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
+                    awslogs-region: !Ref 'AWS::Region'
+                    awslogs-stream-prefix: ecs
+
+              - Name: sidecar-injector
+                Image: !Ref ContainerImageInjectorURI
+                #Command: !Ref CommandSidecarInjector
+                #EntryPoint: [!Ref EntrypointSidecarInjector]
+                Essential: false
+                MountPoints:
+                  - SourceVolume: "my-vol"
+                    ContainerPath: "/xray/"
+                Cpu: '128'
+                Memory: !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
+                LogConfiguration:
+                  LogDriver: awslogs
+                  Options:
+                    awslogs-create-group: 'True'
+                    awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
+                    awslogs-region: !Ref 'AWS::Region'
+                    awslogs-stream-prefix: ecs
         
       Volumes:
         - Name: "my-vol"
