@@ -197,6 +197,15 @@ Parameters:
     Type: String
     Description: Version of the pn-prototype scripts
     Default: main
+  
+  # Use compiled lambdas zip
+  LambdasBucketName:
+    Type: String
+    Description: Bucket Name where lambdas zip are saved
+  
+  LambdasBasePath:
+    Type: String
+    Description: path inside bucket where lambdas zip are saved
 
 Conditions:
   IsAlbArnEmpty: !Equals [!Ref ApplicationLoadBalancerArn, "-"]
@@ -315,6 +324,23 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-fragments-utils-transform.yaml"
+
+  CdcViewsTransform:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-cdc-views-transform.yaml"
+      Parameters:
+        LambdasBucketName: !Ref LambdasBucketName
+        LambdasBasePath: !Ref LambdasBasePath
+  
+  ApiAlarmsSegmentationTransform:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-api-alarms-segmentation-transform.yaml"
+      Parameters:
+        LambdasBucketName: !Ref LambdasBucketName
+        LambdasBasePath: !Ref LambdasBasePath
+  
 
 Outputs:
 

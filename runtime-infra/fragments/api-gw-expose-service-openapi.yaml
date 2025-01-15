@@ -110,6 +110,120 @@ Parameters:
     AllowedValues:
       - 'true'
       - 'false'
+  
+  #Alarms segmentation parameters
+  StandardApiErrorDataPointsToAlarm:
+    Type: Number
+    Default: 1
+    Description: Number of datapoints for standard error alarm
+
+  StandardApiErrorEvaluationPeriods:
+    Type: Number
+    Default: 5
+    Description: Evaluation periods for standard error alarm
+
+  StandardApiErrorThreshold:
+    Type: Number
+    Default: 1
+    Description: Threshold for standard API errors
+
+  StandardApiErrorPeriod:
+    Type: Number
+    Default: 60
+    Description: Period for standard API errors
+
+  StandardApiErrorStat:
+    Type: String
+    Default: Sum
+    Description: Statistic for standard API errors
+
+  StandardApiErrorComparisonOperator:
+    Type: String
+    Default: GreaterThanThreshold
+    Description: Comparison operator for standard errors
+
+  StandardApiErrorMissingData:
+    Type: String
+    Default: notBreaching
+    Description: Missing data behavior for standard errors
+
+  OncallApiError5xxDataPointsToAlarm:
+    Type: Number
+    Default: 4
+    Description: Datapoints for oncall error alarm
+
+  OncallApiError5xxEvaluationPeriods:
+    Type: Number
+    Default: 12
+    Description: Evaluation periods for oncall alarm
+
+  OncallApiError4xxDataPointsToAlarm:
+    Type: Number
+    Default: 30
+    Description: Datapoints for oncall 4xx alarm
+
+  OncallApiError4xxEvaluationPeriods:
+    Type: Number
+    Default: 12
+    Description: Evaluation periods for oncall 4xx alarm
+
+  OncallApiErrorCountThreshold:
+    Type: Number
+    Default: 25
+    Description: Threshold for oncall error count
+
+  OncallApiError5xxThreshold:
+    Type: Number
+    Default: 0.3
+    Description: Threshold for oncall 5xx errors
+
+  OncallApiError4xxThreshold:
+    Type: Number
+    Default: 0.9
+    Description: Threshold for oncall 4xx errors
+
+  OncallApiErrorPeriod:
+    Type: Number
+    Default: 300
+    Description: Period for oncall errors
+
+  OncallApiErrorStat:
+    Type: String
+    Default: Average
+    Description: Statistic for oncall errors
+
+  OncallApiErrorCountStat:
+    Type: String
+    Default: Sum
+    Description: Statistic for oncall error count
+
+  OncallApiErrorComparisonOperator:
+    Type: String
+    Default: GreaterThanThreshold
+    Description: Comparison operator for oncall errors
+
+  OncallApiErrorMissingData:
+    Type: String
+    Default: notBreaching
+    Description: Missing data behavior for oncall errors
+
+  OncallApiErrorThreshold:
+    Type: Number
+    Default: 0
+    Description: General threshold for oncall errors
+  
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+    Default: ''
+
+  ApiAlarmSegmentation:
+    Type: String
+    Default: 'false'
+    Description: Enable Api alarm segmentation and grouping based on OpenApi spec. file
+    AllowedValues:
+      - 'true'
+      - 'false'
 
 Conditions:
   IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
@@ -131,6 +245,9 @@ Conditions:
   IsIncludeMode: !Equals [ !Ref OpenApiMode, 'INCLUDE' ]
   HasSkipStageCreation: !Equals [ !Ref SkipStageCreation, 'true' ]
   RequiresStageCreation: !Not [ !Condition HasSkipStageCreation ]
+  ApiAlarmSegmentationEnabled: !Equals [ !Ref ApiAlarmSegmentation, 'true' ]
+  ApiAlarmSegmentationDisabled: !Not [ Condition: ApiAlarmSegmentationEnabled ]
+  IsNotBackofficeAndAlarmSegmentationDisabled: !And [ !Condition IsNotBackoffice, !Condition ApiAlarmSegmentationDisabled ]
 
 Resources:
 
@@ -309,6 +426,7 @@ Resources:
 
   APIGatewayApiErrorAlarm:
     Type: AWS::CloudWatch::Alarm
+    Condition: ApiAlarmSegmentationDisabled
     Properties:
       AlarmName: !Sub "${MicroServiceUniqueName}-${IntendedUsage}-ApiGwAlarm"
       AlarmDescription: "CloudWatch alarm for when API Gateway has 4xx or 5xx error."
@@ -371,7 +489,7 @@ Resources:
 
   APIGatewayApiErrorAlarmWakeup:
     Type: AWS::CloudWatch::Alarm
-    Condition: IsNotBackoffice
+    Condition: IsNotBackofficeAndAlarmSegmentationDisabled
     Properties:
       AlarmName: !Sub "oncall-${MicroServiceUniqueName}-${IntendedUsage}-ApiGwAlarm"
       AlarmDescription: "CloudWatch alarm for when API Gateway has 4xx or 5xx error."
@@ -466,6 +584,28 @@ Resources:
                 - "kms:Decrypt"
                 Effect: Allow
                 Resource: "*"
+  
+  # Monitoring Groups Alarms
+  ApiAlarmsSegmentation:
+    Condition: ApiAlarmSegmentationEnabled
+    DependsOn:
+      - PublicRestApiOpenapi
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/api-gw-alarms-segmentation.yaml
+      Parameters:
+        ApiGatewayId: !GetAtt PublicRestApiOpenapi.RestApiId
+        PublicRestApiStage: !Ref PublicRestApiStage
+        OpenApiBucketName: !Ref OpenApiBucketName
+        OpenApiBucketKey: !Ref OpenApiBucketKey
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        MicroServiceUniqueName: !Ref MicroServiceUniqueName
+        IntendedUsage: !Ref IntendedUsage
+        AlarmOn4xx: !Ref AlarmOn4xx
+        OncallApiErrorCountThreshold: !Ref OncallApiErrorCountThreshold #adjust the deafult value in this template to change the minimum numer of request in the 5 min timeframe 
+        OncallApiError5xxThreshold: !Ref OncallApiError5xxThreshold  #adjust the deafult value in this template to change the % of failed request 0.3= 30%
+        OncallApiError4xxThreshold: !Ref OncallApiError4xxThreshold  #adjust the deafult value in this template to change the % of failed request 0.9= 90%
+
 
 Outputs:
 
@@ -498,6 +638,7 @@ Outputs:
     Description: "Stage ARN of the Rest API"
 
   RestApiErrorAlarmArn:
+    Condition: ApiAlarmSegmentationDisabled
     Value: !GetAtt APIGatewayApiErrorAlarm.Arn
     Description: "ARN of the errors alarm"
 

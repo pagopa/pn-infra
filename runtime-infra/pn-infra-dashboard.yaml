@@ -89,6 +89,11 @@ Parameters:
     Default: ""
     Description: Name of the OpenSearch cluster
 
+  OpenSearchEbsSizeValue:
+    Type: String
+    Default: ""
+    Description: Opensearch Ebs Storage Volume Size for all nodes in GB
+
 Conditions:
   HasOpenSearchCluster: !Not [ !Equals [ !Ref OpenSearchClusterName, "" ] ]
 Resources:
@@ -158,33 +163,21 @@ Resources:
                 - Name: ClientId
                   Value: !Ref AWS::AccountId
                 - Name: DomainName
-                  Value: 
-                    Ref: OpenSearchClusterName
+                  Value: !Ref OpenSearchClusterName
               MetricName: FreeStorageSpace
               Namespace: AWS/ES
             Period: 60
-            Stat: Maximum
-          ReturnData: False
-        - Id: m2
-          MetricStat:
-            Metric:
-              Dimensions:
-                - Name: ClientId
-                  Value: !Ref AWS::AccountId
-                - Name: DomainName
-                  Value: 
-                    Ref: OpenSearchClusterName
-              MetricName: ClusterUsedSpace
-              Namespace: AWS/ES
-            Period: 60
-            Stat: Maximum
+            Stat: Maximum 
           ReturnData: False
         - Id: e1
-          Expression: (m1*100)/(m1+m2)
+          Expression: 
+            Fn::Sub:
+              - "(m1 * 100) / (${OpenSearchEbsSizeValue} * 1024)"  
+              - OpenSearchEbsSizeValue: !Ref OpenSearchEbsSizeValue  
           Label: !Sub "${ProjectName}-avg free space"
       ComparisonOperator: LessThanOrEqualToThreshold
       Threshold: 30
-      TreatMissingData: ignore    
+      TreatMissingData: ignore
       EvaluationPeriods: 1
       OKActions:
         - !Ref AlarmSNSTopicArn

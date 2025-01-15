@@ -50,8 +50,25 @@ Resources:
         Parameters:
           compression.type: gzip
           EXTERNAL: 'TRUE'
+          projection.enabled: 'true' 
+          projection.year.type: integer
+          projection.year.range: 2022,2035 
+          projection.month.type: integer
+          projection.month.range: 1,12
+          projection.month.digits: '2' 
+          projection.day.type: integer
+          projection.day.range: 1,31
+          projection.day.digits: '2' 
+          projection.hour.type: integer
+          projection.hour.range: 0,23
+          projection.hour.digits: '2' 
+          storage.location.template: !Join
+            - ''
+            - - s3://
+              - !Ref LogsBucketName
+              - /logsTos3/${year}/${month}/${day}/${hour}/
         StorageDescriptor:
-          Location: !Sub s3://${LogsBucketName}/logsTos3
+          Location: !Sub s3://${LogsBucketName}/logsTos3/
           InputFormat: com.amazon.ionhiveserde.formats.IonInputFormat
           OutputFormat: com.amazon.ionhiveserde.formats.IonOutputFormat
           SerdeInfo:
@@ -387,7 +404,7 @@ Resources:
                     "catalog": "awsdatacatalog",
                     "schema": "${DatabaseName}",
                     "columns": [
-                      {"name": "year", "type": "varchar"},
+                      {"name": "year", "type": "varchar"},  
                       {"name": "month", "type": "varchar"},
                       {"name": "day", "type": "varchar"},
                       {"name": "hour", "type": "varchar"},
@@ -498,6 +515,7 @@ Resources:
 
   AthenaWorkGroup:
     Type: AWS::Athena::WorkGroup
+    DependsOn: AthenaResultsBucket
     Properties:
       Name: LogAnalyticsWorkGroup
       Description: WorkGroup for Log analytics queries
