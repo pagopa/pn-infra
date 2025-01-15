@@ -90,10 +90,12 @@ async function executeCommand(accountName){
       console.log(`Parameter found in ${accountName} account`)
     }
   }
-  // remove from Parameters keys not included in appConfig.skipParameters 
+  // remove from Parameters keys not included in appConfig.skipParameters[accountName]
+  console.log(appConfig.skipParameters[accountName])
   const keys = fullKeys.filter((k) => {
-    return appConfig.skipParameters.indexOf(k)<0
-  })
+    return !appConfig.skipParameters[accountName].some((param) => k.startsWith(param));
+  });
+  console.log(keys.length)
 
   for(let i=0; i<keys.length; i++) {
     parameters[keys[i]].Value = await awsClient._getSSMParameter(accountName, keys[i])
@@ -102,9 +104,18 @@ async function executeCommand(accountName){
   const confBasePath = `${configPath}/${envName}/_conf/${accountName}/system_params`
   // dump into a specific folder
   if(cmd=='dump'){
+    const manifest = []
     keys.forEach(key => {
-      _writeInFile(confBasePath, sanitizeFile(parameters[key])+'.param', parameters[key].Value)
-    })
+      let sanitizedFile = `${sanitizeFile(parameters[key])}.param`
+      _writeInFile(confBasePath, `${sanitizedFile}`, parameters[key].Value)
+      let element = {
+        "paramName": parameters[key].Name,
+        "localName": sanitizedFile,
+        "tier": parameters[key].Tier
+      }
+      manifest.push(element)
+    }) 
+    _writeInFile(confBasePath, `_manifest.json`, JSON.stringify(manifest))
   } else if(cmd=='compare'){
     // compare with a specific folder
     const files = fs.readdirSync(confBasePath)
