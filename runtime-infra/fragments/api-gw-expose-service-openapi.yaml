@@ -147,14 +147,14 @@ Parameters:
     Default: notBreaching
     Description: Missing data behavior for standard errors
 
-  OncallApiErrorDataPointsToAlarm:
+  OncallApiError5xxDataPointsToAlarm:
     Type: Number
-    Default: 20
+    Default: 4
     Description: Datapoints for oncall error alarm
 
-  OncallApiErrorEvaluationPeriods:
+  OncallApiError5xxEvaluationPeriods:
     Type: Number
-    Default: 60
+    Default: 12
     Description: Evaluation periods for oncall alarm
 
   OncallApiError4xxDataPointsToAlarm:
@@ -164,17 +164,17 @@ Parameters:
 
   OncallApiError4xxEvaluationPeriods:
     Type: Number
-    Default: 90
+    Default: 12
     Description: Evaluation periods for oncall 4xx alarm
 
   OncallApiErrorCountThreshold:
     Type: Number
-    Default: 10
+    Default: 25
     Description: Threshold for oncall error count
 
   OncallApiError5xxThreshold:
     Type: Number
-    Default: 0.1
+    Default: 0.3
     Description: Threshold for oncall 5xx errors
 
   OncallApiError4xxThreshold:
@@ -184,7 +184,7 @@ Parameters:
 
   OncallApiErrorPeriod:
     Type: Number
-    Default: 60
+    Default: 300
     Description: Period for oncall errors
 
   OncallApiErrorStat:
@@ -600,13 +600,9 @@ Resources:
         OpenApiBucketKey: !Ref OpenApiBucketKey
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         MicroServiceUniqueName: !Ref MicroServiceUniqueName
-        OncallApiErrorCountThreshold: 25
-        OncallApiErrorEvaluationPeriods: 12
-        OncallApiErrorDataPointsToAlarm: 4
-        OncallApiErrorPeriod: 300
-        OncallApiErrorStat: "Average"
-        IntendedUsage: !Ref IntendedUsage
-        AlarmOn4xx: !Ref AlarmOn4xx
+        OncallApiErrorCountThreshold: !Ref OncallApiErrorCountThreshold #adjust the deafult value in this template to change the minimum numer of request in the 5 min timeframe 
+        OncallApiError5xxThreshold: !Ref OncallApiError5xxThreshold  #adjust the deafult value in this template to change the % of failed request 0.3= 30%
+        OncallApiError4xxThreshold: !Ref OncallApiError4xxThreshold  #adjust the deafult value in this template to change the % of failed request 0.9= 90%
 
 
 Outputs:
