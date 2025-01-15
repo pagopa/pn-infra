@@ -61,19 +61,19 @@ def handler(event, context):
         standard_periods = int(params.get("StandardApiErrorEvaluationPeriods", 5))
 
         # On-call Alarms Parameters
-        oncall_api_error_count_threshold = int(params.get("OncallApiErrorCountThreshold", 10))
+        oncall_api_error_count_threshold = int(params.get("OncallApiErrorCountThreshold", 25))
         oncall_api_error_5xx_threshold = float(params.get("OncallApiError5xxThreshold", 0.1))
         oncall_api_error_4xx_threshold = float(params.get("OncallApiError4xxThreshold", 0.9))
-        oncall_api_error_period = int(params.get("OncallApiErrorPeriod", 60))
+        oncall_api_error_period = int(params.get("OncallApiErrorPeriod", 300))
         oncall_api_error_stat = params.get("OncallApiErrorStat", "Average")
         oncall_api_error_count_stat = params.get("OncallApiErrorCountStat", "Sum")
         oncall_api_error_comparison_operator = params.get("OncallApiErrorComparisonOperator", "GreaterThanThreshold")
         oncall_api_error_missing_data = params.get("OncallApiErrorMissingData", "notBreaching")
         oncall_api_error_threshold = int(params.get("OncallApiErrorThreshold", 0))
-        oncall_5xx_datapoints = int(params.get("OncallApiErrorDataPointsToAlarm", 20))
-        oncall_5xx_periods = int(params.get("OncallApiErrorEvaluationPeriods", 60))
-        oncall_4xx_datapoints = int(params.get("OncallApiError4xxDataPointsToAlarm", 30))
-        oncall_4xx_periods = int(params.get("OncallApiError4xxEvaluationPeriods", 90))
+        oncall_5xx_datapoints = int(params.get("OncallApiError5xxDataPointsToAlarm", 4))
+        oncall_5xx_periods = int(params.get("OncallApiError5xxEvaluationPeriods", 12))
+        oncall_4xx_datapoints = int(params.get("OncallApiError4xxDataPointsToAlarm", 4))
+        oncall_4xx_periods = int(params.get("OncallApiError4xxEvaluationPeriods", 12))
 
         if not all([bucket_name, bucket_key, api_id, api_stage, microservice_name, intended_usage]):
             raise ValueError("Missing required parameters")
