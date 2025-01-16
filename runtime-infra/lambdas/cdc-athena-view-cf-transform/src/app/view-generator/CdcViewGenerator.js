@@ -148,9 +148,8 @@ class CdcViewGenerator {
     return result;
   }
 
-  buildPrestoViewData() {
+  buildViewQuery() {
     const fullCdcTableName = `"${this.#databaseName}"."${this.#cdcTableName}"`;
-    //const fullCdcViewName = `"${this.#databaseName}"."${this.#cdcViewName}"`;
     
     let query = this.#dqlVisitor.getViewQuery( this.#fullTableType, fullCdcTableName, INDENT );
     if( this.#cdcRecordFilter ) {
@@ -158,7 +157,11 @@ class CdcViewGenerator {
                     + " ".repeat( INDENT ) + "(" + this.#cdcRecordFilter + ")"
                     ;
     }
+    return  query;
+  }
 
+  buildPrestoViewData() {
+    const query = this.buildViewQuery();
     const columns = this.#dqlVisitor.getViewColumns( this.#fullTableType );
 
     const viewData = {

@@ -56,6 +56,14 @@ describe("eventHandler tests", function () {
     
     const expectedCloudformationColumns = [
       {
+        "Name": "iun",
+        "Type": "string"
+      },
+      {
+        "Name": "taxonomyCode",
+        "Type": "string"
+      },
+      {
         "Name": "dynamodb_SizeBytes",
         "Type": "bigint"
       },
@@ -64,28 +72,8 @@ describe("eventHandler tests", function () {
         "Type": "string"
       },
       {
-        "Name": "iun",
-        "Type": "string"
-      },
-      {
         "Name": "kinesis_dynamodb_ApproximateCreationDateTime",
         "Type": "bigint"
-      },
-      {
-        "Name": "p_day",
-        "Type": "string"
-      },
-      {
-        "Name": "p_hour",
-        "Type": "string"
-      },
-      {
-        "Name": "p_month",
-        "Type": "string"
-      },
-      {
-        "Name": "p_year",
-        "Type": "string"
       },
       {
         "Name": "stream_awsregion",
@@ -112,7 +100,19 @@ describe("eventHandler tests", function () {
         "Type": "string"
       },
       {
-        "Name": "taxonomyCode",
+        "Name": "p_hour",
+        "Type": "string"
+      },
+      {
+        "Name": "p_year",
+        "Type": "string"
+      },
+      {
+        "Name": "p_month",
+        "Type": "string"
+      },
+      {
+        "Name": "p_day",
         "Type": "string"
       }
     ];
@@ -121,21 +121,21 @@ describe("eventHandler tests", function () {
       originalSql: trimCodeIndent( 10, `
           WITH simplified_data AS (
               SELECT
+                  "dynamodb"."NewImage"."iun"."S" AS "iun",
+                  "dynamodb"."NewImage"."taxonomyCode"."S" AS "taxonomyCode",
                   "dynamodb"."SizeBytes" AS "dynamodb_SizeBytes",
                   "dynamodb"."Keys"."iun"."S" AS "dynamodb_keys_iun",
-                  "dynamodb"."NewImage"."iun"."S" AS "iun",
                   "dynamodb"."ApproximateCreationDateTime" AS "kinesis_dynamodb_ApproximateCreationDateTime",
-                  "p_day" AS "p_day",
-                  "p_hour" AS "p_hour",
-                  "p_month" AS "p_month",
-                  "p_year" AS "p_year",
                   "awsregion" AS "stream_awsregion",
                   "eventid" AS "stream_eventid",
                   "eventname" AS "stream_eventname",
                   "recordformat" AS "stream_recordformat",
                   "tablename" AS "stream_tablename",
                   "useridentity" AS "stream_useridentity",
-                  "dynamodb"."NewImage"."taxonomyCode"."S" AS "taxonomyCode"
+                  "p_hour" AS "p_hour",
+                  "p_year" AS "p_year",
+                  "p_month" AS "p_month",
+                  "p_day" AS "p_day"
               FROM
                   "cdc_analytics_database"."pn_notifications_table" t
           )
@@ -148,6 +148,14 @@ describe("eventHandler tests", function () {
       schema: "cdc_analytics_database",
       columns: [
         {
+          "name": "iun",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "taxonomyCode",
+          "type": "VARCHAR"
+        },
+        {
           "name": "dynamodb_SizeBytes",
           "type": "BIGINT"
         },
@@ -156,28 +164,8 @@ describe("eventHandler tests", function () {
           "type": "VARCHAR"
         },
         {
-          "name": "iun",
-          "type": "VARCHAR"
-        },
-        {
           "name": "kinesis_dynamodb_ApproximateCreationDateTime",
           "type": "BIGINT"
-        },
-        {
-          "name": "p_day",
-          "type": "VARCHAR"
-        },
-        {
-          "name": "p_hour",
-          "type": "VARCHAR"
-        },
-        {
-          "name": "p_month",
-          "type": "VARCHAR"
-        },
-        {
-          "name": "p_year",
-          "type": "VARCHAR"
         },
         {
           "name": "stream_awsregion",
@@ -204,7 +192,19 @@ describe("eventHandler tests", function () {
           "type": "VARCHAR"
         },
         {
-          "name": "taxonomyCode",
+          "name": "p_hour",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "p_year",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "p_month",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "p_day",
           "type": "VARCHAR"
         }
       ]
