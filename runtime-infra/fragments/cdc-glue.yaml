@@ -82,7 +82,7 @@ Resources:
         Parameters:
           projection.enabled: 'true'
           projection.p_year.type: integer
-          projection.p_year.range: 2022,2035
+          projection.p_year.range: 2022,2099
           projection.p_month.type: integer
           projection.p_month.range: 1,12
           projection.p_month.digits: '2'
@@ -161,7 +161,7 @@ Resources:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Ref GlueDatabaseName
       TableInput:
-        Name: !Sub '${GlueTableName}_view'
+        Name: !Sub '${GlueTableName}_jsonview_slow'
         TableType: VIRTUAL_VIEW
         Parameters:
           presto_view: 'true'
@@ -197,6 +197,66 @@ Resources:
               OutputType: 'ViewOriginalText'
               Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
   
+  GlueParquetTable:
+    Condition: HasCdcView
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabaseName
+      TableInput:
+        Name: !Sub ${GlueTableName}_parsed
+        TableType: EXTERNAL_TABLE
+        PartitionKeys:
+          - Name: p_year
+            Type: string
+            Comment: Kinesis stream partition year
+          - Name: p_month
+            Type: string
+            Comment: Kinesis stream partition month
+          - Name: p_day
+            Type: string
+            Comment: Kinesis stream partition day
+        Parameters:
+          projection.enabled: 'true'
+          projection.p_year.type: integer
+          projection.p_year.range: 2022,2099
+          projection.p_month.type: integer
+          projection.p_month.range: 1,12
+          projection.p_month.digits: '2'
+          projection.p_day.type: integer
+          projection.p_day.range: 1,31
+          projection.p_day.digits: '2'
+          storage.location.template: !Join
+            - ''
+            - - 's3://'
+              - !Ref LogsBucketName
+              - '/cdcTos3_parsed/TABLE_NAME_'
+              - !Ref DynamoTableName
+              - '/${p_year}/${p_month}/${p_day}/${p_hour}/'
+        StorageDescriptor:
+          Columns:
+            'Fn::Transform':
+              Name: 'GenerateCdcViewMacro'
+              Parameters:
+                DatabaseName: !Ref GlueDatabaseName
+                CatalogName : 'awsdatacatalog'
+                CdcTableName: !Ref GlueTableName
+                CdcViewName: !Sub '${GlueTableName}_view'
+                CdcKeysType: !Ref DynamoDBKeysStructure
+                CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
+                CdcRecordFilter: !Ref CdcRecordFilter
+                OutputType: 'StorageDescriptor-Columns'
+                Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
+          Location: !Sub s3://${LogsBucketName}/cdcTos3_parsed/TABLE_NAME_${DynamoTableName}/
+          InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat
+          Compressed: false
+          SerdeInfo:
+            SerializationLibrary: org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe
+          StoredAsSubDirectories: false
+
+
+
 Outputs:
   GlueTableName:
     Description: Name of the created Glue Table
@@ -209,6 +269,6 @@ Outputs:
     Value: 
       Fn::If:
         - HasCdcView
-        - !Sub '${GlueTableName}_view'
+        - !Sub '${GlueTableName}_materialized_view'
         - "-"
 
