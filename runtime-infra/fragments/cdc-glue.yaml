@@ -174,7 +174,8 @@ Resources:
                 DatabaseName: !Ref GlueDatabaseName
                 CatalogName : 'awsdatacatalog'
                 CdcTableName: !Ref GlueTableName
-                CdcViewName: !Sub '${GlueTableName}_view'
+                CdcParsedTableName: !Sub '${GlueTableName}_parsed_cache'
+                CdcViewName: !Sub '${GlueTableName}_jsonview_slow'
                 CdcKeysType: !Ref DynamoDBKeysStructure
                 CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
                 CdcRecordFilter: !Ref CdcRecordFilter
@@ -190,7 +191,8 @@ Resources:
               DatabaseName: !Ref GlueDatabaseName
               CatalogName : 'awsdatacatalog'
               CdcTableName: !Ref GlueTableName
-              CdcViewName: !Sub '${GlueTableName}_view'
+              CdcParsedTableName: !Sub '${GlueTableName}_parsed_cache'
+              CdcViewName: !Sub '${GlueTableName}_jsonview_slow'
               CdcKeysType: !Ref DynamoDBKeysStructure
               CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
               CdcRecordFilter: !Ref CdcRecordFilter
@@ -241,7 +243,8 @@ Resources:
                 DatabaseName: !Ref GlueDatabaseName
                 CatalogName : 'awsdatacatalog'
                 CdcTableName: !Ref GlueTableName
-                CdcViewName: !Sub '${GlueTableName}_view'
+                CdcParsedTableName: !Sub '${GlueTableName}_parsed_cache'
+                CdcViewName: !Sub '${GlueTableName}_jsonview_slow'
                 CdcKeysType: !Ref DynamoDBKeysStructure
                 CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
                 CdcRecordFilter: !Ref CdcRecordFilter
@@ -255,7 +258,51 @@ Resources:
             SerializationLibrary: org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe
           StoredAsSubDirectories: false
 
-
+  CdcGlueMaterializedView:
+    Condition: HasCdcView
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabaseName
+      TableInput:
+        Name: !Sub '${GlueTableName}_materialized_view'
+        TableType: VIRTUAL_VIEW
+        Parameters:
+          presto_view: 'true'
+          comment: !Sub "Presto View for ${GlueTableName} cdc based on parquet cache"
+        StorageDescriptor:
+          Columns:
+            'Fn::Transform':
+              Name: 'GenerateCdcViewMacro'
+              Parameters:
+                DatabaseName: !Ref GlueDatabaseName
+                CatalogName : 'awsdatacatalog'
+                CdcTableName: !Ref GlueTableName
+                CdcParsedTableName: !Sub '${GlueTableName}_parsed_cache'
+                CdcViewName: !Sub '${GlueTableName}_jsonview_slow'
+                CdcKeysType: !Ref DynamoDBKeysStructure
+                CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
+                CdcRecordFilter: !Ref CdcRecordFilter
+                OutputType: 'StorageDescriptor-Columns'
+                Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
+          Location: ""
+          SerdeInfo: {}
+        ViewExpandedText: "/* Presto View */"
+        ViewOriginalText:
+          'Fn::Transform':
+            Name: 'GenerateCdcViewMacro'
+            Parameters:
+              DatabaseName: !Ref GlueDatabaseName
+              CatalogName : 'awsdatacatalog'
+              CdcTableName: !Ref GlueTableName
+              CdcParsedTableName: !Sub '${GlueTableName}_parsed_cache'
+              CdcViewName: !Sub '${GlueTableName}_jsonview_slow'
+              CdcKeysType: !Ref DynamoDBKeysStructure
+              CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
+              CdcRecordFilter: !Ref CdcRecordFilter
+              OutputType: 'ViewOriginalText'
+              Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
+  
 
 Outputs:
   GlueTableName:

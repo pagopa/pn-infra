@@ -8,6 +8,7 @@ describe("CdcViewGenerator tests", function () {
       DatabaseName: 'cdc_analytics_database',
       CatalogName : 'awsdatacatalog',
       CdcTableName: 'pn_notifications_table',
+      CdcParsedTableName: 'pn_notifications_table_parsed',
       CdcViewName: 'pn_notifications_view',
       CdcKeysType: 'struct<iun:struct<S:string>>',
       CdcNewImageType: `
@@ -265,6 +266,7 @@ it("should support pn-Timeline table", async () => {
     DatabaseName: 'cdc_analytics_database',
     CatalogName : 'awsdatacatalog',
     CdcTableName: 'pn_timelines_table',
+    CdcParsedTableName: 'pn_timelines_table_parsed',
     CdcViewName: 'pn_timelines_view',
     CdcKeysType: 'struct<iun:struct<S:string>,timelineElementId:struct<S:string>>',
     CdcNewImageType: `
@@ -507,6 +509,7 @@ it("should support string and long translation", async () => {
     DatabaseName: 'cdc_analytics_database',
     CatalogName : 'awsdatacatalog',
     CdcTableName: 'aa',
+    CdcParsedTableName: 'aa_parsed',
     CdcViewName: 'aa_view',
     CdcKeysType: 'struct<iun:struct<S:string>>',
     CdcNewImageType: `
@@ -536,6 +539,37 @@ it("should support string and long translation", async () => {
 
   expect( actualMappedColumns ).to.be.deep.equals( expectedColumns );
 });
+
+it("should support unionAllQuery", async () => {
+  const params = {
+    DatabaseName: 'cdc_analytics_database',
+    CatalogName : 'awsdatacatalog',
+    CdcTableName: 'aa',
+    CdcParsedTableName: 'aa_parsed',
+    CdcViewName: 'aa_view',
+    CdcKeysType: 'struct<iun:struct<S:string>>',
+    CdcNewImageType: `
+      struct<
+        iun:struct<S:string>,
+        quantity:struct<N:long>
+      >`,
+    CdcRecordFilter: ""
+  };
+
+  const expectedQuery = ""
+                      + "  SELECT * FROM \"aa_view\" \n"
+                      + "    WHERE p_year = lpad( cast( year(current_date) as varchar), 4, '0') \n"
+                      + "      AND p_month = lpad( cast( month(current_date) as varchar), 2, '0') \n"
+                      + "      AND p_day = lpad( cast( day(current_date) as varchar), 2, '0') \n"
+                      + "UNION ALL \n"
+                      + "  SELECT * FROM \"aa_parsed\" "
+                      ;
+  const viewGenerator = new CdcViewGenerator( params );
+  const actualQuery = viewGenerator.unionAllQuery();
+  
+  expect( actualQuery ).to.be.equals( expectedQuery );
+});
+
 
 function trimCodeIndent( codeIndentSize, str ) {
   const result = str.split("\n")

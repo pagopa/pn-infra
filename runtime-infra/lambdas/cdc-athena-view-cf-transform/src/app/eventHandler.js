@@ -3,6 +3,7 @@ const { CdcViewGenerator } = require("./view-generator/CdcViewGenerator.js");
 const OUTPUT_TYPE__STORAGE_COLUMNS = "StorageDescriptor-Columns";
 const OUTPUT_TYPE__STORAGE_COLUMNS__NO_PARSED_PARTITION = "StorageDescriptor-Columns-noParsedPartition"
 const OUTPUT_TYPE__PRESTO_VIEW_DEF = "ViewOriginalText";
+const OUTPUT_TYPE__PRESTO_VIEW_DEF__UNION_ALL = "ViewOriginalText-unionAll";
 
 const PARSED_PARTITION_COLUMNS = ["p_year", "p_month", "p_day"];
 
@@ -42,6 +43,17 @@ async function handleEvent(event) {
         );
       fragmentResult = cdcViewGenerator.buildPrestoViewString();
     }
+    else if ( outputType === OUTPUT_TYPE__PRESTO_VIEW_DEF__UNION_ALL ) {
+      const viewData = cdcViewGenerator.buildPrestoViewData();
+      viewData.originalSql = cdcViewGenerator.unionAllQuery();
+      console.debug("QUERY:\n" + viewData.originalSql )
+      console.debug(
+          '{ "VIEW_DATA":\n'
+          + JSON.stringify( viewData, null, 2 )
+          + "\n}"
+        );
+      fragmentResult = cdcViewGenerator.buildPrestoViewStringFromData( viewData );
+    }
     else {
       throw new Error("Output Type not supported " + outputType );
     }
@@ -49,8 +61,7 @@ async function handleEvent(event) {
 
   // - Do nothing but return some well-structured cloudformation fragment
   else {
-    if ( 
-        outputType === OUTPUT_TYPE__STORAGE_COLUMNS 
+    if ( outputType === OUTPUT_TYPE__STORAGE_COLUMNS 
           || outputType === OUTPUT_TYPE__STORAGE_COLUMNS__NO_PARSED_PARTITION
     ) {
       fragmentResult = [{
@@ -58,7 +69,9 @@ async function handleEvent(event) {
           "Type": "string"
         }];
     }
-    else if ( outputType === OUTPUT_TYPE__PRESTO_VIEW_DEF ) {
+    else if ( outputType === OUTPUT_TYPE__PRESTO_VIEW_DEF 
+                 || outputType === OUTPUT_TYPE__PRESTO_VIEW_DEF__UNION_ALL
+    ) {
       const fakeViewData = {
           originalSql: "SELECT 'a_value' AS fake_column",
           catalog: params.CatalogName || "awsdatacatalog",

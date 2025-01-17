@@ -8,6 +8,7 @@ class CdcViewGenerator {
   #catalogName;
   #databaseName;
   #cdcTableName;
+  #cdcParsedTableName;
   #cdcViewName;
   #cdcRecordFilter;
 
@@ -36,6 +37,7 @@ class CdcViewGenerator {
     this.#catalogName = this.#normalizeTrimNotEmpty( params, "CatalogName" );
     this.#databaseName = this.#normalizeTrimNotEmpty( params, "DatabaseName" );
     this.#cdcTableName = this.#normalizeTrimNotEmpty( params, "CdcTableName" );
+    this.#cdcParsedTableName = this.#normalizeTrimNotEmpty( params, "CdcParsedTableName" );
     this.#cdcViewName = this.#normalizeTrimNotEmpty( params, "CdcViewName" );
     this.#cdcRecordFilter = this.#normalizeTrim( params, "CdcRecordFilter" );
     console.debug(" ... done!");
@@ -175,9 +177,24 @@ class CdcViewGenerator {
 
   buildPrestoViewString() {
     const viewData = this.buildPrestoViewData();
+    return this.buildPrestoViewStringFromData( viewData );
+  }
+
+  buildPrestoViewStringFromData( viewData ) {
     const viewDataJsonString = JSON.stringify( viewData, null, 2 );
     const prestoViewString = "/* Presto View: " + btoa( viewDataJsonString) + " */";
     return prestoViewString;
+  }
+
+  unionAllQuery() {
+    return ""
+        + `  SELECT * FROM "${this.#cdcViewName}" \n`
+        + "    WHERE p_year = lpad( cast( year(current_date) as varchar), 4, '0') \n"
+        + "      AND p_month = lpad( cast( month(current_date) as varchar), 2, '0') \n"
+        + "      AND p_day = lpad( cast( day(current_date) as varchar), 2, '0') \n"
+        + "UNION ALL \n"
+        + `  SELECT * FROM "${this.#cdcParsedTableName}" `
+      ;
   }
 
 }
