@@ -1,7 +1,7 @@
 const { handleEvent } = require("../app/eventHandler.js");
 const { expect } = require('chai');
 
-async function makeOneTest( baseEvent, expectedCloudformationColumns, expectedViewData ) {
+async function makeOneTest( baseEvent, expectedCloudformationColumns, expectedCloudformationColumnsForCacheTable, expectedViewData ) {
   const columnEvent = JSON.parse(JSON.stringify( baseEvent ));
   columnEvent.requestId = columnEvent.requestId + "__col";
   columnEvent.params.OutputType = "StorageDescriptor-Columns";
@@ -9,6 +9,14 @@ async function makeOneTest( baseEvent, expectedCloudformationColumns, expectedVi
   const columnResponse = await handleEvent( columnEvent )
   expect(columnResponse.requestId).to.be.equal( columnEvent.requestId );
   expect(columnResponse.fragment ).to.be.deep.equal( expectedCloudformationColumns );
+
+  const cacheColumnEvent = JSON.parse(JSON.stringify( baseEvent ));
+  cacheColumnEvent.requestId = columnEvent.requestId + "__col";
+  cacheColumnEvent.params.OutputType = "StorageDescriptor-Columns-noParsedPartition";
+  
+  const cacheColumnResponse = await handleEvent( cacheColumnEvent )
+  expect(cacheColumnResponse.requestId).to.be.equal( cacheColumnEvent.requestId );
+  expect(cacheColumnResponse.fragment ).to.be.deep.equal( expectedCloudformationColumnsForCacheTable );
 
 
   const viewEvent = JSON.parse(JSON.stringify( baseEvent ));
@@ -117,6 +125,57 @@ describe("eventHandler tests", function () {
       }
     ];
 
+    const expectedCloudformationColumnsForCacheTable = [
+      {
+        "Name": "iun",
+        "Type": "string"
+      },
+      {
+        "Name": "taxonomyCode",
+        "Type": "string"
+      },
+      {
+        "Name": "dynamodb_SizeBytes",
+        "Type": "bigint"
+      },
+      {
+        "Name": "dynamodb_keys_iun",
+        "Type": "string"
+      },
+      {
+        "Name": "kinesis_dynamodb_ApproximateCreationDateTime",
+        "Type": "bigint"
+      },
+      {
+        "Name": "stream_awsregion",
+        "Type": "string"
+      },
+      {
+        "Name": "stream_eventid",
+        "Type": "string"
+      },
+      {
+        "Name": "stream_eventname",
+        "Type": "string"
+      },
+      {
+        "Name": "stream_recordformat",
+        "Type": "string"
+      },
+      {
+        "Name": "stream_tablename",
+        "Type": "string"
+      },
+      {
+        "Name": "stream_useridentity",
+        "Type": "string"
+      },
+      {
+        "Name": "p_hour",
+        "Type": "string"
+      }
+    ];
+
     const expectedViewData = {
       originalSql: trimCodeIndent( 10, `
           WITH simplified_data AS (
@@ -210,7 +269,7 @@ describe("eventHandler tests", function () {
       ]
     };
 
-    await makeOneTest( baseEvent, expectedCloudformationColumns, expectedViewData );
+    await makeOneTest( baseEvent, expectedCloudformationColumns, expectedCloudformationColumnsForCacheTable, expectedViewData );
   });
 
   it("should generate fake output if disabled", async () => {
@@ -247,7 +306,7 @@ describe("eventHandler tests", function () {
         }]
     };
 
-    await makeOneTest( baseEvent, expectedCloudformationColumns, expectedViewData );
+    await makeOneTest( baseEvent, expectedCloudformationColumns, expectedCloudformationColumns, expectedViewData );
   });
 
   it("correct output type is required", async () => { 
@@ -330,7 +389,7 @@ describe("eventHandler tests", function () {
         }]
     };
 
-    await makeOneTest( baseEvent, expectedCloudformationColumns, expectedViewData );
+    await makeOneTest( baseEvent, expectedCloudformationColumns, expectedCloudformationColumns, expectedViewData );
   })
 
 })

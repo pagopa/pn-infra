@@ -204,7 +204,7 @@ Resources:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Ref GlueDatabaseName
       TableInput:
-        Name: !Sub ${GlueTableName}_parsed
+        Name: !Sub ${GlueTableName}_parsed_cache
         TableType: EXTERNAL_TABLE
         PartitionKeys:
           - Name: p_year
@@ -245,7 +245,7 @@ Resources:
                 CdcKeysType: !Ref DynamoDBKeysStructure
                 CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
                 CdcRecordFilter: !Ref CdcRecordFilter
-                OutputType: 'StorageDescriptor-Columns'
+                OutputType: 'StorageDescriptor-Columns-noParsedPartition'
                 Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
           Location: !Sub s3://${LogsBucketName}/cdcTos3_parsed/TABLE_NAME_${DynamoTableName}/
           InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
