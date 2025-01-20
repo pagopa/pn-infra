@@ -3,7 +3,7 @@ Description: Macro used to generate a specific value by inputs
 
 Resources:
 
-  GenerateLBPriorityId:
+  GenerateLBPriorityIdMacro:
     Type: AWS::CloudFormation::Macro
     Properties:
       Description: CloudFormation macro to generate
@@ -16,7 +16,7 @@ Resources:
       LogGroupName:
         !Sub [
           "/aws/lambda/${groupName}",
-          { groupName: !Ref GenerateLBPriorityIdFunction },
+          { groupName: !Ref GenerateLBPriorityIdMacro },
         ]
       RetentionInDays: 14
 
@@ -58,23 +58,28 @@ Resources:
   GenerateLBPriorityIdFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: GenerateLBPriorityId
+      FunctionName: GenerateLBPriorityIdMacro
       ZipFile: |
-          import json
-
-          def generateLBPriorityId(x, y):
+        import json
+        
+        def generateLBPriorityId(x, y):
             return (x * 100) - y
-          
-          def handler(event, context):
-              parameters = event.get("params", {})
-              msNumber = parameters.get("msNumber", 0)
-              index = parameters.get("index", 0)
-              result = generateLBPriorityId(msNumber, index)
-              return {
-                  "statusCode": 200,
-                  "result": result,
-              }
-
+        
+        # Definizione del nuovo handler:
+        def handler(event, context):
+            # Estrarre i parametri dall'evento:
+            parameters = event.get("params", {})
+            msNumber = parameters.get("msNumber", 0)
+            index = parameters.get("index", 0)
+            
+            # Generare il risultato:
+            result = generateLBPriorityId(msNumber, index)
+            
+            # Restituire una risposta:
+            return {
+                "statusCode": 200,
+                "result": result,
+            }
 
       Handler: index.handler
       Runtime: python3.9
