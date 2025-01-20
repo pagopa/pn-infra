@@ -3,7 +3,7 @@ const { parseArgs } = require('util');
 const fs = require('fs');
 
 function _checkingParameters(args, values){
-  const usage = "Usage: index.js --envName <env-name> --cmd <command> [--configPath <configPath>]"
+  const usage = "Usage: index.js --envName <env-name> --cmd <command> [--parameter <parameter> --syncPath <syncPath> --configPath <configPath>]"
   //CHECKING PARAMETER
   args.forEach(el => {
     if(el.mandatory && !values.values[el.name]){
@@ -35,10 +35,12 @@ function _writeInFile(resultFolder, filename, data) {
 const args = [
   { name: "envName", mandatory: true, subcommand: [] },
   { name: "cmd", mandatory: true, subcommand: [] },
+  { name: "parameter", mandatory: false, subcommand: [] },
+  { name: "syncPath", mandatory: false, subcommand: ['parameter'] },
   { name: "configPath", mandatory: false, subcommand: [] },
 ]
 const values = {
-  values: { envName, cmd, configPath },
+  values: { envName, cmd, parameter, syncPath, configPath },
 } = parseArgs({
   options: {
     envName: {
@@ -47,14 +49,22 @@ const values = {
     cmd: {
       type: "string", short: "c", default: undefined
     },
+    parameter: {
+      type: "string", short: "v", default: undefined
+    },
+    syncPath: {
+      type: "string", short: "p", default: undefined
+    },
     configPath: {
       type: "string", short: "p", default: undefined
     },
   },
 });  
 
+
 _checkingParameters(args, values)
 
+const timestamp = new Date().toISOString()
 const awsClient = new AwsClientsWrapper( envName );
 
 function sanitizeFile(systemParameter){
@@ -71,26 +81,46 @@ async function executeCommand(accountName){
   // list parameters -> return {}
   const parameters = await awsClient._listSSMParameters(accountName)
   const fullKeys = Object.keys(parameters)
-
-  // remove from Parameters keys not included in appConfig.skipParameters 
+  if(parameter) {
+    if(fullKeys.indexOf(parameter) < 0) {
+      console.log(`Parameter is not present in ${accountName} account`)
+      return;
+    }
+    else {
+      console.log(`Parameter found in ${accountName} account`)
+    }
+  }
+  // remove from Parameters keys not included in appConfig.skipParameters[accountName]
+  console.log(appConfig.skipParameters[accountName])
   const keys = fullKeys.filter((k) => {
-    return appConfig.skipParameters.indexOf(k)<0
-  })
+    return !appConfig.skipParameters[accountName].some((param) => k.startsWith(param));
+  });
+  console.log(keys.length)
 
   for(let i=0; i<keys.length; i++) {
     parameters[keys[i]].Value = await awsClient._getSSMParameter(accountName, keys[i])
   }
-
+  const syncBasePath = `${syncPath}/${envName}/_conf/${accountName}/system_params`
+  const confBasePath = `${configPath}/${envName}/_conf/${accountName}/system_params`
   // dump into a specific folder
   if(cmd=='dump'){
+    const manifest = []
     keys.forEach(key => {
-      _writeInFile(configPath+'/'+envName+'/_conf/'+accountName+'/system_params/', sanitizeFile(parameters[key])+'.param', parameters[key].Value)
-    })
+      let sanitizedFile = `${sanitizeFile(parameters[key])}.param`
+      _writeInFile(confBasePath, `${sanitizedFile}`, parameters[key].Value)
+      let element = {
+        "paramName": parameters[key].Name,
+        "localName": sanitizedFile,
+        "tier": parameters[key].Tier
+      }
+      manifest.push(element)
+    }) 
+    _writeInFile(confBasePath, `_manifest.json`, JSON.stringify(manifest))
   } else if(cmd=='compare'){
     // compare with a specific folder
-    const files = fs.readdirSync(configPath+'/'+envName+'/_conf/'+accountName+'/system_params/')
+    const files = fs.readdirSync(confBasePath)
     files.forEach(file => {
-      const fileContent = fs.readFileSync(configPath+'/'+envName+'/_conf/'+accountName+'/system_params/'+file, 'utf-8')
+      const fileContent = fs.readFileSync(`${confBasePath}/${file}`, 'utf-8')
       const key = file.split('##A##')[0].replace(/#/g, '/')
       if(parameters[key].Value != fileContent){
         console.log('['+accountName+'] Parameter '+key+' has local changes')
@@ -98,6 +128,25 @@ async function executeCommand(accountName){
         console.log('['+accountName+'] Parameter '+key+' is in sync')
       }
     })
+  } else if(cmd=='sync'){
+    if(!parameter) {
+      console.log("No parameter has been inserted")
+      process.exit(1)
+    }
+    const manifest = JSON.parse(fs.readFileSync(`${syncBasePath}/_manifest.json`))
+
+    for(const data of manifest) {
+      if(data.paramName === parameter) {
+
+        const valueBackup = await awsClient._getSSMParameter(accountName, data.paramName)
+        const paramToSync = fs.readFileSync(`${syncBasePath}/${data.localName}`, 'utf-8')
+        _writeInFile(`backup/${envName}/${timestamp}`, data.localName, valueBackup)
+        console.log(`Backup available in ./backup/${envName}/${timestamp}/${data.localName}`)
+        await awsClient._updateSSMParameter(accountName, data.paramName, data.tier, paramToSync)
+        console.log(`DataStore ${data.paramName} updated successfully!!!`)
+        return;
+      }
+    }
   }
 }
 async function main() {
