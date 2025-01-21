@@ -1157,16 +1157,16 @@ Resources:
             - Name: 'MICROSERVICE_NAME'
               Value: !Ref MicroServiceUniqueName
             - 'Fn::If':
+              - HasJavaToolOptions
+              - Name: 'JAVA_TOOL_OPTIONS'
+                Value: !Sub '-javaagent:/xray/aws-opentelemetry-agent.jar ${JavaToolOptions}'
+              - Name: 'JAVA_TOOL_OPTIONS'
+                Value: '-javaagent:/xray/aws-opentelemetry-agent.jar'
+            - 'Fn::If':
                 - HasJavaToolOptions
                 - Name: 'JAVA_TOOL_OPTIONS'
                   Value: !Sub '${JavaToolOptions}'
                 - !Ref "AWS::NoValue"
-            - 'Fn::If':
-                - HasJavaToolOptions
-                - Name: 'JAVA_TOOL_OPTIONS'
-                  Value: !Sub '${JavaToolOptions} -javaagent:/xray/aws-opentelemetry-agent.jar'
-                - Name: 'JAVA_TOOL_OPTIONS'
-                  Value: '-javaagent:/xray/aws-opentelemetry-agent.jar'
             - 'Fn::If':
                 - Env1Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry1 ] ]
