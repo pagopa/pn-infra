@@ -1078,14 +1078,14 @@ Resources:
                   ContainerPath: "/mnt/efs"
                 - !Ref AWS::NoValue
           DependsOn:
-            'Fn::If':
+            - ContainerName: sidecar-injector
+              Condition: COMPLETE
+            - 'Fn::If':
               - ShouldEnableOtelXRay
-              - !Ref AWS::NoValue
-              - 
-                - ContainerName: sidecar-injector
-                  Condition: COMPLETE
-                - ContainerName: aws-collector
-                  Condition: START
+              -
+                !Ref AWS::NoValue
+              - ContainerName: aws-collector
+                Condition: START
           Secrets:
             - 'Fn::If':
               - Secret1Exist
