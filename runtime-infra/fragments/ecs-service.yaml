@@ -51,7 +51,7 @@ Parameters:
     AllowedValues:
       - "true"
       - "false"
-    Default: "true"
+    Default: "false"
 
   ContainerImageClockdriftURI:
     Type: String
@@ -754,7 +754,7 @@ Conditions:
      - Condition: AutoscalingBySQS
      - Condition: AutoscalingCustom
 
-  ShouldEnableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'true' ] 
+  HasOtelXRayDisable: !Equals [ !Ref DisableOtelXRay, 'true' ] 
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
@@ -1065,7 +1065,7 @@ Resources:
           Image: !Ref ContainerImageURI
           Memory: 
             'Fn::If':
-              - ShouldEnableOtelXRay
+              - HasOtelXRayDisable
               - !FindInMap [ ContainerMemoryNoXray, !Ref MemoryAmount, microservice ]
               - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
           MountPoints:
@@ -1081,7 +1081,7 @@ Resources:
             - ContainerName: sidecar-injector
               Condition: COMPLETE
             - 'Fn::If':
-              - ShouldEnableOtelXRay
+              - HasOtelXRayDisable
               -
                 !Ref AWS::NoValue
               - ContainerName: aws-collector
@@ -1159,7 +1159,7 @@ Resources:
             - 'Fn::If':
               - HasJavaToolOptions
               - Name: 'JAVA_TOOL_OPTIONS'
-                Value: !Sub '-javaagent:/xray/aws-opentelemetry-agent.jar ${JavaToolOptions}'
+                Value: !Sub '${JavaToolOptions} -javaagent:/xray/aws-opentelemetry-agent.jar'
               - Name: 'JAVA_TOOL_OPTIONS'
                 Value: '-javaagent:/xray/aws-opentelemetry-agent.jar'
             - 'Fn::If':
@@ -1656,7 +1656,7 @@ Resources:
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
         - 'Fn::If':
-            - ShouldEnableOtelXRay
+            - HasOtelXRayDisable
             - !Ref AWS::NoValue
             - 
               Name: aws-collector
