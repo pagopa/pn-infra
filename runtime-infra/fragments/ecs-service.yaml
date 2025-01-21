@@ -1163,11 +1163,6 @@ Resources:
               - Name: 'JAVA_TOOL_OPTIONS'
                 Value: '-javaagent:/xray/aws-opentelemetry-agent.jar'
             - 'Fn::If':
-                - HasJavaToolOptions
-                - Name: 'JAVA_TOOL_OPTIONS'
-                  Value: !Sub '${JavaToolOptions}'
-                - !Ref "AWS::NoValue"
-            - 'Fn::If':
                 - Env1Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry1 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry1 ] ]
