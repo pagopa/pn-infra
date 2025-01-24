@@ -55,18 +55,22 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: GenerateLBPriorityIdFunction
-      ZipFile: |
+      Code:
+        ZipFile: |
         import json
-
+        
+        def generateLBPriorityId(x, y):
+            return (x * 100) - y
+        
         # Definizione del nuovo handler:
-        def lambda_handler(event, context):
+        def handler(event, context):
             # Estrarre i parametri dall'evento:
             parameters = event.get("params", {})
             msNumber = int(parameters.get("msNumber", 0))
             index = int(parameters.get("index", 0))
             
             # Generare il risultato:
-            result = (msNumber * 100) - index
+            result = generateLBPriorityId(msNumber, index)
             
             # Restituire una risposta:
             return {
@@ -74,7 +78,7 @@ Resources:
                 "result": result,
             }
 
-      Handler: index.lambda_handler
+      Handler: index.handler
       Runtime: python3.9
       Role: !GetAtt GenerateLBPriorityIdFunctionRole.Arn
 
