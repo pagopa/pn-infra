@@ -13,11 +13,7 @@ Resources:
   GenerateLBPriorityIdFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName:
-        !Sub [
-          "/aws/lambda/${groupName}",
-          { groupName: !Ref GenerateLBPriorityIdMacro },
-        ]
+      LogGroupName: !Sub "/aws/lambda/${GenerateLBPriorityIdFunction}"
       RetentionInDays: 14
 
   GenerateLBPriorityIdFunctionRole:
@@ -40,13 +36,13 @@ Resources:
                 Action:
                   - logs:CreateLogGroup
                 Resource:
-                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/GenerateLBPriorityId"
+                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/GenerateLBPriorityIdFunction"
               - Effect: Allow
                 Action:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/GenerateLBPriorityId:*" 
+                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/GenerateLBPriorityIdFunction:*" 
 
   GenerateLBPriorityIdFunctionPermissions:
     Type: AWS::Lambda::Permission
@@ -58,7 +54,7 @@ Resources:
   GenerateLBPriorityIdFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: GenerateLBPriorityIdMacro
+      FunctionName: GenerateLBPriorityIdFunction
       ZipFile: |
         import json
         
@@ -69,8 +65,8 @@ Resources:
         def handler(event, context):
             # Estrarre i parametri dall'evento:
             parameters = event.get("params", {})
-            msNumber = parameters.get("msNumber", 0)
-            index = parameters.get("index", 0)
+            msNumber = int(parameters.get("msNumber", 0))
+            index = int(parameters.get("index", 0))
             
             # Generare il risultato:
             result = generateLBPriorityId(msNumber, index)
