@@ -57,19 +57,16 @@ Resources:
       FunctionName: GenerateLBPriorityIdFunction
       ZipFile: |
         import json
-        
-        def generateLBPriorityId(x, y):
-            return (x * 100) - y
-        
+
         # Definizione del nuovo handler:
-        def handler(event, context):
+        def lambda_handler(event, context):
             # Estrarre i parametri dall'evento:
             parameters = event.get("params", {})
             msNumber = int(parameters.get("msNumber", 0))
             index = int(parameters.get("index", 0))
             
             # Generare il risultato:
-            result = generateLBPriorityId(msNumber, index)
+            result = (msNumber * 100) - index
             
             # Restituire una risposta:
             return {
@@ -77,7 +74,7 @@ Resources:
                 "result": result,
             }
 
-      Handler: index.handler
+      Handler: index.lambda_handler
       Runtime: python3.9
       Role: !GetAtt GenerateLBPriorityIdFunctionRole.Arn
 
