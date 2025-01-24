@@ -64,15 +64,11 @@ Resources:
           
           # Definizione del nuovo handler:
           def handler(event, context):
-              # Estrarre i parametri dall'evento:
-              parameters = event.get("params", {})
-              msNumber = int(parameters.get("msNumber", 0))
-              index = int(parameters.get("index", 0))
+              msNumber = int(event.get("msNumber", 0))
+              index = int(event.get("index", 0))
               
-              # Generare il risultato:
               result = generateLBPriorityId(msNumber, index)
               
-              # Restituire una risposta:
               return {
                   "result": result,
               }
