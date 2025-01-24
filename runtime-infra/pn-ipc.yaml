@@ -882,6 +882,40 @@ Resources:
         DelaySeconds: 1
         QueueOldestAgeLimit: 172800 # 2 days
 
+  ### Communication FROM pn-paper-channel TO pn-delayer ###
+  PaperChannelToDelayerQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-paperchannel_to_delayer'
+        DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-delayer"
+
+  ### Communication FROM pn-delayer TO pn-paper-channel ###
+  DelayerToPaperChannelQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-delayer_to_paperchannel'
+        DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-paper-channel"
+
   ###                             ELASTIC FILE SYSTEM                     ###
   ###########################################################################
 
@@ -1419,6 +1453,40 @@ Outputs:
   # RaddAltToPaperChannelQueueAgeAlarmARN:
   #   Value: !GetAtt RaddAltToPaperChannelQueue.Outputs.SqsAgeAlarmArn
   #   Description: raddalt-to-paperchannel queue age alarm ARN
+
+  # pn-paperchannel_to_delayer
+  PaperChannelToDelayerQueueName:
+    Value: !GetAtt PaperChannelToDelayerQueue.Outputs.QueueName
+    Description: PaperChannelToDelayerQueue queue name
+  PaperChannelToDelayerQueueURL:
+    Value: !GetAtt PaperChannelToDelayerQueue.Outputs.QueueURL
+    Description: PaperChannelToDelayerQueue queue URL
+  PaperChannelToDelayerQueueARN:
+    Value: !GetAtt PaperChannelToDelayerQueue.Outputs.QueueARN
+    Description: PaperChannelToDelayerQueue queue ARN
+  PaperChannelToDelayerQueueAlarmARN:
+    Value: !GetAtt PaperChannelToDelayerQueue.Outputs.SqsDLQAlarmArn
+    Description: PaperChannelToDelayerQueue alarm ARN
+  PaperChannelToDelayerQueueAgeAlarmARN:
+    Value: !GetAtt PaperChannelToDelayerQueue.Outputs.SqsAgeAlarmArn
+    Description: PaperChannelToDelayerQueue age alarm ARN
+
+  # pn-delayer_to_paperchannel
+  DelayerToPaperChannelQueueName:
+    Value: !GetAtt DelayerToPaperChannelQueue.Outputs.QueueName
+    Description: DelayerToPaperChannelQueue queue name
+  DelayerToPaperChannelQueueQueueURL:
+    Value: !GetAtt DelayerToPaperChannelQueue.Outputs.QueueURL
+    Description: DelayerToPaperChannelQueue queue URL
+  DelayerToPaperChannelQueueARN:
+    Value: !GetAtt DelayerToPaperChannelQueue.Outputs.QueueARN
+    Description: DelayerToPaperChannelQueue queue ARN
+  DelayerToPaperChannelQueueAlarmARN:
+    Value: !GetAtt DelayerToPaperChannelQueue.Outputs.SqsDLQAlarmArn
+    Description: DelayerToPaperChannelQueue alarm ARN
+  DelayerToPaperChannelQueueAgeAlarmARN:
+    Value: !GetAtt DelayerToPaperChannelQueue.Outputs.SqsAgeAlarmArn
+    Description: DelayerToPaperChannelQueue age alarm ARN
 
   # Kinesis Source Stream containing the DynamoDB Change Data Capture events
   CdcKinesisSourceStreamName:
