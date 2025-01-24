@@ -754,7 +754,7 @@ Conditions:
      - Condition: AutoscalingBySQS
      - Condition: AutoscalingCustom
 
-  ShouldEnableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'true' ] 
+  HasOtelXRayDisable: !Equals [ !Ref DisableOtelXRay, 'true' ] 
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
@@ -1065,7 +1065,7 @@ Resources:
           Image: !Ref ContainerImageURI
           Memory: 
             'Fn::If':
-              - ShouldEnableOtelXRay
+              - HasOtelXRayDisable
               - !FindInMap [ ContainerMemoryNoXray, !Ref MemoryAmount, microservice ]
               - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
           MountPoints:
@@ -1078,14 +1078,14 @@ Resources:
                   ContainerPath: "/mnt/efs"
                 - !Ref AWS::NoValue
           DependsOn:
-            'Fn::If':
-              - ShouldEnableOtelXRay
-              - !Ref AWS::NoValue
-              - 
-                - ContainerName: sidecar-injector
-                  Condition: COMPLETE
-                - ContainerName: aws-collector
-                  Condition: START
+            - ContainerName: sidecar-injector
+              Condition: COMPLETE
+            - 'Fn::If':
+              - HasOtelXRayDisable
+              -
+                !Ref AWS::NoValue
+              - ContainerName: aws-collector
+                Condition: START
           Secrets:
             - 'Fn::If':
               - Secret1Exist
@@ -1157,18 +1157,11 @@ Resources:
             - Name: 'MICROSERVICE_NAME'
               Value: !Ref MicroServiceUniqueName
             - 'Fn::If':
-              - ShouldEnableOtelXRay
-              - 'Fn::If':
-                  - HasJavaToolOptions
-                  - Name: 'JAVA_TOOL_OPTIONS'
-                    Value: !Sub '${JavaToolOptions}'
-                  - !Ref "AWS::NoValue"
-              - 'Fn::If':
-                  - HasJavaToolOptions
-                  - Name: 'JAVA_TOOL_OPTIONS'
-                    Value: !Sub '${JavaToolOptions} -javaagent:/xray/aws-opentelemetry-agent.jar'
-                  - Name: 'JAVA_TOOL_OPTIONS'
-                    Value: '-javaagent:/xray/aws-opentelemetry-agent.jar'
+              - HasJavaToolOptions
+              - Name: 'JAVA_TOOL_OPTIONS'
+                Value: !Sub '${JavaToolOptions} -javaagent:/xray/aws-opentelemetry-agent.jar'
+              - Name: 'JAVA_TOOL_OPTIONS'
+                Value: '-javaagent:/xray/aws-opentelemetry-agent.jar'
             - 'Fn::If':
                 - Env1Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry1 ] ]
@@ -1645,8 +1638,25 @@ Resources:
               awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
+        - Name: sidecar-injector
+          Image: !Ref ContainerImageInjectorURI
+          #Command: !Ref CommandSidecarInjector
+          #EntryPoint: [!Ref EntrypointSidecarInjector]
+          Essential: false
+          MountPoints:
+            - SourceVolume: "my-vol"
+              ContainerPath: "/xray/"
+          Cpu: '128'
+          Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-create-group: 'True'
+              awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: ecs
         - 'Fn::If':
-            - ShouldEnableOtelXRay
+            - HasOtelXRayDisable
             - !Ref AWS::NoValue
             - 
               Name: aws-collector
@@ -1654,27 +1664,6 @@ Resources:
               Command: [!Ref AwsCollectorCommand]
               Cpu: '256'
               Memory: !FindInMap [ ContainerMemory, !Ref MemoryAmount, awsCollector ]
-              LogConfiguration:
-                LogDriver: awslogs
-                Options:
-                  awslogs-create-group: 'True'
-                  awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
-                  awslogs-region: !Ref 'AWS::Region'
-                  awslogs-stream-prefix: ecs
-        - 'Fn::If':
-            - ShouldEnableOtelXRay
-            - !Ref AWS::NoValue
-            - 
-              Name: sidecar-injector
-              Image: !Ref ContainerImageInjectorURI
-              #Command: !Ref CommandSidecarInjector
-              #EntryPoint: [!Ref EntrypointSidecarInjector]
-              Essential: false
-              MountPoints:
-                - SourceVolume: "my-vol"
-                  ContainerPath: "/xray/"
-              Cpu: '128'
-              Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
               LogConfiguration:
                 LogDriver: awslogs
                 Options:
