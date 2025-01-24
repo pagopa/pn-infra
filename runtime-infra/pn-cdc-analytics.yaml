@@ -128,6 +128,225 @@ Resources:
               StringEquals:
                 aws:SourceAccount: !Ref AWS::AccountId
 
+  
+
+  ###############################################################################
+  ###                       UPDATE CDC JSON VIEWS CACHE                       ###
+  ###############################################################################
+
+  UpdateCdcJsonViewsCodebuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: "pn-athena-update-cdc-json-cache"
+      ServiceRole: !GetAtt UpdateCdcJsonViewsCodebuildServiceRole.Arn
+      ConcurrentBuildLimit: 1
+      TimeoutInMinutes: 60
+      Source: 
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - |
+                  usage() {
+                          cat <<EOF
+                      Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] -e <env-type> 
+                      [-h]                      : this help message
+                      -e <env-type>             : one of dev / uat / svil / coll / cert / prod
+                  EOF
+                      exit 1
+                  }
+                - |
+                  dump_params(){
+                      echo ""
+                      echo "######      PARAMETERS      ######"
+                      echo "##################################"
+                      echo "Env Name:              ${env_type}"
+                      echo "Region:                ${region}"
+                      echo "AccountId:             ${account_id}"
+                      echo "Athena Output Bucket:  ${athena_output_bucket}"
+                      
+                      if ( [ -z "${env_type-}" ] ) then
+                      usage
+                      fi
+                      if ( [ -z "${region-}" ] ) then
+                      usage
+                      fi
+                      if ( [ -z "${account_id-}" ] ) then
+                      usage
+                      fi
+                      if ( [ -z "${athena_output_bucket-}" ] ) then
+                      usage
+                      fi
+                  }
+                - dump_params
+            build:
+              commands:
+                - export aws_command_base_args=""
+                - |
+                  echo "- List views to update"
+                  export crawlers_list=$(
+                    aws ${aws_command_base_args} \
+                        glue list-crawlers \
+                        --max-results 100 \
+                        --tags '{"PnHasView":"true"}' \
+                    | jq -r '.CrawlerNames | .[]'
+                  )
+                - |
+                  echo "Found $( echo $crawlers_list | wc -w  ) view(s) to update " 
+                - |
+                  for crawler_name in $crawlers_list 
+                  do
+                    crawler_tags=$(
+                      aws ${aws_command_base_args} \
+                          glue get-tags \
+                          --resource-arn "arn:aws:glue:${region}:${account_id}:crawler/${crawler_name}" \
+                        | jq -r '.Tags | tojson' \
+                    )
+
+                    json_view=$( echo $crawler_tags | jq -r '.PnView' )
+                    cache_table=$( echo $crawler_tags | jq -r '.PnViewCache' )
+                    echo "- Update cache ${cache_table} from view ${json_view}"
+
+                    query="INSERT INTO \"${database_name}\".\"${cache_table}\" \n\
+                          SELECT * FROM \"${database_name}\".\"${json_view}\" \n\
+                              WHERE p_year = lpad( cast( year( date_add('day', -1, current_date )) as varchar), 4, '0') \n\
+                                AND p_month = lpad( cast( month( date_add('day', -1, current_date )) as varchar), 2, '0') \n\
+                                AND p_day = lpad( cast( day( date_add('day', -1, current_date )) as varchar), 2, '0') "
+                    
+                    echo "  Start execute query \n      ${query}" 
+                    echo "${query}" > query.txt
+                    queryExecutionId=$(
+                        aws ${aws_command_base_args} \
+                            athena start-query-execution \
+                            --query-string file://query.txt \
+                            --result-configuration "OutputLocation=s3://${athena_output_bucket}/cache_updates/${cache_table}"\
+                          | jq -r '.QueryExecutionId' \
+                      )
+                    if ( [ "${queryExecutionId}" = "" ] ) then
+                      exit 1
+                    fi
+
+                    executionDone="false"
+                    
+                    while ( [ "${executionDone}" != "true" ] ) do
+                      echo " Wait query ${queryExecutionId} execution"
+                      sleep 5
+                      executionState=$( 
+                          aws ${aws_command_base_args} \
+                              athena get-query-execution \
+                              --query-execution-id ${queryExecutionId} \
+                            | jq -r '.QueryExecution.Status.State' \
+                      )
+                      echo " Execution ${executionState}"
+                      
+                      if ( [ "${executionState}" = "FAILED" ] ) then
+                        exit 2
+                      fi
+                      if ( [ "${executionState}" = "SUCCEEDED" ] ) then
+                        executionDone="true"
+                      fi
+                    done
+                  done
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Type: LINUX_CONTAINER
+        Image: "aws/codebuild/standard:7.0"
+        EnvironmentVariables:
+          - Name: region
+            Type: PLAINTEXT
+            Value: !Ref AWS::Region
+          - Name: account_id
+            Type: PLAINTEXT
+            Value: !Ref AWS::AccountId
+          - Name: database_name
+            Type: PLAINTEXT
+            Value: !Ref GlueDatabase
+          - Name: athena_output_bucket
+            Type: PLAINTEXT
+            Value: !Ref AthenaResultsBucket
+          
+  UpdateCdcJsonViewsCodebuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: pn-athena-update-cdc-json-cache-codebuild-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: pn-athena-update-cdc-json-cache-codebuild-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: CanLog
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: 
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*
+              - Sid: CanListCrawlers
+                Effect: Allow
+                Action:
+                  - "glue:BatchGetCrawlers"
+                  - "glue:ListCrawlers"
+                Resource:
+                  - "*"
+              - Sid: CanExecuteQuery
+                Effect: Allow
+                Action:
+                  - "athena:BatchGetQueryExecution"
+                  - "athena:GetQueryExecution"
+                  - "athena:StartQueryExecution"
+                Resource:
+                  - "*"
+              
+  UpdateCdcJsonViewsScheduleBridgeRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Schedule json views cache update everyday at 3AM UTC time.
+      RoleArn: !GetAtt "EventBusRunCodeBuildRole.Arn"
+      ScheduleExpression: "cron(0 3 * * ? *)"
+      State: "ENABLED"
+      Targets: 
+        - Id: "UpdateCdcJsonViewsBridgeRule-CbTarget"
+          Arn: !GetAtt UpdateCdcJsonViewsCodebuildProject.Arn
+          RoleArn: !GetAtt "EventBusRunCodeBuildRole.Arn"
+  
+
+  # - Role and policy used to activate CodeBuild from EventBridge rule
+  EventBusRunCodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: runCodeBuild
+          PolicyDocument:
+            Statement:
+              - Sid: startProjectRun
+                Action:
+                  - "codebuild:*"
+                Effect: Allow
+                Resource: 
+                  - !GetAtt UpdateCdcJsonViewsCodebuildProject.Arn
+
+
 Outputs:
   GlueDatabaseName:
     Description: Name of the Glue Database

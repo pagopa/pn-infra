@@ -153,6 +153,21 @@ Resources:
         - IsGlueCrawlerScheduled
         - ScheduleExpression: !Ref GlueCrawlerSchedule
         - !Ref AWS::NoValue
+      Tags: 
+        Fn::If:
+          - Key: PnHasView
+            Value: 
+              Fn::If: 
+                - HasCdcView
+                - "true"
+                - "false"
+          - HasCdcView
+          - - Key: PnView
+              Value: !Sub '${GlueTableName}_jsonview_slow'
+            - Key: PnViewCache
+              Value: !Sub '${GlueTableName}_parsed_cache'
+          - !Ref AWS::NoValue
+              
   
   CdcGlueView:
     Condition: HasCdcView
