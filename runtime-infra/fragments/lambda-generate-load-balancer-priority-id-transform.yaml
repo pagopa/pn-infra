@@ -71,11 +71,13 @@ Resources:
               except e:
                   print(e)
                   
-              result = generateLBPriorityId(msNumber, index)
-              
-              return {
-                  "fragments": result
-              }
+              priorityId = generateLBPriorityId(msNumber, index)
+              result = {
+                  "status": "success",
+                  "requestId": event['requestId'],
+                  "fragment": priorityId
+              } 
+              return result
 
       Handler: index.handler
       Runtime: python3.9
