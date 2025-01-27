@@ -344,6 +344,15 @@ Resources:
                   "Resource": "arn:${AWS::Partition}:s3:::${LogsBucketName}/safeStorageObjectPutAndGetTracing/*"
                 },
                 {
+                  "Sid": "pnCoreGetLogsToS3",
+                  "Effect": "Allow",
+                  "Principal": {
+                      "AWS": "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
+                  },
+                  "Action": "s3:GetObject",
+                  "Resource": "arn:${AWS::Partition}:s3:::${LogsBucketName}/logsTos3/*"
+                },
+                {
                   "Sid": "pnDiagnosticCloudtrailWrite",
                   "Effect": "Allow",
                   "Principal": {
