@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Macro used to generate a specific value by inputs
+
+Resources:
+
+  GenerateLBPriorityIdMacro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Description: CloudFormation macro to generate
+      FunctionName: !GetAtt GenerateLBPriorityIdFunction.Arn
+      Name: GenerateLBPriorityIdMacro
+  
+  GenerateLBPriorityIdFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${GenerateLBPriorityIdFunction}"
+      RetentionInDays: 14
+
+  GenerateLBPriorityIdFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ["sts:AssumeRole"]
+      Path: /
+      Policies:
+        - PolicyName: PriorityIdTransform
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/GenerateLBPriorityIdFunction"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/GenerateLBPriorityIdFunction:*" 
+
+  GenerateLBPriorityIdFunctionPermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt GenerateLBPriorityIdFunction.Arn
+      Principal: "cloudformation.amazonaws.com"
+  
+  GenerateLBPriorityIdFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: GenerateLBPriorityIdFunction
+      Code:
+        ZipFile: |
+          import json
+          
+          def generateLBPriorityId(x, y):
+              return (x * 100) - y
+          
+          # Definizione del nuovo handler:
+          def handler(event, context):
+              try:
+                  params = event.get("params", {})
+                  msNumber = int(params.get("msNumber", 0))
+                  index = int(params.get("index", 0))
+              except e:
+                  print(e)
+                  
+              priorityId = generateLBPriorityId(msNumber, index)
+              result = {
+                  "status": "success",
+                  "requestId": event['requestId'],
+                  "fragment": priorityId
+              } 
+              return result
+
+      Handler: index.handler
+      Runtime: python3.9
+      Role: !GetAtt GenerateLBPriorityIdFunctionRole.Arn
+
