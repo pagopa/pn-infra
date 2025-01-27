@@ -98,16 +98,6 @@ Parameters:
     Description: Using the right command to choose the config file you want to config your AOC
     Default: --config=/etc/ecs/ecs-xray.yaml
 
-  EntrypointSidecarInjector:
-    Type: String
-    Description: Excute wget for xray auto-intrumentation
-    Default: "wget"
-
-  CommandSidecarInjector:
-    Type: List<String>
-    Description: Command for download and copy xray agent for auto-instrumentation in /xray
-    Default: -O, /xray/aws-opentelemetry-agent.jar, https://github.com/aws-observability/aws-otel-java-instrumentation/releases/download/v1.19.2/aws-opentelemetry-agent.jar
-
   # Heath Check parameters
   HealthCheckInterval:
     Description: Seconds between two health check
@@ -153,11 +143,6 @@ Parameters:
     Default: 60
     Type: Number
     Description: minimum autoscaling number of tasks\
-
-  DownscalingCheckPeriod:
-    Default: 300
-    Type: Number
-    Description: minimum autoscaling number of tasks only for Downscale
 
   AutoscalingDataPointN:
     Default: 1
@@ -1640,8 +1625,6 @@ Resources:
               awslogs-stream-prefix: ecs
         - Name: sidecar-injector
           Image: !Ref ContainerImageInjectorURI
-          #Command: !Ref CommandSidecarInjector
-          #EntryPoint: [!Ref EntrypointSidecarInjector]
           Essential: false
           MountPoints:
             - SourceVolume: "my-vol"
@@ -1927,7 +1910,7 @@ Resources:
       StepScalingPolicyConfiguration:
         AdjustmentType: PercentChangeInCapacity
         MinAdjustmentMagnitude: 1
-        Cooldown: !Ref DownscalingCheckPeriod
+        Cooldown: !Ref AutoscalingCheckPeriod
         MetricAggregationType: Average
         StepAdjustments:
           - MetricIntervalLowerBound: 0
