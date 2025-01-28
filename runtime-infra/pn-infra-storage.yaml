@@ -74,6 +74,16 @@ Parameters:
     Default: 'logsTos3/'
     Description: Prefix for the logs in the bucket
 
+  BucketCdcRetentionDays:
+    Type: Number
+    Default: 1095 # 3 years
+    Description: Number of days to retain cdc in the bucket
+
+  BucketCdcPrefix:
+    Type: String
+    Default: 'cdcTos3/'
+    Description: Prefix for the cdc in the bucket
+
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
   
@@ -120,6 +130,15 @@ Resources:
             Prefix: !Ref BucketLogPrefix
             NoncurrentVersionExpiration:
               NoncurrentDays: 1
+          - Id: DeleteCdc
+            Status: Enabled
+            Prefix: !Ref BucketCdcPrefix
+            ExpirationInDays: !Ref BucketLogRetentionDays   
+          - Id: DeleteNoncurrentCdc
+            Status: Enabled
+            Prefix: !Ref BucketCdcPrefix
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1          
       NotificationConfiguration:
         QueueConfigurations:
           - Event: 's3:ObjectCreated:*'
