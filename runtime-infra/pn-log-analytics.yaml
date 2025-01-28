@@ -36,6 +36,10 @@ Parameters:
   ConfInfoLogsBucketName:
     Type: String
     Description: ConfInfo logs bucket name
+  
+  SafeStorageAccountId:
+    Description: "Confinfo AWS Account id"
+    Type: String
 
 Conditions:
   IsGlueCrawlerScheduled: !Not
@@ -1030,15 +1034,14 @@ Resources:
                 Resource:
                   - !Sub arn:aws:s3:::${ConfInfoLogsBucketName}
         - PolicyName: KMSEncryptionAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - kms:Decrypt
-                  - kms:DescribeKey
-                Resource:
-                  - !Ref ConfInfoLogsBucketKmsKeyArn
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - kms:Decrypt
+                    - kms:DescribeKey
+                  Resource: !Sub "arn:aws:kms:${AWS::Region}:${SafeStorageAccountId}:key/*"
 
   GlueCrawlerConfInfo:
     Type: AWS::Glue::Crawler
