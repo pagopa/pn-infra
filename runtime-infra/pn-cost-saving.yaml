@@ -32,6 +32,11 @@ Parameters:
     Default: ''
     Description: Cluster Ecs Name
 
+  PdfRasterECSClusterName:
+    Type: String
+    Default: ''
+    Description: 'Cluster Ecs Name'
+
   EnvironmentType:
     Type: String
     Default: ''
@@ -41,10 +46,17 @@ Parameters:
     Type: String
     Description: Bucket for save Json with desire count of Ecs
 
+  PnCoreAwsAccountId:
+    Type: String
+    Description: Core Account ID (leave blank in Core account)
+    Default: ''
+
 Conditions:
   IsNotProdAccount: !Not [ !Equals [!Ref EnvironmentType, prod ] ]
   IsNotUatAccount: !Not [ !Equals [!Ref EnvironmentType, uat ] ]
+  IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsStopEcsService: !And [ !Condition IsNotProdAccount, !Condition IsNotUatAccount ]
+  IsStopEcsServiceConfinfo: !And [ !Condition IsNotProdAccount, !Condition IsNotUatAccount, !Condition IsConfinfoAccount]
   IsHotfixAccount: !Equals [!Ref EnvironmentType, hotfix ]
 
 #LAMBDA STOP EC2
@@ -158,59 +170,100 @@ Resources:
       Code:
         ZipFile: |
           import boto3
-          import json
           import os
+          import json
 
           def lambda_handler(event, context):
-
-              ecs_cluster_name = os.environ['ECSClusterName']
-              s3bucket_name = os.environ['EcsDesireCountBucket']
-
+              ecs_cluster_names = os.environ.get('ECSClusterName', '').split(',')
+              
+              if not ecs_cluster_names or ecs_cluster_names == ['']:
+                  print("Error: Not Cluster Specified")
+                  return {
+                      'statusCode': 400,
+                      'body': 'Error: Not Cluster Specified'
+                  }
+              
               ecs_client = boto3.client('ecs')
-              
-              cluster_name = ecs_cluster_name
-              services_response = ecs_client.list_services(cluster=cluster_name, maxResults=100)
-              
-              service_arns = services_response['serviceArns']
-              service_counts = {}
+              overall_success = True  
+              results = [] 
 
-              for service_arn in service_arns:
-                  service_name = service_arn.split('/')[-1]
-                  service_details = ecs_client.describe_services(cluster=cluster_name, services=[service_name])
-                  desired_count = service_details['services'][0]['desiredCount']
-                  service_counts[service_name] = desired_count
+              for cluster_name in ecs_cluster_names:
+                  cluster_name = cluster_name.strip()  
+                  print(f"==> Start stopping services for cluster: {cluster_name}")
 
-              if any(count != 0 for count in service_counts.values()):
-                  json_data = json.dumps(service_counts)
-                  
-                  s3_client = boto3.client('s3')
-                  bucket_name = s3bucket_name
-                  object_key = 'desired_counts_ecs.json'
-                  s3_client.put_object(Body=json_data, Bucket=bucket_name, Key=object_key)
-                  
+                  try:
+                      services_response = ecs_client.list_services(cluster=cluster_name, maxResults=100)
+                      service_arns = services_response['serviceArns']
+                  except Exception as e:
+                      print(f"ERROR: Problem to retrive list of services for cluster {cluster_name}. Details: {str(e)}")
+                      overall_success = False
+                      results.append({
+                          'cluster': cluster_name,
+                          'status': 'error',
+                          'message': f'Errore to retrive list of services: {str(e)}'
+                      })
+                      continue
+
+                  if not service_arns:
+                      print(f"Nessun services trovato nel cluster {cluster_name}.")
+                      results.append({
+                          'cluster': cluster_name,
+                          'status': 'success',
+                          'message': 'no services found in cluster.'
+                      })
+                      continue
+
+                  cluster_success = True  #
                   for service_arn in service_arns:
                       service_name = service_arn.split('/')[-1]
-                      ecs_client.update_service(cluster=cluster_name, service=service_name, desiredCount=0)
+                      try:
+                          ecs_client.update_service(cluster=cluster_name, service=service_name, desiredCount=0)
+                          print(f"SUCCESS: Services {service_name} in cluster {cluster_name} setting desiredCount=0.")
+                      except Exception as e:
+                          print(f"ERROR: Problem to set desire count to zero {service_name} on cluster {cluster_name}. Details: {str(e)}")
+                          cluster_success = False
+                          overall_success = False
 
-                  print(f"JSON salvato su S3 con successo, desire_count impostati a zero")
-                      
-                  return {
-                      'statusCode': 200,
-                      'body': json.dumps('JSON salvato su S3 con successo, desire_count impostati a zero')
-                  }
+                  if cluster_success:
+                      print(f"==> All services in {cluster_name} stopping successful.")
+                      results.append({
+                          'cluster': cluster_name,
+                          'status': 'success',
+                          'message': 'All services successfully stopping.'
+                      })
+                  else:
+                      print(f"==> Error during stop services on cluster: {cluster_name}.")
+                      results.append({
+                          'cluster': cluster_name,
+                          'status': 'error',
+                          'message': 'Error during stop services.'
+                      })
+
+              if overall_success:
+                  print("==> Operation completed with success.")
               else:
-                  print("Tutti i microservizi hanno desire_count uguale a zero. Nessuna azione da intraprendere.")
-                  return {
-                      'statusCode': 200,
-                      'body': json.dumps('Tutti i microservizi hanno desire_count uguale a zero. Nessuna azione da intraprendere.')
-                  }
+                  print("==> Operation completed with errors.")
+
+              return {
+                  'statusCode': 200 if overall_success else 500,
+                  'body': json.dumps(results)
+              }
 
       Environment:
         Variables:
           EcsDesireCountBucket:
             Ref: LambdasBucketName
-          ECSClusterName:
-            Ref: ECSClusterName
+          AwsAccountId: 
+            Fn::Sub: "${AWS::AccountId}"
+          ECSClusterName: 
+            Fn::If:
+              - IsStopEcsServiceConfinfo
+              - !Join 
+                  - ","
+                  - 
+                    - Ref: ECSClusterName
+                    - Ref: PdfRasterECSClusterName
+              - Ref: ECSClusterName
 
       Role:
         Fn::GetAtt:
@@ -235,7 +288,8 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - s3:*
+                  - s3:GetObject
+                  - s3:ListBucket
                 Resource:
                   - !Sub "arn:aws:s3:::${LambdasBucketName}"
                   - !Sub "arn:aws:s3:::${LambdasBucketName}/*"
@@ -243,8 +297,16 @@ Resources:
                 Action:
                   - ecs:*
                 Resource:
-                  - !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*/${ECSClusterName}"
-                  - !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*/${ECSClusterName}/*"
+                  Fn::If:
+                    - IsStopEcsServiceConfinfo
+                    - 
+                      - !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*/${ECSClusterName}"
+                      - !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*/${ECSClusterName}/*"
+                      - !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*/${PdfRasterECSClusterName}"
+                      - !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*/${PdfRasterECSClusterName}/*"
+                    - 
+                      - !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*/${ECSClusterName}"
+                      - !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*/${ECSClusterName}/*"
               - Effect: Allow
                 Action:
                   - "logs:CreateLogStream"
@@ -301,54 +363,67 @@ Resources:
           import os
 
           def lambda_handler(event, context):
-
-              ecs_cluster_name = os.environ['ECSClusterName']
+              # Variabili di ambiente
+              ecs_cluster_names = os.environ['ECSClusterName'].split(",") 
               s3bucket_name = os.environ['EcsDesireCountBucket']
+              account_id = os.environ['AwsAccountId']
 
+              # Client AWS
               s3_client = boto3.client('s3')
               ecs_client = boto3.client('ecs')
 
-              bucket_name = s3bucket_name
-              object_key = 'desired_counts_ecs.json'
-              
-              try:
-                  response = s3_client.get_object(Bucket=bucket_name, Key=object_key)
-                  json_data = response['Body'].read().decode('utf-8')
-                  service_counts = json.loads(json_data)
-              except Exception as e:
-                  return {
-                      'statusCode': 500,
-                      'body': f'Errore nel recuperare il file JSON da S3: {str(e)}'
-                  }
-
-              cluster_name = ecs_cluster_name
-
-              for service_name, desired_count in service_counts.items():
+              for ecs_cluster_name in ecs_cluster_names:
+                  object_key = f'desire_count_ecs_{ecs_cluster_name}_{account_id}.json'
+                  
                   try:
-                      ecs_client.update_service(
-                          cluster=cluster_name,
-                          service=service_name,
-                          desiredCount=desired_count
-                      )
-                      print(f"Desire Count Ecs Service Update Successiful.")
+                      print(f"Recupero del file JSON {object_key} dal bucket {s3bucket_name}...")
+                      response = s3_client.get_object(Bucket=s3bucket_name, Key=object_key)
+                      json_data = response['Body'].read().decode('utf-8')
+                      service_counts = json.loads(json_data)
+                      print(f"File JSON successful retrived for cluster {ecs_cluster_name}.")
                   except Exception as e:
-                      print(f"Error During Update Desire Count Ecs Service.")
+                      print(f"Error during retrive JSON {object_key} from S3: {str(e)}")
                       return {
                           'statusCode': 500,
-                          'body': f'Error During Update Desire Count of {service_name}: {str(e)}'
+                          'body': f"Error during retrive JSON for cluster {ecs_cluster_name}: {str(e)}"
                       }
+
+                  for service_name, desired_count in service_counts.items():
+                      try:
+                          print(f"Update service {service_name} on cluster {ecs_cluster_name} with desiredCount {desired_count}...")
+                          ecs_client.update_service(
+                              cluster=ecs_cluster_name,
+                              service=service_name,
+                              desiredCount=desired_count
+                          )
+                          print(f"[Cluster: {ecs_cluster_name}] Desired count successful update for service '{service_name}'.")
+                      except Exception as e:
+                          print(f"[Cluster: {ecs_cluster_name}] Error during update for service '{service_name}': {str(e)}")
+                          return {
+                              'statusCode': 500,
+                              'body': f"Error during update for service '{service_name}' on cluster {ecs_cluster_name}: {str(e)}"
+                          }
 
               return {
                   'statusCode': 200,
-                  'body': 'Desired counts Successiful Updated'
+                  'body': f"Desired counts successful update for the cluster: {', '.join(ecs_cluster_names)}"
               }
 
       Environment:
         Variables:
           EcsDesireCountBucket:
             Ref: LambdasBucketName
-          ECSClusterName:
-            Ref: ECSClusterName
+          AwsAccountId: 
+            Fn::Sub: "${AWS::AccountId}"
+          ECSClusterName: 
+            Fn::If:
+              - IsStopEcsServiceConfinfo
+              - !Join 
+                  - ","
+                  - 
+                    - Ref: ECSClusterName
+                    - Ref: PdfRasterECSClusterName
+              - Ref: ECSClusterName
 
       Role:
         Fn::GetAtt:
