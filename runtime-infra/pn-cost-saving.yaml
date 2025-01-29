@@ -361,6 +361,7 @@ Resources:
           import boto3
           import json
           import os
+          import re
 
           def lambda_handler(event, context):
               # Variabili di ambiente
@@ -380,35 +381,60 @@ Resources:
                       response = s3_client.get_object(Bucket=s3bucket_name, Key=object_key)
                       json_data = response['Body'].read().decode('utf-8')
                       service_counts = json.loads(json_data)
-                      print(f"File JSON successful retrived for cluster {ecs_cluster_name}.")
+                      print(f"File JSON successfully retrieved for cluster {ecs_cluster_name}.")
                   except Exception as e:
-                      print(f"Error during retrive JSON {object_key} from S3: {str(e)}")
+                      print(f"Error retrieving JSON {object_key} from S3: {str(e)}")
                       return {
                           'statusCode': 500,
-                          'body': f"Error during retrive JSON for cluster {ecs_cluster_name}: {str(e)}"
+                          'body': f"Error retrieving JSON for cluster {ecs_cluster_name}: {str(e)}"
                       }
 
-                  for service_name, desired_count in service_counts.items():
+                  # Recupera la lista dei servizi esistenti nell'ECS Cluster
+                  try:
+                      existing_services = ecs_client.list_services(cluster=ecs_cluster_name)['serviceArns']
+                      existing_service_names = [arn.split("/")[-1] for arn in existing_services]
+                      print(f"Servizi attualmente presenti nel cluster {ecs_cluster_name}: {existing_service_names}")
+                  except Exception as e:
+                      print(f"[Cluster: {ecs_cluster_name}] Error retrieving existing services: {str(e)}")
+                      return {
+                          'statusCode': 500,
+                          'body': f"Error retrieving services for cluster {ecs_cluster_name}: {str(e)}"
+                      }
+
+                  for service_pattern, desired_count in service_counts.items():
+                      # Estrazione del nome base del servizio
+                      base_service_name_match = re.search(r'^(pn-[a-zA-Z-]+-micro\w+-dev-[A-Za-z]+Microservice)', service_pattern)
+                      if not base_service_name_match:
+                          print(f"[Cluster: {ecs_cluster_name}] No valid service name found in pattern '{service_pattern}'")
+                          continue
+                      base_service_name = base_service_name_match.group(1)
+                      
+                      # Cerca un servizio attuale che corrisponda al pattern estratto
+                      matched_service = next((s for s in existing_service_names if base_service_name in s), None)
+                      if not matched_service:
+                          print(f"[Cluster: {ecs_cluster_name}] No matching service found for pattern '{base_service_name}'")
+                          continue
+                      
                       try:
-                          print(f"Update service {service_name} on cluster {ecs_cluster_name} with desiredCount {desired_count}...")
+                          print(f"Update service {matched_service} on cluster {ecs_cluster_name} with desiredCount {desired_count}...")
                           ecs_client.update_service(
                               cluster=ecs_cluster_name,
-                              service=service_name,
+                              service=matched_service,
                               desiredCount=desired_count
                           )
-                          print(f"[Cluster: {ecs_cluster_name}] Desired count successful update for service '{service_name}'.")
+                          print(f"[Cluster: {ecs_cluster_name}] Desired count successfully updated for service '{matched_service}'.")
                       except Exception as e:
-                          print(f"[Cluster: {ecs_cluster_name}] Error during update for service '{service_name}': {str(e)}")
+                          print(f"[Cluster: {ecs_cluster_name}] Error updating service '{matched_service}': {str(e)}")
                           return {
                               'statusCode': 500,
-                              'body': f"Error during update for service '{service_name}' on cluster {ecs_cluster_name}: {str(e)}"
+                              'body': f"Error updating service '{matched_service}' on cluster {ecs_cluster_name}: {str(e)}"
                           }
-
+              
               return {
                   'statusCode': 200,
-                  'body': f"Desired counts successful update for the cluster: {', '.join(ecs_cluster_names)}"
+                  'body': f"Desired counts successfully updated for the cluster: {', '.join(ecs_cluster_names)}"
               }
-
+       
       Environment:
         Variables:
           EcsDesireCountBucket:
