@@ -874,6 +874,11 @@ Conditions:
   Env88Exist: !Not [ !Equals [ !Ref ContainerEnvEntry88, '' ] ]
   Env89Exist: !Not [ !Equals [ !Ref ContainerEnvEntry89, '' ] ]
   Env90Exist: !Not [ !Equals [ !Ref ContainerEnvEntry90, '' ] ]
+  Env91Exist: !Not [ !Equals [ !Ref ContainerEnvEntry91, '' ] ]
+  Env92Exist: !Not [ !Equals [ !Ref ContainerEnvEntry92, '' ] ]
+  Env93Exist: !Not [ !Equals [ !Ref ContainerEnvEntry93, '' ] ]
+  Env94Exist: !Not [ !Equals [ !Ref ContainerEnvEntry94, '' ] ]
+  Env95Exist: !Not [ !Equals [ !Ref ContainerEnvEntry95, '' ] ]
 
   Secret1Exist: !Not [ !Equals [ !Ref ContainerSecret1, '' ] ]
   Secret2Exist: !Not [ !Equals [ !Ref ContainerSecret2, '' ] ]
@@ -1631,6 +1636,31 @@ Resources:
                 - Env90Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry90 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry90 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env91Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry91 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry91 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env92Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry92 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry92 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env93Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry93 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry93 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env94Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry94 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry94 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env95Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry95 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry95 ] ]
                 - !Ref "AWS::NoValue"
           EnvironmentFiles:
             - Type: s3
