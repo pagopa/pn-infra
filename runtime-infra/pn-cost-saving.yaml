@@ -405,7 +405,7 @@ Resources:
 
                   # Extract Pattern
                   for service_pattern, desired_count in service_counts.items():
-                      base_service_name_match = re.search(r'^(pn-[\w-]+-micro\w+-dev-[\w]+Microservice)', service_pattern)
+                      base_service_name_match = re.search(r'^(pn-[\w-]+-micro\w+-[\w]+-[\w]+Microservice)', service_pattern)
                       if not base_service_name_match:
                           print(f"[Cluster: {ecs_cluster_name}] ERROR: No valid service name found in pattern '{service_pattern}'")
                           continue
