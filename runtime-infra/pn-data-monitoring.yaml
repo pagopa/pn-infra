@@ -201,13 +201,14 @@ Resources:
                       --logs-bucket-name $LOGS_BUCKET_NAME \
                       --resource-root $ROOT_FOLDER/pn-prototypes \
                       --core-bucket-name $CORE_BUCKET \
-                      --confinfo-bucket-name $CONFINFO_BUCKET
+                      --confinfo-bucket-name $CONFINFO_BUCKET \
+                      --timestamp-utc $DATE_EXECUTION
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
         ComputeType: BUILD_GENERAL1_XLARGE
         Type: LINUX_CONTAINER
-        Image: "aws/codebuild/standard:7.0"
+        Image: "aws/codebuild/standard:7.0-25.01.30"
         EnvironmentVariables:
           - Name: REGION
             Type: PLAINTEXT
