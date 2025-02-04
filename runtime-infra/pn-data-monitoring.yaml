@@ -175,7 +175,7 @@ Resources:
     Properties:
       Name: pn-data-monitoring-codebuild
       ServiceRole: !GetAtt DataMonitoringCodeBuildServiceRole.Arn
-      ConcurrentBuildLimit: 1
+      ConcurrentBuildLimit: 3
       TimeoutInMinutes: 240
       Source: 
         Type: NO_SOURCE
@@ -237,6 +237,9 @@ Resources:
           - Name: CONFINFO_BUCKET
             Type: PLAINTEXT
             Value: !If [IsCoreAccount, !Ref ConfinfoDynamoDbExportBucketName, !Ref DataMonitoringBucket]
+          - Name: DATE_EXECUTION
+            Type: PLAINTEXT
+            Value: ""
 
   DataMonitoringCodeBuildServiceRole:
     Type: AWS::IAM::Role
