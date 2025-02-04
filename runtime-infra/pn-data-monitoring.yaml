@@ -175,7 +175,7 @@ Resources:
     Properties:
       Name: pn-data-monitoring-codebuild
       ServiceRole: !GetAtt DataMonitoringCodeBuildServiceRole.Arn
-      ConcurrentBuildLimit: 3
+      ConcurrentBuildLimit: 1
       TimeoutInMinutes: 240
       Source: 
         Type: NO_SOURCE
@@ -201,14 +201,13 @@ Resources:
                       --logs-bucket-name $LOGS_BUCKET_NAME \
                       --resource-root $ROOT_FOLDER/pn-prototypes \
                       --core-bucket-name $CORE_BUCKET \
-                      --confinfo-bucket-name $CONFINFO_BUCKET \
-                      --timestamp-utc "$DATE_EXECUTION"
+                      --confinfo-bucket-name $CONFINFO_BUCKET
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
         ComputeType: BUILD_GENERAL1_XLARGE
         Type: LINUX_CONTAINER
-        Image: "aws/codebuild/standard:7.0-25.01.30"
+        Image: "aws/codebuild/standard:7.0"
         EnvironmentVariables:
           - Name: REGION
             Type: PLAINTEXT
@@ -237,9 +236,6 @@ Resources:
           - Name: CONFINFO_BUCKET
             Type: PLAINTEXT
             Value: !If [IsCoreAccount, !Ref ConfinfoDynamoDbExportBucketName, !Ref DataMonitoringBucket]
-          - Name: DATE_EXECUTION
-            Type: PLAINTEXT
-            Value: ""
 
   DataMonitoringCodeBuildServiceRole:
     Type: AWS::IAM::Role
