@@ -157,19 +157,19 @@ Resources:
                   EOF
                       exit 1
                   }
-                - |
                   dump_params(){
+                      if ( [ -z "$DATE" ] ) then
+                        export DATE=$( date -I)
+                      fi
+
                       echo ""
                       echo "######      PARAMETERS      ######"
                       echo "##################################"
-                      echo "Env Name:              ${env_type}"
                       echo "Region:                ${region}"
                       echo "AccountId:             ${account_id}"
                       echo "Athena Output Bucket:  ${athena_output_bucket}"
+                      echo "Reference Date::       ${DATE}"
                       
-                      if ( [ -z "${env_type-}" ] ) then
-                      usage
-                      fi
                       if ( [ -z "${region-}" ] ) then
                       usage
                       fi
@@ -180,7 +180,7 @@ Resources:
                       usage
                       fi
                   }
-                - dump_params
+                  dump_params
             build:
               commands:
                 - export aws_command_base_args=""
@@ -210,10 +210,18 @@ Resources:
                     echo "- Update cache ${cache_table} from view ${json_view}"
 
                     query="INSERT INTO \"${database_name}\".\"${cache_table}\" \n\
-                          SELECT * FROM \"${database_name}\".\"${json_view}\" \n\
-                              WHERE p_year = lpad( cast( year( date_add('day', -1, current_date )) as varchar), 4, '0') \n\
-                                AND p_month = lpad( cast( month( date_add('day', -1, current_date )) as varchar), 2, '0') \n\
-                                AND p_day = lpad( cast( day( date_add('day', -1, current_date )) as varchar), 2, '0') "
+                          ( \n\
+                            SELECT * FROM \"${database_name}\".\"${json_view}\" \n\
+                              WHERE p_year = lpad( cast( year( date_add('day', -1, date('$DATE') )) as varchar), 4, '0') \n\
+                                AND p_month = lpad( cast( month( date_add('day', -1, date('$DATE') )) as varchar), 2, '0') \n\
+                                AND p_day = lpad( cast( day( date_add('day', -1, date('$DATE') )) as varchar), 2, '0') 
+                            EXCEPT
+                            SELECT * FROM \"${database_name}\".\"${cache_table}\" \n\
+                              WHERE p_year = lpad( cast( year( date_add('day', -1, date('$DATE') )) as varchar), 4, '0') \n\
+                                AND p_month = lpad( cast( month( date_add('day', -1, date('$DATE') )) as varchar), 2, '0') \n\
+                                AND p_day = lpad( cast( day( date_add('day', -1, date('$DATE') )) as varchar), 2, '0') \n\
+                          ) \n\
+                    "
                     
                     echo "  Start execute query \n      ${query}" 
                     echo "${query}" > query.txt
@@ -242,6 +250,11 @@ Resources:
                       echo " Execution ${executionState}"
                       
                       if ( [ "${executionState}" = "FAILED" ] ) then
+                        echo -n " Reason: "
+                        aws ${aws_command_base_args} \
+                              athena get-query-execution \
+                              --query-execution-id ${queryExecutionId} \
+                            | jq -r '.QueryExecution.Status.StateChangeReason'
                         exit 2
                       fi
                       if ( [ "${executionState}" = "SUCCEEDED" ] ) then
@@ -268,6 +281,9 @@ Resources:
           - Name: athena_output_bucket
             Type: PLAINTEXT
             Value: !Ref AthenaResultsBucket
+          - Name: DATE
+            Type: PLAINTEXT
+            Value: ''
           
   UpdateCdcJsonViewsCodebuildServiceRole:
     Type: AWS::IAM::Role
@@ -300,6 +316,11 @@ Resources:
                 Action:
                   - "glue:BatchGetCrawlers"
                   - "glue:ListCrawlers"
+                  - "glue:GetTags"
+                  - "glue:GetTable"
+                  - "glue:GetTables"
+                  - "glue:GetDatabase"
+                  - "glue:GetDatabases"
                 Resource:
                   - "*"
               - Sid: CanExecuteQuery
@@ -310,6 +331,57 @@ Resources:
                   - "athena:StartQueryExecution"
                 Resource:
                   - "*"
+              - Sid: CanCheckOutputBucketLocation
+                Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                Resource:
+                  - !Sub arn:aws:s3:::${AthenaResultsBucket}
+              - Sid: WriteAndReadQueryResult
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource:
+                  - !Sub arn:aws:s3:::${AthenaResultsBucket}/cache_updates/*
+              - Sid: ReadLogBucket
+                Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:GetEncryptionConfiguration
+                  - s3:ListBucket
+                  - s3:GetObject
+                Resource:
+                  - !Sub arn:aws:s3:::${LogsBucketName}
+                  - !Sub arn:aws:s3:::${LogsBucketName}/*
+              - Sid: DecriptLogBucket
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                Resource:
+                  - !Ref LogsBucketKmsKeyArn
+              - Sid: ReadWriteDestination
+                Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:GetEncryptionConfiguration
+                  - s3:ListBucket
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource:
+                  - !Sub arn:aws:s3:::${LogsBucketName}
+                  - !Sub arn:aws:s3:::${LogsBucketName}/cdcTos3_parsed/*
+              - Sid: EncryptDecriptDestination
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:Encrypt
+                  - kms:GenerateDataKey
+                  - kms:ReEncrypt*
+                  - kms:DescribeKey
+                Resource:
+                  - !Ref LogsBucketKmsKeyArn
               
   UpdateCdcJsonViewsScheduleBridgeRule:
     Type: AWS::Events::Rule
