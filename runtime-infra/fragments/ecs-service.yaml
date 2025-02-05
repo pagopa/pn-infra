@@ -602,6 +602,26 @@ Parameters:
     Description: 90th container environment entry in the form key=value
     Type: String
     Default: ''
+  ContainerEnvEntry91:
+    Description: 91th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry92:
+    Description: 92th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry93:
+    Description: 93th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry94:
+    Description: 94th container environment entry in the form key=value
+    Type: String
+    Default: ''
+  ContainerEnvEntry95:
+    Description: 95th container environment entry in the form key=value
+    Type: String
+    Default: ''
 
   # Secrets
   ContainerSecret1:
@@ -754,7 +774,7 @@ Conditions:
      - Condition: AutoscalingBySQS
      - Condition: AutoscalingCustom
 
-  ShouldEnableOtelXRay: !Equals [ !Ref DisableOtelXRay, 'true' ] 
+  HasOtelXRayDisable: !Equals [ !Ref DisableOtelXRay, 'true' ] 
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
 
@@ -854,6 +874,11 @@ Conditions:
   Env88Exist: !Not [ !Equals [ !Ref ContainerEnvEntry88, '' ] ]
   Env89Exist: !Not [ !Equals [ !Ref ContainerEnvEntry89, '' ] ]
   Env90Exist: !Not [ !Equals [ !Ref ContainerEnvEntry90, '' ] ]
+  Env91Exist: !Not [ !Equals [ !Ref ContainerEnvEntry91, '' ] ]
+  Env92Exist: !Not [ !Equals [ !Ref ContainerEnvEntry92, '' ] ]
+  Env93Exist: !Not [ !Equals [ !Ref ContainerEnvEntry93, '' ] ]
+  Env94Exist: !Not [ !Equals [ !Ref ContainerEnvEntry94, '' ] ]
+  Env95Exist: !Not [ !Equals [ !Ref ContainerEnvEntry95, '' ] ]
 
   Secret1Exist: !Not [ !Equals [ !Ref ContainerSecret1, '' ] ]
   Secret2Exist: !Not [ !Equals [ !Ref ContainerSecret2, '' ] ]
@@ -1065,7 +1090,7 @@ Resources:
           Image: !Ref ContainerImageURI
           Memory: 
             'Fn::If':
-              - ShouldEnableOtelXRay
+              - HasOtelXRayDisable
               - !FindInMap [ ContainerMemoryNoXray, !Ref MemoryAmount, microservice ]
               - !FindInMap [ ContainerMemory, !Ref MemoryAmount, microservice ]
           MountPoints:
@@ -1078,14 +1103,14 @@ Resources:
                   ContainerPath: "/mnt/efs"
                 - !Ref AWS::NoValue
           DependsOn:
-            'Fn::If':
-              - ShouldEnableOtelXRay
-              - !Ref AWS::NoValue
-              - 
-                - ContainerName: sidecar-injector
-                  Condition: COMPLETE
-                - ContainerName: aws-collector
-                  Condition: START
+            - ContainerName: sidecar-injector
+              Condition: COMPLETE
+            - 'Fn::If':
+              - HasOtelXRayDisable
+              -
+                !Ref AWS::NoValue
+              - ContainerName: aws-collector
+                Condition: START
           Secrets:
             - 'Fn::If':
               - Secret1Exist
@@ -1157,18 +1182,11 @@ Resources:
             - Name: 'MICROSERVICE_NAME'
               Value: !Ref MicroServiceUniqueName
             - 'Fn::If':
-              - ShouldEnableOtelXRay
-              - 'Fn::If':
-                  - HasJavaToolOptions
-                  - Name: 'JAVA_TOOL_OPTIONS'
-                    Value: !Sub '${JavaToolOptions}'
-                  - !Ref "AWS::NoValue"
-              - 'Fn::If':
-                  - HasJavaToolOptions
-                  - Name: 'JAVA_TOOL_OPTIONS'
-                    Value: !Sub '${JavaToolOptions} -javaagent:/xray/aws-opentelemetry-agent.jar'
-                  - Name: 'JAVA_TOOL_OPTIONS'
-                    Value: '-javaagent:/xray/aws-opentelemetry-agent.jar'
+              - HasJavaToolOptions
+              - Name: 'JAVA_TOOL_OPTIONS'
+                Value: !Sub '${JavaToolOptions} -javaagent:/xray/aws-opentelemetry-agent.jar'
+              - Name: 'JAVA_TOOL_OPTIONS'
+                Value: '-javaagent:/xray/aws-opentelemetry-agent.jar'
             - 'Fn::If':
                 - Env1Exist
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry1 ] ]
@@ -1619,6 +1637,31 @@ Resources:
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry90 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry90 ] ]
                 - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env91Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry91 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry91 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env92Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry92 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry92 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env93Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry93 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry93 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env94Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry94 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry94 ] ]
+                - !Ref "AWS::NoValue"
+            - 'Fn::If':
+                - Env95Exist
+                - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry95 ] ]
+                  Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry95 ] ]
+                - !Ref "AWS::NoValue"
           EnvironmentFiles:
             - Type: s3
               Value: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/runtime-variable.env'
@@ -1645,8 +1688,25 @@ Resources:
               awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
+        - Name: sidecar-injector
+          Image: !Ref ContainerImageInjectorURI
+          #Command: !Ref CommandSidecarInjector
+          #EntryPoint: [!Ref EntrypointSidecarInjector]
+          Essential: false
+          MountPoints:
+            - SourceVolume: "my-vol"
+              ContainerPath: "/xray/"
+          Cpu: '128'
+          Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-create-group: 'True'
+              awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: ecs
         - 'Fn::If':
-            - ShouldEnableOtelXRay
+            - HasOtelXRayDisable
             - !Ref AWS::NoValue
             - 
               Name: aws-collector
@@ -1654,27 +1714,6 @@ Resources:
               Command: [!Ref AwsCollectorCommand]
               Cpu: '256'
               Memory: !FindInMap [ ContainerMemory, !Ref MemoryAmount, awsCollector ]
-              LogConfiguration:
-                LogDriver: awslogs
-                Options:
-                  awslogs-create-group: 'True'
-                  awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
-                  awslogs-region: !Ref 'AWS::Region'
-                  awslogs-stream-prefix: ecs
-        - 'Fn::If':
-            - ShouldEnableOtelXRay
-            - !Ref AWS::NoValue
-            - 
-              Name: sidecar-injector
-              Image: !Ref ContainerImageInjectorURI
-              #Command: !Ref CommandSidecarInjector
-              #EntryPoint: [!Ref EntrypointSidecarInjector]
-              Essential: false
-              MountPoints:
-                - SourceVolume: "my-vol"
-                  ContainerPath: "/xray/"
-              Cpu: '128'
-              Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
               LogConfiguration:
                 LogDriver: awslogs
                 Options:
