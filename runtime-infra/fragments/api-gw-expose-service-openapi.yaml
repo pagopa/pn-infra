@@ -149,12 +149,12 @@ Parameters:
 
   OncallApiError5xxDataPointsToAlarm:
     Type: Number
-    Default: 4
+    Default: 5
     Description: Datapoints for oncall error alarm
 
   OncallApiError5xxEvaluationPeriods:
     Type: Number
-    Default: 12
+    Default: 6
     Description: Evaluation periods for oncall alarm
 
   OncallApiError4xxDataPointsToAlarm:
@@ -164,17 +164,17 @@ Parameters:
 
   OncallApiError4xxEvaluationPeriods:
     Type: Number
-    Default: 12
+    Default: 6
     Description: Evaluation periods for oncall 4xx alarm
 
   OncallApiErrorCountThreshold:
     Type: Number
-    Default: 25
+    Default: 100
     Description: Threshold for oncall error count
 
   OncallApiError5xxThreshold:
     Type: Number
-    Default: 0.3
+    Default: 0.5
     Description: Threshold for oncall 5xx errors
 
   OncallApiError4xxThreshold:
@@ -603,7 +603,7 @@ Resources:
         IntendedUsage: !Ref IntendedUsage
         AlarmOn4xx: !Ref AlarmOn4xx
         OncallApiErrorCountThreshold: !Ref OncallApiErrorCountThreshold #adjust the deafult value in this template to change the minimum numer of request in the 5 min timeframe 
-        OncallApiError5xxThreshold: !Ref OncallApiError5xxThreshold  #adjust the deafult value in this template to change the % of failed request 0.3= 30%
+        OncallApiError5xxThreshold: !Ref OncallApiError5xxThreshold  #adjust the deafult value in this template to change the % of failed request 0.5= 50%
         OncallApiError4xxThreshold: !Ref OncallApiError4xxThreshold  #adjust the deafult value in this template to change the % of failed request 0.9= 90%
 
 
