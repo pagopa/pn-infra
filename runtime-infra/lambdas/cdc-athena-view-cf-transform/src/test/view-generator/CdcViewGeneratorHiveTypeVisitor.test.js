@@ -162,27 +162,27 @@ describe("CdcViewGeneratorHiveTypeVisitor tests", function () {
     
     const expectedDdlColumns = [
       { name: "Ffield1F", type: "string" },
-      { name: "Ffield3F", type: "number" },
-      { name: "Ffield2F", type: "array<struct< \"Ffield2_1F\":number >>" }
+      { name: "Ffield2F", type: "array<struct< \"Ffield2_1F\":number >>" },
+      { name: "Ffield3F", type: "number" }
     ]
     const expectedDdqColumns = [
       { name: "Ffield1F", type: "TstringT" },
-      { name: "Ffield3F", type: "TnumberT" },
-      { name: "Ffield2F", type: "array(row( \"Ffield2_1F\" TnumberT ))" }
+      { name: "Ffield2F", type: "array(row( \"Ffield2_1F\" TnumberT ))" },
+      { name: "Ffield3F", type: "TnumberT" }
     ]
 
     const expectedQuery = `
     WITH simplified_data AS (
       SELECT
         "field1" AS "Ffield1F",
-        "field3" AS "Ffield3F",
         transform( "field2", (elem0) -> 
           cast(row(
             elem0."field2_1"
           ) AS row(
             "Ffield2_1F" TnumberT
           ))
-        ) AS "Ffield2F"
+        ) AS "Ffield2F",
+        "field3" AS "Ffield3F"
       FROM
         source_table t
     )
