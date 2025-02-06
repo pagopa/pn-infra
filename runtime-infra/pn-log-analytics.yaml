@@ -23,11 +23,29 @@ Parameters:
     Type: String
     Default: ''
     Description: Cron expression for the Glue Crawler schedule. #e.g. 'cron(0 1 * * ? *)'
+  
+  ConfInfoGlueCrawlerSchedule:
+    Type: String
+    Default: ''
+    Description: Cron expression for the confinfo Glue Crawler schedule. #e.g. 'cron(0 1 * * ? *)'
+
+  ConfInfoLogsBucketName:
+    Type: String
+    Description: ConfInfo logs bucket name
+  
+  SafeStorageAccountId:
+    Description: "Confinfo AWS Account id"
+    Type: String
 
 Conditions:
   IsGlueCrawlerScheduled: !Not
     - !Equals
       - !Ref GlueCrawlerSchedule
+      - ''
+  
+  IsConfInfoGlueCrawlerScheduled: !Not
+    - !Equals
+      - !Ref ConfInfoGlueCrawlerSchedule
       - ''
 
 Resources:
@@ -513,17 +531,6 @@ Resources:
         - ScheduleExpression: !Ref GlueCrawlerSchedule
         - !Ref AWS::NoValue
 
-  AthenaWorkGroup:
-    Type: AWS::Athena::WorkGroup
-    DependsOn: AthenaResultsBucket
-    Properties:
-      Name: LogAnalyticsWorkGroup
-      Description: WorkGroup for Log analytics queries
-      State: ENABLED
-      WorkGroupConfiguration:
-        ResultConfiguration:
-          OutputLocation: !Sub s3://${AthenaResultsBucket}/
-  
   AthenaResultsBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
@@ -568,3 +575,506 @@ Resources:
             Condition:
               StringEquals:
                 aws:SourceAccount: !Ref AWS::AccountId
+
+  AthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    DependsOn: AthenaResultsBucket
+    Properties:
+      Name: LogAnalyticsWorkGroup
+      Description: WorkGroup for Log analytics queries
+      State: ENABLED
+      WorkGroupConfiguration:
+        ResultConfiguration:
+          OutputLocation: !Sub s3://${AthenaResultsBucket}/
+
+  GlueDatabaseConfInfo:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: log_analytics_database_confinfo
+        Description: Database for Log analytics ConfInfo
+
+  GlueTableConfInfo:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabaseConfInfo
+      TableInput:
+        Name: log_analytics_table_confinfo
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          compression.type: gzip
+          EXTERNAL: 'TRUE'
+          projection.enabled: 'true'
+          projection.year.type: integer
+          projection.year.range: 2022,2035
+          projection.month.type: integer
+          projection.month.range: 1,12
+          projection.month.digits: '2'
+          projection.day.type: integer
+          projection.day.range: 1,31
+          projection.day.digits: '2'
+          projection.hour.type: integer
+          projection.hour.range: 0,23
+          projection.hour.digits: '2'
+          storage.location.template: !Join
+            - ''
+            - - s3://
+              - !Ref ConfInfoLogsBucketName
+              - /logsTos3/${year}/${month}/${day}/${hour}/
+        StorageDescriptor:
+          Location: !Sub s3://${ConfInfoLogsBucketName}/logsTos3/
+          InputFormat: com.amazon.ionhiveserde.formats.IonInputFormat
+          OutputFormat: com.amazon.ionhiveserde.formats.IonOutputFormat
+          SerdeInfo:
+            SerializationLibrary: com.amazon.ionhiveserde.IonHiveSerDe
+            Parameters:
+              serialization.format: '1'
+          Columns:
+            - Name: messagetype
+              Type: string
+            - Name: owner
+              Type: string
+            - Name: loggroup
+              Type: string
+            - Name: logstream
+              Type: string
+            - Name: subscriptionfilters
+              Type: array<string>
+            - Name: logevents
+              Type: array<struct<id:string,timestamp:bigint,message:string>>
+        PartitionKeys:
+          - Name: year
+            Type: string
+          - Name: month
+            Type: string
+          - Name: day
+            Type: string
+          - Name: hour
+            Type: string
+
+  ApiGatewayViewConfinfo:
+    Type: AWS::Glue::Table
+    DependsOn: GlueTableConfInfo
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabaseConfInfo
+      TableInput:
+        Name: apigateway_confinfo_view
+        TableType: VIRTUAL_VIEW
+        Parameters:
+          presto_view: 'true'
+          comment: Presto View for API Gateway Logs
+        StorageDescriptor:
+          Columns:
+            - Name: year
+              Type: string
+            - Name: month
+              Type: string
+            - Name: day
+              Type: string
+            - Name: hour
+              Type: string
+            - Name: messagetype
+              Type: string
+            - Name: owner
+              Type: string
+            - Name: loggroup
+              Type: string
+            - Name: logstream
+              Type: string
+            - Name: subscriptionfilters
+              Type: array<string>
+            - Name: event_id
+              Type: string
+            - Name: event_timestamp
+              Type: timestamp
+            - Name: requesttime
+              Type: string
+            - Name: requestid
+              Type: string
+            - Name: httpmethod
+              Type: string
+            - Name: path
+              Type: string
+            - Name: status
+              Type: int
+            - Name: responselatency
+              Type: double
+            - Name: xraytraceid
+              Type: string
+            - Name: integrationrequestid
+              Type: string
+            - Name: functionresponsestatus
+              Type: string
+            - Name: integrationlatency
+              Type: double
+            - Name: integrationservicestatus
+              Type: string
+            - Name: authorizestatus
+              Type: string
+            - Name: authorizerstatus
+              Type: string
+            - Name: authorizerlatency
+              Type: double
+            - Name: authorizerrequestid
+              Type: string
+            - Name: ip
+              Type: string
+            - Name: useragent
+              Type: string
+            - Name: principalid
+              Type: string
+            - Name: cxid
+              Type: string
+            - Name: cxtype
+              Type: string
+            - Name: sourcechannel
+              Type: string
+            - Name: sourceversion
+              Type: string
+            - Name: uid
+              Type: string
+        ViewOriginalText: !Sub
+          - '/* Presto View: ${View} */'
+          - View: !Base64
+              Fn::Sub:
+                - |
+                  {
+                    "originalSql": "SELECT year, month, day, hour, messagetype, owner, loggroup, logstream, subscriptionfilters, e.id AS event_id, from_unixtime(e.timestamp / 1000) AS event_timestamp, JSON_EXTRACT_SCALAR(e.message, '$.requestTime') AS requesttime, JSON_EXTRACT_SCALAR(e.message, '$.requestId') AS requestid, JSON_EXTRACT_SCALAR(e.message, '$.httpMethod') AS httpmethod, JSON_EXTRACT_SCALAR(e.message, '$.path') AS path, TRY(CAST(JSON_EXTRACT_SCALAR(e.message, '$.status') AS INTEGER)) AS status, TRY(CAST(JSON_EXTRACT_SCALAR(e.message, '$.responseLatency') AS DOUBLE)) AS responselatency, JSON_EXTRACT_SCALAR(e.message, '$.xrayTraceId') AS xraytraceid, JSON_EXTRACT_SCALAR(e.message, '$.integrationRequestId') AS integrationrequestid, JSON_EXTRACT_SCALAR(e.message, '$.functionResponseStatus') AS functionresponsestatus, TRY(CAST(JSON_EXTRACT_SCALAR(e.message, '$.integrationLatency') AS DOUBLE)) AS integrationlatency, JSON_EXTRACT_SCALAR(e.message, '$.integrationServiceStatus') AS integrationservicestatus, JSON_EXTRACT_SCALAR(e.message, '$.authorizeStatus') AS authorizestatus, JSON_EXTRACT_SCALAR(e.message, '$.authorizerStatus') AS authorizerstatus, TRY(CAST(JSON_EXTRACT_SCALAR(e.message, '$.authorizerLatency') AS DOUBLE)) AS authorizerlatency, JSON_EXTRACT_SCALAR(e.message, '$.authorizerRequestId') AS authorizerrequestid, JSON_EXTRACT_SCALAR(e.message, '$.ip') AS ip, JSON_EXTRACT_SCALAR(e.message, '$.userAgent') AS useragent, JSON_EXTRACT_SCALAR(e.message, '$.principalId') AS principalid, JSON_EXTRACT_SCALAR(e.message, '$.cxId') AS cxid, JSON_EXTRACT_SCALAR(e.message, '$.cxType') AS cxtype, JSON_EXTRACT_SCALAR(JSON_EXTRACT(e.message, '$.sourceChannelDetails'), '$.channel') AS sourcechannel, JSON_EXTRACT_SCALAR(JSON_EXTRACT(e.message, '$.sourceChannelDetails'), '$.version') AS sourceversion, JSON_EXTRACT_SCALAR(e.message, '$.uid') AS uid FROM ${DatabaseName}.${TableName} CROSS JOIN UNNEST(logEvents) AS t(e) WHERE logGroup LIKE 'pn-%'",
+                    "catalog": "awsdatacatalog",
+                    "schema": "${DatabaseName}",
+                    "columns": [
+                      {"name": "year", "type": "varchar"},
+                      {"name": "month", "type": "varchar"},
+                      {"name": "day", "type": "varchar"},
+                      {"name": "hour", "type": "varchar"},
+                      {"name": "messagetype", "type": "varchar"},
+                      {"name": "owner", "type": "varchar"},
+                      {"name": "loggroup", "type": "varchar"},
+                      {"name": "logstream", "type": "varchar"},
+                      {"name": "subscriptionfilters", "type": "array(varchar)"},
+                      {"name": "event_id", "type": "varchar"},
+                      {"name": "event_timestamp", "type": "timestamp"},
+                      {"name": "requesttime", "type": "varchar"},
+                      {"name": "requestid", "type": "varchar"},
+                      {"name": "httpmethod", "type": "varchar"},
+                      {"name": "path", "type": "varchar"},
+                      {"name": "status", "type": "integer"},
+                      {"name": "responselatency", "type": "double"},
+                      {"name": "xraytraceid", "type": "varchar"},
+                      {"name": "integrationrequestid", "type": "varchar"},
+                      {"name": "functionresponsestatus", "type": "varchar"},
+                      {"name": "integrationlatency", "type": "double"},
+                      {"name": "integrationservicestatus", "type": "varchar"},
+                      {"name": "authorizestatus", "type": "varchar"},
+                      {"name": "authorizerstatus", "type": "varchar"},
+                      {"name": "authorizerlatency", "type": "double"},
+                      {"name": "authorizerrequestid", "type": "varchar"},
+                      {"name": "ip", "type": "varchar"},
+                      {"name": "useragent", "type": "varchar"},
+                      {"name": "principalid", "type": "varchar"},
+                      {"name": "cxid", "type": "varchar"},
+                      {"name": "cxtype", "type": "varchar"},
+                      {"name": "sourcechannel", "type": "varchar"},
+                      {"name": "sourceversion", "type": "varchar"},
+                      {"name": "uid", "type": "varchar"}
+                    ]
+                  }
+                - DatabaseName: !Ref GlueDatabaseConfInfo
+                  TableName: !Ref GlueTableConfInfo
+
+  EcsMicroservicesViewConfInfo:
+    Type: AWS::Glue::Table
+    DependsOn: GlueTableConfInfo
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabaseConfInfo
+      TableInput:
+        Name: ecs_microservices_confinfo_view
+        TableType: VIRTUAL_VIEW
+        Parameters:
+          presto_view: 'true'
+          comment: Presto View for ECS Microservices Logs
+        StorageDescriptor:
+          Columns:
+            - Name: year
+              Type: string
+            - Name: month
+              Type: string
+            - Name: day
+              Type: string
+            - Name: hour
+              Type: string
+            - Name: messagetype
+              Type: string
+            - Name: owner
+              Type: string
+            - Name: loggroup
+              Type: string
+            - Name: logstream
+              Type: string
+            - Name: subscriptionfilters
+              Type: array<string>
+            - Name: event_id
+              Type: string
+            - Name: event_timestamp
+              Type: timestamp
+            - Name: message_timestamp_string
+              Type: string
+            - Name: logger_name
+              Type: string
+            - Name: thread_name
+              Type: string
+            - Name: level
+              Type: string
+            - Name: level_value
+              Type: int
+            - Name: trace_id
+              Type: string
+            - Name: iun
+              Type: string
+            - Name: ctx_awsmessageid
+              Type: string
+            - Name: aws_xray_trace_id
+              Type: string
+            - Name: log_message
+              Type: string
+            - Name: aud_type
+              Type: string
+        ViewOriginalText: !Sub
+          - '/* Presto View: ${View} */'
+          - View: !Base64
+              Fn::Sub:
+                - |
+                  {
+                    "originalSql": "SELECT year, month, day, hour, messageType, owner, logGroup, logStream, subscriptionFilters, e.id AS event_id, from_unixtime(e.timestamp / 1000) AS event_timestamp, JSON_EXTRACT_SCALAR(e.message, '$[\"@timestamp\"]') AS message_timestamp_string, JSON_EXTRACT_SCALAR(e.message, '$[\"logger_name\"]') AS logger_name, JSON_EXTRACT_SCALAR(e.message, '$[\"thread_name\"]') AS thread_name, JSON_EXTRACT_SCALAR(e.message, '$[\"level\"]') AS level, CAST(JSON_EXTRACT(e.message, '$[\"level_value\"]') AS INTEGER) AS level_value, JSON_EXTRACT_SCALAR(e.message, '$[\"trace_id\"]') AS trace_id, JSON_EXTRACT_SCALAR(e.message, '$[\"iun\"]') AS iun, JSON_EXTRACT_SCALAR(e.message, '$[\"ctx_awsMessageId\"]') AS ctx_awsmessageid, JSON_EXTRACT_SCALAR(e.message, '$[\"AWS-XRAY-TRACE-ID\"]') AS aws_xray_trace_id, JSON_EXTRACT_SCALAR(e.message, '$[\"message\"]') AS log_message, TRY(JSON_EXTRACT_SCALAR(e.message, '$[\"aud_type\"]')) AS aud_type FROM ${DatabaseName}.${TableName} CROSS JOIN UNNEST(logEvents) AS t(e) WHERE logGroup LIKE '/aws/ecs/pn-%'",
+                    "catalog": "awsdatacatalog",
+                    "schema": "${DatabaseName}",
+                    "columns": [
+                      {"name": "year", "type": "varchar"},
+                      {"name": "month", "type": "varchar"},
+                      {"name": "day", "type": "varchar"},
+                      {"name": "hour", "type": "varchar"},
+                      {"name": "messagetype", "type": "varchar"},
+                      {"name": "owner", "type": "varchar"},
+                      {"name": "loggroup", "type": "varchar"},
+                      {"name": "logstream", "type": "varchar"},
+                      {"name": "subscriptionfilters", "type": "array(varchar)"},
+                      {"name": "event_id", "type": "varchar"},
+                      {"name": "event_timestamp", "type": "timestamp"},
+                      {"name": "message_timestamp_string", "type": "varchar"},
+                      {"name": "logger_name", "type": "varchar"},
+                      {"name": "thread_name", "type": "varchar"},
+                      {"name": "level", "type": "varchar"},
+                      {"name": "level_value", "type": "integer"},
+                      {"name": "trace_id", "type": "varchar"},
+                      {"name": "iun", "type": "varchar"},
+                      {"name": "ctx_awsmessageid", "type": "varchar"},
+                      {"name": "aws_xray_trace_id", "type": "varchar"},
+                      {"name": "log_message", "type": "varchar"},
+                      {"name": "aud_type", "type": "varchar"}
+                    ]
+                  }
+                - DatabaseName: !Ref GlueDatabaseConfInfo
+                  TableName: !Ref GlueTableConfInfo
+
+  LambdaViewConfInfo:
+    Type: AWS::Glue::Table
+    DependsOn: GlueTableConfInfo
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabaseConfInfo
+      TableInput:
+        Name: lambda_confinfo_view
+        TableType: VIRTUAL_VIEW
+        Parameters:
+          presto_view: 'true'
+          comment: Optimized view for lambda logs
+        StorageDescriptor:
+          Columns:
+            - Name: year
+              Type: string
+            - Name: month
+              Type: string
+            - Name: day
+              Type: string
+            - Name: hour
+              Type: string
+            - Name: messagetype
+              Type: string
+            - Name: owner
+              Type: string
+            - Name: loggroup
+              Type: string
+            - Name: logstream
+              Type: string
+            - Name: subscriptionfilters
+              Type: array<string>
+            - Name: event_id
+              Type: string
+            - Name: event_timestamp
+              Type: timestamp
+            - Name: log_message
+              Type: string
+            - Name: message_id
+              Type: string
+            - Name: sqs_event_source
+              Type: string
+            - Name: sqs_event_source_arn
+              Type: string
+            - Name: sqs_region
+              Type: string
+            - Name: s3_event_version
+              Type: string
+            - Name: s3_event_source
+              Type: string
+            - Name: s3_event_time
+              Type: string
+            - Name: s3_event_name
+              Type: string
+            - Name: s3_user_identity
+              Type: string
+            - Name: s3_source_ip
+              Type: string
+            - Name: s3_bucket_name
+              Type: string
+            - Name: s3_object_key
+              Type: string
+            - Name: s3_object_size
+              Type: bigint
+            - Name: s3_object_etag
+              Type: string
+            - Name: s3_object_version_id
+              Type: string
+            - Name: aud_type
+              Type: string
+        ViewOriginalText: !Sub
+          - '/* Presto View: ${View} */'
+          - View: !Base64
+              Fn::Sub:
+                - |
+                  {
+                    "originalSql": "SELECT year, month, day, hour, messagetype, owner, loggroup, logstream, subscriptionfilters, e.id AS event_id, from_unixtime(e.timestamp / 1000) AS event_timestamp, IF(position('{' IN e.message) > 0, substr(e.message, 1, position('{' IN e.message) - 1), e.message) AS log_message, json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].messageId') AS message_id, json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].eventSource') AS sqs_event_source, json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].eventSourceARN') AS sqs_event_source_arn, json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].awsRegion') AS sqs_region, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].eventVersion') AS s3_event_version, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].eventSource') AS s3_event_source, TRY(cast(json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].eventTime') AS timestamp)) AS s3_event_time, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].eventName') AS s3_event_name, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].userIdentity.principalId') AS s3_user_identity, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].requestParameters.sourceIPAddress') AS s3_source_ip, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].s3.bucket.name') AS s3_bucket_name, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].s3.object.key') AS s3_object_key, TRY(cast(json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].s3.object.size') AS bigint)) AS s3_object_size, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].s3.object.eTag') AS s3_object_etag, json_extract_scalar(TRY(json_parse(json_extract_scalar(TRY(json_parse(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL))), '$.Records[0].body'))), '$.Records[0].s3.object.versionId') AS s3_object_version_id, TRY(JSON_EXTRACT_SCALAR(JSON_PARSE(IF(position('{' IN e.message) > 0, substr(e.message, position('{' IN e.message)), NULL)), '$[\"aud_type\"]')) AS aud_type FROM ${DatabaseName}.${TableName} CROSS JOIN UNNEST(logEvents) AS t(e) WHERE logGroup LIKE '/aws/lambda/pn-%'",
+                    "catalog": "awsdatacatalog",
+                    "schema": "${DatabaseName}",
+                    "columns": [
+                        {"name": "year", "type": "varchar"},  
+                        {"name": "month", "type": "varchar"},
+                        {"name": "day", "type": "varchar"},
+                        {"name": "hour", "type": "varchar"},
+                        {"name": "messagetype", "type": "varchar"},
+                        {"name": "owner", "type": "varchar"},
+                        {"name": "loggroup", "type": "varchar"},
+                        {"name": "logstream", "type": "varchar"},
+                        {"name": "subscriptionfilters", "type": "array(varchar)"},
+                        {"name": "event_id", "type": "varchar"},
+                        {"name": "event_timestamp", "type": "timestamp"},
+                        {"name": "log_message", "type": "varchar"},
+                        {"name": "message_id", "type": "varchar"},
+                        {"name": "sqs_event_source", "type": "varchar"},
+                        {"name": "sqs_event_source_arn", "type": "varchar"},
+                        {"name": "sqs_region", "type": "varchar"},
+                        {"name": "s3_event_version", "type": "varchar"},
+                        {"name": "s3_event_source", "type": "varchar"},
+                        {"name": "s3_event_time", "type": "timestamp"},
+                        {"name": "s3_event_name", "type": "varchar"},
+                        {"name": "s3_user_identity", "type": "varchar"},
+                        {"name": "s3_source_ip", "type": "varchar"},
+                        {"name": "s3_bucket_name", "type": "varchar"},
+                        {"name": "s3_object_key", "type": "varchar"},
+                        {"name": "s3_object_size", "type": "bigint"},
+                        {"name": "s3_object_etag", "type": "varchar"},
+                        {"name": "s3_object_version_id", "type": "varchar"},
+                        {"name": "aud_type", "type": "varchar"}
+                      ]
+                  }
+                - DatabaseName: !Ref GlueDatabaseConfInfo
+                  TableName: !Ref GlueTableConfInfo
+
+  GlueCrawlerRoleConfinfo:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - glue.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                  - s3:GetObject
+                Resource:
+                  - !Sub arn:aws:s3:::${ConfInfoLogsBucketName}
+                  - !Sub arn:aws:s3:::${ConfInfoLogsBucketName}/logsTos3/*
+        - PolicyName: S3EncryptionAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetEncryptionConfiguration
+                Resource:
+                  - !Sub arn:aws:s3:::${ConfInfoLogsBucketName}
+        - PolicyName: KMSEncryptionAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                Resource: !Sub "arn:aws:kms:${AWS::Region}:${SafeStorageAccountId}:key/*"
+
+  GlueCrawlerConfInfo:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: LogAnalyticsCrawlerConfInfo
+      Role: !GetAtt GlueCrawlerRoleConfinfo.Arn
+      DatabaseName: !Ref GlueDatabaseConfInfo
+      Targets:
+        CatalogTargets:
+          - DatabaseName: !Ref GlueDatabaseConfInfo
+            Tables:
+              - !Ref GlueTableConfInfo
+      SchemaChangePolicy:
+        UpdateBehavior: LOG
+        DeleteBehavior: LOG
+      Configuration: |
+        {
+          "Version": 1.0,
+          "CrawlerOutput": {
+            "Partitions": {
+              "AddOrUpdateBehavior": "InheritFromTable"
+            }
+          }
+        }
+      TablePrefix: ''
+      Schedule: !If
+        - IsConfInfoGlueCrawlerScheduled
+        - ScheduleExpression: !Ref ConfInfoGlueCrawlerSchedule
+        - !Ref AWS::NoValue
+
+  AthenaWorkGroupConfInfo:
+    Type: AWS::Athena::WorkGroup
+    DependsOn: AthenaResultsBucket
+    Properties:
+      Name: LogAnalyticsWorkGroupConfInfo
+      Description: WorkGroup for Log analytics queries
+      State: ENABLED
+      WorkGroupConfiguration:
+        ResultConfiguration:
+          OutputLocation: !Sub s3://${AthenaResultsBucket}/confinfo-results/

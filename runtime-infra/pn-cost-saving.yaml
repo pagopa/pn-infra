@@ -172,27 +172,29 @@ Resources:
           import boto3
           import os
           import json
-
+          
+          # Retrive Cluster info:
           def lambda_handler(event, context):
               ecs_cluster_names = os.environ.get('ECSClusterName', '').split(',')
               
               if not ecs_cluster_names or ecs_cluster_names == ['']:
-                  print("Error: Not Cluster Specified")
+                  print("ERROR: Not Cluster Specified")
                   return {
                       'statusCode': 400,
-                      'body': 'Error: Not Cluster Specified'
+                      'body': 'ERROR: Not Cluster Specified'
                   }
               
               ecs_client = boto3.client('ecs')
               overall_success = True  
               results = [] 
-
+              
+              # For All Ecs Cluster in the account stop the services:
               for cluster_name in ecs_cluster_names:
                   cluster_name = cluster_name.strip()  
-                  print(f"==> Start stopping services for cluster: {cluster_name}")
+                  print(f"==> Stopping services for cluster: {cluster_name}")
 
                   try:
-                      services_response = ecs_client.list_services(cluster=cluster_name, maxResults=100)
+                      services_response = ecs_client.list_services(cluster=cluster_name, maxResults=50)
                       service_arns = services_response['serviceArns']
                   except Exception as e:
                       print(f"ERROR: Problem to retrive list of services for cluster {cluster_name}. Details: {str(e)}")
@@ -200,7 +202,7 @@ Resources:
                       results.append({
                           'cluster': cluster_name,
                           'status': 'error',
-                          'message': f'Errore to retrive list of services: {str(e)}'
+                          'message': f'ERROR: to retrive list of services: {str(e)}'
                       })
                       continue
 
@@ -236,7 +238,7 @@ Resources:
                       results.append({
                           'cluster': cluster_name,
                           'status': 'error',
-                          'message': 'Error during stop services.'
+                          'message': 'ERROR: during stop services.'
                       })
 
               if overall_success:
@@ -361,54 +363,81 @@ Resources:
           import boto3
           import json
           import os
+          import re
 
           def lambda_handler(event, context):
-              # Variabili di ambiente
+              # Env Variable
               ecs_cluster_names = os.environ['ECSClusterName'].split(",") 
               s3bucket_name = os.environ['EcsDesireCountBucket']
               account_id = os.environ['AwsAccountId']
 
-              # Client AWS
+              # Setup AWS Client
               s3_client = boto3.client('s3')
               ecs_client = boto3.client('ecs')
-
+              
+              # For All Clusters retrive json in bucket
               for ecs_cluster_name in ecs_cluster_names:
                   object_key = f'desire_count_ecs_{ecs_cluster_name}_{account_id}.json'
                   
                   try:
-                      print(f"Recupero del file JSON {object_key} dal bucket {s3bucket_name}...")
+                      print(f"Retrive JSON file {object_key} from bucket: {s3bucket_name}...")
                       response = s3_client.get_object(Bucket=s3bucket_name, Key=object_key)
                       json_data = response['Body'].read().decode('utf-8')
                       service_counts = json.loads(json_data)
-                      print(f"File JSON successful retrived for cluster {ecs_cluster_name}.")
+                      print(f"File JSON successfully retrieved for cluster {ecs_cluster_name}.")
                   except Exception as e:
-                      print(f"Error during retrive JSON {object_key} from S3: {str(e)}")
+                      print(f"ERROR:  retrieving JSON {object_key} from S3: {str(e)}")
                       return {
                           'statusCode': 500,
-                          'body': f"Error during retrive JSON for cluster {ecs_cluster_name}: {str(e)}"
+                          'body': f"ERROR : retrieving JSON for cluster {ecs_cluster_name}: {str(e)}"
                       }
 
-                  for service_name, desired_count in service_counts.items():
+                  try:
+                      existing_services = ecs_client.list_services(cluster=ecs_cluster_name, maxResults=50,)['serviceArns']
+                      existing_service_names = [arn.split("/")[-1] for arn in existing_services]
+                      print(f"Actual ECS service in cluster: {ecs_cluster_name}: {existing_service_names}")
+                  except Exception as e:
+                      print(f"[Cluster: {ecs_cluster_name}] ERROR: retrieving existing services: {str(e)}")
+                      return {
+                          'statusCode': 500,
+                          'body': f"ERROR: retrieving services for cluster {ecs_cluster_name}: {str(e)}"
+                      }
+
+                  # Extract Pattern
+                  for service_pattern, desired_count in service_counts.items():
+                      base_service_name_match = re.search(r'^(?:[\w-]+-)?([\w]+Microservice)', service_pattern)
+                      if not base_service_name_match:
+                          print(f"[Cluster: {ecs_cluster_name}] ERROR: No valid service name found in pattern '{service_pattern}'")
+                          continue
+                      base_service_name = base_service_name_match.group(1)
+                      
+                      # Search ECS service in actual service that match with bucket file 
+                      matched_service = next((s for s in existing_service_names if base_service_name in s), None)
+                      if not matched_service:
+                          print(f"[Cluster: {ecs_cluster_name}] ERROR: No matching service found for pattern '{base_service_name}'")
+                          continue
+                      
+                      # Update Ecs Service
                       try:
-                          print(f"Update service {service_name} on cluster {ecs_cluster_name} with desiredCount {desired_count}...")
+                          print(f"Update service {matched_service} on cluster {ecs_cluster_name} with desiredCount {desired_count}...")
                           ecs_client.update_service(
                               cluster=ecs_cluster_name,
-                              service=service_name,
+                              service=matched_service,
                               desiredCount=desired_count
                           )
-                          print(f"[Cluster: {ecs_cluster_name}] Desired count successful update for service '{service_name}'.")
+                          print(f"[Cluster: {ecs_cluster_name}] Desired count successfully updated for service '{matched_service}'.")
                       except Exception as e:
-                          print(f"[Cluster: {ecs_cluster_name}] Error during update for service '{service_name}': {str(e)}")
+                          print(f"[Cluster: {ecs_cluster_name}] ERROR: updating service '{matched_service}': {str(e)}")
                           return {
                               'statusCode': 500,
-                              'body': f"Error during update for service '{service_name}' on cluster {ecs_cluster_name}: {str(e)}"
+                              'body': f"ERROR: updating service '{matched_service}' on cluster {ecs_cluster_name}: {str(e)}"
                           }
-
+              
               return {
                   'statusCode': 200,
-                  'body': f"Desired counts successful update for the cluster: {', '.join(ecs_cluster_names)}"
+                  'body': f"Desired counts successfully updated for the cluster: {', '.join(ecs_cluster_names)}"
               }
-
+       
       Environment:
         Variables:
           EcsDesireCountBucket:
