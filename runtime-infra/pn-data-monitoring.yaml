@@ -175,7 +175,7 @@ Resources:
     Properties:
       Name: pn-data-monitoring-codebuild
       ServiceRole: !GetAtt DataMonitoringCodeBuildServiceRole.Arn
-      ConcurrentBuildLimit: 3
+      ConcurrentBuildLimit: 1
       TimeoutInMinutes: 240
       Source: 
         Type: NO_SOURCE
@@ -208,7 +208,7 @@ Resources:
       Environment:
         ComputeType: BUILD_GENERAL1_XLARGE
         Type: LINUX_CONTAINER
-        Image: "aws/codebuild/standard:7.0-25.01.30"
+        Image: "aws/codebuild/standard:7.0-24.10.02"
         EnvironmentVariables:
           - Name: REGION
             Type: PLAINTEXT
