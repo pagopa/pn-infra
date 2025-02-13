@@ -136,6 +136,7 @@ Parameters:
       - Disabled
       - REST-API
       - SQS
+      - CPU
       - CUSTOM
     ConstraintDescription: must specify the type of Autoscaling strategy
   
@@ -162,6 +163,15 @@ Parameters:
     Default: ''
     Type: String
   
+  AutoscalingCpuStatistic:
+    Default: Maximum
+    Type: String
+    AllowedValues:
+      - Minimum
+      - Maximum
+      - Average
+    Description: CPU autoscaling statistics
+
   MinTasksNumber:
     Default: 1
     Type: Number
@@ -752,11 +762,13 @@ Conditions:
   
   AutoscalingByRestApi: !Equals [ !Ref AutoscalingStrategy, REST-API]
   AutoscalingBySQS: !Equals [ !Ref AutoscalingStrategy, SQS]
+  AutoscalingByCPU: !Equals [ !Ref AutoscalingStrategy, CPU]
   AutoscalingCustom: !Equals [ !Ref AutoscalingStrategy, CUSTOM]
   AutoscalingEnabled:
     Fn::Or:
      - Condition: AutoscalingByRestApi
      - Condition: AutoscalingBySQS
+     - Condition: AutoscalingByCPU
      - Condition: AutoscalingCustom
 
   HasOtelXRayDisable: !Equals [ !Ref DisableOtelXRay, 'true' ] 
@@ -2051,6 +2063,31 @@ Resources:
       EvaluationPeriods: !Ref AutoscalingDataPointM
       Period: !Ref AutoscalingCheckPeriod
       Statistic: 'Average'
+      Threshold: !Ref AutoscalingThreshold
+      AlarmActions:
+        - !Ref ScaleUpPolicy
+      OKActions:
+        - !Ref ScaleDownPolicy
+
+  #### Alarm for SQS metric Autoscaling
+  AlarmCPU:
+    Type: "AWS::CloudWatch::Alarm"
+    Condition: AutoscalingByCPU
+    Properties:
+      AlarmName: !Sub "${MicroServiceUniqueName}-autoscaling-cpu"
+      AlarmDescription: "Trigger scaling based on CPU"
+      DatapointsToAlarm: !Ref AutoscalingDataPointN
+      Namespace: "AWS/ECS"
+      MetricName: "CPUUtilization"
+      ComparisonOperator: "GreaterThanThreshold"
+      Dimensions:
+        - Value: !Ref "ECSClusterName"
+          Name: ClusterName
+        - Value: !GetAtt [ECSService, Name]
+          Name: ServiceName
+      EvaluationPeriods: !Ref AutoscalingDataPointM
+      Period: !Ref AutoscalingCheckPeriod
+      Statistic: !Ref AutoscalingCpuStatistic
       Threshold: !Ref AutoscalingThreshold
       AlarmActions:
         - !Ref ScaleUpPolicy
