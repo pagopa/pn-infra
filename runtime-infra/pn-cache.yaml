@@ -21,6 +21,11 @@ Parameters:
     Description: "AccessString for elasticache redis default user"
     Default: "on ~* +@all"
 
+  AccessStringEmdIntegrationUser:
+    Type: String
+    Description: "AccessString for elasticache redis default user"
+    Default: "on ~pn-emd::* +@all"
+
   AccessStringUser1:
     Type: String
     Description: "AccessString for elasticache redis user"
@@ -46,6 +51,16 @@ Parameters:
     Description: "Username for elasticache redis user"
     Default: "iam-user-logextractor"
 
+  UserIdEmdIntegration:
+    Type: String
+    Description: "UserId for elasticache redis user"
+    Default: "iam-user-emdintegration"
+
+  UsernameEmdIntegration:
+    Type: String
+    Description: "Username for elasticache redis user"
+    Default: "iam-user-emdintegration"
+
 Resources:
 
   RedisServerless:
@@ -53,7 +68,7 @@ Resources:
     Properties:
       ServerlessCacheName: !Sub ${ProjectName}-redis-serverless
       Engine: redis
-      Description: Redis Serverless Cache for Logextractor
+      Description: Redis Serverless Cache for Logextractor and EmdIntegration
       MajorEngineVersion: 7
       SecurityGroupIds:
         - !GetAtt SecurityGroup.GroupId
@@ -122,6 +137,7 @@ Resources:
         - !Ref DefaultElasticCacheUser
         - !Ref ElasticCacheUser1
         - !Ref ElasticCacheLogExtractorUser
+        - !Ref ElasticCacheEmdIntegrationUser
 
   DefaultElasticCacheUser:
     Type: AWS::ElastiCache::User
@@ -152,6 +168,16 @@ Resources:
       Engine: redis
       UserId: !Ref UserIdLogExtractor
       UserName: !Ref UsernameLogExtractor
+
+  ElasticCacheEmdIntegrationUser:
+    Type: AWS::ElastiCache::User
+    Properties:
+      AccessString: !Ref AccessStringEmdIntegrationUser
+      AuthenticationMode: 
+        Type: iam
+      Engine: redis
+      UserId: !Ref UserIdEmdIntegration
+      UserName: !Ref UsernameEmdIntegration
 
 Outputs:
   ElasticacheSecurityGroup:
@@ -185,3 +211,11 @@ Outputs:
   ElasticCacheLogExtractorUserId:
     Description: Id of the LogExtractorUser
     Value: !Ref UsernameLogExtractor
+
+  ElasticCacheEmdIntegrationUserArn:
+    Description: ElasticCacheEmdIntegrationUser Arn
+    Value: !GetAtt ElasticCacheEmdIntegrationUser.Arn
+
+  ElasticCacheEmdIntegrationUserId:
+    Description: Id of the EmdIntegration
+    Value: !Ref UsernameEmdIntegration
