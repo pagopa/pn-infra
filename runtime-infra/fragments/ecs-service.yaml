@@ -225,6 +225,11 @@ Parameters:
     Type: Number
     Description: Ephemeral storage value in GB
     Default: '21'
+  
+  # Parent microservice name for configuration 
+  ParentMicroserviceName:
+    Type: String
+    Description: Parent microservice unique (logical) name. Used for multiple instance configuration.
 
   # Container environment map, maximum 40 entry
   ContainerEnvEntry1:
@@ -1649,7 +1654,15 @@ Resources:
                 - !Ref "AWS::NoValue"
           EnvironmentFiles:
             - Type: s3
-              Value: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/runtime-variable.env'
+              Value: !If
+                - ParentMicroserviceName
+                - !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${ParentMicroserviceName}/runtime-variable.env'
+                - !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/runtime-variable.env'
+            - Type: s3
+              Value: !If
+                - ParentMicroserviceName
+                - !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${ParentMicroserviceName}/application.env'
+                - !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/application.env'
           PortMappings:
             - ContainerPort: 8080
           LinuxParameters:
