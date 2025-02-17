@@ -225,6 +225,17 @@ Parameters:
     Type: Number
     Description: Ephemeral storage value in GB
     Default: '21'
+  
+  # Parent microservice name for configuration 
+  ParentMicroserviceName:
+    Type: String
+    Description: Parent microservice unique (logical) name. Used for multiple instance configuration.
+    Default: ''
+
+  ApplicativeEnvFileChecksum:
+    Type: String
+    Description: Applicative environment variable file checksum.
+    Default: ''
 
   # Container environment map, maximum 40 entry
   ContainerEnvEntry1:
@@ -769,6 +780,8 @@ Conditions:
   
   HasTaskRoleManagedPolicyArn: !Not [ !Equals [ !Ref TaskRoleManagedPolicyArn, '' ] ] 
 
+  HasParentMicroserviceName: !Not [!Equals [!Ref ParentMicroserviceName, ""]]
+
   Env1Exist: !Not [ !Equals [!Ref ContainerEnvEntry1, '']]
   Env2Exist: !Not [ !Equals [!Ref ContainerEnvEntry2, '']]
   Env3Exist: !Not [ !Equals [!Ref ContainerEnvEntry3, '']]
@@ -1171,6 +1184,8 @@ Resources:
               - !Ref "AWS::NoValue"
             - Name: 'MICROSERVICE_NAME'
               Value: !Ref MicroServiceUniqueName
+            - Name: 'APPLICATION_ENV_FILE_CHECKSUM'
+              Value: !Ref ApplicativeEnvFileChecksum
             - 'Fn::If':
               - HasJavaToolOptions
               - Name: 'JAVA_TOOL_OPTIONS'
@@ -1652,9 +1667,18 @@ Resources:
                 - Name: !Select [ 0, !Split [ "=", !Ref ContainerEnvEntry95 ] ]
                   Value: !Select [ 1, !Split [ "=", !Ref ContainerEnvEntry95 ] ]
                 - !Ref "AWS::NoValue"
-          EnvironmentFiles:
-            - Type: s3
-              Value: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/runtime-variable.env'
+          EnvironmentFiles: !If
+            - HasParentMicroserviceName
+            - 
+              - Type: s3
+                Value: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${ParentMicroserviceName}/runtime-variable.env'
+              - Type: s3
+                Value: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${ParentMicroserviceName}/application.env'
+            - 
+              - Type: s3
+                Value: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/runtime-variable.env'
+              - Type: s3
+                Value: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/application.env'
           PortMappings:
             - ContainerPort: 8080
           LinuxParameters:
