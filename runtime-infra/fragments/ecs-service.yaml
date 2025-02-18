@@ -1768,16 +1768,14 @@ Resources:
             Statement: 
               !If
                 - HasParentMicroserviceName
-                -
-                  - Effect: Allow
-                    Action:
-                      - s3:GetObject
-                    Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${ParentMicroserviceName}/*'
-                -
-                  - Effect: Allow
-                    Action:
-                      - s3:GetObject
-                    Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/*'
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                  Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${ParentMicroserviceName}/*'
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                  Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/*'
               - Effect: Allow
                 Action:
                   - s3:GetBucketLocation
