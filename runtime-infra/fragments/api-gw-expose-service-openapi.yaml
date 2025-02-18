@@ -329,11 +329,7 @@ Resources:
           DataTraceEnabled: 'false'
           LoggingLevel: 'INFO'
       Variables: 
-        ServiceApiPath: 
-          'Fn::If':
-            - HasBasePathOverride
-            - !Ref ServiceApiPathOverride
-            - !Ref ServiceApiPath
+        ServiceApiPath: !Ref ServiceApiPath
         ApplicationLoadBalancerDomain: !Ref ApplicationLoadBalancerDomain
         NetworkLoadBalancerLink: !Ref NetworkLoadBalancerLink
         ProjectName: !Ref ProjectName
