@@ -275,11 +275,7 @@ Resources:
             Value: !Ref OpenApiBucketKey   
           - !Ref AWS::NoValue
         - Key: "PN_SERVICE_PATH"
-          Value: 
-            'Fn::If':
-              - HasBasePathOverride
-              - !Ref ServiceApiPathOverride
-              - !Ref ServiceApiPath
+          Value: !Ref ServiceApiPath
       Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
       FailOnWarnings: true
       Mode: overwrite
