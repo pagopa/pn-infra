@@ -1765,21 +1765,26 @@ Resources:
       Policies:
         - PolicyName: !Sub '${MicroServiceUniqueName}-S3RuntimePolicy'
           PolicyDocument:
-            Statement: 
-              !If
-                - HasParentMicroserviceName
+            Statement: !If
+              - HasParentMicroserviceName
+              - 
                 - Effect: Allow
                   Action:
                     - s3:GetObject
                   Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${ParentMicroserviceName}/*'
                 - Effect: Allow
                   Action:
+                    - s3:GetBucketLocation
+                  Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}'
+              -
+                - Effect: Allow
+                  Action:
                     - s3:GetObject
                   Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/*'
-              - Effect: Allow
-                Action:
-                  - s3:GetBucketLocation
-                Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}'
+                - Effect: Allow
+                  Action:
+                    - s3:GetBucketLocation
+                  Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}'
         - Fn::If:
           - HasSecrets
           - PolicyName: !Sub '${MicroServiceUniqueName}-ExecutionPolicy'
