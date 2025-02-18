@@ -37,6 +37,11 @@ Parameters:
     Type: String
     Description: path of the exposed API
 
+  ServiceApiPathOverride:
+    Type: String
+    Default: ''
+    Description: Optional path of the exposed API
+
   NetworkLoadBalancerLink:
     Type: String
     Description: Link inside the VPC
@@ -248,6 +253,7 @@ Conditions:
   ApiAlarmSegmentationEnabled: !Equals [ !Ref ApiAlarmSegmentation, 'true' ]
   ApiAlarmSegmentationDisabled: !Not [ Condition: ApiAlarmSegmentationEnabled ]
   IsNotBackofficeAndAlarmSegmentationDisabled: !And [ !Condition IsNotBackoffice, !Condition ApiAlarmSegmentationDisabled ]
+  HasBasePathOverride: !Not [ !Equals [ !Ref ServiceApiPathOverride, '' ] ]
 
 Resources:
 
@@ -269,7 +275,11 @@ Resources:
             Value: !Ref OpenApiBucketKey   
           - !Ref AWS::NoValue
         - Key: "PN_SERVICE_PATH"
-          Value: !Ref ServiceApiPath
+          Value: 
+            'Fn::If':
+              - HasBasePathOverride
+              - !Ref ServiceApiPathOverride
+              - !Ref ServiceApiPath
       Name: !Sub '${MicroServiceUniqueName}-public-api-${IntendedUsage}-openapi'
       FailOnWarnings: true
       Mode: overwrite
@@ -319,7 +329,11 @@ Resources:
           DataTraceEnabled: 'false'
           LoggingLevel: 'INFO'
       Variables: 
-        ServiceApiPath: !Ref ServiceApiPath
+        ServiceApiPath: 
+          'Fn::If':
+            - HasBasePathOverride
+            - !Ref ServiceApiPathOverride
+            - !Ref ServiceApiPath
         ApplicationLoadBalancerDomain: !Ref ApplicationLoadBalancerDomain
         NetworkLoadBalancerLink: !Ref NetworkLoadBalancerLink
         ProjectName: !Ref ProjectName
@@ -394,7 +408,11 @@ Resources:
     Type: AWS::ApiGateway::BasePathMapping
     Condition: RequiresStageCreation
     Properties:
-      BasePath: !Ref ServiceApiPath
+      BasePath: 
+        'Fn::If':
+          - HasBasePathOverride
+          - !Ref ServiceApiPathOverride
+          - !Ref ServiceApiPath
       DomainName: !Ref DnsName
       RestApiId: !Ref PublicRestApiOpenapi
       Stage: !Ref PublicRestApiStage
