@@ -42,7 +42,7 @@ Parameters:
   MemoryAmount:
     Type: String
     Description: memory amount reserved to the task pod.
-    AllowedValues: [ 2GB, 4GB, 6GB, 8GB ]
+    AllowedValues: [ 1GB, 2GB, 4GB, 6GB, 8GB ]
 
   # Open Telemetry X-Ray configuration
   DisableOtelXRay:
@@ -711,6 +711,11 @@ Parameters:
 
 Mappings:
   ContainerMemory:
+    1GB:
+      awsCollector: 256
+      sidecarInjector: 128
+      clockdrift: 128
+      microservice: 768
     2GB:
       awsCollector: 512
       sidecarInjector: 256
@@ -732,6 +737,9 @@ Mappings:
       clockdrift: 256
       microservice: 7680
   ContainerMemoryNoXray:
+    1GB:
+      clockdrift: 256
+      microservice: 768
     2GB:
       clockdrift: 256
       microservice: 1792
