@@ -84,6 +84,11 @@ Parameters:
     Default: 'cdcTos3/'
     Description: Prefix for the cdc in the bucket
 
+  BucketObjectLockRetentionDays:
+    Type: Number
+    Default: 14
+    Description: Number of days of Default Retention ObjectLock
+
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
   
@@ -118,6 +123,13 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      ObjectLockEnabled: true 
+      ObjectLockConfiguration:
+        ObjectLockEnabled: Enabled
+        Rule:
+          DefaultRetention:
+            Mode: GOVERNANCE
+            Days: !Ref BucketObjectLockRetentionDays
       # lifecycle configuration to delete objects after {BucketLogRetention} days
       LifecycleConfiguration:
         Rules:
