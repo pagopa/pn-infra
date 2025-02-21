@@ -1,4 +1,5 @@
 const { HiveType } = require('../hive-type-parser/HiveType.js');
+const { CdcViewColumnSorter } = require('./CdcViewColumnSorter.js')
 
 const DYNAMODB_SUFFIXES = ["S", "N", "BOOL", "L", "M"];
 const TABLE_ALIAS = "t"
@@ -21,6 +22,8 @@ class SimplifiedCdcViewGeneratorContext {
   #simpleTypeTranslator;
   #aliasCustomize;
 
+  #columnSorter;
+
   constructor( useDdlOrDqlSyntax, rootPath, depth, simpleTypeTranslator, aliasCustomize ) {
     this.#useDdlOrDqlSyntax = useDdlOrDqlSyntax;
     this.#initializeKeywords( useDdlOrDqlSyntax );
@@ -33,6 +36,7 @@ class SimplifiedCdcViewGeneratorContext {
   
     this.#simpleTypeTranslator = simpleTypeTranslator;
     this.#aliasCustomize = aliasCustomize;
+    this.#columnSorter = new CdcViewColumnSorter();
   }
 
   #newChildContext( rootPath, depth ) {
@@ -118,18 +122,17 @@ class SimplifiedCdcViewGeneratorContext {
 
     const propertiesSelectList = this.#buildSimplePropertySelectList( selectListIndent )
     const arraySelectList = this.#buildTransformSelectList( selectListIndent, indentationStepSize )
-    const bothSelectListAreNotEmpty = 
-                propertiesSelectList && propertiesSelectList.trim().length > 0 
-              &&
-                arraySelectList && arraySelectList.trim().length > 0
-            ;
+    const selectList = [ ... propertiesSelectList, ... arraySelectList ]
+    
+    const sortedSelectList = this.#columnSorter.sortArray( selectList, (el) => el.alias ).map( el => el.selectListElement )
 
     // Query definition with CTE used for simple where condition writing
     const query = "WITH simplified_data AS (\n" 
                 + indentStep + "SELECT\n"
-                + propertiesSelectList
-                + ( bothSelectListAreNotEmpty ? ",\n" : "" )
-                + arraySelectList + "\n"
+                + sortedSelectList.join(",\n") + "\n"
+                //+ propertiesSelectList
+                //+ ( bothSelectListAreNotEmpty ? ",\n" : "" )
+                //+ arraySelectList + "\n"
                 // End CTE and write query.
                 // The caller can add where condition using aliases instead of value expression.
                 + indentStep + "FROM\n"
@@ -162,6 +165,8 @@ class SimplifiedCdcViewGeneratorContext {
       result.push( { name: alias, type: type} );
     }
 
+    result = this.#columnSorter.sortArray( result, (el) => el.name )
+
     return result;
   }
 
@@ -174,9 +179,9 @@ class SimplifiedCdcViewGeneratorContext {
                                     + this.#generateOneNonArrayValue( fields )
                                     + " AS " + this.#wrapAlias( alias )
                                     ;
-            return selectListElement;
+            return { alias, selectListElement};
           })
-          .join(",\n");
+          ;//.join(",\n");
     return result;
   }
 
@@ -197,9 +202,9 @@ class SimplifiedCdcViewGeneratorContext {
                                     baseIndent, arrayField, arrayElementName, transformBody );
             
             const selectListElement = transformFunctionCall + " AS " + this.#wrapAlias( alias );
-            return selectListElement;
+            return { alias, selectListElement};
           })
-          .join(",\n");
+          ;//.join(",\n");
     return result;
   }
   
