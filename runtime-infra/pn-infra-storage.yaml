@@ -118,6 +118,13 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      ObjectLockEnabled: true 
+      ObjectLockConfiguration:
+        ObjectLockEnabled: Enabled
+        Rule:
+          DefaultRetention:
+            Mode: GOVERNANCE
+            Days: 14
       # lifecycle configuration to delete objects after {BucketLogRetention} days
       LifecycleConfiguration:
         Rules:
