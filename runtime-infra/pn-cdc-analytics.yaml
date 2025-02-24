@@ -370,8 +370,9 @@ Resources:
                   - s3:GetObject
                   - s3:PutObject
                 Resource:
-                  - !Sub arn:aws:s3:::${LogsBucketName}
-                  - !Sub arn:aws:s3:::${LogsBucketName}/cdcTos3_parsed/*
+                - !Sub arn:aws:s3:::${AthenaResultsBucket}
+                - !Sub arn:aws:s3:::${AthenaResultsBucket}/cdcTos3_parsed/*
+                  
               - Sid: EncryptDecriptDestination
                 Effect: Allow
                 Action:
