@@ -263,7 +263,7 @@ Resources:
                 CdcRecordFilter: !Ref CdcRecordFilter
                 OutputType: 'StorageDescriptor-Columns-noParsedPartition'
                 Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
-          Location: !Sub s3://${LogsBucketName}/cdcTos3_parsed/TABLE_NAME_${DynamoTableName}/
+          Location: !Sub s3://${ProjectName}-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}/cdcTos3_parsed/TABLE_NAME_${DynamoTableName}/
           InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat
           Compressed: false
