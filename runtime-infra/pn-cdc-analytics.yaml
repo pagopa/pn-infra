@@ -128,189 +128,175 @@ Resources:
               StringEquals:
                 aws:SourceAccount: !Ref AWS::AccountId
 
-  
-
   ###############################################################################
   ###                       UPDATE CDC JSON VIEWS CACHE                       ###
   ###############################################################################
 
-  UpdateCdcJsonViewsCodebuildProject:
-    Type: 'AWS::CodeBuild::Project'
+  UpdateCdcJsonViewsLambda:
+    Type: AWS::Lambda::Function
     Properties:
-      Name: "pn-athena-update-cdc-json-cache"
-      ServiceRole: !GetAtt UpdateCdcJsonViewsCodebuildServiceRole.Arn
-      ConcurrentBuildLimit: 1
-      TimeoutInMinutes: 60
-      Source: 
-        Type: NO_SOURCE
-        BuildSpec: |
-          version: 0.2
-          phases:
-            pre_build:
-              commands:
-                - |
-                  usage() {
-                          cat <<EOF
-                      Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] -e <env-type> 
-                      [-h]                      : this help message
-                      -e <env-type>             : one of dev / uat / svil / coll / cert / prod
-                  EOF
-                      exit 1
-                  }
-                  dump_params(){
-                      if ( [ -z "$DATE" ] ) then
-                        export DATE=$( date -I)
-                      fi
-
-                      echo ""
-                      echo "######      PARAMETERS      ######"
-                      echo "##################################"
-                      echo "Region:                ${region}"
-                      echo "AccountId:             ${account_id}"
-                      echo "Athena Output Bucket:  ${athena_output_bucket}"
-                      echo "Reference Date::       ${DATE}"
-                      
-                      if ( [ -z "${region-}" ] ) then
-                      usage
-                      fi
-                      if ( [ -z "${account_id-}" ] ) then
-                      usage
-                      fi
-                      if ( [ -z "${athena_output_bucket-}" ] ) then
-                      usage
-                      fi
-                  }
-                  dump_params
-            build:
-              commands:
-                - export aws_command_base_args=""
-                - |
-                  echo "- List views to update"
-                  export crawlers_list=$(
-                    aws ${aws_command_base_args} \
-                        glue list-crawlers \
-                        --max-results 100 \
-                        --tags '{"PnHasView":"true"}' \
-                    | jq -r '.CrawlerNames | .[]'
-                  )
-                - |
-                  echo "Found $( echo $crawlers_list | wc -w  ) view(s) to update " 
-                - |
-                  for crawler_name in $crawlers_list 
-                  do
-                    crawler_tags=$(
-                      aws ${aws_command_base_args} \
-                          glue get-tags \
-                          --resource-arn "arn:aws:glue:${region}:${account_id}:crawler/${crawler_name}" \
-                        | jq -r '.Tags | tojson' \
-                    )
-
-                    json_view=$( echo $crawler_tags | jq -r '.PnView' )
-                    cache_table=$( echo $crawler_tags | jq -r '.PnViewCache' )
-                    echo "- Update cache ${cache_table} from view ${json_view}"
-
-                    query="INSERT INTO \"${database_name}\".\"${cache_table}\" \n\
-                          ( \n\
-                            SELECT * FROM \"${database_name}\".\"${json_view}\" \n\
-                              WHERE p_year = lpad( cast( year( date_add('day', -1, date('$DATE') )) as varchar), 4, '0') \n\
-                                AND p_month = lpad( cast( month( date_add('day', -1, date('$DATE') )) as varchar), 2, '0') \n\
-                                AND p_day = lpad( cast( day( date_add('day', -1, date('$DATE') )) as varchar), 2, '0') 
-                            EXCEPT
-                            SELECT * FROM \"${database_name}\".\"${cache_table}\" \n\
-                              WHERE p_year = lpad( cast( year( date_add('day', -1, date('$DATE') )) as varchar), 4, '0') \n\
-                                AND p_month = lpad( cast( month( date_add('day', -1, date('$DATE') )) as varchar), 2, '0') \n\
-                                AND p_day = lpad( cast( day( date_add('day', -1, date('$DATE') )) as varchar), 2, '0') \n\
-                          ) \n\
-                    "
-                    
-                    echo "  Start execute query \n      ${query}" 
-                    echo "${query}" > query.txt
-                    queryExecutionId=$(
-                        aws ${aws_command_base_args} \
-                            athena start-query-execution \
-                            --query-string file://query.txt \
-                            --result-configuration "OutputLocation=s3://${athena_output_bucket}/cache_updates/${cache_table}"\
-                          | jq -r '.QueryExecutionId' \
-                      )
-                    if ( [ "${queryExecutionId}" = "" ] ) then
-                      exit 1
-                    fi
-
-                    executionDone="false"
-                    
-                    while ( [ "${executionDone}" != "true" ] ) do
-                      echo " Wait query ${queryExecutionId} execution"
-                      sleep 5
-                      executionState=$( 
-                          aws ${aws_command_base_args} \
-                              athena get-query-execution \
-                              --query-execution-id ${queryExecutionId} \
-                            | jq -r '.QueryExecution.Status.State' \
-                      )
-                      echo " Execution ${executionState}"
-                      
-                      if ( [ "${executionState}" = "FAILED" ] ) then
-                        echo -n " Reason: "
-                        aws ${aws_command_base_args} \
-                              athena get-query-execution \
-                              --query-execution-id ${queryExecutionId} \
-                            | jq -r '.QueryExecution.Status.StateChangeReason'
-                        exit 2
-                      fi
-                      if ( [ "${executionState}" = "SUCCEEDED" ] ) then
-                        executionDone="true"
-                      fi
-                    done
-                  done
-      Artifacts:
-        Type: NO_ARTIFACTS
+      FunctionName: PnAthenaUpdateCdcJsonCache
+      Description: Updates CDC JSON cache tables based on views
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      MemorySize: 256
+      Timeout: 900 # 15 minutes (maximum lambda timeout)
+      Role: !GetAtt UpdateCdcJsonViewsLambdaRole.Arn
       Environment:
-        ComputeType: BUILD_GENERAL1_SMALL
-        Type: LINUX_CONTAINER
-        Image: "aws/codebuild/standard:7.0"
-        EnvironmentVariables:
-          - Name: region
-            Type: PLAINTEXT
-            Value: !Ref AWS::Region
-          - Name: account_id
-            Type: PLAINTEXT
-            Value: !Ref AWS::AccountId
-          - Name: database_name
-            Type: PLAINTEXT
-            Value: !Ref GlueDatabase
-          - Name: athena_output_bucket
-            Type: PLAINTEXT
-            Value: !Ref AthenaResultsBucket
-          - Name: DATE
-            Type: PLAINTEXT
-            Value: ''
-          
-  UpdateCdcJsonViewsCodebuildServiceRole:
+        Variables:
+          REGION: !Ref AWS::Region
+          ACCOUNT_ID: !Ref AWS::AccountId
+          DATABASE_NAME: !Ref GlueDatabase
+          ATHENA_OUTPUT_BUCKET: !Ref AthenaResultsBucket
+      Code:
+        ZipFile: |
+          import boto3, json, time, os, logging
+          from datetime import datetime, timedelta
+          from concurrent.futures import ThreadPoolExecutor
+          from zoneinfo import ZoneInfo
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          region = os.environ.get('REGION')
+          account_id = os.environ.get('ACCOUNT_ID')
+          database_name = os.environ.get('DATABASE_NAME')
+          athena_output_bucket = os.environ.get('ATHENA_OUTPUT_BUCKET')
+
+          def execute_query(data, reference_date, start_time, timeout=880):
+              """Execute and monitor Athena query with timeout handling"""
+              athena = boto3.client('athena', region_name=region)
+              
+              # Build date condition and query
+              date_filter = f"p_year = lpad(cast(year(date('{reference_date}')) as varchar), 4, '0') " + \
+                          f"AND p_month = lpad(cast(month(date('{reference_date}')) as varchar), 2, '0') " + \
+                          f"AND p_day = lpad(cast(day(date('{reference_date}')) as varchar), 2, '0')"
+              
+              query = f"INSERT INTO \"{database_name}\".\"{data['cache']}\" " + \
+                    f"(SELECT * FROM \"{database_name}\".\"{data['view']}\" WHERE {date_filter} " + \
+                    f"EXCEPT SELECT * FROM \"{database_name}\".\"{data['cache']}\" WHERE {date_filter})"
+              
+              # Start query and get execution ID
+              resp = athena.start_query_execution(
+                  QueryString=query,
+                  ResultConfiguration={'OutputLocation': f"s3://{athena_output_bucket}/cache_updates/{data['cache']}"}
+              )
+              qid = resp['QueryExecutionId']
+              result = {'table': data['cache'], 'id': qid}
+              
+              # Monitor until completion or timeout
+              while True:
+                  # Check for Lambda timeout
+                  elapsed = time.time() - start_time
+                  if elapsed > timeout:
+                      logger.warning(f"TIMEOUT: Query {qid} for {data['cache']}")
+                      return {'table': data['cache'], 'id': qid, 'state': 'TIMEOUT', 'time': elapsed}
+                      
+                  # Check query status
+                  status = athena.get_query_execution(QueryExecutionId=qid)['QueryExecution']['Status']['State']
+                  
+                  if status == 'SUCCEEDED':
+                      logger.info(f"Success: {data['cache']} in {time.time() - start_time:.1f}s")
+                      return {'table': data['cache'], 'id': qid, 'state': 'SUCCESS', 'time': elapsed}
+                  
+                  if status in ['FAILED', 'CANCELLED']:
+                      error = athena.get_query_execution(QueryExecutionId=qid)['QueryExecution']['Status'].get('StateChangeReason', 'Unknown')
+                      logger.error(f"Failed: {data['cache']} - {error}")
+                      return {'table': data['cache'], 'id': qid, 'state': 'FAILED', 'error': error, 'time': elapsed}
+                  
+                  time.sleep(2)
+
+          def log_errors(failures, timeouts):
+              """Log failures and timeouts"""
+              if not failures and not timeouts:
+                  return
+                  
+              logger.warning(f"=== CDC JSON CACHE UPDATE ERRORS: {len(failures)} failures, {len(timeouts)} timeouts ===")
+              
+              # Log failures
+              for f in failures:
+                  logger.error(f"FAILED: table={f['table']}, query={f['id']}, error={f.get('error', 'Unknown')}")
+              
+              # Log timeouts
+              for t in timeouts:
+                  logger.warning(f"TIMEOUT: table={t['table']}, query={t['id']}")
+
+          def lambda_handler(event, context):
+              start_time = time.time()
+              
+              # get reference date (yesterday in Europe/Rome timezone) or from event
+              reference_date = event.get('date') or (datetime.now(ZoneInfo('Europe/Rome')) - timedelta(days=1)).strftime('%Y-%m-%d')
+              logger.info(f"Reference date: {reference_date}")
+              
+              # get crawlers with PnHasView tag
+              glue = boto3.client('glue', region_name=region)
+              crawlers = glue.list_crawlers(Tags={'PnHasView': 'true'}, MaxResults=100).get('CrawlerNames', [])
+              
+              if not crawlers:
+                  logger.info("No crawlers with PnHasView tag found")
+                  return {'statusCode': 200, 'body': json.dumps({'message': 'No crawlers to process'})}
+              
+              # get view-cache pairs from crawler tags
+              queries = []
+              for crawler in crawlers:
+                  tags = glue.get_tags(ResourceArn=f"arn:aws:glue:{region}:{account_id}:crawler/{crawler}")['Tags']
+                  if 'PnView' in tags and 'PnViewCache' in tags:
+                      queries.append({'view': tags['PnView'], 'cache': tags['PnViewCache']})
+              
+              # execute max 20 queries parallel
+              results = []
+              with ThreadPoolExecutor(max_workers=20) as executor:
+                  futures = {executor.submit(execute_query, q, reference_date, start_time): q['cache'] for q in queries}
+                  for future in futures:
+                      try:
+                          results.append(future.result())
+                      except Exception as e:
+                          results.append({'table': futures[future], 'state': 'ERROR', 'error': str(e)})
+              
+             
+              successes = [r for r in results if r.get('state') == 'SUCCESS']
+              failures = [r for r in results if r.get('state') == 'FAILED']
+              timeouts = [r for r in results if r.get('state') == 'TIMEOUT']
+              
+              if failures or timeouts:
+                  log_errors(failures, timeouts)
+              
+              total_time = time.time() - start_time
+              logger.info(f"Completed: {len(successes)} successes, {len(failures)} failures, {len(timeouts)} timeouts in {total_time:.1f}s")
+              
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps({
+                      'message': f"Completed in {total_time:.1f}s: {len(successes)} successes, {len(failures)} failures, {len(timeouts)} timeouts",
+                      'execution_time': total_time,
+                      'results': results
+                  })
+              }
+
+  UpdateCdcJsonViewsLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${UpdateCdcJsonViewsLambda}"
+      RetentionInDays: 30
+
+  UpdateCdcJsonViewsLambdaRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: pn-athena-update-cdc-json-cache-codebuild-role
+      RoleName: pn-athena-update-cdc-json-cache-lambda-role
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
-              Service:
-                - "codebuild.amazonaws.com"
-            Action:
-              - "sts:AssumeRole"
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
-        - PolicyName: pn-athena-update-cdc-json-cache-codebuild-policy
+        - PolicyName: pn-athena-update-cdc-json-cache-lambda-policy
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-              - Sid: CanLog
-                Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: 
-                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*
               - Sid: CanListCrawlers
                 Effect: Allow
                 Action:
@@ -321,16 +307,14 @@ Resources:
                   - "glue:GetTables"
                   - "glue:GetDatabase"
                   - "glue:GetDatabases"
-                Resource:
-                  - "*"
+                Resource: "*"
               - Sid: CanExecuteQuery
                 Effect: Allow
                 Action:
                   - "athena:BatchGetQueryExecution"
                   - "athena:GetQueryExecution"
                   - "athena:StartQueryExecution"
-                Resource:
-                  - "*"
+                Resource: "*"
               - Sid: CanCheckOutputBucketLocation
                 Effect: Allow
                 Action:
@@ -382,7 +366,7 @@ Resources:
                   - kms:DescribeKey
                 Resource:
                   - !Ref LogsBucketKmsKeyArn
-              
+
   UpdateCdcJsonViewsScheduleBridgeRule:
     Type: AWS::Scheduler::Schedule
     Properties: 
@@ -393,10 +377,10 @@ Resources:
         Mode: "OFF"
       State: "ENABLED"
       Target:
-        Arn: !GetAtt UpdateCdcJsonViewsCodebuildProject.Arn
-        RoleArn: !GetAtt EventBusRunCodeBuildRole.Arn
+        Arn: !GetAtt UpdateCdcJsonViewsLambda.Arn
+        RoleArn: !GetAtt EventBusRunLambdaRole.Arn
   
-  EventBusRunCodeBuildRole:
+  EventBusRunLambdaRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -409,15 +393,15 @@ Resources:
                 - events.amazonaws.com
                 - scheduler.amazonaws.com
       Policies:
-        - PolicyName: runCodeBuild
+        - PolicyName: runLambda
           PolicyDocument:
             Statement:
-              - Sid: startProjectRun
+              - Sid: invokeLambda
                 Action:
-                  - "codebuild:*"
+                  - "lambda:InvokeFunction"
                 Effect: Allow
                 Resource: 
-                  - !GetAtt UpdateCdcJsonViewsCodebuildProject.Arn
+                  - !GetAtt UpdateCdcJsonViewsLambda.Arn
 
 Outputs:
   GlueDatabaseName:
