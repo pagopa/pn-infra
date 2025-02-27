@@ -224,8 +224,8 @@ Resources:
           def lambda_handler(event, context):
               start_time = time.time()
               
-              # get reference date (yesterday in Europe/Rome timezone) or from event
-              reference_date = event.get('date') or (datetime.now(ZoneInfo('Europe/Rome')) - timedelta(days=1)).strftime('%Y-%m-%d')
+              # get reference date (yesterday in UTC timezone) or from event
+              reference_date = event.get('date') or (datetime.now(ZoneInfo('UTC')) - timedelta(days=1)).strftime('%Y-%m-%d')
               logger.info(f"Reference date: {reference_date}")
               
               # get crawlers with PnHasView tag
@@ -372,7 +372,6 @@ Resources:
     Properties: 
       Description: Schedule json views cache update everyday at 01:00 Europe/Rome
       ScheduleExpression: "cron(0 1 * * ? *)"
-      ScheduleExpressionTimezone: "Europe/Rome"
       FlexibleTimeWindow:
         Mode: "OFF"
       State: "ENABLED"
