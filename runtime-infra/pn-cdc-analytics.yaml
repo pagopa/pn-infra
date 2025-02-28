@@ -137,7 +137,10 @@ Resources:
   ###############################################################################
   ###                       UPDATE CDC JSON VIEWS CACHE                       ###
   ###############################################################################
-
+  # Run with specific date: 
+  # CLI example: aws lambda invoke --function-name PnAthenaUpdateCdcJsonCache --payload '{"date": "2025-02-15"}' output.txt
+  # Console example: Use test event with payload {"date": "2025-02-15"}
+  # Default: yesterday's date (UTC) if "date" is not specified
   UpdateCdcJsonViewsLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -208,8 +211,7 @@ Resources:
                   # Check for Lambda timeout
                   elapsed = time.time() - start_time
                   if elapsed > timeout:
-                      # Adattato al formato del metric filter
-                      logger.warning(f"Query State TIMEOUT {qid} for {data['cache']}")
+                      logging.error(f"Query State TIMEOUT {qid} for {data['cache']}")
                       return {'table': data['cache'], 'id': qid, 'state': 'TIMEOUT', 'time': elapsed}
                       
                   # Check query status
