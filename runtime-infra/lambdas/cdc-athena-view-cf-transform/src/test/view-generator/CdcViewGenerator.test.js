@@ -8,6 +8,7 @@ describe("CdcViewGenerator tests", function () {
       DatabaseName: 'cdc_analytics_database',
       CatalogName : 'awsdatacatalog',
       CdcTableName: 'pn_notifications_table',
+      CdcParsedTableName: 'pn_notifications_table_parsed',
       CdcViewName: 'pn_notifications_view',
       CdcKeysType: 'struct<iun:struct<S:string>>',
       CdcNewImageType: `
@@ -37,14 +38,6 @@ describe("CdcViewGenerator tests", function () {
 
     const expectedCloudformationColumns = [
         {
-          "Name": "dynamodb_SizeBytes",
-          "Type": "bigint"
-        },
-        {
-          "Name": "dynamodb_keys_iun",
-          "Type": "string"
-        },
-        {
           "Name": "group",
           "Type": "string"
         },
@@ -53,24 +46,28 @@ describe("CdcViewGenerator tests", function () {
           "Type": "string"
         },
         {
-          "Name": "kinesis_dynamodb_ApproximateCreationDateTime",
+          "Name": "recipients",
+          "Type": "array<struct<recipientId:string,recipientType:string,payments:array<struct<applyCost:boolean,creditorTaxId:string,f24_applyCost:boolean,f24_title:string,noticeCode:string>>>>"
+        },
+        {
+          "Name": "taxonomyCode",
+          "Type": "string"
+        },
+        {
+          "Name": "version",
+          "Type": "string"
+        },
+        {
+          "Name": "dynamodb_SizeBytes",
           "Type": "bigint"
         },
         {
-          "Name": "p_day",
+          "Name": "dynamodb_keys_iun",
           "Type": "string"
         },
         {
-          "Name": "p_hour",
-          "Type": "string"
-        },
-        {
-          "Name": "p_month",
-          "Type": "string"
-        },
-        {
-          "Name": "p_year",
-          "Type": "string"
+          "Name": "kinesis_dynamodb_ApproximateCreationDateTime",
+          "Type": "bigint"
         },
         {
           "Name": "stream_awsregion",
@@ -97,16 +94,20 @@ describe("CdcViewGenerator tests", function () {
           "Type": "string"
         },
         {
-          "Name": "taxonomyCode",
+          "Name": "p_hour",
           "Type": "string"
         },
         {
-          "Name": "version",
+          "Name": "p_year",
           "Type": "string"
         },
         {
-          "Name": "recipients",
-          "Type": "array<struct<recipientId:string,recipientType:string,payments:array<struct<applyCost:boolean,creditorTaxId:string,f24_applyCost:boolean,f24_title:string,noticeCode:string>>>>"
+          "Name": "p_month",
+          "Type": "string"
+        },
+        {
+          "Name": "p_day",
+          "Type": "string"
         }
       ];
     
@@ -114,23 +115,8 @@ describe("CdcViewGenerator tests", function () {
         originalSql: trimCodeIndent( 12, `
             WITH simplified_data AS (
                 SELECT
-                    "dynamodb"."SizeBytes" AS "dynamodb_SizeBytes",
-                    "dynamodb"."Keys"."iun"."S" AS "dynamodb_keys_iun",
                     "dynamodb"."NewImage"."group"."S" AS "group",
                     "dynamodb"."NewImage"."iun"."S" AS "iun",
-                    "dynamodb"."ApproximateCreationDateTime" AS "kinesis_dynamodb_ApproximateCreationDateTime",
-                    "p_day" AS "p_day",
-                    "p_hour" AS "p_hour",
-                    "p_month" AS "p_month",
-                    "p_year" AS "p_year",
-                    "awsregion" AS "stream_awsregion",
-                    "eventid" AS "stream_eventid",
-                    "eventname" AS "stream_eventname",
-                    "recordformat" AS "stream_recordformat",
-                    "tablename" AS "stream_tablename",
-                    "useridentity" AS "stream_useridentity",
-                    "dynamodb"."NewImage"."taxonomyCode"."S" AS "taxonomyCode",
-                    coalesce("dynamodb"."NewImage"."version"."N","dynamodb"."NewImage"."version"."S") AS "version",
                     transform( "dynamodb"."NewImage"."recipients"."L", (elem0) -> 
                         cast(row(
                             elem0."M"."recipientId"."S",
@@ -155,7 +141,22 @@ describe("CdcViewGenerator tests", function () {
                             "recipientType" VARCHAR,
                             "payments" array(row( "applyCost" BOOLEAN, "creditorTaxId" VARCHAR, "f24_applyCost" BOOLEAN, "f24_title" VARCHAR, "noticeCode" VARCHAR ))
                         ))
-                    ) AS "recipients"
+                    ) AS "recipients",
+                    "dynamodb"."NewImage"."taxonomyCode"."S" AS "taxonomyCode",
+                    coalesce("dynamodb"."NewImage"."version"."N","dynamodb"."NewImage"."version"."S") AS "version",
+                    "dynamodb"."SizeBytes" AS "dynamodb_SizeBytes",
+                    "dynamodb"."Keys"."iun"."S" AS "dynamodb_keys_iun",
+                    "dynamodb"."ApproximateCreationDateTime" AS "kinesis_dynamodb_ApproximateCreationDateTime",
+                    "awsregion" AS "stream_awsregion",
+                    "eventid" AS "stream_eventid",
+                    "eventname" AS "stream_eventname",
+                    "recordformat" AS "stream_recordformat",
+                    "tablename" AS "stream_tablename",
+                    "useridentity" AS "stream_useridentity",
+                    "p_hour" AS "p_hour",
+                    "p_year" AS "p_year",
+                    "p_month" AS "p_month",
+                    "p_day" AS "p_day"
                 FROM
                     "cdc_analytics_database"."pn_notifications_table" t
             )
@@ -170,14 +171,6 @@ describe("CdcViewGenerator tests", function () {
         schema: "cdc_analytics_database",
         columns: [
           {
-            "name": "dynamodb_SizeBytes",
-            "type": "BIGINT"
-          },
-          {
-            "name": "dynamodb_keys_iun",
-            "type": "VARCHAR"
-          },
-          {
             "name": "group",
             "type": "VARCHAR"
           },
@@ -186,24 +179,28 @@ describe("CdcViewGenerator tests", function () {
             "type": "VARCHAR"
           },
           {
-            "name": "kinesis_dynamodb_ApproximateCreationDateTime",
+            "name": "recipients",
+            "type": "array(row( \"recipientId\" VARCHAR, \"recipientType\" VARCHAR, \"payments\" array(row( \"applyCost\" BOOLEAN, \"creditorTaxId\" VARCHAR, \"f24_applyCost\" BOOLEAN, \"f24_title\" VARCHAR, \"noticeCode\" VARCHAR )) ))"
+          },
+          {
+            "name": "taxonomyCode",
+            "type": "VARCHAR"
+          },
+          {
+            "name": "version",
+            "type": "VARCHAR"
+          },
+          {
+            "name": "dynamodb_SizeBytes",
             "type": "BIGINT"
           },
           {
-            "name": "p_day",
+            "name": "dynamodb_keys_iun",
             "type": "VARCHAR"
           },
           {
-            "name": "p_hour",
-            "type": "VARCHAR"
-          },
-          {
-            "name": "p_month",
-            "type": "VARCHAR"
-          },
-          {
-            "name": "p_year",
-            "type": "VARCHAR"
+            "name": "kinesis_dynamodb_ApproximateCreationDateTime",
+            "type": "BIGINT"
           },
           {
             "name": "stream_awsregion",
@@ -230,16 +227,20 @@ describe("CdcViewGenerator tests", function () {
             "type": "VARCHAR"
           },
           {
-            "name": "taxonomyCode",
+            "name": "p_hour",
             "type": "VARCHAR"
           },
           {
-            "name": "version",
+            "name": "p_year",
             "type": "VARCHAR"
           },
           {
-            "name": "recipients",
-            "type": "array(row( \"recipientId\" VARCHAR, \"recipientType\" VARCHAR, \"payments\" array(row( \"applyCost\" BOOLEAN, \"creditorTaxId\" VARCHAR, \"f24_applyCost\" BOOLEAN, \"f24_title\" VARCHAR, \"noticeCode\" VARCHAR )) ))"
+            "name": "p_month",
+            "type": "VARCHAR"
+          },
+          {
+            "name": "p_day",
+            "type": "VARCHAR"
           }
         ]
       };
@@ -265,6 +266,7 @@ it("should support pn-Timeline table", async () => {
     DatabaseName: 'cdc_analytics_database',
     CatalogName : 'awsdatacatalog',
     CdcTableName: 'pn_timelines_table',
+    CdcParsedTableName: 'pn_timelines_table_parsed',
     CdcViewName: 'pn_timelines_view',
     CdcKeysType: 'struct<iun:struct<S:string>,timelineElementId:struct<S:string>>',
     CdcNewImageType: `
@@ -286,11 +288,23 @@ it("should support pn-Timeline table", async () => {
         "Type": "string"
       },
       {
+        "Name": "details_f24Attachments",
+        "Type": "array<struct<_elem_value:string>>"
+      },
+      {
         "Name": "details_relatedFeedbackTimelineId",
         "Type": "string"
       },
       {
         "Name": "details_vat",
+        "Type": "string"
+      },
+      {
+        "Name": "iun",
+        "Type": "string"
+      },
+      {
+        "Name": "timelineElementId",
         "Type": "string"
       },
       {
@@ -306,28 +320,8 @@ it("should support pn-Timeline table", async () => {
         "Type": "string"
       },
       {
-        "Name": "iun",
-        "Type": "string"
-      },
-      {
         "Name": "kinesis_dynamodb_ApproximateCreationDateTime",
         "Type": "bigint"
-      },
-      {
-        "Name": "p_day",
-        "Type": "string"
-      },
-      {
-        "Name": "p_hour",
-        "Type": "string"
-      },
-      {
-        "Name": "p_month",
-        "Type": "string"
-      },
-      {
-        "Name": "p_year",
-        "Type": "string"
       },
       {
         "Name": "stream_awsregion",
@@ -354,12 +348,20 @@ it("should support pn-Timeline table", async () => {
         "Type": "string"
       },
       {
-        "Name": "timelineElementId",
+        "Name": "p_hour",
         "Type": "string"
       },
       {
-        "Name": "details_f24Attachments",
-        "Type": "array<struct<_elem_value:string>>"
+        "Name": "p_year",
+        "Type": "string"
+      },
+      {
+        "Name": "p_month",
+        "Type": "string"
+      },
+      {
+        "Name": "p_day",
+        "Type": "string"
       }
     ];
   
@@ -368,31 +370,31 @@ it("should support pn-Timeline table", async () => {
           WITH simplified_data AS (
               SELECT
                   "dynamodb"."NewImage"."details"."M"."aarTemplateType"."S" AS "details_aarTemplateType",
-                  "dynamodb"."NewImage"."details"."M"."relatedFeedbackTimelineId"."S" AS "details_relatedFeedbackTimelineId",
-                  "dynamodb"."NewImage"."details"."M"."vat"."N" AS "details_vat",
-                  "dynamodb"."SizeBytes" AS "dynamodb_SizeBytes",
-                  "dynamodb"."Keys"."iun"."S" AS "dynamodb_keys_iun",
-                  "dynamodb"."Keys"."timelineElementId"."S" AS "dynamodb_keys_timelineElementId",
-                  "dynamodb"."NewImage"."iun"."S" AS "iun",
-                  "dynamodb"."ApproximateCreationDateTime" AS "kinesis_dynamodb_ApproximateCreationDateTime",
-                  "p_day" AS "p_day",
-                  "p_hour" AS "p_hour",
-                  "p_month" AS "p_month",
-                  "p_year" AS "p_year",
-                  "awsregion" AS "stream_awsregion",
-                  "eventid" AS "stream_eventid",
-                  "eventname" AS "stream_eventname",
-                  "recordformat" AS "stream_recordformat",
-                  "tablename" AS "stream_tablename",
-                  "useridentity" AS "stream_useridentity",
-                  "dynamodb"."NewImage"."timelineElementId"."S" AS "timelineElementId",
                   transform( "dynamodb"."NewImage"."details"."M"."f24Attachments"."L", (elem0) -> 
                       cast(row(
                           elem0."S"
                       ) AS row(
                           "_elem_value" VARCHAR
                       ))
-                  ) AS "details_f24Attachments"
+                  ) AS "details_f24Attachments",
+                  "dynamodb"."NewImage"."details"."M"."relatedFeedbackTimelineId"."S" AS "details_relatedFeedbackTimelineId",
+                  "dynamodb"."NewImage"."details"."M"."vat"."N" AS "details_vat",
+                  "dynamodb"."NewImage"."iun"."S" AS "iun",
+                  "dynamodb"."NewImage"."timelineElementId"."S" AS "timelineElementId",
+                  "dynamodb"."SizeBytes" AS "dynamodb_SizeBytes",
+                  "dynamodb"."Keys"."iun"."S" AS "dynamodb_keys_iun",
+                  "dynamodb"."Keys"."timelineElementId"."S" AS "dynamodb_keys_timelineElementId",
+                  "dynamodb"."ApproximateCreationDateTime" AS "kinesis_dynamodb_ApproximateCreationDateTime",
+                  "awsregion" AS "stream_awsregion",
+                  "eventid" AS "stream_eventid",
+                  "eventname" AS "stream_eventname",
+                  "recordformat" AS "stream_recordformat",
+                  "tablename" AS "stream_tablename",
+                  "useridentity" AS "stream_useridentity",
+                  "p_hour" AS "p_hour",
+                  "p_year" AS "p_year",
+                  "p_month" AS "p_month",
+                  "p_day" AS "p_day"
               FROM
                   "cdc_analytics_database"."pn_timelines_table" t
           )
@@ -409,11 +411,23 @@ it("should support pn-Timeline table", async () => {
           "type": "VARCHAR"
         },
         {
+          "name": "details_f24Attachments",
+          "type": "array(row( \"_elem_value\" VARCHAR ))"
+        },
+        {
           "name": "details_relatedFeedbackTimelineId",
           "type": "VARCHAR"
         },
         {
           "name": "details_vat",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "iun",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "timelineElementId",
           "type": "VARCHAR"
         },
         {
@@ -429,28 +443,8 @@ it("should support pn-Timeline table", async () => {
           "type": "VARCHAR"
         },
         {
-          "name": "iun",
-          "type": "VARCHAR"
-        },
-        {
           "name": "kinesis_dynamodb_ApproximateCreationDateTime",
           "type": "BIGINT"
-        },
-        {
-          "name": "p_day",
-          "type": "VARCHAR"
-        },
-        {
-          "name": "p_hour",
-          "type": "VARCHAR"
-        },
-        {
-          "name": "p_month",
-          "type": "VARCHAR"
-        },
-        {
-          "name": "p_year",
-          "type": "VARCHAR"
         },
         {
           "name": "stream_awsregion",
@@ -477,12 +471,20 @@ it("should support pn-Timeline table", async () => {
           "type": "VARCHAR"
         },
         {
-          "name": "timelineElementId",
+          "name": "p_hour",
           "type": "VARCHAR"
         },
         {
-          "name": "details_f24Attachments",
-          "type": "array(row( \"_elem_value\" VARCHAR ))"
+          "name": "p_year",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "p_month",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "p_day",
+          "type": "VARCHAR"
         }
       ]
     };
@@ -507,6 +509,7 @@ it("should support string and long translation", async () => {
     DatabaseName: 'cdc_analytics_database',
     CatalogName : 'awsdatacatalog',
     CdcTableName: 'aa',
+    CdcParsedTableName: 'aa_parsed',
     CdcViewName: 'aa_view',
     CdcKeysType: 'struct<iun:struct<S:string>>',
     CdcNewImageType: `
@@ -536,6 +539,37 @@ it("should support string and long translation", async () => {
 
   expect( actualMappedColumns ).to.be.deep.equals( expectedColumns );
 });
+
+it("should support unionAllQuery", async () => {
+  const params = {
+    DatabaseName: 'cdc_analytics_database',
+    CatalogName : 'awsdatacatalog',
+    CdcTableName: 'aa',
+    CdcParsedTableName: 'aa_parsed',
+    CdcViewName: 'aa_view',
+    CdcKeysType: 'struct<iun:struct<S:string>>',
+    CdcNewImageType: `
+      struct<
+        iun:struct<S:string>,
+        quantity:struct<N:long>
+      >`,
+    CdcRecordFilter: ""
+  };
+
+  const expectedQuery = ""
+                      + "  SELECT * FROM \"aa_view\" \n"
+                      + "    WHERE p_year = lpad( cast( year(current_date) as varchar), 4, '0') \n"
+                      + "      AND p_month = lpad( cast( month(current_date) as varchar), 2, '0') \n"
+                      + "      AND p_day = lpad( cast( day(current_date) as varchar), 2, '0') \n"
+                      + "UNION ALL \n"
+                      + "  SELECT * FROM \"aa_parsed\" "
+                      ;
+  const viewGenerator = new CdcViewGenerator( params );
+  const actualQuery = viewGenerator.unionAllQuery();
+  
+  expect( actualQuery ).to.be.equals( expectedQuery );
+});
+
 
 function trimCodeIndent( codeIndentSize, str ) {
   const result = str.split("\n")
