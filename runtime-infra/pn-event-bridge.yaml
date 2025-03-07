@@ -257,6 +257,20 @@ Parameters:
   AddressManagerToRaddAltQueueURL:
     Type: String
 
+  # Safestorage to DeliveryLimitConfigurer
+  SafeStorageToDeliveryLimitConfigurerQueueARN:
+    Type: String
+
+  SafeStorageToDeliveryLimitConfigurerQueueURL:
+    Type: String
+
+  # Safestorage to PaperChannelLimitConfigurer
+  SafeStorageToPaperChannelLimitConfigurerQueueARN:
+    Type: String
+
+  SafeStorageToPaperChannelLimitConfigurerQueueURL:
+    Type: String
+
   OncallDlqRatio:
     Type: Number
     Default: 0.1
@@ -1157,7 +1171,43 @@ Resources:
           InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn         
-   
+
+  #rule safestorage outcome to portfat
+  PnCoreEventBusToLimitConfigurerQueue:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Route SafeStorage Events to LimitConfigurer
+      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
+      EventBusName: !Ref PnCoreEventBus
+      EventPattern:
+        detail-type: [ "SafeStorageOutcomeEvent" ]
+        detail:
+          documentType: [ 'SEND_SERVICE_ORDER' ]
+      Targets: 
+        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
+          Id: !Sub ${ProjectName}-Logger-SafeStore2LimitConfigurer
+          InputTransformer:
+            InputPathsMap:
+              "timestamp": "$.time"
+            InputTemplate: |
+              {
+                  "timestamp": <timestamp>,
+                  "ruleArn": <aws.events.rule-arn>,
+                  "ruleName": <aws.events.rule-name>,
+                  "ingestionTime": <aws.events.event.ingestion-time>,
+                  "originalEvent": <aws.events.event.json>
+              }       
+        - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2DeliveryLimitConfigurer'
+          Arn: !Ref SafeStorageToDeliveryLimitConfigurerQueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+        - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2PaperChannelLimitConfigurer'
+          Arn: !Ref SafeStorageToPaperChannelLimitConfigurerQueueARN
+          InputPath: $.detail
+          DeadLetterConfig: 
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
   # pn-infra-logs
   MatchedEventLoggerLambdaPermission:
     Type: AWS::Lambda::Permission
@@ -1537,6 +1587,10 @@ Outputs:
   PnCoreEventBusToUserAttributesQueueArn:
     Description: 'Event bus to user attributes rule ARN'
     Value: !GetAtt PnCoreEventBusToUserAttributesQueue.Arn
+
+  PnCoreEventBusToLimitConfigurerQueueArn:
+    Description: 'Event bus to limit configurer rule ARN'
+    Value: !GetAtt PnCoreEventBusToLimitConfigurerQueue.Arn
 
   #
   CoreEventBusEventsLogGroupArn:
