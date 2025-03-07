@@ -157,6 +157,7 @@ Resources:
           ACCOUNT_ID: !Ref AWS::AccountId
           DATABASE_NAME: !Ref GlueDatabase
           ATHENA_OUTPUT_BUCKET: !Ref AthenaResultsBucket
+          ATHENA_WORKGROUP: !Ref AthenaWorkGroup
       Code:
         ZipFile: |
           import boto3, json, time, os, logging, sys
@@ -184,6 +185,7 @@ Resources:
           account_id = os.environ.get('ACCOUNT_ID')
           database_name = os.environ.get('DATABASE_NAME')
           athena_output_bucket = os.environ.get('ATHENA_OUTPUT_BUCKET')
+          athena_workgroup = os.environ.get('ATHENA_WORKGROUP')
 
           def execute_query(data, reference_date, start_time, timeout=880):
               """Execute and monitor Athena query with timeout handling"""
@@ -201,6 +203,7 @@ Resources:
               # Start query and get execution ID
               resp = athena.start_query_execution(
                   QueryString=query,
+                  WorkGroup=athena_workgroup,
                   ResultConfiguration={'OutputLocation': f"s3://{athena_output_bucket}/cache_updates/{data['cache']}"}
               )
               qid = resp['QueryExecutionId']
