@@ -52,23 +52,23 @@ aws sso login --profile sso_pn-core-<env>
 
 #### Process entire year:
 
-python update_cdc_cache_optimized_final.py --envName dev --table pn_userattributes --year 2024  
+python update_cdc_cache.py --envName dev --table pn_userattributes --year 2024  
 
 #### Process multiple specific months:
 
-./update_cdc_cache_optimized_final.py --envName dev --table pn_userattributes --year 2024 --months "01,02,03"  
+./update_cdc_cache.py --envName dev --table pn_userattributes --year 2024 --months "01,02,03"  
 
 #### Process a single month:
 
-./update_cdc_cache_optimized_final.py --envName dev --table pn_userattributes --year 2024 --months "05"  
+./update_cdc_cache.py --envName dev --table pn_userattributes --year 2024 --months "05"  
 
 #### Process specific days in a month:
 
-./update_cdc_cache_optimized_final.py --envName dev --table pn_userattributes --year 2024 --months "05" --days "01,15,30"  
+./update_cdc_cache.py --envName dev --table pn_userattributes --year 2024 --months "05" --days "01,15,30"  
 
 #### Process a single day:
 
-./update_cdc_cache_optimized_final.py --envName dev --table pn_userattributes --year 2024 --months "05" --days "15"  
+./update_cdc_cache.py --envName dev --table pn_userattributes --year 2024 --months "05" --days "15"  
 
 ## Behavior with current date
 
