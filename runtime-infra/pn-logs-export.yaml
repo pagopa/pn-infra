@@ -99,6 +99,24 @@ Parameters:
     Type: Number
     Default: 1
     Description: Safestorage logger batch size
+    
+  GlueDatabaseName:
+    Type: String
+    Default: "logs_analytics_database" 
+    Description: Glue database name for Parquet schema reference used in data conversion
+  
+  ParquetGlueTableName:
+    Type: String
+    Default: "log_analytics_parquet_table"
+    Description: Glue table name for Parquet schema reference used in data conversion
+    
+  UseNewlineDelimiter:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Whether to append newline delimiter to records
 
 Conditions:
   HasOpenSearchExport: !Not [ !Equals [ !Ref OpenSearchClusterEndpoint, "" ] ]
@@ -137,6 +155,24 @@ Resources:
         StreamNamePrefix: 'logsTos3'
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         StreamContent: CLOUDWATCH_LOGS
+
+  ###             Export CloudWatch Logs to Parquet format             ###
+  ###########################################################################
+  LogsToExternalBucketParquet:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket-parquet.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        SourceKinesisDataStreamArn: !Ref LogsKinesisSourceStreamArn
+        SourceKinesisDataStreamKeyArn: !Ref LogsKinesisSourceStreamKeyArn
+        LogsBucketName: !Ref LogsBucketName
+        LogsExporterRoleArn: !Ref LogsExporterRoleArn
+        StreamNamePrefix: 'logsTos3Parquet'
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        GlueDatabaseName: !Ref GlueDatabaseName
+        GlueTableName: !Ref GlueTableName
+        UseNewlineDelimiter: !Ref UseNewlineDelimiter
 
   ###                   Export dynamo CDC to OpenSearch                   ###
   ###########################################################################
@@ -227,6 +263,14 @@ Outputs:
   CdcToS3KinesisDeliveryStreamAlarmArn:
     Description: 'Cdc delivery stream alarm ARN'
     Value: !GetAtt CdcToExternalBucket.Outputs.DeliveryStreamErrorLogsMetricAlarmArn
+    
+  LogsToParquetDeliveryStreamArn:
+    Description: 'Parquet Delivery stream ARN'
+    Value: !GetAtt LogsToExternalBucketParquet.Outputs.DeliveryStreamArn
+
+  LogsToParquetAlarmArn:
+    Description: 'Parquet delivery stream alarm ARN'
+    Value: !GetAtt LogsToExternalBucketParquet.Outputs.DeliveryStreamErrorLogsMetricAlarmArn
 
   OpenSearchDeliveryLambdaAlarmArn:
     Description: 'Lambda Logs to OpenSearch alarm ARN'
