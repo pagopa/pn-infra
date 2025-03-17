@@ -7,7 +7,11 @@ Parameters:
   ProjectName:
     Type: String
     Default: pn
-    Description: Base name for pn project    
+    Description: Base name for pn project
+  BucketSuffix:
+    Type: String
+    Default: "001"
+    Description: Suffix for the athena result bucket name.    
   LogsBucketName:
     Type: String
     Description: Logs bucket name
@@ -82,7 +86,7 @@ Resources:
         Parameters:
           projection.enabled: 'true'
           projection.p_year.type: integer
-          projection.p_year.range: 2022,2035
+          projection.p_year.range: 2022,2099
           projection.p_month.type: integer
           projection.p_month.range: 1,12
           projection.p_month.digits: '2'
@@ -153,6 +157,15 @@ Resources:
         - IsGlueCrawlerScheduled
         - ScheduleExpression: !Ref GlueCrawlerSchedule
         - !Ref AWS::NoValue
+      Tags: 
+        !If
+          - HasCdcView
+          - 
+            PnHasView: "true"
+            PnView: !Sub '${GlueTableName}_json_view'
+            PnViewCache: !Sub '${GlueTableName}_parsed_cache'
+          - 
+            PnHasView: "false"
   
   CdcGlueView:
     Condition: HasCdcView
@@ -161,7 +174,7 @@ Resources:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Ref GlueDatabaseName
       TableInput:
-        Name: !Sub '${GlueTableName}_view'
+        Name: !Sub '${GlueTableName}_json_view'
         TableType: VIRTUAL_VIEW
         Parameters:
           presto_view: 'true'
@@ -174,7 +187,8 @@ Resources:
                 DatabaseName: !Ref GlueDatabaseName
                 CatalogName : 'awsdatacatalog'
                 CdcTableName: !Ref GlueTableName
-                CdcViewName: !Sub '${GlueTableName}_view'
+                CdcParsedTableName: !Sub '${GlueTableName}_parsed_cache'
+                CdcViewName: !Sub '${GlueTableName}_json_view'
                 CdcKeysType: !Ref DynamoDBKeysStructure
                 CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
                 CdcRecordFilter: !Ref CdcRecordFilter
@@ -190,13 +204,119 @@ Resources:
               DatabaseName: !Ref GlueDatabaseName
               CatalogName : 'awsdatacatalog'
               CdcTableName: !Ref GlueTableName
-              CdcViewName: !Sub '${GlueTableName}_view'
+              CdcParsedTableName: !Sub '${GlueTableName}_parsed_cache'
+              CdcViewName: !Sub '${GlueTableName}_json_view'
               CdcKeysType: !Ref DynamoDBKeysStructure
               CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
               CdcRecordFilter: !Ref CdcRecordFilter
               OutputType: 'ViewOriginalText'
               Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
   
+  GlueParquetTable:
+    Condition: HasCdcView
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabaseName
+      TableInput:
+        Name: !Sub ${GlueTableName}_parsed_cache
+        TableType: EXTERNAL_TABLE
+        PartitionKeys:
+          - Name: p_year
+            Type: string
+            Comment: Kinesis stream partition year
+          - Name: p_month
+            Type: string
+            Comment: Kinesis stream partition month
+          - Name: p_day
+            Type: string
+            Comment: Kinesis stream partition day
+        Parameters:
+          projection.enabled: 'true'
+          projection.p_year.type: integer
+          projection.p_year.range: 2022,2099
+          projection.p_month.type: integer
+          projection.p_month.range: 1,12
+          projection.p_month.digits: '2'
+          projection.p_day.type: integer
+          projection.p_day.range: 1,31
+          projection.p_day.digits: '2'
+          storage.location.template: !Join
+            - ''
+            - - 's3://'
+              - !Sub ${ProjectName}-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}
+              - '/cdcTos3_parsed/TABLE_NAME_'
+              - !Ref DynamoTableName
+              - '/${p_year}/${p_month}/${p_day}/'
+        StorageDescriptor:
+          Columns:
+            'Fn::Transform':
+              Name: 'GenerateCdcViewMacro'
+              Parameters:
+                DatabaseName: !Ref GlueDatabaseName
+                CatalogName : 'awsdatacatalog'
+                CdcTableName: !Ref GlueTableName
+                CdcParsedTableName: !Sub '${GlueTableName}_parsed_cache'
+                CdcViewName: !Sub '${GlueTableName}_json_view'
+                CdcKeysType: !Ref DynamoDBKeysStructure
+                CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
+                CdcRecordFilter: !Ref CdcRecordFilter
+                OutputType: 'StorageDescriptor-Columns-noParsedPartition'
+                Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
+          Location: !Sub s3://${ProjectName}-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}/cdcTos3_parsed/TABLE_NAME_${DynamoTableName}/
+          InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat
+          Compressed: false
+          SerdeInfo:
+            SerializationLibrary: org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe
+          StoredAsSubDirectories: false
+
+  CdcGlueMaterializedView:
+    Condition: HasCdcView
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabaseName
+      TableInput:
+        Name: !Sub '${GlueTableName}_unified_view'
+        TableType: VIRTUAL_VIEW
+        Parameters:
+          presto_view: 'true'
+          comment: !Sub "Presto View for ${GlueTableName} cdc based on parquet cache"
+        StorageDescriptor:
+          Columns:
+            'Fn::Transform':
+              Name: 'GenerateCdcViewMacro'
+              Parameters:
+                DatabaseName: !Ref GlueDatabaseName
+                CatalogName : 'awsdatacatalog'
+                CdcTableName: !Ref GlueTableName
+                CdcParsedTableName: !Sub '${GlueTableName}_parsed_cache'
+                CdcViewName: !Sub '${GlueTableName}_json_view'
+                CdcKeysType: !Ref DynamoDBKeysStructure
+                CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
+                CdcRecordFilter: !Ref CdcRecordFilter
+                OutputType: 'StorageDescriptor-Columns'
+                Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
+          Location: ""
+          SerdeInfo: {}
+        ViewExpandedText: "/* Presto View */"
+        ViewOriginalText:
+          'Fn::Transform':
+            Name: 'GenerateCdcViewMacro'
+            Parameters:
+              DatabaseName: !Ref GlueDatabaseName
+              CatalogName : 'awsdatacatalog'
+              CdcTableName: !Ref GlueTableName
+              CdcParsedTableName: !Sub '${GlueTableName}_parsed_cache'
+              CdcViewName: !Sub '${GlueTableName}_json_view'
+              CdcKeysType: !Ref DynamoDBKeysStructure
+              CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
+              CdcRecordFilter: !Ref CdcRecordFilter
+              OutputType: 'ViewOriginalText-unionAll'
+              Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
+  
+
 Outputs:
   GlueTableName:
     Description: Name of the created Glue Table
@@ -209,6 +329,6 @@ Outputs:
     Value: 
       Fn::If:
         - HasCdcView
-        - !Sub '${GlueTableName}_view'
+        - !Sub '${GlueTableName}_unified_view'
         - "-"
 

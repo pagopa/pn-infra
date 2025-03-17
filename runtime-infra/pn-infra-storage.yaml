@@ -84,6 +84,11 @@ Parameters:
     Default: 'cdcTos3/'
     Description: Prefix for the cdc in the bucket
 
+  BucketObjectLockRetentionDays:
+    Type: Number
+    Default: 14
+    Description: Number of days of Default Retention ObjectLock
+
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
   
@@ -118,6 +123,13 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      ObjectLockEnabled: true 
+      ObjectLockConfiguration:
+        ObjectLockEnabled: Enabled
+        Rule:
+          DefaultRetention:
+            Mode: GOVERNANCE
+            Days: !Ref BucketObjectLockRetentionDays
       # lifecycle configuration to delete objects after {BucketLogRetention} days
       LifecycleConfiguration:
         Rules:
@@ -218,6 +230,8 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       BucketName: !Sub '${ProjectName}-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -352,7 +366,7 @@ Resources:
         LogGroupPrefix: '/aws/lambda'
         LogGroupRetention: !Ref LogRetention
         LogsKinesisSourceStreamArn: !GetAtt LogsKinesisStream.Arn
-
+  
   DiagnosticCloudTrailFileQueue:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
@@ -400,6 +414,20 @@ Resources:
                 "aws:SourceArn": !Sub "arn:${AWS::Partition}:s3:*:*:${ProjectName}-logs-bucket-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}"
               StringEquals:
                 "aws:SourceAccount": !Ref AWS::AccountId
+
+  #loggroup for athena cdc cache update lambda             
+  AthenaUpdateCdcJsonCache:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub '${ProjectName}-AthenaUpdateCdcJsonCache'
+        LogGroupPrefix: '/aws/lambda'
+        LogGroupRetention: !Ref LogRetention
+        LogsKinesisSourceStreamArn: !GetAtt LogsKinesisStream.Arn
+        
 Outputs:
   LogsBucketKmsKeyArn:
     Value: 
