@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Create Kinesis Firehose for logs JSON to Parquet data format conversion
+Description: Create Kinesis Firehose with JSON to Parquet conversion
 
 Parameters:
   ProjectName:
@@ -36,7 +36,7 @@ Parameters:
     Description: Glue database name
     Default: "logs_analytics_database"
     
-  GlueTableName:
+  ParquetGlueTableName:
     Type: String
     Description: Glue table name for schema reference used for parquet conversion
     Default: "log_analytics_parquet_table"
@@ -103,26 +103,26 @@ Resources:
             Resource:
               - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog"
               - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabaseName}"
-              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabaseName}/${GlueTableName}"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabaseName}/${ParquetGlueTableName}"
         Version: "2012-10-17"
       PolicyName: !Sub '${ProjectName}-${StreamNamePrefix}-glue-access-policy'
       Roles:
         - Ref: DeliveryStreamSourceServiceRole
 
-  DeliveryStreamLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      RetentionInDays: 120
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
+  # DeliveryStreamLogGroup:
+  #   Type: AWS::Logs::LogGroup
+  #   Properties:
+  #     RetentionInDays: 120
+  #   UpdateReplacePolicy: Retain
+  #   DeletionPolicy: Retain
 
-  DeliveryStreamLogGroupS3Destination:
-    Type: AWS::Logs::LogStream
-    Properties:
-      LogGroupName:
-        Ref: DeliveryStreamLogGroup
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
+  # DeliveryStreamLogGroupS3Destination:
+  #   Type: AWS::Logs::LogStream
+  #   Properties:
+  #     LogGroupName:
+  #       Ref: DeliveryStreamLogGroup
+  #   UpdateReplacePolicy: Retain
+  #   DeletionPolicy: Retain
 
   LogsKinesisDeliveryStreamToParquet:
     DependsOn:
@@ -141,9 +141,7 @@ Resources:
           IntervalInSeconds: 300
           SizeInMBs: 128
         CloudWatchLoggingOptions:
-          Enabled: true
-          LogGroupName: !Ref DeliveryStreamLogGroup
-          LogStreamName: !Ref DeliveryStreamLogGroupS3Destination
+          Enabled: false
         Prefix: !Sub '${StreamNamePrefix}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
         ErrorOutputPrefix: !Sub 'errors/${StreamNamePrefix}/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
         RoleARN: !Ref LogsExporterRoleArn
@@ -174,7 +172,7 @@ Resources:
             RoleARN: !Ref LogsExporterRoleArn
             CatalogId: !Ref AWS::AccountId
             DatabaseName: !Ref GlueDatabaseName
-            TableName: !Ref GlueTableName
+            TableName: !Ref ParquetGlueTableName
             Region: !Ref AWS::Region
             VersionId: 'LATEST'
           # Configuration for backup of records that cannot be converted to Parquet
@@ -183,43 +181,43 @@ Resources:
             Enabled: true
             RawDataS3Prefix: !Sub '${StreamNamePrefix}/failedFormatConversion/'
 
-  DeliveryStreamErrorLogsMetricFilter:
-    DependsOn:
-      - DeliveryStreamLogGroup
-    Type: AWS::Logs::MetricFilter
-    Properties:
-      LogGroupName: !Ref DeliveryStreamLogGroup
-      FilterPattern: '?S3 ?InternalError ?ParquetError'
-      MetricTransformations:
-        - MetricValue: 1
-          MetricNamespace: "LogsExport"
-          MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-kinesis-error"
+  # DeliveryStreamErrorLogsMetricFilter:
+  #   DependsOn:
+  #     - DeliveryStreamLogGroup
+  #   Type: AWS::Logs::MetricFilter
+  #   Properties:
+  #     LogGroupName: !Ref DeliveryStreamLogGroup
+  #     FilterPattern: '?S3 ?InternalError ?ParquetError'
+  #     MetricTransformations:
+  #       - MetricValue: 1
+  #         MetricNamespace: "LogsExport"
+  #         MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-kinesis-error"
 
-  DeliveryStreamErrorLogsMetricAlarm:
-    Type: AWS::CloudWatch::Alarm
-    DependsOn:
-      - DeliveryStreamErrorLogsMetricFilter
-    Properties:
-      AlarmName: !Sub "${ProjectName}-${StreamNamePrefix}-Kinesis-Alarm"
-      AlarmDescription: "Alarm for delivery stream errors"
-      TreatMissingData: notBreaching
-      AlarmActions:
-        - !Ref AlarmSNSTopicArn
-      OKActions:
-        - !Ref AlarmSNSTopicArn
-      DatapointsToAlarm: 1
-      MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-kinesis-error"
-      Namespace: "LogsExport"
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 60
-      Period: 60
-      Statistic: Sum
-      Threshold: 1
+  # DeliveryStreamErrorLogsMetricAlarm:
+  #   Type: AWS::CloudWatch::Alarm
+  #   DependsOn:
+  #     - DeliveryStreamErrorLogsMetricFilter
+  #   Properties:
+  #     AlarmName: !Sub "${ProjectName}-${StreamNamePrefix}-Kinesis-Alarm"
+  #     AlarmDescription: "Alarm for delivery stream errors"
+  #     TreatMissingData: notBreaching
+  #     AlarmActions:
+  #       - !Ref AlarmSNSTopicArn
+  #     OKActions:
+  #       - !Ref AlarmSNSTopicArn
+  #     DatapointsToAlarm: 1
+  #     MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-kinesis-error"
+  #     Namespace: "LogsExport"
+  #     ComparisonOperator: GreaterThanOrEqualToThreshold
+  #     EvaluationPeriods: 60
+  #     Period: 60
+  #     Statistic: Sum
+  #     Threshold: 1
 
 Outputs:
-  DeliveryStreamErrorLogsMetricAlarmArn:
-    Description: 'ARN of delivery stream error log alarm'
-    Value: !GetAtt DeliveryStreamErrorLogsMetricAlarm.Arn
+  # DeliveryStreamErrorLogsMetricAlarmArn:
+  #   Description: 'ARN of delivery stream error log alarm'
+  #   Value: !GetAtt DeliveryStreamErrorLogsMetricAlarm.Arn
 
   DeliveryStreamArn:
     Description: 'ARN of delivery stream'
