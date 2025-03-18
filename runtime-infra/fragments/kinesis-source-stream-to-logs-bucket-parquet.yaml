@@ -120,20 +120,20 @@ Resources:
       Roles:
         - Ref: DeliveryStreamSourceServiceRole
 
-  # DeliveryStreamLogGroup:
-  #   Type: AWS::Logs::LogGroup
-  #   Properties:
-  #     RetentionInDays: 120
-  #   UpdateReplacePolicy: Retain
-  #   DeletionPolicy: Retain
+  DeliveryStreamLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 120
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
 
-  # DeliveryStreamLogGroupS3Destination:
-  #   Type: AWS::Logs::LogStream
-  #   Properties:
-  #     LogGroupName:
-  #       Ref: DeliveryStreamLogGroup
-  #   UpdateReplacePolicy: Retain
-  #   DeletionPolicy: Retain
+  DeliveryStreamLogGroupS3Destination:
+    Type: AWS::Logs::LogStream
+    Properties:
+      LogGroupName:
+        Ref: DeliveryStreamLogGroup
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
 
   LogsKinesisDeliveryStreamToParquet:
     DependsOn:
