@@ -916,6 +916,40 @@ Resources:
         - Key: "Microservice"
           Value: "pn-paper-channel"
 
+  ### Communication FROM pn-delayer TO pn-paper-channel ###
+  SafeStorageToDeliveryLimitConfigurerQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestorage_to_delivery_limit_configurer'
+        DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-delivery-limit-configurer"
+
+  ### Communication FROM pn-safe-storage TO pn-delivery-limit-configurer ###
+  SafeStorageToPaperChannelLimitConfigurerQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestorage_to_paperchannel_limit_configurer'
+        DelaySeconds: 1
+        VisibilityTimeout: 60
+        MaxReceiveCount: 10
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-paper-channel-limit-configurer"
+
   ###                             ELASTIC FILE SYSTEM                     ###
   ###########################################################################
 
@@ -1487,6 +1521,40 @@ Outputs:
   DelayerToPaperChannelQueueAgeAlarmARN:
     Value: !GetAtt DelayerToPaperChannelQueue.Outputs.SqsAgeAlarmArn
     Description: DelayerToPaperChannelQueue age alarm ARN
+
+  # SafeStorageToDeliveryLimitConfigurerQueue queue output
+  SafeStorageToDeliveryLimitConfigurerQueueName:
+    Value: !GetAtt SafeStorageToDeliveryLimitConfigurerQueue.Outputs.QueueName
+    Description: SafeStorageToDeliveryLimitConfigurer queue name
+  SafeStorageToDeliveryLimitConfigurerQueueURL:
+    Value: !GetAtt SafeStorageToDeliveryLimitConfigurerQueue.Outputs.QueueURL
+    Description: SafeStorageToDeliveryLimitConfigurer queue URL
+  SafeStorageToDeliveryLimitConfigurerQueueARN:
+    Value: !GetAtt SafeStorageToDeliveryLimitConfigurerQueue.Outputs.QueueARN
+    Description: SafeStorageToDeliveryLimitConfigurer queue  ARN
+  SafeStorageToDeliveryLimitConfigurerQueueAlarmARN:
+    Value: !GetAtt SafeStorageToDeliveryLimitConfigurerQueue.Outputs.SqsDLQAlarmArn
+    Description: SafeStorageToDeliveryLimitConfigurer queue alarm ARN
+  SafeStorageToDeliveryLimitConfigurerQueueAgeAlarmARN:
+    Value: !GetAtt SafeStorageToDeliveryLimitConfigurerQueue.Outputs.SqsAgeAlarmArn
+    Description: SafeStorageToDeliveryLimitConfigurer queue age alarm ARN
+
+  # SafeStorageToPaperChannelLimitConfigurer queue output
+  SafeStorageToPaperChannelLimitConfigurerQueueName:
+    Value: !GetAtt SafeStorageToPaperChannelLimitConfigurerQueue.Outputs.QueueName
+    Description: SafeStorageToPaperChannelLimitConfigurer queue name
+  SafeStorageToPaperChannelLimitConfigurerQueueURL:
+    Value: !GetAtt SafeStorageToPaperChannelLimitConfigurerQueue.Outputs.QueueURL
+    Description: SafeStorageToPaperChannelLimitConfigurer queue URL
+  SafeStorageToPaperChannelLimitConfigurerQueueARN:
+    Value: !GetAtt SafeStorageToPaperChannelLimitConfigurerQueue.Outputs.QueueARN
+    Description: SafeStorageToPaperChannelLimitConfigurer queue ARN
+  SafeStorageToPaperChannelLimitConfigurerQueueAlarmARN:
+    Value: !GetAtt SafeStorageToPaperChannelLimitConfigurerQueue.Outputs.SqsDLQAlarmArn
+    Description: SafeStorageToPaperChannelLimitConfigurer queue alarm ARN
+  SafeStorageToPaperChannelLimitConfigurerQueueAgeAlarmARN:
+    Value: !GetAtt SafeStorageToPaperChannelLimitConfigurerQueue.Outputs.SqsAgeAlarmArn
+    Description: SafeStorageToPaperChannelLimitConfigurer queue age alarm ARN
 
   # Kinesis Source Stream containing the DynamoDB Change Data Capture events
   CdcKinesisSourceStreamName:
