@@ -143,19 +143,23 @@ Resources:
         CloudWatchLoggingOptions:
           Enabled: false
         Prefix: !Sub '${StreamNamePrefix}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
-        ErrorOutputPrefix: !Sub 'errors/${StreamNamePrefix}/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
+        ErrorOutputPrefix: !Sub '${StreamNamePrefix}/errors/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
         RoleARN: !Ref LogsExporterRoleArn
         SourceRecordCompression: GZIP
         ProcessingConfiguration:
-          Fn::If: 
-            - UseNewlineDelimiter
-            - Enabled: true
-              Processors:
-              - Type: AppendDelimiterToRecord
-                Parameters:
-                - ParameterName: Delimiter
-                  ParameterValue: "\\n"
-            - Enabled: false
+          Enabled: true
+          Processors:
+            - Type: RecordDeAggregation
+              Parameters:
+                - ParameterName: SubRecordType
+                  ParameterValue: JSON
+            - Fn::If: 
+                - UseNewlineDelimiter
+                - Type: AppendDelimiterToRecord
+                  Parameters:
+                  - ParameterName: Delimiter
+                    ParameterValue: "\\n"
+                - !Ref AWS::NoValue
         DataFormatConversionConfiguration:
           Enabled: true
           InputFormatConfiguration:
@@ -175,11 +179,9 @@ Resources:
             TableName: !Ref ParquetGlueTableName
             Region: !Ref AWS::Region
             VersionId: 'LATEST'
-          # Configuration for backup of records that cannot be converted to Parquet
-          # This saves only records that fail conversion to Parquet
-          RawDataDeliveryConfiguration:
-            Enabled: true
-            RawDataS3Prefix: !Sub '${StreamNamePrefix}/failedFormatConversion/'
+          # RawDataDeliveryConfiguration:
+          #   Enabled: true
+          #   RawDataS3Prefix: !Sub '${StreamNamePrefix}/failedFormatConversion/'
 
   # DeliveryStreamErrorLogsMetricFilter:
   #   DependsOn:
