@@ -135,6 +135,7 @@ Resources:
       KinesisStreamSourceConfiguration:
         KinesisStreamARN: !Ref SourceKinesisDataStreamArn
         RoleARN: !GetAtt DeliveryStreamSourceServiceRole.Arn
+        SourceRecordCompression: GZIP
       ExtendedS3DestinationConfiguration: 
         BucketARN: !Sub arn:aws:s3:::${LogsBucketName}
         BufferingHints:
@@ -145,14 +146,13 @@ Resources:
         Prefix: !Sub '${StreamNamePrefix}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
         ErrorOutputPrefix: !Sub '${StreamNamePrefix}/errors/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
         RoleARN: !Ref LogsExporterRoleArn
-        SourceRecordCompression: GZIP
         ProcessingConfiguration:
           Enabled: true
           Processors:
-            - Type: RecordDeAggregation
-              Parameters:
-                - ParameterName: SubRecordType
-                  ParameterValue: JSON
+            # - Type: RecordDeAggregation
+            #   Parameters:
+            #     - ParameterName: SubRecordType
+            #       ParameterValue: JSON
             - Fn::If: 
                 - UseNewlineDelimiter
                 - Type: AppendDelimiterToRecord
