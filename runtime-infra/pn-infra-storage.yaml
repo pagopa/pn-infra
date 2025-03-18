@@ -89,6 +89,17 @@ Parameters:
     Default: 14
     Description: Number of days of Default Retention ObjectLock
 
+  ObjectLockRetention:
+    Type: Number
+    Default: 14
+  
+  ObjectLockEnabled:
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
   
@@ -99,6 +110,7 @@ Conditions:
   CdcOnDemandDisabled: !Not [!Equals [!Ref CdcStreamMode, ON_DEMAND]]
   LogsOnDemandDisabled: !Not [!Equals [!Ref LogsStreamMode, ON_DEMAND]]
 
+  IsObjectLockEnabled: !Equals [ !Ref ObjectLockEnabled, 'true' ]
 Resources:
   
   ### - S3 Bucket for logs storages
@@ -110,6 +122,16 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       BucketName: !Sub '${ProjectName}-logs-bucket-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}'
+      ObjectLockEnabled: !If [ IsObjectLockEnabled, true, false ]
+      ObjectLockConfiguration:
+        Fn::If:
+          - IsObjectLockEnabled
+          - ObjectLockEnabled: true
+            Rule:
+              DefaultRetention:
+                Days: !Ref ObjectLockRetention
+                Mode: GOVERNANCE
+          - !Ref AWS::NoValue
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
