@@ -156,23 +156,23 @@ Resources:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         StreamContent: CLOUDWATCH_LOGS
 
-  ###             Export CloudWatch Logs to Parquet format             ###
-  ###########################################################################
-  LogsToExternalBucketParquet:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket-parquet.yaml"
-      Parameters:
-        ProjectName: !Ref ProjectName
-        SourceKinesisDataStreamArn: !Ref LogsKinesisSourceStreamArn
-        SourceKinesisDataStreamKeyArn: !Ref LogsKinesisSourceStreamKeyArn
-        LogsBucketName: !Ref LogsBucketName
-        LogsExporterRoleArn: !Ref LogsExporterRoleArn
-        StreamNamePrefix: 'logsTos3Parquet'
-        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        GlueDatabaseName: !Ref GlueDatabaseName
-        ParquetGlueTableName: !Ref ParquetGlueTableName
-        UseNewlineDelimiter: !Ref UseNewlineDelimiter
+  # ###             Export CloudWatch Logs to Parquet format             ###
+  # ###########################################################################
+  # LogsToExternalBucketParquet:
+  #   Type: AWS::CloudFormation::Stack
+  #   Properties:
+  #     TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket-parquet.yaml"
+  #     Parameters:
+  #       ProjectName: !Ref ProjectName
+  #       SourceKinesisDataStreamArn: !Ref LogsKinesisSourceStreamArn
+  #       SourceKinesisDataStreamKeyArn: !Ref LogsKinesisSourceStreamKeyArn
+  #       LogsBucketName: !Ref LogsBucketName
+  #       LogsExporterRoleArn: !Ref LogsExporterRoleArn
+  #       StreamNamePrefix: 'logsTos3Parquet'
+  #       AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+  #       GlueDatabaseName: !Ref GlueDatabaseName
+  #       ParquetGlueTableName: !Ref ParquetGlueTableName
+  #       UseNewlineDelimiter: !Ref UseNewlineDelimiter
 
   ###                   Export dynamo CDC to OpenSearch                   ###
   ###########################################################################
