@@ -146,19 +146,19 @@ Resources:
         ErrorOutputPrefix: !Sub '${StreamNamePrefix}/errors/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
         RoleARN: !Ref LogsExporterRoleArn
         ProcessingConfiguration:
-          Enabled: true
-          Processors:
-            # - Type: RecordDeAggregation
-            #   Parameters:
-            #     - ParameterName: SubRecordType
-            #       ParameterValue: JSON
-            - Fn::If: 
-                - UseNewlineDelimiter
-                - Type: AppendDelimiterToRecord
-                  Parameters:
-                  - ParameterName: Delimiter
-                    ParameterValue: "\\n"
-                - !Ref AWS::NoValue
+          Enabled: false
+          # Processors:
+          #   # - Type: RecordDeAggregation
+          #   #   Parameters:
+          #   #     - ParameterName: SubRecordType
+          #   #       ParameterValue: JSON
+          #   - Fn::If: 
+          #       - UseNewlineDelimiter
+          #       - Type: AppendDelimiterToRecord
+          #         Parameters:
+          #         - ParameterName: Delimiter
+          #           ParameterValue: "\\n"
+          #       - !Ref AWS::NoValue
         DataFormatConversionConfiguration:
           Enabled: true
           InputFormatConfiguration:
