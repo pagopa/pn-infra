@@ -48,7 +48,11 @@ Parameters:
     AllowedValues:
       - "true"
       - "false"
-
+  
+  LogsBucketKmsKeyArn:
+    Type: String
+    Description: Arn of logs bucket KMS key
+  
 Conditions:
   UseNewlineDelimiter: !Equals [ !Ref UseNewlineDelimiter, "true" ]
 
@@ -92,9 +96,32 @@ Resources:
             Effect: Allow
             Resource:
               - !Sub "arn:aws:s3:::${LogsBucketName}"
-              - !Sub "arn:aws:s3:::${LogsBucketName}/*"
+              - !Sub "arn:aws:s3:::${LogsBucketName}/{StreamNamePrefix}*"
+          - Action:
+              - logs:PutLogEvents
+              - logs:CreateLogStream
+            Effect: Allow
+            Resource:
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeliveryStreamLogGroup}:*"
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeliveryStreamLogGroup}:log-stream:${DeliveryStreamLogGroupS3Destination}"
         Version: "2012-10-17"
       PolicyName: !Sub '${ProjectName}-${StreamNamePrefix}-source-read-policy'
+      Roles:
+        - Ref: DeliveryStreamSourceServiceRole
+
+  S3KMSAccessPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - kms:Decrypt
+              - kms:GenerateDataKey
+              - kms:DescribeKey
+            Resource: !Ref LogsBucketKmsKeyArn
+        Version: "2012-10-17"
+      PolicyName: !Sub '${ProjectName}-${StreamNamePrefix}-s3-kms-access-policy'
       Roles:
         - Ref: DeliveryStreamSourceServiceRole
 
@@ -138,7 +165,8 @@ Resources:
   LogsKinesisDeliveryStreamToParquet:
     DependsOn:
       - DeliveryStreamSourceServiceRoleDefaultPolicy
-      - GlueAccessPolicy
+      - DeliveryStreamLogGroup
+      - DeliveryStreamLogGroupS3Destination
     Type: AWS::KinesisFirehose::DeliveryStream
     Properties:
       DeliveryStreamName: !Sub '${ProjectName}-${StreamNamePrefix}-delivery-stream-v1'
@@ -152,24 +180,26 @@ Resources:
           IntervalInSeconds: 300
           SizeInMBs: 128
         CloudWatchLoggingOptions:
-          Enabled: false
+          Enabled: true
+          LogGroupName: !Ref DeliveryStreamLogGroup
+          LogStreamName: !Ref DeliveryStreamLogGroupS3Destination
         Prefix: !Sub '${StreamNamePrefix}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
         ErrorOutputPrefix: !Sub '${StreamNamePrefix}/errors/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
         RoleARN: !GetAtt DeliveryStreamSourceServiceRole.Arn
         ProcessingConfiguration:
-          Enabled: false
-          # Processors:
-          #   # - Type: RecordDeAggregation
-          #   #   Parameters:
-          #   #     - ParameterName: SubRecordType
-          #   #       ParameterValue: JSON
-          #   - Fn::If: 
-          #       - UseNewlineDelimiter
-          #       - Type: AppendDelimiterToRecord
-          #         Parameters:
-          #         - ParameterName: Delimiter
-          #           ParameterValue: "\\n"
-          #       - !Ref AWS::NoValue
+          Enabled: true
+          Processors:
+            - Type: Decompression
+              Parameters:
+                - ParameterName: CompressionFormat
+                  ParameterValue: GZIP
+            - Fn::If: 
+                - UseNewlineDelimiter
+                - Type: AppendDelimiterToRecord
+                  Parameters:
+                  - ParameterName: Delimiter
+                    ParameterValue: "\\n"
+                - !Ref AWS::NoValue
         DataFormatConversionConfiguration:
           Enabled: true
           InputFormatConfiguration:
@@ -189,9 +219,6 @@ Resources:
             TableName: !Ref ParquetGlueTableName
             Region: !Ref AWS::Region
             VersionId: 'LATEST'
-          # RawDataDeliveryConfiguration:
-          #   Enabled: true
-          #   RawDataS3Prefix: !Sub '${StreamNamePrefix}/failedFormatConversion/'
 
   # DeliveryStreamErrorLogsMetricFilter:
   #   DependsOn:
