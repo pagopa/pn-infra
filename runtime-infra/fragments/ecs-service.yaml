@@ -1757,6 +1757,9 @@ Resources:
               awslogs-stream-prefix: ecs
           PortMappings:
             - ContainerPort: 25888
+          Environment:
+            - Name: 'CW_CONFIG_CONTENT'
+              Value: 'cwagentconfig'
         - 'Fn::If':
             - HasOtelXRayDisable
             - !Ref AWS::NoValue
