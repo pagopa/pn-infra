@@ -66,8 +66,12 @@ Parameters:
   ContainerImageInjectorURI:
     Type: String
     Description: Container image URI for Open telemetry
-    #Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/alpine:3.14
     Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.32.0
+
+  ContainerCloudWatchAgentURI:
+    Type: String
+    Description: Container image URI for Cloud Watch Agent
+    Default: public.ecr.aws/cloudwatch-agent/cloudwatch-agent:latest
 
   EfsFilesystem:
     Type: String
@@ -716,42 +720,52 @@ Mappings:
       sidecarInjector: 128
       clockdrift: 128
       microservice: 768
+      sidecarCwAgent: 256
     2GB:
       awsCollector: 512
       sidecarInjector: 256
       clockdrift: 256
       microservice: 1536
+      sidecarCwAgent: 256
     4GB:
       awsCollector: 512
       sidecarInjector: 256
       clockdrift: 256
       microservice: 3584
+      sidecarCwAgent: 256
     6GB:
       awsCollector: 512
       sidecarInjector: 256
       clockdrift: 256
       microservice: 5632
+      sidecarCwAgent: 256
     8GB:
       awsCollector: 512
       sidecarInjector: 256
       clockdrift: 256
       microservice: 7680
+      sidecarCwAgent: 256
   ContainerMemoryNoXray:
     1GB:
       clockdrift: 256
       microservice: 768
+      sidecarCwAgent: 256
     2GB:
       clockdrift: 256
       microservice: 1792
+      sidecarCwAgent: 256
     4GB:
       clockdrift: 256
       microservice: 3840
+      sidecarCwAgent: 256
     6GB:
       clockdrift: 256
       microservice: 5888
+      sidecarCwAgent: 256
     8GB:
       clockdrift: 256
       microservice: 7936
+      sidecarCwAgent: 256
 
 
 Conditions:
@@ -1111,6 +1125,8 @@ Resources:
           DependsOn:
             - ContainerName: sidecar-injector
               Condition: COMPLETE
+            - ContainerName: sidecar-cw-agent
+              Condition: START
             - 'Fn::If':
               - HasOtelXRayDisable
               -
@@ -1179,6 +1195,8 @@ Resources:
                     !Select [ 1, !Split [ "=", !Ref ContainerSecret10 ] ]
                 - !Ref "AWS::NoValue"
           Environment:
+            - Name: 'AWS_EMF_AGENT_ENDPOINT'
+              Value: 'tcp://127.0.0.1:25888'
             - Name: 'OTEL_RESOURCE_ATTRIBUTES'
               Value: !Sub 'service.name=${MicroServiceUniqueName}'
             - Name: 'OTEL_IMR_EXPORT_INTERVAL'
@@ -1718,6 +1736,21 @@ Resources:
               ContainerPath: "/xray/"
           Cpu: '128'
           Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarInjector ]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-create-group: 'True'
+              awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: ecs
+        - Name: sidecar-cw-agent
+          Image: !Ref ContainerImageInjectorURI
+          Essential: false
+          Cpu: '256'
+          Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarCwAgent ]
+          PortMappings:
+            - ContainerPort: 8080
+            - Protocol: tcp
           LogConfiguration:
             LogDriver: awslogs
             Options:
