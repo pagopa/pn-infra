@@ -1755,6 +1755,8 @@ Resources:
               awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
+          PortMappings:
+            - ContainerPort: 25888
         - 'Fn::If':
             - HasOtelXRayDisable
             - !Ref AWS::NoValue
