@@ -1759,7 +1759,7 @@ Resources:
             - ContainerPort: 25888
           Environment:
             - Name: 'CW_CONFIG_CONTENT'
-              ValueFrom: 'cwagentconfig'
+              Value: '{"agent": {"omit_hostname": true, "debug": true}, "logs": {"metrics_collected": {"emf": {}}}}'
         - 'Fn::If':
             - HasOtelXRayDisable
             - !Ref AWS::NoValue
