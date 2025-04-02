@@ -393,7 +393,7 @@ Resources:
               Dimensions:
                 - Name: QueueName
                   Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ], "" ]
-              MetricName: NumberOfMessagesReceived
+              MetricName: NumberOfMessagesSent
               Namespace: AWS/SQS
             Period: 60
             Stat: Sum
