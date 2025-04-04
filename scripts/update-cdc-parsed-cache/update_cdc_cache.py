@@ -120,7 +120,7 @@ def execute_query(session, params):
     }
     
     if output_location:
-        output_path = f"{output_location}/cache_updates/{table}/{year}"
+        output_path = f"{output_location}cache_updates/{table}/{year}"
         if month: output_path += f"/{month}"
         if day: output_path += f"/{day}"
         config['ResultConfiguration'] = {'OutputLocation': output_path}
