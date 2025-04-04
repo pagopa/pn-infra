@@ -77,7 +77,7 @@ Parameters:
       - false
   OncallDlqRatio:
     Type: Number
-    Default: 0.1
+    Default: 0.3
     Description: Wakeup alarm ratio between messages written to DLQ and messages read from queue
 
   OncallLimit:
@@ -393,7 +393,7 @@ Resources:
               Dimensions:
                 - Name: QueueName
                   Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ], "" ]
-              MetricName: NumberOfMessagesReceived
+              MetricName: NumberOfMessagesSent
               Namespace: AWS/SQS
             Period: 60
             Stat: Sum
