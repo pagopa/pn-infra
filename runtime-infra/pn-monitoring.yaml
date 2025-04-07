@@ -518,7 +518,7 @@ Resources:
         - !Ref AlarmSNSTopicArn 
       Metrics:
         - Id: q1
-          Expression: "SELECT MAX(ClockErrorBound) FROM SCHEMA(\"ECS/ContainerInsights\", ClusterName,Family,TaskID) WHERE ClusterName = 'pn-core-ecs-cluster' GROUP BY ClusterName"
+          Expression: "SELECT MAX(ClockErrorBound) FROM SCHEMA(\"ECS/ContainerInsights\", ClusterName,Family,TaskID) GROUP BY ClusterName"
           Period: 600
           ReturnData: False
         - Id: e2
@@ -539,7 +539,7 @@ Resources:
         - !Ref AlarmSNSTopicArn    
       Metrics:
         - Id: q1
-          Expression: "SELECT MAX(Synchronization) FROM SCHEMA(\"ECS/ContainerInsights\", ClusterName,Family,TaskID) WHERE ClusterName = 'pn-core-ecs-cluster' GROUP BY ClusterName"
+          Expression: "SELECT MAX(Synchronization) FROM SCHEMA(\"ECS/ContainerInsights\", ClusterName,Family,TaskID) GROUP BY ClusterName"
           Period: 600
           ReturnData: False
         - Id: e2
