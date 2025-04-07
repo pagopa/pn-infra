@@ -513,7 +513,9 @@ Resources:
     Properties:
       AlarmName: "pn-Clock-Error-Bound-Alarm"
       AlarmDescription: "CloudWatch Alarm for Clock Error Bound limit over threshold"
-      TreatMissingData: notBreaching       
+      TreatMissingData: notBreaching      
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn 
       Metrics:
         - Id: q1
           Expression: "SELECT MAX(ClockErrorBound) FROM SCHEMA(\"ECS/ContainerInsights\", ClusterName,Family,TaskID) WHERE ClusterName = 'pn-core-ecs-cluster' GROUP BY ClusterName"
@@ -532,7 +534,9 @@ Resources:
     Properties:
       AlarmName: "pn-Synchronization-Alarm"
       AlarmDescription: "CloudWatch Alarm for Synchronization value different by Synchronized"
-      TreatMissingData: notBreaching       
+      TreatMissingData: notBreaching   
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn    
       Metrics:
         - Id: q1
           Expression: "SELECT MAX(Synchronization) FROM SCHEMA(\"ECS/ContainerInsights\", ClusterName,Family,TaskID) WHERE ClusterName = 'pn-core-ecs-cluster' GROUP BY ClusterName"
