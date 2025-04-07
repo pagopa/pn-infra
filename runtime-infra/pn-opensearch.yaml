@@ -8,6 +8,10 @@ Parameters:
     Type: Number
     Description: The number of I/O operations per second (IOPS) that the volume supports
 
+  EbsThroughput:
+    Type: Number
+    Description: The number of I/O operations per second (IOPS) that the volume supports
+
   EbsVolumeSize:
     Type: Number
     Description: The size (in GiB) of the EBS volume for each data node
@@ -140,6 +144,7 @@ Resources:
       EBSOptions:
         EBSEnabled: true
         Iops: !Ref EbsIops
+        Throughput: !!Ref EbsThroughput
         VolumeSize: !Ref EbsVolumeSize
         VolumeType: !Ref EbsVolumeType
       EngineVersion: !Ref EngineVersion
