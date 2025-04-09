@@ -96,7 +96,7 @@ Resources:
             Effect: Allow
             Resource:
               - !Sub "arn:aws:s3:::${LogsBucketName}"
-              - !Sub "arn:aws:s3:::${LogsBucketName}/{StreamNamePrefix}*"
+              - !Sub "arn:aws:s3:::${LogsBucketName}/${StreamNamePrefix}*"
           - Action:
               - logs:PutLogEvents
               - logs:CreateLogStream
@@ -185,7 +185,7 @@ Resources:
           LogStreamName: !Ref DeliveryStreamLogGroupS3Destination
         Prefix: !Sub '${StreamNamePrefix}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
         ErrorOutputPrefix: !Sub '${StreamNamePrefix}/errors/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
-        RoleARN: !Ref LogsExporterRoleArn
+        RoleARN: !GetAtt DeliveryStreamSourceServiceRole.Arn
         ProcessingConfiguration:
           Enabled: true
           Processors:
@@ -213,7 +213,7 @@ Resources:
                 Compression: UNCOMPRESSED
                 EnableDictionaryCompression: false
           SchemaConfiguration:
-            RoleARN: !Ref LogsExporterRoleArn
+            RoleARN: !GetAtt DeliveryStreamSourceServiceRole.Arn
             CatalogId: !Ref AWS::AccountId
             DatabaseName: !Ref GlueDatabaseName
             TableName: !Ref ParquetGlueTableName
