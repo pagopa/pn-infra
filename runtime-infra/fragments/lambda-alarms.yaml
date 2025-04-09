@@ -22,7 +22,43 @@ Parameters:
     Type: String
     Default: "ERROR"
 
+  IteratorAgeEvaluationPeriods:
+    Type: Number
+    Default: 0 # disabled by default
+    Description: Number of periods to evaluate for the IteratorAge alarm
+
+  IteratorAgeThreshold:
+    Type: Number
+    Default: 3600000 # 1 hour in milliseconds
+    Description: Threshold for the IteratorAge alarm
+
+Conditions:
+  HasIteratorAgeAlarm: !Not [!Equals [!Ref IteratorAgeEvaluationPeriods, 0]]
+
 Resources:
+  # Create an alarm on Lambda Iterator Age
+  LambdaIteratorAgeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasIteratorAgeAlarm
+    Properties:
+      AlarmName: !Sub "${FunctionName}-IteratorAge-Alarm"
+      AlarmDescription: "CloudWatch alarm for when lambda iterator age is greater than 1 hour for more than 30 periods of 1 minute."
+      TreatMissingData: notBreaching
+      AlarmActions: 
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: !Ref IteratorAgeEvaluationPeriods
+      Threshold: !Ref IteratorAgeThreshold
+      MetricName: IteratorAge
+      Namespace: AWS/Lambda
+      Period: 60 # 1 minute
+      Statistic: Maximum
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref FunctionName
+
   # CloudWatch metric to filer ERROR in log group
   LambdaErrorLogsMetricFilter: 
     Type: AWS::Logs::MetricFilter
