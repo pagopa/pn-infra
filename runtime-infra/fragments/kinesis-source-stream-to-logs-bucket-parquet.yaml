@@ -185,7 +185,7 @@ Resources:
           LogStreamName: !Ref DeliveryStreamLogGroupS3Destination
         Prefix: !Sub '${StreamNamePrefix}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
         ErrorOutputPrefix: !Sub '${StreamNamePrefix}/errors/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
-        RoleARN: !GetAtt DeliveryStreamSourceServiceRole.Arn
+        RoleARN: !Ref LogsExporterRoleArn
         ProcessingConfiguration:
           Enabled: true
           Processors:
@@ -213,7 +213,7 @@ Resources:
                 Compression: UNCOMPRESSED
                 EnableDictionaryCompression: false
           SchemaConfiguration:
-            RoleARN: !GetAtt DeliveryStreamSourceServiceRole.Arn
+            RoleARN: !Ref LogsExporterRoleArn
             CatalogId: !Ref AWS::AccountId
             DatabaseName: !Ref GlueDatabaseName
             TableName: !Ref ParquetGlueTableName
