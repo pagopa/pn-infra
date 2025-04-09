@@ -55,7 +55,7 @@ Parameters:
     Description: 'For this queue, set if there is an alarm to create'
   QueueOldestAgeLimit:
     Type: Number
-    Default: '21600'
+    Default: '7200'
     Description: 'Oldest job age (in seconds) before raising an alarm'
   OncallQueueOldestAgeLimit:
     Type: Number
@@ -313,30 +313,6 @@ Resources:
       Statistic: "Maximum"
       Period: 60  
       Threshold: !Ref OncallQueueDlqOldestAgeLimit
-      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
-      EvaluationPeriods: 1       
-      AlarmActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      InsufficientDataActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-
-  WorkdayOldMessagesAlarm:
-    Condition: IsWithAlarm
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub "workday-${QueueName}-HasOldMessage"
-      AlarmDescription: "Alarm messages when the oldest message in queue is older than limit QueueOldestAgeLimit"
-      Namespace: "AWS/SQS"
-      MetricName: "ApproximateAgeOfOldestMessage"
-      TreatMissingData: "notBreaching"
-      Dimensions:
-        - Name: "QueueName"
-          Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
-      Statistic: "Maximum"
-      Period: 60  
-      Threshold: !Ref WorkdayQueueDlqOldestAgeLimit
       ComparisonOperator: "GreaterThanOrEqualToThreshold" 
       EvaluationPeriods: 1       
       AlarmActions:
