@@ -55,7 +55,7 @@ Parameters:
     Description: 'For this queue, set if there is an alarm to create'
   QueueOldestAgeLimit:
     Type: Number
-    Default: '21600'
+    Default: '7200'
     Description: 'Oldest job age (in seconds) before raising an alarm'
   OncallQueueOldestAgeLimit:
     Type: Number
@@ -65,6 +65,10 @@ Parameters:
     Type: Number
     Default: '864000'
     Description: 'Oldest job age in dlq queue (in seconds) before raising an oncall only in workday alarm'
+  OncallQueueDlqOldestAgeLimit:
+    Type: Number
+    Default: '0'
+    Description: 'Oldest job age in dlq queue (in seconds) before raising an oncall alarm'
   VisibilityTimeout:
     Type: Number
     Default: 30
@@ -120,7 +124,10 @@ Conditions:
 
   HasOncallDLQLimit: !Not [ !Equals [ !Ref OncallDLQLimit, '0' ] ]
 
+  RequiresDLQOncallAgeAlarm: !Not [ !Equals [ !Ref OncallQueueDlqOldestAgeLimit, '0' ] ]
   RequiresOncallDLQAlarm: !And [ !Condition IsWithAlarm, !Condition HasOncallDLQLimit ]
+  RequiresOncallDLQAgeAlarm: !And [ !Condition IsWithDLQ, !Condition RequiresDLQOncallAgeAlarm]
+
 Resources:
 
 
@@ -291,21 +298,21 @@ Resources:
       OKActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
-  WorkdayOldMessagesAlarm:
-    Condition: IsWithAlarm
+  OncallDlqOldMessagesAlarm:
+    Condition: RequiresOncallDLQAgeAlarm
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "workday-${QueueName}-HasOldMessage"
-      AlarmDescription: "Alarm messages when the oldest message in queue is older than limit QueueOldestAgeLimit"
+      AlarmName: !Sub "oncall-${QueueName}-DLQ-HasOldMessage"
+      AlarmDescription: "Alarm messages when the oldest message in queue is older than limit OncallQueueDlqOldestAgeLimit"
       Namespace: "AWS/SQS"
       MetricName: "ApproximateAgeOfOldestMessage"
       TreatMissingData: "notBreaching"
       Dimensions:
         - Name: "QueueName"
-          Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
+          Value: !If [ IsNotFifo, !Sub '${DeadLetterQueue.QueueName}', !Sub '${DeadLetterQueueFifo.QueueName}' ]
       Statistic: "Maximum"
       Period: 60  
-      Threshold: !Ref WorkdayQueueDlqOldestAgeLimit
+      Threshold: !Ref OncallQueueDlqOldestAgeLimit
       ComparisonOperator: "GreaterThanOrEqualToThreshold" 
       EvaluationPeriods: 1       
       AlarmActions:
@@ -455,7 +462,4 @@ Outputs:
       !If
       - IsDLQHasMessagesAlarm
       - !GetAtt WorkdayDlqOldMessagesAlarm.Arn
-      - !If
-        - IsWithAlarm
-        - !GetAtt WorkdayOldMessagesAlarm.Arn
-        - ''
+      - ''
