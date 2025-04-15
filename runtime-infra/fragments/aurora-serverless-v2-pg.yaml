@@ -1,0 +1,264 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Fragment for creating an RDS Aurora Serverless v2 PostgreSQL cluster
+
+Parameters:
+  EnvType:
+    Type: String
+    Description: "Environment type (dev, test, uat, hotfix, prod)"
+    AllowedValues:
+      - dev
+      - test
+      - uat
+      - hotfix
+      - prod
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: "ID of the VPC where the cluster will reside"
+  PrivateSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: "List of Private Subnet IDs for the DBSubnetGroup (ensure multi-AZ)"
+  SourceVpcCidr:
+    Type: String
+    Description: "Source VPC CIDR block allowed for DB ingress (e.g., 10.x.x.x/16)"
+  ClusterIdentifierSuffix:
+    Type: String
+    Description: "Suffix to make cluster resources unique (e.g., microservice name like 'pdfnorm')"
+  DatabaseName:
+    Type: String
+    Description: "Name for the initial database"
+    Default: "appdb"
+  MasterUsername:
+    Type: String
+    Description: "Master username"
+    Default: "dbadmin"
+    NoEcho: true
+  SvcUsername:
+    Type: String
+    Description: "Username for the service account placeholder secret"
+    Default: "dbsvcuser"
+    NoEcho: true
+  EngineVersion:
+    Type: String
+    Description: "Aurora PostgreSQL engine version (must be compatible with Serverless v2)"
+    Default: "14.12"
+  DbClusterFamily:
+    Type: String
+    Description: "DB Cluster Parameter Group Family (e.g., aurora-postgresql14)"
+    Default: "aurora-postgresql14"
+  MinACU:
+    Type: Number
+    Description: "Minimum Aurora Capacity Units (ACUs)"
+    Default: 0.5
+  MaxACU:
+    Type: Number
+    Description: "Maximum Aurora Capacity Units (ACUs)"
+    Default: 2
+  BackupRetentionPeriod:
+    Type: Number
+    Description: "Backup retention period in days (1-35)"
+    Default: 7
+  DeletionProtectionEnabled:
+    Type: String
+    Description: "Enable deletion protection (typically 'true' for prod)"
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  AlarmSNSTopicArn:
+    Type: String
+    Description: "ARN of the SNS topic for CloudWatch alarms"
+  DbCpuAlarmThreshold:
+    Type: Number
+    Default: 80
+  DbConnectionsAlarmThreshold:
+    Type: Number
+    Default: 1500
+
+Resources:
+  PnDbClusterParameterGroup:
+    Type: AWS::RDS::DBClusterParameterGroup
+    Properties:
+      Description: !Sub "CPG for pn-${ClusterIdentifierSuffix} Aurora PG ${EngineVersion} - ${EnvType}"
+      Family: !Ref DbClusterFamily
+      Parameters:
+        log_statement: 'ddl'
+        log_min_duration_statement: '5000'
+      Tags:
+        - Key: Name
+          Value: !Sub "pn-${ClusterIdentifierSuffix}-aurora-pg-cpg"
+        - Key: Environment
+          Value: !Ref EnvType
+
+  PnDbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub "SNG for pn-${ClusterIdentifierSuffix} Aurora DB - ${EnvType}"
+      SubnetIds: !Ref PrivateSubnets
+      Tags:
+        - Key: Name
+          Value: !Sub "pn-${ClusterIdentifierSuffix}-aurora-pg-sng"
+        - Key: Environment
+          Value: !Ref EnvType
+
+  PnDbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "SG for pn-${ClusterIdentifierSuffix} Aurora DB - ${EnvType}"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !Ref SourceVpcCidr
+      Tags:
+        - Key: Name
+          Value: !Sub "pn-${ClusterIdentifierSuffix}-aurora-pg-sg"
+        - Key: Environment
+          Value: !Ref EnvType
+
+  PnMasterUserSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "pn-${ClusterIdentifierSuffix}-rds-master-credentials"
+      Description: !Sub "RDS master credentials for pn-${ClusterIdentifierSuffix} ${EnvType} (managed by RDS)"
+      Tags:
+        - Key: Name
+          Value: !Sub "pn-${ClusterIdentifierSuffix}-rds-master-credentials"
+        - Key: Environment
+          Value: !Ref EnvType
+
+  PnSecretRotationSchedule:
+    Type: AWS::SecretsManager::RotationSchedule
+    Properties:
+      SecretId: !Ref PnMasterUserSecret
+      RotationLambdaARN: !Sub "arn:aws:serverlessrepo:${AWS::Region}:${AWS::AccountId}:applications/SecretsManagerRDSPOSTGRESQLRotationSingleUser"
+      RotationRules:
+        AutomaticallyAfterDays: 30
+      HostedRotationLambda:
+         RotationType: PostgreSQLSingleUser
+         MasterSecretArn: !Ref PnMasterUserSecret
+         VpcSecurityGroupIds: !GetAtt PnDbSecurityGroup.GroupId
+         VpcSubnetIds: !Join [ ",", !Ref PrivateSubnets ]
+
+  PnSvcUserSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "pn-${ClusterIdentifierSuffix}-svc-user-credentials"
+      Description: !Sub "Credentials for ${ClusterIdentifierSuffix} DB service user - ${EnvType}"
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username": "${SvcUsername}"}'
+        GenerateStringKey: "password"
+        PasswordLength: 32
+        ExcludePunctuation: false
+        IncludeSpace: false
+        RequireEachIncludedType: true
+      Tags:
+        - Key: Name
+          Value: !Sub "pn-${ClusterIdentifierSuffix}-svc-user"
+        - Key: Environment
+          Value: !Ref EnvType
+
+  PnDbCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      Engine: aurora-postgresql
+      EngineVersion: !Ref EngineVersion
+      DatabaseName: !Ref DatabaseName
+      DBClusterIdentifier: !Sub "pn-${ClusterIdentifierSuffix}-aurora-pg-cluster"
+      DBClusterParameterGroupName: !Ref PnDbClusterParameterGroup
+      DBSubnetGroupName: !Ref PnDbSubnetGroup
+      EnableHttpEndpoint: false
+      ManageMasterUserPassword: true
+      MasterUsername: !Join ['', ['{{resolve:secretsmanager:', !Ref PnMasterUserSecret, ':SecretString:username}}']]
+      MasterUserPassword: !Join ['', ['{{resolve:secretsmanager:', !Ref PnMasterUserSecret, ':SecretString:password}}']]
+      BackupRetentionPeriod: !Ref BackupRetentionPeriod
+      Port: 5432
+      PreferredBackupWindow: "02:00-03:00"
+      PreferredMaintenanceWindow: "sun:04:00-sun:05:00"
+      StorageEncrypted: true
+      VpcSecurityGroupIds:
+        - !GetAtt PnDbSecurityGroup.GroupId
+      EngineMode: provisioned
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: !Ref MinACU
+        MaxCapacity: !Ref MaxACU
+      CopyTagsToSnapshot: true
+      DeletionProtection: !Equals [!Ref DeletionProtectionEnabled, "true"]
+      EnableCloudwatchLogsExports:
+        - postgresql
+      Tags:
+        - Key: Name
+          Value: !Sub "pn-${ClusterIdentifierSuffix}-aurora-pg-cluster"
+        - Key: Environment
+          Value: !Ref EnvType
+
+  PnDbClusterCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "pn-${ClusterIdentifierSuffix}-DBCluster-CPU-High"
+      AlarmDescription: "Alarm if DB cluster CPU utilization exceeds threshold"
+      Namespace: AWS/RDS
+      MetricName: CPUUtilization
+      Dimensions:
+        - Name: DBClusterIdentifier
+          Value: !Ref PnDbCluster
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: !Ref DbCpuAlarmThreshold
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: missing
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+
+  PnDbClusterConnectionsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "pn-${ClusterIdentifierSuffix}-DBCluster-Connections-High"
+      AlarmDescription: "Alarm if DB cluster connections exceeds threshold"
+      Namespace: AWS/RDS
+      MetricName: DatabaseConnections
+      Dimensions:
+        - Name: DBClusterIdentifier
+          Value: !Ref PnDbCluster
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: !Ref DbConnectionsAlarmThreshold
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: missing
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+
+Outputs:
+  RdsEndpointAddress:
+    Description: "RDS Cluster Writer Endpoint Address"
+    Value: !GetAtt PnDbCluster.Endpoint.Address
+  RdsReadEndpointAddress:
+    Description: "RDS Cluster Reader Endpoint Address"
+    Value: !GetAtt PnDbCluster.ReadEndpoint.Address
+  RdsPort:
+    Description: "RDS Cluster Port"
+    Value: !GetAtt PnDbCluster.Endpoint.Port
+  RdsDbName:
+    Description: "RDS Database Name"
+    Value: !Ref DatabaseName
+  RdsMasterUserSecretArn:
+    Description: "ARN of the Secret Manager secret for RDS master user"
+    Value: !Ref PnMasterUserSecret
+  RdsSecurityGroupId:
+    Description: "ID of the Security Group attached to the RDS cluster"
+    Value: !GetAtt PnDbSecurityGroup.GroupId
+  DBClusterArn:
+    Description: "ARN of the DB Cluster"
+    Value: !Ref PnDbCluster
+  DBClusterResourceId:
+    Description: "Resource ID of the DB Cluster"
+    Value: !GetAtt PnDbCluster.DBClusterResourceId
+  SvcUserSecretArn:
+    Description: "ARN of the placeholder secret for service user"
+    Value: !Ref PnSvcUserSecret
