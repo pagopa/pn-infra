@@ -754,6 +754,8 @@ Resources:
               }
             }
           };
+    DependsOn:
+      - RaddSSLCertCheckExpirationLogGroup
 
   SSLCertExpirationCheckRole:
     Type: AWS::IAM::Role
@@ -787,7 +789,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Name: !Sub ${SSLCertExpirationCheckLambdaName}-schedule
-      ScheduleExpression: rate(1 day)
+      ScheduleExpression: cron(0 12 * * ? *)
       State: ENABLED
       Targets:
         - Arn: !GetAtt SSLCertCheckExpirationLambda.Arn
@@ -812,11 +814,11 @@ Resources:
       Metrics:
         - Id: q1
           Expression: "SELECT MIN(SSLExpiration) FROM SCHEMA(\"RADD\", \"Iss\")"
-          Period: 86400
+          Period: 10800
           ReturnData: False
         - Id: e2
           Expression: "IF(q1 > 5, 0, 1)"
-          Period: 86400 
+          Period: 10800
       DatapointsToAlarm: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 1
@@ -827,6 +829,16 @@ Resources:
     Properties:
       LogGroupName: !Sub "/aws/lambda/${SSLCertExpirationCheckLambdaName}"
       RetentionInDays: 14
+
+  SSLCertCheckExpirationLambdaAlarm:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - RaddSSLCertCheckExpirationLogGroup
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref SSLCertCheckExpirationLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 Outputs:
   OOMAlarmArn:
