@@ -789,7 +789,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Name: !Sub ${SSLCertExpirationCheckLambdaName}-schedule
-      ScheduleExpression: rate(1 day)
+      ScheduleExpression: cron(0 12 * * ? *)
       State: ENABLED
       Targets:
         - Arn: !GetAtt SSLCertCheckExpirationLambda.Arn
@@ -818,10 +818,10 @@ Resources:
           ReturnData: False
         - Id: e2
           Expression: "IF(q1 > 5, 0, 1)"
-          Period: 10800 
+          Period: 10800
       DatapointsToAlarm: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 7
+      EvaluationPeriods: 1
       Threshold: 1
 
   RaddSSLCertCheckExpirationLogGroup:
