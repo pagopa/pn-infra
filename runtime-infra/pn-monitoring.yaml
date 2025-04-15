@@ -93,6 +93,16 @@ Parameters:
     Default: 1
     Description: 'Batch size for the diagnostic logger lambda'
 
+  SSLCertExpirationCheckLambdaName:
+    Type: String
+    Default: 'pn-radd-SSLCertExpirationCheck'
+    Description: 'Name of the SSL certificate expiration check lambda'
+
+  SSLCertificateParameterStoreName:
+    Type: String
+    Default: "/radd/ssl-monitoring-domains"
+    Description: SSM parameter with JSON array of domains
+
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
 
@@ -349,7 +359,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub "${ProjectName}-compositeMetricGenerator"
-      Runtime: nodejs18.x
+      Runtime: nodejs22.x
       Handler: "index.handler"
       Code:
         S3Bucket: !Ref LambdasBucketName
@@ -625,7 +635,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Ref DiagnosticLambdaLoggerName
-      Runtime: nodejs18.x
+      Runtime: nodejs22.x
       Role: !GetAtt DiagnosticLoggerLambdaRole.Arn
       Handler: index.handler
       MemorySize: !Ref DiagnosticLoggerMemory
@@ -663,6 +673,160 @@ Resources:
       Parameters:
         FunctionName: !Ref DiagnosticLoggerLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  SSLCertCheckExpirationLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref SSLCertExpirationCheckLambdaName
+      Runtime: nodejs22.x
+      Handler: index.handler
+      Role: !GetAtt SSLCertExpirationCheckRole.Arn
+      Timeout: 300
+      Environment:
+        Variables:  
+          DomainParameterName: !Ref SSLCertificateParameterStoreName
+      Code:
+        ZipFile: |
+          const { SSMClient, GetParameterCommand } = require("@aws-sdk/client-ssm");
+          const tls = require('tls');
+          const ssm = new SSMClient({});
+          const PARAM_NAME = process.env.DomainParameterName;
+          
+          const getSSMParam = async () => {
+            const cmd = new GetParameterCommand({ Name: PARAM_NAME });
+            const res = await ssm.send(cmd);
+            return JSON.parse(res.Parameter.Value);
+          };
+          
+          const checkCert = (domain) => {
+            return new Promise((resolve, reject) => {
+              const socket = tls.connect({ host: domain, port: 443, servername: domain }, () => {
+                const cert = socket.getPeerCertificate();
+                socket.end();
+                if (!cert || !cert.valid_to) {
+                    return reject(new Error("Invalid certificate for " + domain));
+                }
+                resolve(new Date(cert.valid_to));
+              });
+              socket.setTimeout(10000);
+              socket.on('timeout', () => {
+                  socket.destroy();
+                  reject(new Error("Timeout for " + domain));
+              });
+              socket.on('error', (err) => {
+                  reject(new Error("TLS error for " + domain + ": " + err.message));
+              });
+            });
+          };
+          
+          const logEMFMetric = (iss, days) => {
+            const metric = {
+              _aws: {
+                Timestamp: Date.now(),
+                CloudWatchMetrics: [
+                  {
+                    Namespace: "RADD",
+                    Dimensions: [["Iss"]],
+                    Metrics: [{ Name: "SSLExpiration", Unit: "None" }]
+                  }
+                ]
+              },
+              Iss: iss,
+              SSLExpiration: days
+            };
+            console.log(JSON.stringify(metric));
+          };
+          
+          exports.handler = async () => {
+            const now = new Date();
+            const domains = await getSSMParam();
+            let errorFlag = false;
+            for (const e of domains) {
+              try {
+                const domain = e.domain
+                const iss = e.iss
+                const expiryDate = await checkCert(domain);
+                const daysLeft = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+                logEMFMetric(iss, daysLeft);
+                console.log(`Certificate for iss ${iss} expires in ${daysLeft} days`);
+              } catch (err) {
+                console.error(`Error with issuer "${iss}" : ${err.message}`);
+              }
+            }
+          };
+
+  SSLCertExpirationCheckRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-SSLCertCheckExpirationRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Path: /
+      Policies:
+        - PolicyName: !Sub ${ProjectName}-PnSSLCertCheckExpirationRolePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource:
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SSLCertificateParameterStoreName}"
+
+  SSLCertExpirationCheckLambdaSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub ${SSLCertExpirationCheckLambdaName}-schedule
+      ScheduleExpression: rate(1 day)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt SSLCertCheckExpirationLambda.Arn
+          Id: "SSLCertCheckTarget"
+
+  SSLCertExpirationCheckLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref SSLCertExpirationCheckLambdaName
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt SSLCertExpirationCheckLambdaSchedule.Arn
+
+  SSLCertificateExpirationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-radd-SSL-Certificate-Expiration-Alarm"
+      AlarmDescription: "CloudWatch alarm for SSL Expiration."
+      TreatMissingData: notBreaching        
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      Metrics:
+        - Id: q1
+          Expression: "SELECT MIN(SSLExpiration) FROM SCHEMA(\"RADD\", \"Iss\")"
+          Period: 86400
+          ReturnData: False
+        - Id: e2
+          Expression: "IF(q1 > 5, 0, 1)"
+          Period: 86400 
+      DatapointsToAlarm: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Threshold: 1
+
+  RaddSSLCertCheckExpirationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${SSLCertExpirationCheckLambdaName}"
+      RetentionInDays: 14
 
 Outputs:
   OOMAlarmArn:
