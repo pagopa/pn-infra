@@ -95,12 +95,12 @@ Parameters:
 
   SSLCertExpirationCheckLambdaName:
     Type: String
-    Default: 'pn-SSLCertExpirationCheck'
+    Default: 'pn-radd-SSLCertExpirationCheck'
     Description: 'Name of the SSL certificate expiration check lambda'
 
   SSLCertificateParameterStoreName:
     Type: String
-    Default: "/ssl-monitoring/domains"
+    Default: "/radd/ssl-monitoring-domains"
     Description: SSM parameter with JSON array of domains
 
 Conditions:
@@ -804,7 +804,7 @@ Resources:
   SSLCertificateExpirationAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "${ProjectName}-SSL-Certificate-Expiration-Alarm"
+      AlarmName: !Sub "${ProjectName}-radd-SSL-Certificate-Expiration-Alarm"
       AlarmDescription: "CloudWatch alarm for SSL Expiration."
       TreatMissingData: notBreaching        
       AlarmActions:
@@ -821,6 +821,12 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 1
       Threshold: 1
+
+  RaddSSLCertCheckExpirationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${SSLCertExpirationCheckLambdaName}"
+      RetentionInDays: 14
 
 Outputs:
   OOMAlarmArn:
