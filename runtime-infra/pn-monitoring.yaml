@@ -754,6 +754,8 @@ Resources:
               }
             }
           };
+    DependsOn:
+      - RaddSSLCertCheckExpirationLogGroup
 
   SSLCertExpirationCheckRole:
     Type: AWS::IAM::Role
@@ -827,6 +829,16 @@ Resources:
     Properties:
       LogGroupName: !Sub "/aws/lambda/${SSLCertExpirationCheckLambdaName}"
       RetentionInDays: 14
+
+  SSLCertCheckExpirationLambdaAlarm:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - RaddSSLCertCheckExpirationLogGroup
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref SSLCertCheckExpirationLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 Outputs:
   OOMAlarmArn:
