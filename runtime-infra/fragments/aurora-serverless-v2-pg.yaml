@@ -1,4 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
+# Transform: AWS::SecretsManager-2020-07-23
 Description: Fragment for creating an RDS Aurora Serverless v2 PostgreSQL cluster
 
 Parameters:
@@ -34,7 +35,7 @@ Parameters:
     NoEcho: true
   SvcUsername:
     Type: String
-    Description: "Username for the service account placeholder secret"
+    Description: "Username for optional service account"
     Default: "dbsvcuser"
     NoEcho: true
   EngineVersion:
@@ -74,8 +75,11 @@ Parameters:
     Type: Number
     Default: 1500
 
+Conditions:
+  IsDeletionProtectionTrue: !Equals [!Ref DeletionProtectionEnabled, "true"]
+
 Resources:
-  PnDbClusterParameterGroup:
+  PnAuroraDbClusterParameterGroup:
     Type: AWS::RDS::DBClusterParameterGroup
     Properties:
       Description: !Sub "CPG for pn-${ClusterIdentifierSuffix} Aurora PG ${EngineVersion} - ${EnvType}"
@@ -89,7 +93,7 @@ Resources:
         - Key: Environment
           Value: !Ref EnvType
 
-  PnDbSubnetGroup:
+  PnAuroraDbSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
       DBSubnetGroupDescription: !Sub "SNG for pn-${ClusterIdentifierSuffix} Aurora DB - ${EnvType}"
@@ -100,7 +104,7 @@ Resources:
         - Key: Environment
           Value: !Ref EnvType
 
-  PnDbSecurityGroup:
+  PnAuroraDbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: !Sub "SG for pn-${ClusterIdentifierSuffix} Aurora DB - ${EnvType}"
@@ -116,29 +120,36 @@ Resources:
         - Key: Environment
           Value: !Ref EnvType
 
-  PnMasterUserSecret:
-    Type: AWS::SecretsManager::Secret
-    Properties:
-      Name: !Sub "pn-${ClusterIdentifierSuffix}-rds-master-credentials"
-      Description: !Sub "RDS master credentials for pn-${ClusterIdentifierSuffix} ${EnvType} (managed by RDS)"
-      Tags:
-        - Key: Name
-          Value: !Sub "pn-${ClusterIdentifierSuffix}-rds-master-credentials"
-        - Key: Environment
-          Value: !Ref EnvType
+  # PnMasterUserSecret:
+  #   Type: AWS::SecretsManager::Secret
+  #   Properties:
+  #     Name: !Sub "pn-${ClusterIdentifierSuffix}-rds-master-credentials"
+  #     Description: !Sub "RDS master credentials for pn-${ClusterIdentifierSuffix} ${EnvType} (managed by RDS)"
+  #     GenerateSecretString:
+  #       SecretStringTemplate: !Sub '{"username": "${MasterUsername}"}'
+  #       GenerateStringKey: "password"
+  #       PasswordLength: 32
+  #       ExcludePunctuation: false
+  #       IncludeSpace: false
+  #       RequireEachIncludedType: true
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Sub "pn-${ClusterIdentifierSuffix}-rds-master-credentials"
+  #       - Key: Environment
+  #         Value: !Ref EnvType
 
-  PnSecretRotationSchedule:
-    Type: AWS::SecretsManager::RotationSchedule
-    Properties:
-      SecretId: !Ref PnMasterUserSecret
-      RotationLambdaARN: !Sub "arn:aws:serverlessrepo:${AWS::Region}:${AWS::AccountId}:applications/SecretsManagerRDSPOSTGRESQLRotationSingleUser"
-      RotationRules:
-        AutomaticallyAfterDays: 30
-      HostedRotationLambda:
-         RotationType: PostgreSQLSingleUser
-         MasterSecretArn: !Ref PnMasterUserSecret
-         VpcSecurityGroupIds: !GetAtt PnDbSecurityGroup.GroupId
-         VpcSubnetIds: !Join [ ",", !Ref PrivateSubnets ]
+  # PnSecretRotationSchedule:
+  #   Type: AWS::SecretsManager::RotationSchedule
+  #   Properties:
+  #     SecretId: !Ref PnMasterUserSecret
+  #     RotationRules:
+  #       AutomaticallyAfterDays: 30
+  #     HostedRotationLambda:
+  #        RotationType: PostgreSQLSingleUser
+  #        MasterSecretArn: !Ref PnMasterUserSecret
+  #        VpcSecurityGroupIds:
+  #          - !GetAtt PnAuroraDbSecurityGroup.GroupId
+  #        VpcSubnetIds: !Join [ ",", !Ref PrivateSubnets ]
 
   PnSvcUserSecret:
     Type: AWS::SecretsManager::Secret
@@ -158,32 +169,32 @@ Resources:
         - Key: Environment
           Value: !Ref EnvType
 
-  PnDbCluster:
+  PnAuroraDbCluster:
     Type: AWS::RDS::DBCluster
     Properties:
       Engine: aurora-postgresql
       EngineVersion: !Ref EngineVersion
       DatabaseName: !Ref DatabaseName
       DBClusterIdentifier: !Sub "pn-${ClusterIdentifierSuffix}-aurora-pg-cluster"
-      DBClusterParameterGroupName: !Ref PnDbClusterParameterGroup
-      DBSubnetGroupName: !Ref PnDbSubnetGroup
+      DBClusterParameterGroupName: !Ref PnAuroraDbClusterParameterGroup
+      DBSubnetGroupName: !Ref PnAuroraDbSubnetGroup
       EnableHttpEndpoint: false
-      ManageMasterUserPassword: true
-      MasterUsername: !Join ['', ['{{resolve:secretsmanager:', !Ref PnMasterUserSecret, ':SecretString:username}}']]
-      MasterUserPassword: !Join ['', ['{{resolve:secretsmanager:', !Ref PnMasterUserSecret, ':SecretString:password}}']]
+      ManageMasterUserPassword: true 
+      MasterUsername: !Ref MasterUsername
+      # MasterUserPassword: 
       BackupRetentionPeriod: !Ref BackupRetentionPeriod
       Port: 5432
       PreferredBackupWindow: "02:00-03:00"
       PreferredMaintenanceWindow: "sun:04:00-sun:05:00"
       StorageEncrypted: true
       VpcSecurityGroupIds:
-        - !GetAtt PnDbSecurityGroup.GroupId
+        - !GetAtt PnAuroraDbSecurityGroup.GroupId
       EngineMode: provisioned
       ServerlessV2ScalingConfiguration:
         MinCapacity: !Ref MinACU
         MaxCapacity: !Ref MaxACU
       CopyTagsToSnapshot: true
-      DeletionProtection: !Equals [!Ref DeletionProtectionEnabled, "true"]
+      DeletionProtection: !If [IsDeletionProtectionTrue, true, false]
       EnableCloudwatchLogsExports:
         - postgresql
       Tags:
@@ -192,7 +203,7 @@ Resources:
         - Key: Environment
           Value: !Ref EnvType
 
-  PnDbClusterCPUAlarm:
+  PnAuroraDbClusterCPUAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "pn-${ClusterIdentifierSuffix}-DBCluster-CPU-High"
@@ -201,7 +212,7 @@ Resources:
       MetricName: CPUUtilization
       Dimensions:
         - Name: DBClusterIdentifier
-          Value: !Ref PnDbCluster
+          Value: !Ref PnAuroraDbCluster
       Statistic: Average
       Period: 300
       EvaluationPeriods: 3
@@ -213,7 +224,7 @@ Resources:
       OKActions:
         - !Ref AlarmSNSTopicArn
 
-  PnDbClusterConnectionsAlarm:
+  PnAuroraDbClusterConnectionsAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "pn-${ClusterIdentifierSuffix}-DBCluster-Connections-High"
@@ -222,7 +233,7 @@ Resources:
       MetricName: DatabaseConnections
       Dimensions:
         - Name: DBClusterIdentifier
-          Value: !Ref PnDbCluster
+          Value: !Ref PnAuroraDbCluster
       Statistic: Maximum
       Period: 300
       EvaluationPeriods: 3
@@ -237,28 +248,31 @@ Resources:
 Outputs:
   RdsEndpointAddress:
     Description: "RDS Cluster Writer Endpoint Address"
-    Value: !GetAtt PnDbCluster.Endpoint.Address
+    Value: !GetAtt PnAuroraDbCluster.Endpoint.Address
   RdsReadEndpointAddress:
     Description: "RDS Cluster Reader Endpoint Address"
-    Value: !GetAtt PnDbCluster.ReadEndpoint.Address
+    Value: !GetAtt PnAuroraDbCluster.ReadEndpoint.Address
   RdsPort:
     Description: "RDS Cluster Port"
-    Value: !GetAtt PnDbCluster.Endpoint.Port
+    Value: !GetAtt PnAuroraDbCluster.Endpoint.Port
   RdsDbName:
     Description: "RDS Database Name"
     Value: !Ref DatabaseName
-  RdsMasterUserSecretArn:
-    Description: "ARN of the Secret Manager secret for RDS master user"
-    Value: !Ref PnMasterUserSecret
+  # RdsMasterUserSecretArn: # Commentato perchè PnMasterUserSecret è commentato
+  #   Description: "ARN of the Secret Manager secret for RDS master user"
+  #   Value: !Ref PnMasterUserSecret
   RdsSecurityGroupId:
     Description: "ID of the Security Group attached to the RDS cluster"
-    Value: !GetAtt PnDbSecurityGroup.GroupId
+    Value: !GetAtt PnAuroraDbSecurityGroup.GroupId
   DBClusterArn:
     Description: "ARN of the DB Cluster"
-    Value: !Ref PnDbCluster
+    Value: !Ref PnAuroraDbCluster
   DBClusterResourceId:
     Description: "Resource ID of the DB Cluster"
-    Value: !GetAtt PnDbCluster.DBClusterResourceId
+    Value: !GetAtt PnAuroraDbCluster.DBClusterResourceId
   SvcUserSecretArn:
     Description: "ARN of the placeholder secret for service user"
     Value: !Ref PnSvcUserSecret
+  SvcUsername:
+    Description: "Svc Username for service user"
+    Value: !Ref SvcUsername
