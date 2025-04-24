@@ -42,6 +42,11 @@ Parameters:
     Default: ""
     Description: DynamoDB List of Table to export
 
+  DynamoDbTableLambdaDump:
+    Type: String
+    Default: pn-PaperRequestError
+    Description: DynamoDB List of Table to Dump
+
   DynamoDbExportPrefix:
     Type: String
     Description: String Prefix after S3Prefix
@@ -647,7 +652,148 @@ Resources:
             - events:PutEvents
             Resource:
             - !Sub "arn:${AWS::Partition}:events:eu-central-1:${AWS::AccountId}:event-bus/default"
-      
+
+  PaperRequestErrorDumpFuction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      FunctionName: Lambda-PaperRequestErrorDump
+      Code:
+        ZipFile: |
+          import boto3
+          import boto3
+          import csv
+          import io
+          from datetime import datetime
+
+          dynamodb = boto3.resource('dynamodb')
+          s3 = boto3.client('s3')
+
+          def lambda_handler(event, context):
+              dynamo_table_names = os.environ['DynamoDbExportTableName']
+              s3_bucket = os.environ['S3Bucket']
+              prefix = os.environ['Prefix']
+              region = os.environ['Region']
+              accountid = os.environ['AccountID']
+              category_filter = 'RENDICONTAZIONE_SCARTATA'
+              timestamp = datetime.now().strftime('%Y%m%d_%H%M')
+              s3_key = f'{prefix}/rendicontazione_scartata_{timestamp}.csv'
+
+              table = dynamodb.Table(table_name)
+              all_items = []
+              exclusive_start_key = None
+
+              while True:
+                  scan_params = {
+                      'FilterExpression': 'category = :val',
+                      'ExpressionAttributeValues': {':val': category_filter}
+                  }
+                  if exclusive_start_key:
+                      scan_params['ExclusiveStartKey'] = exclusive_start_key
+
+                  response = table.scan(**scan_params)
+                  all_items.extend(response.get('Items', []))
+                  
+                  exclusive_start_key = response.get('LastEvaluatedKey')
+                  if not exclusive_start_key:
+                      break
+
+              csv_buffer = io.StringIO()
+              if all_items:
+                  headers = all_items[0].keys()
+                  writer = csv.DictWriter(csv_buffer, fieldnames=headers)
+                  writer.writeheader()
+                  for item in all_items:
+                      writer.writerow(item)
+
+              s3.put_object(
+                  Bucket=s3_bucket,
+                  Key=s3_key,
+                  Body=csv_buffer.getvalue()
+              )
+
+              return {
+                  'statusCode': 200,
+                  'body': f'CSV con {len(all_items)} record caricato su s3://{s3_bucket}/{s3_key}'
+              }
+
+
+      Environment:
+        Variables:
+          DynamoDbExportTableNames:
+            Ref: DynamoDbTableLambdaDump
+          S3Bucket:
+            Ref: DataMonitoringBucket
+          Prefix: Lambda-PaperRequestErrorDump
+          Region: !Ref AWS::Region
+          AccountID: !Ref AWS::AccountId
+
+
+      Role:
+        Fn::GetAtt:
+          - ExportRoleErrorDumpFuction
+          - Arn
+
+  ExportRoleErrorDumpFuction:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ExportPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Scan
+                Resource: arn:aws:dynamodb:*:*:*
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource:
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/*
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - "kms:Decrypt"
+                Resource: "*"
+
+  ScheduleErrorDumpFuction:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: cron(0 10 * * ? *)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt PaperRequestErrorDumpFuction.Arn
+          Id: PaperRequestErrorDumpFuction
+
+  PermissionForEventsToInvokeErrorDumpFuction:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref PaperRequestErrorDumpFuction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ScheduleErrorDumpFuction.Arn
+
+  ErrorDumpFuctionLogroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy : Delete
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${PaperRequestErrorDumpFuction}"
+      RetentionInDays: 3
+     
 Outputs:
   DataMonitoringBucketName: 
     Value: !Ref DataMonitoringBucket
