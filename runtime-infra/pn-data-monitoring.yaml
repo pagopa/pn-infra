@@ -75,6 +75,16 @@ Parameters:
     Type: String
     Description: Datalake Role Name
     Default: 'pagopa-pn'
+  
+  SesEmailSender:
+    Type: String
+    Description: Datalake Role Name
+    Default: 'noreply@dev.notifichedigitali.it'
+
+  SlackEmailTo:
+    Type: String
+    Description: Datalake Role Name
+    Default: 'send_postalizzazione_-aaaaqaoy5xowjnyffn7zs54xku@pagopaspa.slack.com'
 
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
@@ -666,11 +676,46 @@ Resources:
           import csv
           import io
           from datetime import datetime
+          from email.message import EmailMessage
 
           dynamodb = boto3.resource('dynamodb')
           s3 = boto3.client('s3')
+          sts = boto3.client('sts')
+
+          def send_email_via_ses_crossaccount(recipient_email, csv_content, filename):
+              # Assume Role in Account B (dove si trova SES)
+              assumed = sts.assume_role(
+                  RoleArn=os.environ['SesCrossAccountRoleArn'],
+                  RoleSessionName='SesSendSession'
+              )
+
+              ses = boto3.client(
+                  'ses',
+                  region_name='eu-south-1',
+                  aws_access_key_id=assumed['Credentials']['AccessKeyId'],
+                  aws_secret_access_key=assumed['Credentials']['SecretAccessKey'],
+                  aws_session_token=assumed['Credentials']['SessionToken']
+              )
+
+              msg = EmailMessage()
+              msg['Subject'] = 'CSV Rendicontazione Scartata'
+              msg['From'] = os.environ['EmailSender']
+              msg['To'] = recipient_email
+              msg.set_content('In allegato il file CSV esportato dalla Lambda.')
+
+              msg.add_attachment(csv_content.encode('utf-8'),
+                                maintype='text',
+                                subtype='csv',
+                                filename=filename)
+
+              ses.send_raw_email(
+                  Source=msg['From'],
+                  Destinations=[recipient_email],
+                  RawMessage={'Data': msg.as_bytes()}
+              )
 
           def lambda_handler(event, context):
+              # Estrazione variabili d'ambiente
               dynamo_table_name = os.environ['DynamoDbTableLambdaDump']
               s3_bucket = os.environ['S3Bucket']
               prefix = os.environ['Prefix']
@@ -713,11 +758,16 @@ Resources:
                   Body=csv_buffer.getvalue()
               )
 
+              send_email_via_ses_crossaccount(
+                  recipient_email=os.environ['EmailTo'],
+                  csv_content=csv_buffer.getvalue(),
+                  filename=f"rendicontazione_scartata_{timestamp}.csv"
+              )
+
               return {
                   'statusCode': 200,
-                  'body': f'CSV with {len(all_items)} record is generated and move to s3://{s3_bucket}/{s3_key}'
+                  'body': f'CSV with {len(all_items)} removed records was uploaded on s3://{s3_bucket}/{s3_key} and sent via email on slack.'
               }
-
 
       Environment:
         Variables:
@@ -726,6 +776,11 @@ Resources:
           S3Bucket:
             Ref: DataMonitoringBucket
           Prefix: Lambda-PaperRequestErrorDump
+          SesCrossAccountRoleArn: arn:aws:iam::089813480515:role/usessmfromcore
+          EmailSender:
+            Ref: SesEmailSender
+          EmailTo:
+            Ref: SlackEmailTo
           Region: !Ref AWS::Region
           AccountID: !Ref AWS::AccountId
 
