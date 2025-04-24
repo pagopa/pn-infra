@@ -661,7 +661,7 @@ Resources:
       FunctionName: Lambda-PaperRequestErrorDump
       Code:
         ZipFile: |
-          import boto3
+          import os
           import boto3
           import csv
           import io
@@ -671,7 +671,7 @@ Resources:
           s3 = boto3.client('s3')
 
           def lambda_handler(event, context):
-              dynamo_table_names = os.environ['DynamoDbExportTableName']
+              dynamo_table_name = os.environ['DynamoDbTableLambdaDump']
               s3_bucket = os.environ['S3Bucket']
               prefix = os.environ['Prefix']
               region = os.environ['Region']
@@ -680,7 +680,7 @@ Resources:
               timestamp = datetime.now().strftime('%Y%m%d_%H%M')
               s3_key = f'{prefix}/rendicontazione_scartata_{timestamp}.csv'
 
-              table = dynamodb.Table(table_name)
+              table = dynamodb.Table(dynamo_table_name)
               all_items = []
               exclusive_start_key = None
 
@@ -715,7 +715,7 @@ Resources:
 
               return {
                   'statusCode': 200,
-                  'body': f'CSV con {len(all_items)} record caricato su s3://{s3_bucket}/{s3_key}'
+                  'body': f'CSV with {len(all_items)} record is generated and move to s3://{s3_bucket}/{s3_key}'
               }
 
 
