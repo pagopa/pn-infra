@@ -100,10 +100,6 @@ Parameters:
     Default: 1
     Description: Safestorage logger batch size
 
-  StartingPositionTimestamp:
-    Type: String
-    Description: Starting position timestamp for lambda ingestion
-
   EnvironmentType:
     Type: String
     Default: ''
@@ -111,12 +107,6 @@ Parameters:
 Conditions:
   HasOpenSearchExport: !Not [ !Equals [ !Ref OpenSearchClusterEndpoint, "" ] ]
   HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, "-" ] ]
-  IsProdEnvironment: !Equals [ !Ref EnvironmentType, "prod" ]
-  IsUatEnvironment: !Equals [ !Ref EnvironmentType, "uat" ]
-  IsUatOrProdEnvironment: !Or 
-    - !Condition IsUatEnvironment
-    - !Condition IsProdEnvironment
-
 
 Resources:
 
@@ -200,10 +190,6 @@ Resources:
         OpenSearchKinesisWindow: !Ref OpenSearchKinesisWindow
         OpenSearchParallelizationFactor: !Ref OpenSearchParallelizationFactor
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        StartingPositionTimestamp: !If 
-          - IsUatOrProdEnvironment
-          - !Ref StartingPositionTimestamp
-          - !Ref "AWS::NoValue"
       Tags:
         - Key: "pn-eni-related"
           Value: "true"
