@@ -220,43 +220,43 @@ Resources:
             Region: !Ref AWS::Region
             VersionId: 'LATEST'
 
-  # DeliveryStreamErrorLogsMetricFilter:
-  #   DependsOn:
-  #     - DeliveryStreamLogGroup
-  #   Type: AWS::Logs::MetricFilter
-  #   Properties:
-  #     LogGroupName: !Ref DeliveryStreamLogGroup
-  #     FilterPattern: '?S3 ?InternalError ?ParquetError'
-  #     MetricTransformations:
-  #       - MetricValue: 1
-  #         MetricNamespace: "LogsExport"
-  #         MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-kinesis-error"
+  DeliveryStreamErrorLogsMetricFilter:
+    DependsOn:
+      - DeliveryStreamLogGroup
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref DeliveryStreamLogGroup
+      FilterPattern: '?S3 ?InternalError ?ParquetError'
+      MetricTransformations:
+        - MetricValue: 1
+          MetricNamespace: "LogsExport"
+          MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-kinesis-error"
 
-  # DeliveryStreamErrorLogsMetricAlarm:
-  #   Type: AWS::CloudWatch::Alarm
-  #   DependsOn:
-  #     - DeliveryStreamErrorLogsMetricFilter
-  #   Properties:
-  #     AlarmName: !Sub "${ProjectName}-${StreamNamePrefix}-Kinesis-Alarm"
-  #     AlarmDescription: "Alarm for delivery stream errors"
-  #     TreatMissingData: notBreaching
-  #     AlarmActions:
-  #       - !Ref AlarmSNSTopicArn
-  #     OKActions:
-  #       - !Ref AlarmSNSTopicArn
-  #     DatapointsToAlarm: 1
-  #     MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-kinesis-error"
-  #     Namespace: "LogsExport"
-  #     ComparisonOperator: GreaterThanOrEqualToThreshold
-  #     EvaluationPeriods: 60
-  #     Period: 60
-  #     Statistic: Sum
-  #     Threshold: 1
+  DeliveryStreamErrorLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn:
+      - DeliveryStreamErrorLogsMetricFilter
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${StreamNamePrefix}-Kinesis-Alarm"
+      AlarmDescription: "Alarm for delivery stream errors"
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-kinesis-error"
+      Namespace: "LogsExport"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Statistic: Sum
+      Threshold: 1
 
 Outputs:
-  # DeliveryStreamErrorLogsMetricAlarmArn:
-  #   Description: 'ARN of delivery stream error log alarm'
-  #   Value: !GetAtt DeliveryStreamErrorLogsMetricAlarm.Arn
+  DeliveryStreamErrorLogsMetricAlarmArn:
+    Description: 'ARN of delivery stream error log alarm'
+    Value: !GetAtt DeliveryStreamErrorLogsMetricAlarm.Arn
 
   DeliveryStreamArn:
     Description: 'ARN of delivery stream'
