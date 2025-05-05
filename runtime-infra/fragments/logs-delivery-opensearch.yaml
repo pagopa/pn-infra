@@ -80,6 +80,13 @@ Parameters:
     Type: Number
     Default: 14
 
+  StartingPositionTimestamp:
+    Type: String
+    Description: Starting position timestamp for lambda ingestion
+
+Conditions:
+  HasStartingPositionTimestamp: !Not [ !Equals [ !Ref StartingPositionTimestamp, "" ] ]
+
 Resources:
   DeliveryLambdaRole:
     Type: AWS::IAM::Role
@@ -173,7 +180,14 @@ Resources:
         - ReportBatchItemFailures
       MaximumBatchingWindowInSeconds: !Ref OpenSearchKinesisWindow # 5 minutes
       ParallelizationFactor: !Ref OpenSearchParallelizationFactor
-      StartingPosition: LATEST
+      StartingPosition: !If 
+          - HasStartingPositionTimestamp
+          - AT_TIMESTAMP
+          - LATEST
+      StartingPositionTimestamp: !If 
+          - HasStartingPositionTimestamp
+          - !Ref StartingPositionTimestamp
+          - !Ref "AWS::NoValue"
 
   DeliveryLambdaAlarms:
     Type: AWS::CloudFormation::Stack
