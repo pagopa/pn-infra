@@ -80,6 +80,15 @@ Parameters:
     Type: Number
     Default: 14
 
+  OpensearchIngestionEnabled: 
+    Description: Enable Ingestion To Opensearch
+    Default: true
+    Type: String
+    AllowedValues: [true, false]
+
+Conditions:
+  IsOpensearchIngestionEnabled: !Equals [ !Ref OpensearchIngestionEnabled, true ]
+
 Resources:
   DeliveryLambdaRole:
     Type: AWS::IAM::Role
@@ -164,6 +173,7 @@ Resources:
 
   DeliveryLambdaKinesisSource:
     Type: AWS::Lambda::EventSourceMapping
+    Condition: IsOpensearchIngestionEnabled
     Properties:
       BatchSize: !Ref OpenSearchKinesisBatchSize
       BisectBatchOnFunctionError: true
