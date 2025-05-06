@@ -76,15 +76,20 @@ Parameters:
     Description: Datalake Role Name
     Default: 'pagopa-pn'
   
-  SesEmailSender:
+  DataMonitoringSesEmailSender:
     Type: String
-    Description: Datalake Role Name
-    Default: 'noreply@dev.notifichedigitali.it'
+    Description: Sender Email to send report to slack channel
+    Default: ''
 
-  SlackEmailTo:
+  DataMonitoringSlackEmailTo:
     Type: String
-    Description: Datalake Role Name
-    Default: 'send_postalizzazione_-aaaaqaoy5xowjnyffn7zs54xku@pagopaspa.slack.com'
+    Description: Slack Email channel
+    Default: ''
+
+  PaperRequestErrorDumpFuctionCronExpression:
+    Type: String
+    Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
+    Default: 'cron(0 12 * * * *)'
 
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
@@ -184,29 +189,6 @@ Resources:
               ArnLike:
                 aws:PrincipalArn:
                   - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:role/${DataLakeRoleName}"
-
-  SendEmailFromCoreRole:
-    Condition: IsConfinfoAccount
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: SendEmailPolicyFromCore
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ses:SendEmail
-                  - ses:SendRawEmail
-                Resource: 
-                  - !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*"
   
   DataMonitoringCodebuildProject:
     Type: 'AWS::CodeBuild::Project'
@@ -799,11 +781,11 @@ Resources:
           S3Bucket:
             Ref: DataMonitoringBucket
           Prefix: Lambda-PaperRequestErrorDump
-          SesCrossAccountRoleArn: arn:aws:iam::089813480515:role/usessmfromcore
+          SesCrossAccountRoleArn: !GetAtt SendEmailFromCoreRole.Arn
           EmailSender:
-            Ref: SesEmailSender
+            Ref: DataMonitoringSesEmailSender
           EmailTo:
-            Ref: SlackEmailTo
+            Ref: DataMonitoringSlackEmailTo
           Region: !Ref AWS::Region
           AccountID: !Ref AWS::AccountId
 
@@ -854,7 +836,7 @@ Resources:
   ScheduleErrorDumpFuction:
     Type: AWS::Events::Rule
     Properties:
-      ScheduleExpression: cron(0 10 * * ? *)
+      ScheduleExpression: !Ref PaperRequestErrorDumpFuctionCronExpression
       State: ENABLED
       Targets:
         - Arn: !GetAtt PaperRequestErrorDumpFuction.Arn
