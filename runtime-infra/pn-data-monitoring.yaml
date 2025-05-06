@@ -184,6 +184,29 @@ Resources:
               ArnLike:
                 aws:PrincipalArn:
                   - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:role/${DataLakeRoleName}"
+
+  SendEmailFromCoreRole:
+    Condition: IsConfinfoAccount
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SendEmailPolicyFromCore
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource: 
+                  - !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*"
   
   DataMonitoringCodebuildProject:
     Type: 'AWS::CodeBuild::Project'
@@ -784,7 +807,6 @@ Resources:
           Region: !Ref AWS::Region
           AccountID: !Ref AWS::AccountId
 
-
       Role:
         Fn::GetAtt:
           - ExportRoleErrorDumpFuction
@@ -816,13 +838,18 @@ Resources:
                   - !Sub arn:aws:s3:::${DataMonitoringBucket}/*
               - Effect: Allow
                 Action:
-                  - "logs:CreateLogStream"
-                  - "logs:PutLogEvents"
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
                 Resource: arn:aws:logs:*:*:*
               - Effect: Allow
                 Action:
-                  - "kms:Decrypt"
+                  - kms:Decrypt
                 Resource: "*"
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource: !GetAtt SendEmailFromCoreRole.Arn
+
 
   ScheduleErrorDumpFuction:
     Type: AWS::Events::Rule
