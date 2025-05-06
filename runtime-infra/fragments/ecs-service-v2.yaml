@@ -1,6 +1,3 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Description: Add an ECS Service to an exsisting ECS cluster (v2 - with optional ALB integration)
-
 Parameters:
 
   # Logical parameters
@@ -230,9 +227,11 @@ Parameters:
   LoadBalancerListenerArn:
     Type: String
     Description: Application load balancer listener ARN
+    Default: ''
   LoadbalancerRulePriority:
     Type: Number
     Description: Routing rules in the dame load balancer listener must have different priorities
+    Default: 0
   EphemeralStorageValueGB:
     Type: Number
     Description: Ephemeral storage value in GB
@@ -677,13 +676,13 @@ Parameters:
     Description: Microservice secret name prefix
     Type: String
     Default: ''
-    
+
   LoadBalancingAlgorithm:
     Type: String
     Default: least_outstanding_requests
 
   # Alarm
-  LogAlarmStrategyV1: # updated parameter name to allow a new default value, will be restored with task PN-4855 
+  LogAlarmStrategyV1: # updated parameter name to allow a new default value, will be restored with task PN-4855
     Description: Log alarm strategy, one of "-", "FATAL" or "ERROR_FATAL"
     Default: 'ERROR_FATAL'
     AllowedValues:
