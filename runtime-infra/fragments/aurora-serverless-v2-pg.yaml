@@ -178,7 +178,7 @@ Resources:
       DBClusterIdentifier: !Sub "pn-${ClusterIdentifierSuffix}-aurora-pg-cluster"
       DBClusterParameterGroupName: !Ref PnAuroraDbClusterParameterGroup
       DBSubnetGroupName: !Ref PnAuroraDbSubnetGroup
-      EnableHttpEndpoint: false
+      EnableHttpEndpoint: true
       ManageMasterUserPassword: true 
       MasterUsername: !Ref MasterUsername
       # MasterUserPassword: 
@@ -200,6 +200,24 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "pn-${ClusterIdentifierSuffix}-aurora-pg-cluster"
+        - Key: Environment
+          Value: !Ref EnvType
+
+  PnAuroraDbInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub "pn-${ClusterIdentifierSuffix}-instance-1"
+      DBClusterIdentifier: !Ref PnAuroraDbCluster
+      Engine: aurora-postgresql
+      EngineVersion: !Ref EngineVersion
+      DBInstanceClass: db.serverless 
+      PubliclyAccessible: false
+      DBSubnetGroupName: !Ref PnAuroraDbSubnetGroup
+      PromotionTier: 1
+      EnablePerformanceInsights: false
+      Tags:
+        - Key: Name
+          Value: !Sub "pn-${ClusterIdentifierSuffix}-instance-1"
         - Key: Environment
           Value: !Ref EnvType
 
