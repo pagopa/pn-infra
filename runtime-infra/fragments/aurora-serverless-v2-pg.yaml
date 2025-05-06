@@ -120,37 +120,6 @@ Resources:
         - Key: Environment
           Value: !Ref EnvType
 
-  # PnMasterUserSecret:
-  #   Type: AWS::SecretsManager::Secret
-  #   Properties:
-  #     Name: !Sub "pn-${ClusterIdentifierSuffix}-rds-master-credentials"
-  #     Description: !Sub "RDS master credentials for pn-${ClusterIdentifierSuffix} ${EnvType} (managed by RDS)"
-  #     GenerateSecretString:
-  #       SecretStringTemplate: !Sub '{"username": "${MasterUsername}"}'
-  #       GenerateStringKey: "password"
-  #       PasswordLength: 32
-  #       ExcludePunctuation: false
-  #       IncludeSpace: false
-  #       RequireEachIncludedType: true
-  #     Tags:
-  #       - Key: Name
-  #         Value: !Sub "pn-${ClusterIdentifierSuffix}-rds-master-credentials"
-  #       - Key: Environment
-  #         Value: !Ref EnvType
-
-  # PnSecretRotationSchedule:
-  #   Type: AWS::SecretsManager::RotationSchedule
-  #   Properties:
-  #     SecretId: !Ref PnMasterUserSecret
-  #     RotationRules:
-  #       AutomaticallyAfterDays: 30
-  #     HostedRotationLambda:
-  #        RotationType: PostgreSQLSingleUser
-  #        MasterSecretArn: !Ref PnMasterUserSecret
-  #        VpcSecurityGroupIds:
-  #          - !GetAtt PnAuroraDbSecurityGroup.GroupId
-  #        VpcSubnetIds: !Join [ ",", !Ref PrivateSubnets ]
-
   PnSvcUserSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
