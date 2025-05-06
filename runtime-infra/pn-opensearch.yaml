@@ -61,7 +61,6 @@ Parameters:
 
   EnvironmentType:
     Type: String
-    Default: ''
   
   OpenSearchEnabled: 
     Description: Enable OpenSearch
@@ -73,12 +72,10 @@ Conditions:
   HasDedicatedMaster: !Not [ !Equals [ !Ref MasterNodeType, "" ] ]
   IsProdEnvironment: !Equals [ !Ref EnvironmentType, "prod" ]
   IsUatEnvironment: !Equals [ !Ref EnvironmentType, "uat" ]
-  IsUatOrProdEnvironment: !Or 
-    - !Condition IsUatEnvironment
-    - !Condition IsProdEnvironment
   IsOpenSearchEnabled: !Equals  [true, !Ref OpenSearchEnabled]
   ShouldCreateOpenSearchDomain: !Or
-    - !Condition IsUatOrProdEnvironment
+    - !Condition IsUatEnvironment
+    - !Condition IsProdEnvironment
     - !Condition IsOpenSearchEnabled
 
 Resources:
