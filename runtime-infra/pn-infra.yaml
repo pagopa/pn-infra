@@ -173,6 +173,18 @@ Parameters:
     Type: String
     Description: 'Bucket name for the DynamoDB export for Confinfo Account'
 
+  DataMonitoringSlackEmailTo:
+    Type: String
+    Description: Slack Email channel
+
+  PaperRequestErrorDumpFuctionCronExpression:
+    Type: String
+    Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
+
+  PaperRequestErrorDumpFuctionDelete:
+    Type: String
+    Description: Condition for remove item form PaperRequestError DynamoDb table
+
   ParquetBucketPath:
     Type: String
     Description: parquet files s3 bucket path
@@ -463,6 +475,12 @@ Outputs:
     Value: !Ref DynamoDbExportPrefix
   ConfinfoDynamoDbExportBucketName:
     Value: !Ref ConfinfoDynamoDbExportBucketName
+  DataMonitoringSlackEmailTo:
+    Value: !Ref DataMonitoringSlackEmailTo
+  PaperRequestErrorDumpFuctionCronExpression:
+    Value: !Ref PaperRequestErrorDumpFuctionCronExpression
+  PaperRequestErrorDumpFuctionDelete:
+    Value: !Ref PaperRequestErrorDumpFuctionDelete
   ParquetBucketPath:
     Value: !Ref ParquetBucketPath
   DataMonitoringCodebuildComputeType:

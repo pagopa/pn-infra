@@ -76,20 +76,20 @@ Parameters:
     Description: Datalake Role Name
     Default: 'pagopa-pn'
   
-  DataMonitoringSesEmailSender:
-    Type: String
-    Description: Sender Email to send report to slack channel
-    Default: ''
-
   DataMonitoringSlackEmailTo:
     Type: String
     Description: Slack Email channel
-    Default: ''
+    Default: 'send_postalizzazione_-aaaaqaoy5xowjnyffn7zs54xku@pagopaspa.slack.com'
 
   PaperRequestErrorDumpFuctionCronExpression:
     Type: String
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
     Default: 'cron(30 11 * * ? *)'
+
+  PaperRequestErrorDumpFuctionDelete:
+    Type: String
+    Description: Condition for remove item form PaperRequestError DynamoDb table
+    Default: 'false'
 
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
@@ -681,19 +681,30 @@ Resources:
           import csv
           import io
           from datetime import datetime
+          from email.message import EmailMessage
+          from botocore.config import Config
 
           dynamodb = boto3.resource('dynamodb')
-          s3 = boto3.client('s3')
+          s3 = boto3.client(
+              's3',
+              region_name=os.environ['Region'],
+              config=Config(s3={'addressing_style': 'virtual'})
+          )
           sns = boto3.client('sns')
+          sts = boto3.client('sts')
 
           def lambda_handler(event, context):
               dynamo_table_name = os.environ['DynamoDbTableLambdaDump']
               s3_bucket = os.environ['S3Bucket']
               prefix = os.environ['Prefix']
+              region = os.environ['Region']
+              accountid = os.environ['AccountID']
               category_filter = 'RENDICONTAZIONE_SCARTATA'
+              delete_items = os.environ.get('DeleteItems', 'false').lower() == 'true'
+              sns_topic_arn = os.environ['SnsTopicArn']
               timestamp = datetime.now().strftime('%Y%m%d_%H%M')
+              timestampSubject = datetime.now().strftime('%Y-%m-%d')
               s3_key = f'{prefix}/rendicontazione_scartata_{timestamp}.csv'
-              topic_arn = os.environ['SNSTopicArn']
 
               table = dynamodb.Table(dynamo_table_name)
               all_items = []
@@ -709,7 +720,6 @@ Resources:
 
                   response = table.scan(**scan_params)
                   all_items.extend(response.get('Items', []))
-
                   exclusive_start_key = response.get('LastEvaluatedKey')
                   if not exclusive_start_key:
                       break
@@ -728,41 +738,61 @@ Resources:
                   Body=csv_buffer.getvalue()
               )
 
-              sns.publish(
-                  TopicArn=topic_arn,
-                  Subject='CSV Rendicontazione Scartata',
-                  Message=(
-                      f'CSV caricato su S3: s3://{s3_bucket}/{s3_key}\n\n'
-                      f'Contenuto:\n\n{csv_buffer.getvalue()}'
-                  )
+              presigned_url = s3.generate_presigned_url(
+                  ClientMethod='get_object',
+                  Params={
+                      'Bucket': s3_bucket,
+                      'Key': s3_key,
+                      'ResponseContentDisposition': 'inline'
+                  },
+                  ExpiresIn=259200
               )
+
+              sns.publish(
+                  TopicArn=sns_topic_arn,
+                  Subject=f'CSV Rendicontazione Scartata {timestampSubject}',
+                  Message=f"In allegato il link per scaricare il file CSV:\n\n{presigned_url}"
+              )
+
+              if delete_items:
+                  for item in all_items:
+                      request_id = item.get('requestId')
+                      created = item.get('created')
+                      if request_id and created:
+                          try:
+                              response = table.delete_item(
+                                  Key={
+                                      'requestId': request_id,
+                                      'created': created
+                                  }
+                              )
+                              print(f"Deleted item with requestId: {request_id} and created: {created}")
+                          except Exception as e:
+                              print(f'Errore durante la cancellazione di item {request_id}: {str(e)}')    
 
               return {
                   'statusCode': 200,
-                  'body': f'CSV with {len(all_items)} removed records was uploaded on s3://{s3_bucket}/{s3_key} and sent via SNS.'
+                  'body': f'CSV con {len(all_items)} record caricato su s3://{s3_bucket}/{s3_key} e link inviato via SNS.'
               }
+
+
 
       Environment:
         Variables:
-          DynamoDbExportTableNames:
-            Ref: DynamoDbTableLambdaDump
-          S3Bucket:
-            Ref: DataMonitoringBucket
+          DynamoDbTableLambdaDump: !Ref DynamoDbTableLambdaDump
+          S3Bucket: !Ref DataMonitoringBucket
           Prefix: Lambda-PaperRequestErrorDump
-          SNSTopicArn: !Ref EMailSnsTopic
-          EmailSender:
-            Ref: DataMonitoringSesEmailSender
-          EmailTo:
-            Ref: DataMonitoringSlackEmailTo
+          DeleteItems: !Ref PaperRequestErrorDumpFuctionDelete
+          SnsTopicArn: !Ref EMailSnsTopic
           Region: !Ref AWS::Region
           AccountID: !Ref AWS::AccountId
 
       Role:
         Fn::GetAtt:
-          - ExportRoleErrorDumpFuction
+          - PaperRequestErrorDumpFuctionRole
           - Arn
 
-  ExportRoleErrorDumpFuction:
+  PaperRequestErrorDumpFuctionRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -780,10 +810,12 @@ Resources:
               - Effect: Allow
                 Action:
                   - dynamodb:Scan
-                Resource: arn:aws:dynamodb:*:*:*
+                  - dynamodb:DeleteItem
+                Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDbTableLambdaDump}
               - Effect: Allow
                 Action:
                   - s3:PutObject
+                  - s3:GetObject
                 Resource:
                   - !Sub arn:aws:s3:::${DataMonitoringBucket}/*
               - Effect: Allow
@@ -809,7 +841,7 @@ Resources:
     Type: AWS::SNS::Subscription
     Properties:
       Protocol: email
-      Endpoint: !Ref DataMonitoringSesEmailSender
+      Endpoint: !Ref DataMonitoringSlackEmailTo
       TopicArn: !Ref EMailSnsTopic
 
   LambdaSNSTopicPolicy:
@@ -822,7 +854,8 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !GetAtt PaperRequestErrorDumpFuction.Arn
+              Service:
+              - lambda.amazonaws.com
             Action: sns:Publish
             Resource: !Ref EMailSnsTopic
 
