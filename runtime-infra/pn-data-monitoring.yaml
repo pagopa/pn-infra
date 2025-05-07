@@ -89,7 +89,7 @@ Parameters:
   PaperRequestErrorDumpFuctionCronExpression:
     Type: String
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
-    Default: 'cron(0 12 * * * *)'
+    Default: 'cron(30 11 * * ? *)'
 
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
@@ -681,54 +681,19 @@ Resources:
           import csv
           import io
           from datetime import datetime
-          from email.message import EmailMessage
 
           dynamodb = boto3.resource('dynamodb')
           s3 = boto3.client('s3')
-          sts = boto3.client('sts')
-
-          def send_email_via_ses_crossaccount(recipient_email, csv_content, filename):
-              # Assume Role in Account B (dove si trova SES)
-              assumed = sts.assume_role(
-                  RoleArn=os.environ['SesCrossAccountRoleArn'],
-                  RoleSessionName='SesSendSession'
-              )
-
-              ses = boto3.client(
-                  'ses',
-                  region_name='eu-south-1',
-                  aws_access_key_id=assumed['Credentials']['AccessKeyId'],
-                  aws_secret_access_key=assumed['Credentials']['SecretAccessKey'],
-                  aws_session_token=assumed['Credentials']['SessionToken']
-              )
-
-              msg = EmailMessage()
-              msg['Subject'] = 'CSV Rendicontazione Scartata'
-              msg['From'] = os.environ['EmailSender']
-              msg['To'] = recipient_email
-              msg.set_content('In allegato il file CSV esportato dalla Lambda.')
-
-              msg.add_attachment(csv_content.encode('utf-8'),
-                                maintype='text',
-                                subtype='csv',
-                                filename=filename)
-
-              ses.send_raw_email(
-                  Source=msg['From'],
-                  Destinations=[recipient_email],
-                  RawMessage={'Data': msg.as_bytes()}
-              )
+          sns = boto3.client('sns')
 
           def lambda_handler(event, context):
-              # Estrazione variabili d'ambiente
               dynamo_table_name = os.environ['DynamoDbTableLambdaDump']
               s3_bucket = os.environ['S3Bucket']
               prefix = os.environ['Prefix']
-              region = os.environ['Region']
-              accountid = os.environ['AccountID']
               category_filter = 'RENDICONTAZIONE_SCARTATA'
               timestamp = datetime.now().strftime('%Y%m%d_%H%M')
               s3_key = f'{prefix}/rendicontazione_scartata_{timestamp}.csv'
+              topic_arn = os.environ['SNSTopicArn']
 
               table = dynamodb.Table(dynamo_table_name)
               all_items = []
@@ -744,7 +709,7 @@ Resources:
 
                   response = table.scan(**scan_params)
                   all_items.extend(response.get('Items', []))
-                  
+
                   exclusive_start_key = response.get('LastEvaluatedKey')
                   if not exclusive_start_key:
                       break
@@ -763,15 +728,18 @@ Resources:
                   Body=csv_buffer.getvalue()
               )
 
-              send_email_via_ses_crossaccount(
-                  recipient_email=os.environ['EmailTo'],
-                  csv_content=csv_buffer.getvalue(),
-                  filename=f"rendicontazione_scartata_{timestamp}.csv"
+              sns.publish(
+                  TopicArn=topic_arn,
+                  Subject='CSV Rendicontazione Scartata',
+                  Message=(
+                      f'CSV caricato su S3: s3://{s3_bucket}/{s3_key}\n\n'
+                      f'Contenuto:\n\n{csv_buffer.getvalue()}'
+                  )
               )
 
               return {
                   'statusCode': 200,
-                  'body': f'CSV with {len(all_items)} removed records was uploaded on s3://{s3_bucket}/{s3_key} and sent via email on slack.'
+                  'body': f'CSV with {len(all_items)} removed records was uploaded on s3://{s3_bucket}/{s3_key} and sent via SNS.'
               }
 
       Environment:
@@ -781,7 +749,7 @@ Resources:
           S3Bucket:
             Ref: DataMonitoringBucket
           Prefix: Lambda-PaperRequestErrorDump
-          SesCrossAccountRoleArn: !GetAtt SendEmailFromCoreRole.Arn
+          SNSTopicArn: !Ref EMailSnsTopic
           EmailSender:
             Ref: DataMonitoringSesEmailSender
           EmailTo:
@@ -829,9 +797,34 @@ Resources:
                 Resource: "*"
               - Effect: Allow
                 Action:
-                  - sts:AssumeRole
-                Resource: !GetAtt SendEmailFromCoreRole.Arn
+                  - sns:Publish
+                Resource: !Ref EMailSnsTopic
 
+  EMailSnsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: pn-SnsToEmail
+
+  EMailSnsTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Ref DataMonitoringSesEmailSender
+      TopicArn: !Ref EMailSnsTopic
+
+  LambdaSNSTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref EMailSnsTopic
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !GetAtt PaperRequestErrorDumpFuction.Arn
+            Action: sns:Publish
+            Resource: !Ref EMailSnsTopic
 
   ScheduleErrorDumpFuction:
     Type: AWS::Events::Rule

@@ -786,28 +786,6 @@ Resources:
               - ses:GetSendStatistics
               - ses:GetSendQuota
             Resource: '*'
-
-  SendEmailFromCoreRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: SendEmailPolicyFromCore
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ses:SendEmail
-                  - ses:SendRawEmail
-                Resource: 
-                  - !Sub "arn:aws:ses:${AWS::Region}:${PnCoreAwsAccountId}:identity/*"
             
   SesQuotaMonitoringLambdaFunctionLogGroup:
     Type: AWS::Logs::LogGroup
