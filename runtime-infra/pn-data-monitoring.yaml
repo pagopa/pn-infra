@@ -42,11 +42,6 @@ Parameters:
     Default: ""
     Description: DynamoDB List of Table to export
 
-  DynamoDbTableLambdaDump:
-    Type: String
-    Default: pn-PaperRequestError
-    Description: DynamoDB List of Table to Dump
-
   DynamoDbExportPrefix:
     Type: String
     Description: String Prefix after S3Prefix
@@ -84,7 +79,7 @@ Parameters:
   PaperRequestErrorDumpFuctionCronExpression:
     Type: String
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
-    Default: 'cron(30 11 * * ? *)'
+    Default: ''
 
   PaperRequestErrorDumpFuctionDelete:
     Type: String
@@ -98,6 +93,7 @@ Conditions:
   IsDatalakeAccountInCore: !And [ !Condition IsDatalakeAccount, !Condition IsCoreAccount ]
   HasCronExpression: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
+  HasCronExpressionLambdaPaperError: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
 
 Resources:
   
@@ -672,6 +668,8 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.12
+      Timeout: 600
+      MemorySize: 256
       Handler: index.lambda_handler
       FunctionName: Lambda-PaperRequestErrorDump
       Code:
@@ -779,7 +777,7 @@ Resources:
 
       Environment:
         Variables:
-          DynamoDbTableLambdaDump: !Ref DynamoDbTableLambdaDump
+          DynamoDbTableLambdaDump: pn-PaperRequestError
           S3Bucket: !Ref DataMonitoringBucket
           Prefix: Lambda-PaperRequestErrorDump
           DeleteItems: !Ref PaperRequestErrorDumpFuctionDelete
@@ -811,13 +809,13 @@ Resources:
                 Action:
                   - dynamodb:Scan
                   - dynamodb:DeleteItem
-                Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDbTableLambdaDump}
+                Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperRequestError
               - Effect: Allow
                 Action:
                   - s3:PutObject
                   - s3:GetObject
                 Resource:
-                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/*
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/Lambda-PaperRequestErrorDump/*
               - Effect: Allow
                 Action:
                   - logs:CreateLogStream
@@ -860,6 +858,7 @@ Resources:
             Resource: !Ref EMailSnsTopic
 
   ScheduleErrorDumpFuction:
+    Condition: HasCronExpressionLambdaPaperError
     Type: AWS::Events::Rule
     Properties:
       ScheduleExpression: !Ref PaperRequestErrorDumpFuctionCronExpression
@@ -869,6 +868,7 @@ Resources:
           Id: PaperRequestErrorDumpFuction
 
   PermissionForEventsToInvokeErrorDumpFuction:
+    Condition: HasCronExpressionLambdaPaperError
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
