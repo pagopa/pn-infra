@@ -86,6 +86,11 @@ Parameters:
     Description: Condition for remove item form PaperRequestError DynamoDb table
     Default: 'false'
 
+  PresignedUrlTimeOfexpiration:
+    Type: Number
+    Description: Presigned URL Time of Expiration
+    Default: 259200 
+
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
@@ -700,6 +705,7 @@ Resources:
               category_filter = 'RENDICONTAZIONE_SCARTATA'
               delete_items = os.environ.get('DeleteItems', 'false').lower() == 'true'
               sns_topic_arn = os.environ['SnsTopicArn']
+              presignedurltime = os.environ['PresignedUrlTime']
               timestamp = datetime.now().strftime('%Y%m%d_%H%M')
               timestampSubject = datetime.now().strftime('%Y-%m-%d')
               s3_key = f'{prefix}/rendicontazione_scartata_{timestamp}.csv'
@@ -743,7 +749,7 @@ Resources:
                       'Key': s3_key,
                       'ResponseContentDisposition': 'inline'
                   },
-                  ExpiresIn=259200
+                  ExpiresIn=presignedurltime
               )
 
               sns.publish(
@@ -784,6 +790,7 @@ Resources:
           SnsTopicArn: !Ref EMailSnsTopic
           Region: !Ref AWS::Region
           AccountID: !Ref AWS::AccountId
+          PresignedUrlTime: !Ref PresignedUrlTimeOfexpiration
 
       Role:
         Fn::GetAtt:
