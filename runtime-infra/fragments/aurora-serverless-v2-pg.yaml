@@ -1,5 +1,4 @@
 AWSTemplateFormatVersion: 2010-09-09
-# Transform: AWS::SecretsManager-2020-07-23
 Description: Fragment for creating an RDS Aurora Serverless v2 PostgreSQL cluster
 
 Parameters:
@@ -151,7 +150,6 @@ Resources:
       EnableHttpEndpoint: true
       ManageMasterUserPassword: true 
       MasterUsername: !Ref MasterUsername
-      # MasterUserPassword: 
       BackupRetentionPeriod: !Ref BackupRetentionPeriod
       Port: 5432
       PreferredBackupWindow: "02:00-03:00"
@@ -246,9 +244,6 @@ Outputs:
   RdsDbName:
     Description: "RDS Database Name"
     Value: !Ref DatabaseName
-  # RdsMasterUserSecretArn: # Commentato perchè PnMasterUserSecret è commentato
-  #   Description: "ARN of the Secret Manager secret for RDS master user"
-  #   Value: !Ref PnMasterUserSecret
   RdsSecurityGroupId:
     Description: "ID of the Security Group attached to the RDS cluster"
     Value: !GetAtt PnAuroraDbSecurityGroup.GroupId
