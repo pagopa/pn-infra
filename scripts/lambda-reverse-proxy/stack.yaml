@@ -8,12 +8,14 @@ Parameters:
   Subnets:
     Type: List<AWS::EC2::Subnet::Id>
 
-  RoutingMode:
+  EnvironmentType:
     Type: String
-    Default: WHITELIST
     AllowedValues:
-      - WHITELIST
-      - BLACKLIST 
+      - dev
+      - test
+      - prod
+      - hotfix
+      - uat
 
   ExternalChannelBaseUrl:
     Type: String
@@ -568,7 +570,7 @@ Resources:
           };
 
       Handler: index.handler
-      Runtime: nodejs18.x
+      Runtime: nodejs22.x
       Environment:
         Variables:
           ExternalChannelBaseUrl: !Ref ExternalChannelBaseUrl
@@ -579,7 +581,7 @@ Resources:
           MockNormalizzatoreBaseUrl: !Ref MockNormalizzatoreBaseUrl
           InfocamereBaseUrl: !Ref InfocamereBaseUrl
           MockNationalRegistriesBaseUrl: !Ref MockNationalRegistriesBaseUrl
-          RoutingMode: !Ref RoutingMode
+          EnvironmentType: !Ref EnvironmentType
           SSM_PARAMETER_STORE_TIMEOUT_MILLIS: 5000
       VpcConfig:
         SecurityGroupIds:
@@ -590,8 +592,7 @@ Resources:
       TracingConfig:
         Mode: Active
       Layers:
-        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
-        - !Sub "arn:aws:lambda:${AWS::Region}:325218067255:layer:AWS-Parameters-and-Secrets-Lambda-Extension:4"     
+        - !Sub "arn:aws:lambda:${AWS::Region}:325218067255:layer:AWS-Parameters-and-Secrets-Lambda-Extension:17"     
       Tags:
         - Key: "pn-eni-related"
           Value: "true"
