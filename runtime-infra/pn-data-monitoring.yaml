@@ -70,6 +70,26 @@ Parameters:
     Type: String
     Description: Datalake Role Name
     Default: 'pagopa-pn'
+  
+  DataMonitoringSlackEmailTo:
+    Type: String
+    Description: Slack Email channel
+    Default: ''
+
+  PaperRequestErrorDumpFuctionCronExpression:
+    Type: String
+    Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
+    Default: '-'
+
+  PaperRequestErrorDumpFuctionDelete:
+    Type: String
+    Description: Condition for remove item form PaperRequestError DynamoDb table
+    Default: 'false'
+
+  PresignedUrlTimeOfexpiration:
+    Type: Number
+    Description: Presigned URL Time of Expiration
+    Default: 259200 
 
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
@@ -78,6 +98,8 @@ Conditions:
   IsDatalakeAccountInCore: !And [ !Condition IsDatalakeAccount, !Condition IsCoreAccount ]
   HasCronExpression: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
+  HasCronExpressionLambdaPaperError: !Not [ !Equals [!Ref PaperRequestErrorDumpFuctionCronExpression, '-' ] ]
+  HasLambdaPaperErrorInCoreAccountCronExp: !And [ !Condition HasCronExpressionLambdaPaperError, !Condition IsCoreAccount ]
 
 Resources:
   
@@ -647,7 +669,235 @@ Resources:
             - events:PutEvents
             Resource:
             - !Sub "arn:${AWS::Partition}:events:eu-central-1:${AWS::AccountId}:event-bus/default"
-      
+
+  PaperRequestErrorDumpFuction:
+    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Timeout: 600
+      MemorySize: 256
+      Handler: index.lambda_handler
+      FunctionName: Lambda-PaperRequestErrorDump
+      Code:
+        ZipFile: |
+          import os
+          import boto3
+          import csv
+          import io
+          from datetime import datetime
+          from email.message import EmailMessage
+          from botocore.config import Config
+
+          dynamodb = boto3.resource('dynamodb')
+          s3 = boto3.client(
+              's3',
+              region_name=os.environ['Region'],
+              config=Config(s3={'addressing_style': 'virtual'})
+          )
+          sns = boto3.client('sns')
+          sts = boto3.client('sts')
+
+          def lambda_handler(event, context):
+              dynamo_table_name = os.environ['DynamoDbTableLambdaDump']
+              s3_bucket = os.environ['S3Bucket']
+              prefix = os.environ['Prefix']
+              region = os.environ['Region']
+              accountid = os.environ['AccountID']
+              category_filter = 'RENDICONTAZIONE_SCARTATA'
+              delete_items = os.environ.get('DeleteItems', 'false').lower() == 'true'
+              sns_topic_arn = os.environ['SnsTopicArn']
+              presignedurltime = os.environ['PresignedUrlTime']
+              timestamp = datetime.now().strftime('%Y%m%d_%H%M')
+              timestampSubject = datetime.now().strftime('%Y-%m-%d')
+              s3_key = f'{prefix}/rendicontazione_scartata_{timestamp}.csv'
+
+              table = dynamodb.Table(dynamo_table_name)
+              all_items = []
+              exclusive_start_key = None
+
+              while True:
+                  scan_params = {
+                      'FilterExpression': 'category = :val',
+                      'ExpressionAttributeValues': {':val': category_filter}
+                  }
+                  if exclusive_start_key:
+                      scan_params['ExclusiveStartKey'] = exclusive_start_key
+
+                  response = table.scan(**scan_params)
+                  all_items.extend(response.get('Items', []))
+                  exclusive_start_key = response.get('LastEvaluatedKey')
+                  if not exclusive_start_key:
+                      break
+
+              csv_buffer = io.StringIO()
+              if all_items:
+                  headers = all_items[0].keys()
+                  writer = csv.DictWriter(csv_buffer, fieldnames=headers)
+                  writer.writeheader()
+                  for item in all_items:
+                      writer.writerow(item)
+
+              s3.put_object(
+                  Bucket=s3_bucket,
+                  Key=s3_key,
+                  Body=csv_buffer.getvalue()
+              )
+
+              presigned_url = s3.generate_presigned_url(
+                  ClientMethod='get_object',
+                  Params={
+                      'Bucket': s3_bucket,
+                      'Key': s3_key,
+                      'ResponseContentDisposition': 'inline'
+                  },
+                  ExpiresIn=presignedurltime
+              )
+
+              sns.publish(
+                  TopicArn=sns_topic_arn,
+                  Subject=f'CSV Rendicontazione Scartata {timestampSubject}',
+                  Message=f"In allegato il link per scaricare il file CSV:\n\n{presigned_url}"
+              )
+
+              if delete_items:
+                  for item in all_items:
+                      request_id = item.get('requestId')
+                      created = item.get('created')
+                      if request_id and created:
+                          try:
+                              response = table.delete_item(
+                                  Key={
+                                      'requestId': request_id,
+                                      'created': created
+                                  }
+                              )
+                              print(f"Deleted item with requestId: {request_id} and created: {created}")
+                          except Exception as e:
+                              print(f'Error During cancellation of item {request_id}: {str(e)}')    
+
+              return {
+                  'statusCode': 200,
+                  'body': f'CSV with {len(all_items)} records uploaded on s3://{s3_bucket}/{s3_key} and link send by Email.'
+              }
+
+
+
+      Environment:
+        Variables:
+          DynamoDbTableLambdaDump: pn-PaperRequestError
+          S3Bucket: !Ref DataMonitoringBucket
+          Prefix: Lambda-PaperRequestErrorDump
+          DeleteItems: !Ref PaperRequestErrorDumpFuctionDelete
+          SnsTopicArn: !Ref EMailSnsTopic
+          Region: !Ref AWS::Region
+          AccountID: !Ref AWS::AccountId
+          PresignedUrlTime: !Ref PresignedUrlTimeOfexpiration
+
+      Role:
+        Fn::GetAtt:
+          - PaperRequestErrorDumpFuctionRole
+          - Arn
+
+  PaperRequestErrorDumpFuctionRole:
+    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ExportPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Scan
+                  - dynamodb:DeleteItem
+                Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperRequestError
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource:
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/Lambda-PaperRequestErrorDump/*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref EMailSnsTopic
+
+  EMailSnsTopic:
+    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: pn-SnsToEmail
+
+  EMailSnsTopicSubscription:
+    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Ref DataMonitoringSlackEmailTo
+      TopicArn: !Ref EMailSnsTopic
+
+  LambdaSNSTopicPolicy:
+    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref EMailSnsTopic
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - lambda.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref EMailSnsTopic
+
+  ScheduleErrorDumpFuction:
+    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: !Ref PaperRequestErrorDumpFuctionCronExpression
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt PaperRequestErrorDumpFuction.Arn
+          Id: PaperRequestErrorDumpFuction
+
+  PermissionForEventsToInvokeErrorDumpFuction:
+    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref PaperRequestErrorDumpFuction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ScheduleErrorDumpFuction.Arn
+
+  ErrorDumpFuctionLogroup:
+    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy : Delete
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${PaperRequestErrorDumpFuction}"
+      RetentionInDays: 3
+     
 Outputs:
   DataMonitoringBucketName: 
     Value: !Ref DataMonitoringBucket
