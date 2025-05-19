@@ -59,24 +59,8 @@ Parameters:
     Type: String
     Description: Lambda logs ingestion param
 
-  EnvironmentType:
-    Type: String
-  
-  OpenSearchEnabled: 
-    Description: Enable OpenSearch
-    Default: false
-    Type: String
-    AllowedValues: [true, false]
-
 Conditions:
   HasDedicatedMaster: !Not [ !Equals [ !Ref MasterNodeType, "" ] ]
-  IsProdEnvironment: !Equals [ !Ref EnvironmentType, "prod" ]
-  IsUatEnvironment: !Equals [ !Ref EnvironmentType, "uat" ]
-  IsOpenSearchEnabled: !Equals  [true, !Ref OpenSearchEnabled]
-  ShouldCreateOpenSearchDomain: !Or
-    - !Condition IsUatEnvironment
-    - !Condition IsProdEnvironment
-    - !Condition IsOpenSearchEnabled
 
 Resources:
   SecurityGroup:
@@ -116,7 +100,6 @@ Resources:
     DeletionPolicy: Retain
 
   OpenSearchServiceDomain:
-    Condition: ShouldCreateOpenSearchDomain
     Type: "AWS::OpenSearchService::Domain"
     Properties:
       AccessPolicies:
