@@ -74,6 +74,11 @@ Parameters:
     Default: 'logsTos3/'
     Description: Prefix for the logs in the bucket
 
+  BucketParquetLogPrefix:
+    Type: String
+    Default: 'logsTos3Parquet/'
+    Description: Prefix for the Parquet logs in the bucket
+
   BucketCdcRetentionDays:
     Type: Number
     Default: 1095 # 3 years
@@ -150,7 +155,16 @@ Resources:
             Status: Enabled
             Prefix: !Ref BucketCdcPrefix
             NoncurrentVersionExpiration:
-              NoncurrentDays: 1          
+              NoncurrentDays: 1
+          - Id: DeleteParquetLogs
+            Status: Enabled
+            Prefix: !Ref BucketParquetLogPrefix
+            ExpirationInDays: !Ref BucketLogRetentionDays
+          - Id: DeleteNoncurrentParquetLogs
+            Status: Enabled
+            Prefix: !Ref BucketParquetLogPrefix
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
       NotificationConfiguration:
         QueueConfigurations:
           - Event: 's3:ObjectCreated:*'
