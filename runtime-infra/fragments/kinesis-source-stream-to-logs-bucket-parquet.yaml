@@ -1,0 +1,263 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create Kinesis Firehose with JSON to Parquet conversion
+
+Parameters:
+  ProjectName:
+    Type: String 
+    Description: Project name identifier
+  
+  SourceKinesisDataStreamArn:
+    Type: String
+    Description: Source Kinesis Stream ARN
+  
+  SourceKinesisDataStreamKeyArn:
+    Type: String
+    Description: Source Kinesis Stream Key ARN
+  
+  LogsBucketName:
+    Type: String 
+    Description: Destination bucket name
+  
+  LogsExporterRoleArn:
+    Type: String 
+    Description: S3 access role
+  
+  StreamNamePrefix:
+    Type: String 
+    Description: Stream prefix identifier
+    Default: 'logsTos3Parquet'
+  
+  AlarmSNSTopicArn:
+    Description: Alarm SNS Topic ARN
+    Type: String
+    
+  GlueDatabaseName:
+    Type: String
+    Description: Glue database name
+    Default: "log_analytics_database"
+    
+  ParquetGlueTableName:
+    Type: String
+    Description: Glue table name for schema reference used for parquet conversion
+    Default: "log_analytics_parquet_table"
+    
+  UseNewlineDelimiter:
+    Type: String
+    Description: Whether to append newline delimiter to records
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  
+  LogsBucketKmsKeyArn:
+    Type: String
+    Description: Arn of logs bucket KMS key
+  
+Conditions:
+  UseNewlineDelimiter: !Equals [ !Ref UseNewlineDelimiter, "true" ]
+
+Resources:
+  DeliveryStreamSourceServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+        Version: "2012-10-17"
+
+  DeliveryStreamSourceServiceRoleDefaultPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - kinesis:DescribeStream
+              - kinesis:DescribeStreamSummary
+              - kinesis:GetRecords
+              - kinesis:GetShardIterator
+              - kinesis:ListShards
+              - kinesis:ListStreams
+              - kinesis:SubscribeToShard
+            Effect: Allow
+            Resource: !Ref SourceKinesisDataStreamArn
+          - Action: kms:Decrypt
+            Effect: Allow
+            Resource: !Ref SourceKinesisDataStreamKeyArn
+          - Action:
+              - s3:AbortMultipartUpload
+              - s3:GetBucketLocation
+              - s3:GetObject
+              - s3:ListBucket
+              - s3:ListBucketMultipartUploads
+              - s3:PutObject
+            Effect: Allow
+            Resource:
+              - !Sub "arn:aws:s3:::${LogsBucketName}"
+              - !Sub "arn:aws:s3:::${LogsBucketName}/${StreamNamePrefix}*"
+          - Action:
+              - logs:PutLogEvents
+              - logs:CreateLogStream
+            Effect: Allow
+            Resource:
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeliveryStreamLogGroup}:*"
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeliveryStreamLogGroup}:log-stream:${DeliveryStreamLogGroupS3Destination}"
+        Version: "2012-10-17"
+      PolicyName: !Sub '${ProjectName}-${StreamNamePrefix}-source-read-policy'
+      Roles:
+        - Ref: DeliveryStreamSourceServiceRole
+
+  S3KMSAccessPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - kms:Decrypt
+              - kms:GenerateDataKey
+              - kms:DescribeKey
+            Resource: !Ref LogsBucketKmsKeyArn
+        Version: "2012-10-17"
+      PolicyName: !Sub '${ProjectName}-${StreamNamePrefix}-s3-kms-access-policy'
+      Roles:
+        - Ref: DeliveryStreamSourceServiceRole
+
+  GlueAccessPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - glue:GetTableVersions
+              - glue:GetPartitions
+              - glue:GetTable
+              - glue:GetTableVersion
+              - glue:GetDatabase
+              - glue:GetDatabases
+            Effect: Allow
+            Resource:
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabaseName}"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabaseName}/${ParquetGlueTableName}"
+        Version: "2012-10-17"
+      PolicyName: !Sub '${ProjectName}-${StreamNamePrefix}-glue-access-policy'
+      Roles:
+        - Ref: DeliveryStreamSourceServiceRole
+
+  DeliveryStreamLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 120
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+
+  DeliveryStreamLogGroupS3Destination:
+    Type: AWS::Logs::LogStream
+    Properties:
+      LogGroupName:
+        Ref: DeliveryStreamLogGroup
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+
+  LogsKinesisDeliveryStreamToParquet:
+    DependsOn:
+      - DeliveryStreamSourceServiceRoleDefaultPolicy
+      - DeliveryStreamLogGroup
+      - DeliveryStreamLogGroupS3Destination
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamName: !Sub '${ProjectName}-${StreamNamePrefix}-delivery-stream-v1'
+      DeliveryStreamType: KinesisStreamAsSource
+      KinesisStreamSourceConfiguration:
+        KinesisStreamARN: !Ref SourceKinesisDataStreamArn
+        RoleARN: !GetAtt DeliveryStreamSourceServiceRole.Arn
+      ExtendedS3DestinationConfiguration: 
+        BucketARN: !Sub arn:aws:s3:::${LogsBucketName}
+        BufferingHints:
+          IntervalInSeconds: 60
+          SizeInMBs: 128
+        CloudWatchLoggingOptions:
+          Enabled: true
+          LogGroupName: !Ref DeliveryStreamLogGroup
+          LogStreamName: !Ref DeliveryStreamLogGroupS3Destination
+        Prefix: !Sub '${StreamNamePrefix}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
+        ErrorOutputPrefix: !Sub '${StreamNamePrefix}/errors/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
+        RoleARN: !GetAtt DeliveryStreamSourceServiceRole.Arn
+        ProcessingConfiguration:
+          Enabled: true
+          Processors:
+            - Type: Decompression
+              Parameters:
+                - ParameterName: CompressionFormat
+                  ParameterValue: GZIP
+            - Fn::If: 
+                - UseNewlineDelimiter
+                - Type: AppendDelimiterToRecord
+                  Parameters:
+                  - ParameterName: Delimiter
+                    ParameterValue: "\\n"
+                - !Ref AWS::NoValue
+        DataFormatConversionConfiguration:
+          Enabled: true
+          InputFormatConfiguration:
+            Deserializer:
+              OpenXJsonSerDe:
+                CaseInsensitive: true
+                ConvertDotsInJsonKeysToUnderscores: false
+          OutputFormatConfiguration:
+            Serializer:
+              ParquetSerDe:
+                Compression: SNAPPY
+                EnableDictionaryCompression: true
+          SchemaConfiguration:
+            RoleARN: !GetAtt DeliveryStreamSourceServiceRole.Arn
+            CatalogId: !Ref AWS::AccountId
+            DatabaseName: !Ref GlueDatabaseName
+            TableName: !Ref ParquetGlueTableName
+            Region: !Ref AWS::Region
+            VersionId: 'LATEST'
+
+  DeliveryStreamErrorLogsMetricFilter:
+    DependsOn:
+      - DeliveryStreamLogGroup
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref DeliveryStreamLogGroup
+      FilterPattern: '?S3 ?InternalError'
+      MetricTransformations:
+        - MetricValue: 1
+          MetricNamespace: "LogsExport"
+          MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-kinesis-error"
+
+  DeliveryStreamErrorLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn:
+      - DeliveryStreamErrorLogsMetricFilter
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${StreamNamePrefix}-Kinesis-Alarm"
+      AlarmDescription: "Alarm for delivery stream errors"
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      MetricName: !Sub "${ProjectName}-${StreamNamePrefix}-kinesis-error"
+      Namespace: "LogsExport"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Statistic: Sum
+      Threshold: 1
+
+Outputs:
+  DeliveryStreamErrorLogsMetricAlarmArn:
+    Description: 'ARN of delivery stream error log alarm'
+    Value: !GetAtt DeliveryStreamErrorLogsMetricAlarm.Arn
+
+  DeliveryStreamArn:
+    Description: 'ARN of delivery stream'
+    Value: !GetAtt LogsKinesisDeliveryStreamToParquet.Arn
