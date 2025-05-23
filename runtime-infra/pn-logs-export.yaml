@@ -122,9 +122,25 @@ Parameters:
       - "false"
     Description: Whether to append newline delimiter to records in Firehose 
 
+  EnvironmentType:
+    Type: String
+
+  OpensearchIngestionEnabled: 
+    Description: Enable Ingestion To Opensearch
+    Default: false
+    Type: String
+    AllowedValues: [true, false]
+
 Conditions:
   HasOpenSearchExport: !Not [ !Equals [ !Ref OpenSearchClusterEndpoint, "" ] ]
   HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, "-" ] ]
+  IsUatEnvironment: !Equals [ !Ref EnvironmentType, "uat" ]
+  IsProdEnvironment: !Equals [ !Ref EnvironmentType, "prod" ]
+  IsOpensearchIngestionEnabled: !Equals  [true, !Ref OpensearchIngestionEnabled]
+  ShouldActivateIngestion: !Or
+    - !Condition IsProdEnvironment
+    - !Condition IsUatEnvironment
+    - !Condition IsOpensearchIngestionEnabled
 
 Resources:
 
@@ -227,6 +243,10 @@ Resources:
         OpenSearchKinesisWindow: !Ref OpenSearchKinesisWindow
         OpenSearchParallelizationFactor: !Ref OpenSearchParallelizationFactor
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        OpensearchIngestionEnabled: !If
+          - ShouldActivateIngestion
+          - true
+          - false
       Tags:
         - Key: "pn-eni-related"
           Value: "true"
