@@ -10,7 +10,7 @@ Parameters:
   LogsBucketName:
     Type: String
     Description: Logs bucket name
-  
+
   BucketSuffix:
     Type: String
     Description: Suffix for the athena result bucket name
@@ -70,7 +70,7 @@ Resources:
           EXTERNAL: 'TRUE'
           projection.enabled: 'true' 
           projection.year.type: integer
-          projection.year.range: 2022,2035 
+          projection.year.range: 2022,2099 
           projection.month.type: integer
           projection.month.range: 1,12
           projection.month.digits: '2' 
@@ -129,7 +129,7 @@ Resources:
           EXTERNAL: 'TRUE'
           projection.enabled: 'true' 
           projection.year.type: integer
-          projection.year.range: 2022,2035 
+          projection.year.range: 2022,2099
           projection.month.type: integer
           projection.month.range: 1,12
           projection.month.digits: '2' 
@@ -481,7 +481,7 @@ Resources:
                     "catalog": "awsdatacatalog",
                     "schema": "${DatabaseName}",
                     "columns": [
-                      {"name": "year", "type": "varchar"},  
+                      {"name": "year", "type": "varchar"},
                       {"name": "month", "type": "varchar"},
                       {"name": "day", "type": "varchar"},
                       {"name": "hour", "type": "varchar"},
@@ -563,6 +563,7 @@ Resources:
 
   GlueCrawler:
     Type: AWS::Glue::Crawler
+    Condition: IsGlueCrawlerScheduled
     Properties:
       Name: LogAnalyticsCrawler
       Role: !GetAtt GlueCrawlerRole.Arn
@@ -585,10 +586,8 @@ Resources:
           }
         }
       TablePrefix: ''
-      Schedule: !If
-        - IsGlueCrawlerScheduled
-        - ScheduleExpression: !Ref GlueCrawlerSchedule
-        - !Ref AWS::NoValue
+      Schedule:
+        ScheduleExpression: !Ref GlueCrawlerSchedule
 
   AthenaResultsBucket:
     Type: AWS::S3::Bucket
@@ -1100,6 +1099,7 @@ Resources:
 
   GlueCrawlerConfInfo:
     Type: AWS::Glue::Crawler
+    Condition: IsConfInfoGlueCrawlerScheduled
     Properties:
       Name: LogAnalyticsCrawlerConfInfo
       Role: !GetAtt GlueCrawlerRoleConfinfo.Arn
@@ -1122,10 +1122,8 @@ Resources:
           }
         }
       TablePrefix: ''
-      Schedule: !If
-        - IsConfInfoGlueCrawlerScheduled
-        - ScheduleExpression: !Ref ConfInfoGlueCrawlerSchedule
-        - !Ref AWS::NoValue
+      Schedule:
+        ScheduleExpression: !Ref ConfInfoGlueCrawlerSchedule
 
   AthenaWorkGroupConfInfo:
     Type: AWS::Athena::WorkGroup
