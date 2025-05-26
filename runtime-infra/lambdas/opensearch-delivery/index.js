@@ -53,7 +53,9 @@ const handler = async (event) => {
     const ret = uniqueSeqNumbers.map((s) => {
       return { itemIdentifier: s };
     })
-    return ret
+    return {
+      batchItemFailures: ret
+    } 
 
   } else {
     return {
