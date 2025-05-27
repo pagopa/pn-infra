@@ -1,9 +1,12 @@
-name: build
+name: static-analysis
+description: |
+  This workflow runs static analysis on the infrastructure code using Trivy in IaC mode.
+  It scans for vulnerabilities in the runtime infrastructure code and uploads the results to GitHub's Security tab.
 on:
   push:
 jobs:
   build:
-    name: Build
+    name: Infrastructure Static Analysis
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
