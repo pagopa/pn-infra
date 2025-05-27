@@ -1716,6 +1716,7 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-group: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
               awslogs-stream-prefix: ecs
+              mode: 'blocking'
         - Name: clockdrift
           Image: !Ref ContainerImageClockdriftURI
           Essential: false
