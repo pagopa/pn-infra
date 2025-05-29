@@ -152,7 +152,7 @@ const compareExecutor = async(lines, cfg) => {
       itemsInDynamoDbButNotInLocalFile.push(item)
     }
     else {
-      if(JSON.stringify(item) != JSON.stringify(localItem)){
+      if(!deepEqual(item, localItem)){
         differentItems.push({ dynamodb: item, local: localItem })
       }
     }
@@ -216,6 +216,30 @@ function makeExecutor(cmd){
       throw new Error("Command "+cmd+" not supported")
   }
 
+}
+
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (typeof a !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!deepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
+  const aKeys = Object.keys(a).sort();
+  const bKeys = Object.keys(b).sort();
+  if (aKeys.length !== bKeys.length) return false;
+  for (let i = 0; i < aKeys.length; i++) {
+    if (aKeys[i] !== bKeys[i]) return false;
+    if (!deepEqual(a[aKeys[i]], b[bKeys[i]])) return false;
+  }
+  return true;
 }
 
 async function main() {

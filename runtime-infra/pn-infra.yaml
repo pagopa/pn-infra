@@ -173,6 +173,22 @@ Parameters:
     Type: String
     Description: 'Bucket name for the DynamoDB export for Confinfo Account'
 
+  DataMonitoringSlackEmailTo:
+    Type: String
+    Description: Slack Email channel
+
+  PaperRequestErrorDumpFuctionCronExpression:
+    Type: String
+    Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
+
+  PaperRequestErrorDumpFuctionDelete:
+    Type: String
+    Description: Condition for remove item form PaperRequestError DynamoDb table
+
+  PresignedUrlTimeOfexpiration:
+    Type: Number
+    Description: Presigned URL Time of Expiration
+
   ParquetBucketPath:
     Type: String
     Description: parquet files s3 bucket path
@@ -358,6 +374,10 @@ Outputs:
     Value: !Ref VpcSubnets
     Description: Subnets
 
+  VpcCidr:
+    Value: !Ref VpcCidr
+    Description: Cidr of the VPC where PN-CORE is installed
+    
   # Load balancers outputs
   NetworkLoadBalancerLink:
     Value:
@@ -459,6 +479,14 @@ Outputs:
     Value: !Ref DynamoDbExportPrefix
   ConfinfoDynamoDbExportBucketName:
     Value: !Ref ConfinfoDynamoDbExportBucketName
+  DataMonitoringSlackEmailTo:
+    Value: !Ref DataMonitoringSlackEmailTo
+  PaperRequestErrorDumpFuctionCronExpression:
+    Value: !Ref PaperRequestErrorDumpFuctionCronExpression
+  PaperRequestErrorDumpFuctionDelete:
+    Value: !Ref PaperRequestErrorDumpFuctionDelete
+  PresignedUrlTimeOfexpiration:
+    Value: !Ref PresignedUrlTimeOfexpiration
   ParquetBucketPath:
     Value: !Ref ParquetBucketPath
   DataMonitoringCodebuildComputeType:

@@ -317,9 +317,11 @@ Resources:
       AlarmName: "pn-Clock-Error-Bound-Alarm"
       AlarmDescription: "CloudWatch Alarm for Clock Error Bound limit over threshold"
       TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
       Metrics:
         - Id: q1
-          Expression: "SELECT MAX(ClockErrorBound) FROM SCHEMA(\"ECS/ContainerInsights\", ClusterName,Family,TaskID) WHERE ClusterName = 'pn-confidential-ecs-cluster' GROUP BY ClusterName"
+          Expression: "SELECT MAX(ClockErrorBound) FROM SCHEMA(\"ECS/ContainerInsights\", ClusterName,Family,TaskID) GROUP BY ClusterName"
           Period: 600
           ReturnData: False
         - Id: e2
@@ -336,9 +338,11 @@ Resources:
       AlarmName: "pn-Synchronization-Alarm"
       AlarmDescription: "CloudWatch Alarm for Synchronization value different by Synchronized"
       TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
       Metrics:
         - Id: q1
-          Expression: "SELECT MAX(Synchronization) FROM SCHEMA(\"ECS/ContainerInsights\", ClusterName,Family,TaskID) WHERE ClusterName = 'pn-confidential-ecs-cluster' GROUP BY ClusterName"
+          Expression: "SELECT MAX(Synchronization) FROM SCHEMA(\"ECS/ContainerInsights\", ClusterName,Family,TaskID) GROUP BY ClusterName"
           Period: 600
           ReturnData: False
         - Id: e2
@@ -424,7 +428,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Ref DiagnosticLambdaLoggerName
-      Runtime: nodejs18.x
+      Runtime: nodejs22.x
       Role: !GetAtt DiagnosticLoggerLambdaRole.Arn
       Handler: index.handler
       MemorySize: !Ref DiagnosticLoggerMemory

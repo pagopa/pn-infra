@@ -93,6 +93,11 @@ Parameters:
     Type: String
     Default: 'cdcTos3/'
     Description: Prefix for the cdc in the bucket
+  
+  BucketObjectLockRetentionDays:
+    Type: Number
+    Default: 14
+    Description: Number of days of Default Retention ObjectLock
 
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
@@ -133,6 +138,13 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      ObjectLockEnabled: true 
+      ObjectLockConfiguration:
+        ObjectLockEnabled: Enabled
+        Rule:
+          DefaultRetention:
+            Mode: GOVERNANCE
+            Days: !Ref BucketObjectLockRetentionDays
       LifecycleConfiguration:
         Rules:
           - Id: DeleteLogs
@@ -296,6 +308,8 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       BucketName: !Sub '${ProjectName}-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
