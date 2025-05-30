@@ -59,8 +59,17 @@ Parameters:
     Type: String
     Description: Lambda logs ingestion param
 
+  ZoneAwareness:
+    Type: String
+    Default: true
+    Description: Zone Awareness Enabled
+    AllowedValues:
+      - true
+      - false
+
 Conditions:
   HasDedicatedMaster: !Not [ !Equals [ !Ref MasterNodeType, "" ] ]
+  HasZoneAwareness: !Equals [ !Ref ZoneAwareness, true ]
 
 Resources:
   SecurityGroup:
@@ -124,23 +133,40 @@ Resources:
         MasterUserOptions: 
           MasterUserName: !Sub '{{resolve:secretsmanager:${ProjectName}-opensearch-master:SecretString:username}}'
           MasterUserPassword: !Sub '{{resolve:secretsmanager:${ProjectName}-opensearch-master:SecretString:password}}'
-      ClusterConfig:
-        !If 
-          - HasDedicatedMaster
-          - InstanceCount: !Ref InstanceReplicas
-            InstanceType: !Ref InstanceType
-            DedicatedMasterCount: !Ref MasterNodeInstancesNumber
-            DedicatedMasterEnabled: true
-            DedicatedMasterType: !Ref MasterNodeType
-            ZoneAwarenessConfig:
-              AvailabilityZoneCount: 3
-            ZoneAwarenessEnabled: true
-          - InstanceCount: !Ref InstanceReplicas
-            InstanceType: !Ref InstanceType
-            DedicatedMasterEnabled: false
-            ZoneAwarenessConfig:
-              AvailabilityZoneCount: 3
-            ZoneAwarenessEnabled: true
+      ClusterConfig: !If
+        - HasDedicatedMaster
+        - !If
+            - HasZoneAwareness
+            - 
+              InstanceCount: !Ref InstanceReplicas
+              InstanceType: !Ref InstanceType
+              DedicatedMasterCount: !Ref MasterNodeInstancesNumber
+              DedicatedMasterEnabled: true
+              DedicatedMasterType: !Ref MasterNodeType
+              ZoneAwarenessEnabled: true
+              ZoneAwarenessConfig:
+                AvailabilityZoneCount: 3
+            - 
+              InstanceCount: !Ref InstanceReplicas
+              InstanceType: !Ref InstanceType
+              DedicatedMasterCount: !Ref MasterNodeInstancesNumber
+              DedicatedMasterEnabled: true
+              DedicatedMasterType: !Ref MasterNodeType
+              ZoneAwarenessEnabled: false
+        - !If
+            - HasZoneAwareness
+            - 
+              InstanceCount: !Ref InstanceReplicas
+              InstanceType: !Ref InstanceType
+              DedicatedMasterEnabled: false
+              ZoneAwarenessEnabled: true
+              ZoneAwarenessConfig:
+                AvailabilityZoneCount: 3
+            -
+              InstanceCount: !Ref InstanceReplicas
+              InstanceType: !Ref InstanceType
+              DedicatedMasterEnabled: false
+              ZoneAwarenessEnabled: false
       EBSOptions:
         EBSEnabled: true
         Iops: !Ref EbsIops
@@ -148,10 +174,17 @@ Resources:
         VolumeSize: !Ref EbsVolumeSize
         VolumeType: !Ref EbsVolumeType
       EngineVersion: !Ref EngineVersion
-      VPCOptions:
-        SecurityGroupIds:
-          - Ref: SecurityGroup
-        SubnetIds: !Ref VpcOpensearchSubnetsIds
+      VPCOptions: !If
+        - HasZoneAwareness
+        -
+          SecurityGroupIds:
+            - Ref: SecurityGroup
+          SubnetIds: !Ref VpcOpensearchSubnetsIds
+        -
+          SecurityGroupIds:
+            - Ref: SecurityGroup
+          SubnetIds: 
+            - !Select [0, !Ref VpcOpensearchSubnetsIds] 
       Tags:
         - Key: "pn-eni-related"
           Value: "true"
