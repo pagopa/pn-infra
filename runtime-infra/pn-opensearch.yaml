@@ -174,10 +174,17 @@ Resources:
         VolumeSize: !Ref EbsVolumeSize
         VolumeType: !Ref EbsVolumeType
       EngineVersion: !Ref EngineVersion
-      VPCOptions:
-        SecurityGroupIds:
-          - Ref: SecurityGroup
-        SubnetIds: !Ref VpcOpensearchSubnetsIds
+      VPCOptions: !If
+        - HasZoneAwareness
+        -
+          SecurityGroupIds:
+            - Ref: SecurityGroup
+          SubnetIds: !Ref VpcOpensearchSubnetsIds
+        -
+          SecurityGroupIds:
+            - Ref: SecurityGroup
+          SubnetIds: 
+            !Select [0, !Ref VpcOpensearchSubnetsIds] 
       Tags:
         - Key: "pn-eni-related"
           Value: "true"
