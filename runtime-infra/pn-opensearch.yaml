@@ -59,6 +59,14 @@ Parameters:
     Type: String
     Description: Lambda logs ingestion param
 
+  ZoneAwarenessReplication:
+    Type: String
+    Default: true
+    Description: Zone Awareness Enabled
+    AllowedValues:
+      - true
+      - false
+
 Conditions:
   HasDedicatedMaster: !Not [ !Equals [ !Ref MasterNodeType, "" ] ]
 
@@ -134,13 +142,13 @@ Resources:
             DedicatedMasterType: !Ref MasterNodeType
             ZoneAwarenessConfig:
               AvailabilityZoneCount: 3
-            ZoneAwarenessEnabled: true
+            ZoneAwarenessEnabled: !Ref ZoneAwarenessReplication
           - InstanceCount: !Ref InstanceReplicas
             InstanceType: !Ref InstanceType
             DedicatedMasterEnabled: false
             ZoneAwarenessConfig:
               AvailabilityZoneCount: 3
-            ZoneAwarenessEnabled: true
+            ZoneAwarenessEnabled: !Ref ZoneAwarenessReplication
       EBSOptions:
         EBSEnabled: true
         Iops: !Ref EbsIops
