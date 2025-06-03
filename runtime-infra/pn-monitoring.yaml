@@ -102,6 +102,10 @@ Parameters:
     Type: String
     Default: "/radd/ssl-monitoring-domains"
     Description: SSM parameter with JSON array of domains
+  
+  SSLCertificateExpirationAlarmThreshold:
+    Type: String
+    Description: SSL certificare expiration threshold
 
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
@@ -817,7 +821,7 @@ Resources:
           Period: 10800
           ReturnData: False
         - Id: e2
-          Expression: "IF(q1 > 5, 0, 1)"
+          Expression: !Sub "IF(q1 > ${SSLCertificateExpirationAlarmThreshold}, 0, 1)"
           Period: 10800
       DatapointsToAlarm: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
