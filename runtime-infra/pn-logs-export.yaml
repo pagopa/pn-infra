@@ -100,15 +100,15 @@ Parameters:
     Default: 1
     Description: Safestorage logger batch size
     
-  GlueDatabaseName:
-    Type: String
-    Default: "log_analytics_database" 
-    Description: Glue database name for Parquet schema reference used in data conversion
+  # GlueDatabaseName:
+  #   Type: String
+  #   Default: "log_analytics_database" 
+  #   Description: Glue database name for Parquet schema reference used in data conversion
   
-  ParquetGlueTableName:
-    Type: String
-    Default: "log_analytics_parquet_table"
-    Description: Glue table name for Parquet schema reference used in data conversion
+  # ParquetGlueTableName:
+  #   Type: String
+  #   Default: "log_analytics_parquet_table"
+  #   Description: Glue table name for Parquet schema reference used in data conversion
   
   LogsBucketKmsKeyArn:
     Type: String
@@ -178,22 +178,23 @@ Resources:
 
   ###    Export CloudWatch Logs to Log saving Bucket in Parquet format    ###
   ###########################################################################
-  LogsToExternalBucketParquet:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket-parquet.yaml"
-      Parameters:
-        ProjectName: !Ref ProjectName
-        SourceKinesisDataStreamArn: !Ref LogsKinesisSourceStreamArn
-        SourceKinesisDataStreamKeyArn: !Ref LogsKinesisSourceStreamKeyArn
-        LogsBucketName: !Ref LogsBucketName
-        LogsExporterRoleArn: !Ref LogsExporterRoleArn
-        StreamNamePrefix: 'logsTos3Parquet'
-        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        GlueDatabaseName: log_analytics_database
-        ParquetGlueTableName: !Ref ParquetGlueTableName
-        UseNewlineDelimiter: !Ref UseNewlineDelimiter
-        LogsBucketKmsKeyArn: !Ref LogsBucketKmsKeyArn
+  ######################Commented for now, is on hold.#######################
+  # LogsToExternalBucketParquet:
+  #   Type: AWS::CloudFormation::Stack
+  #   Properties:
+  #     TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket-parquet.yaml"
+  #     Parameters:
+  #       ProjectName: !Ref ProjectName
+  #       SourceKinesisDataStreamArn: !Ref LogsKinesisSourceStreamArn
+  #       SourceKinesisDataStreamKeyArn: !Ref LogsKinesisSourceStreamKeyArn
+  #       LogsBucketName: !Ref LogsBucketName
+  #       LogsExporterRoleArn: !Ref LogsExporterRoleArn
+  #       StreamNamePrefix: 'logsTos3Parquet'
+  #       AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+  #       GlueDatabaseName: log_analytics_database
+  #       ParquetGlueTableName: !Ref ParquetGlueTableName
+  #       UseNewlineDelimiter: !Ref UseNewlineDelimiter
+  #       LogsBucketKmsKeyArn: !Ref LogsBucketKmsKeyArn
 
   ###                   Export dynamo CDC to OpenSearch                   ###
   ###########################################################################
@@ -289,13 +290,13 @@ Outputs:
     Description: 'Cdc delivery stream alarm ARN'
     Value: !GetAtt CdcToExternalBucket.Outputs.DeliveryStreamErrorLogsMetricAlarmArn
     
-  LogsToParquetDeliveryStreamArn:
-    Description: 'Parquet Delivery stream ARN'
-    Value: !GetAtt LogsToExternalBucketParquet.Outputs.DeliveryStreamArn
+  # LogsToParquetDeliveryStreamArn:
+  #   Description: 'Parquet Delivery stream ARN'
+  #   Value: !GetAtt LogsToExternalBucketParquet.Outputs.DeliveryStreamArn
 
-  LogsToParquetAlarmArn:
-    Description: 'Parquet delivery stream alarm ARN'
-    Value: !GetAtt LogsToExternalBucketParquet.Outputs.DeliveryStreamErrorLogsMetricAlarmArn
+  # LogsToParquetAlarmArn:
+  #   Description: 'Parquet delivery stream alarm ARN'
+  #   Value: !GetAtt LogsToExternalBucketParquet.Outputs.DeliveryStreamErrorLogsMetricAlarmArn
 
   OpenSearchDeliveryLambdaAlarmArn:
     Description: 'Lambda Logs to OpenSearch alarm ARN'
