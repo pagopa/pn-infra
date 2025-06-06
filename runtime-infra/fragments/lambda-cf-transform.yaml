@@ -1,0 +1,115 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  EnvironmentType:
+    Type: String
+    Description: "Environment type (dev, test, uat, hotfix, prod)"
+    AllowedValues:
+      - dev
+      - test
+      - uat
+      - hotfix
+      - prod
+
+
+Resources:
+  rTransformExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: LogsCfTransform
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/CfTransform'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:*'
+  
+  rTransformFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${rTransformFunction}"
+      RetentionInDays: 14
+
+  rTransformFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: CfTransform
+      Environment:
+        Variables:
+          EnvironmentType: !Ref EnvironmentType
+      Code:
+        ZipFile: |
+          import json
+          import logging
+          import time
+
+          env_type = os.environ['EnvironmentType']
+          log = logging.getLogger()
+          log.setLevel(logging.INFO)
+          
+          def add_env_type_to_stack(fragment, stack_templates):
+              if "Resources" in fragment:
+                  for resource_name, resource in fragment["Resources"].items():
+                      props = resource["Properties"]
+                      if "TemplateUrl" in props:
+                          template_url = props.get("TemplateURL", "")
+                          for stack in stack_templates:
+                            if stack in template_url:
+                              props["Parameters"]["EnvType"] = env_type
+              return fragment
+
+          def process_template(event):
+              """
+              Update the Deployment name and respective references using Epoch time.
+              """
+              fragment = event['fragment']
+              transformed_template = addEnvType(fragment, ['api-gw-expose-service.yaml'])
+              return transformed_template
+
+          def handler(event, context):
+              """
+              Returns processed template back to CloudFormation
+              """
+              log.info(json.dumps(event))
+              processed_template=process_template(event)
+              log.info('Processed template' + json.dumps(processed_template))
+
+              r = {}
+              r['requestId'] = event['requestId']
+              r['status'] = 'SUCCESS'
+              r['fragment'] = processed_template
+
+              return r
+
+      Handler: index.handler
+      Runtime: python3.9
+      Role: !GetAtt rTransformExecutionRole.Arn
+  rTransformFunctionPermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt rTransformFunction.Arn
+      Principal: 'cloudformation.amazonaws.com'
+  rTransform:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Name: 'CfTransform'
+      Description: Inject env type parameter in cloudformation stack
+      FunctionName: !GetAtt rTransformFunction.Arn
