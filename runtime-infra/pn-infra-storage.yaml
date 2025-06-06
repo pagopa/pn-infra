@@ -92,7 +92,12 @@ Parameters:
   DataLakeAccountId1:
     Type: String
     Default: '-'
-    Description: Data lake can access bucket
+    Description: Data lake account id 1
+
+  DataLakeAccountId2:
+    Type: String
+    Default: '-'
+    Description: Data lake account id 2
 
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
@@ -515,3 +520,9 @@ Outputs:
 
   LogRetention:
     Value: !Ref LogRetention
+
+  DataLakeAccountId1:
+    Value: !Ref DataLakeAccountId1
+  
+  DataLakeAccountId2:
+    Value: !Ref DataLakeAccountId2
