@@ -89,6 +89,15 @@ Parameters:
     Default: 14
     Description: Number of days of Default Retention ObjectLock
 
+  DataLakeAccountId1:
+    Type: String
+    Description: Data lake account id 1
+
+  DataLakeAccountId2:
+    Type: String
+    Default: '-'
+    Description: Data lake account id 2
+
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
   
@@ -206,6 +215,21 @@ Resources:
               - kms:GenerateDataKey*
               - kms:DescribeKey
             Resource: "*"
+          - Sid: Allow Datalake roles to access logs bucket
+            Effect: Allow
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:GenerateDataKey*
+            Principal:
+              AWS: !Sub "arn:aws:iam::${DataLakeAccountId1}:root"
+            Resource: "*"
+            Condition:
+              "ArnEquals": 
+                "aws:PrincipalArn": 
+                  - !Sub "arn:aws:iam::${DataLakeAccountId1}:role/pagopa-data_engineers"
+                  - !Sub "arn:aws:iam::${DataLakeAccountId1}:role/pdnd-de_ext"
+                  - !Sub "arn:aws:iam::${DataLakeAccountId1}:role/cdp_pagopa_dl_send_rw"
           - Fn::If:
             - ActivateSafeStorageCondition
             - Sid: Allow safe storage kms usage
@@ -491,3 +515,9 @@ Outputs:
 
   LogRetention:
     Value: !Ref LogRetention
+
+  DataLakeAccountId1:
+    Value: !Ref DataLakeAccountId1
+  
+  DataLakeAccountId2:
+    Value: !Ref DataLakeAccountId2
