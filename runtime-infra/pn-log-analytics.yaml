@@ -10,7 +10,7 @@ Parameters:
   LogsBucketName:
     Type: String
     Description: Logs bucket name
-  
+
   BucketSuffix:
     Type: String
     Description: Suffix for the athena result bucket name
@@ -70,7 +70,7 @@ Resources:
           EXTERNAL: 'TRUE'
           projection.enabled: 'true' 
           projection.year.type: integer
-          projection.year.range: 2022,2035 
+          projection.year.range: 2022,2099 
           projection.month.type: integer
           projection.month.range: 1,12
           projection.month.digits: '2' 
@@ -91,6 +91,65 @@ Resources:
           OutputFormat: com.amazon.ionhiveserde.formats.IonOutputFormat
           SerdeInfo:
             SerializationLibrary: com.amazon.ionhiveserde.IonHiveSerDe
+            Parameters:
+              serialization.format: '1'
+          Columns:
+            - Name: messagetype
+              Type: string
+            - Name: owner
+              Type: string
+            - Name: loggroup
+              Type: string
+            - Name: logstream
+              Type: string
+            - Name: subscriptionfilters
+              Type: array<string>
+            - Name: logevents
+              Type: array<struct<id:string,timestamp:bigint,message:string>>
+        PartitionKeys:
+          - Name: year
+            Type: string
+          - Name: month
+            Type: string
+          - Name: day
+            Type: string
+          - Name: hour
+            Type: string
+    
+  ParquetGlueTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabase
+      TableInput:
+        Name: log_analytics_parquet_table
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          compression.type: snappy
+          EXTERNAL: 'TRUE'
+          projection.enabled: 'true' 
+          projection.year.type: integer
+          projection.year.range: 2022,2099
+          projection.month.type: integer
+          projection.month.range: 1,12
+          projection.month.digits: '2' 
+          projection.day.type: integer
+          projection.day.range: 1,31
+          projection.day.digits: '2' 
+          projection.hour.type: integer
+          projection.hour.range: 0,23
+          projection.hour.digits: '2' 
+          storage.location.template: !Join
+            - ''
+            - - s3://
+              - !Ref LogsBucketName
+              - /logsTos3Parquet/${year}/${month}/${day}/${hour}/
+        StorageDescriptor:
+          Location: !Sub s3://${LogsBucketName}/logsTos3Parquet/
+          InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat
+          SerdeInfo:
+            SerializationLibrary: org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe
             Parameters:
               serialization.format: '1'
           Columns:
@@ -422,7 +481,7 @@ Resources:
                     "catalog": "awsdatacatalog",
                     "schema": "${DatabaseName}",
                     "columns": [
-                      {"name": "year", "type": "varchar"},  
+                      {"name": "year", "type": "varchar"},
                       {"name": "month", "type": "varchar"},
                       {"name": "day", "type": "varchar"},
                       {"name": "hour", "type": "varchar"},
@@ -504,6 +563,7 @@ Resources:
 
   GlueCrawler:
     Type: AWS::Glue::Crawler
+    Condition: IsGlueCrawlerScheduled
     Properties:
       Name: LogAnalyticsCrawler
       Role: !GetAtt GlueCrawlerRole.Arn
@@ -526,10 +586,8 @@ Resources:
           }
         }
       TablePrefix: ''
-      Schedule: !If
-        - IsGlueCrawlerScheduled
-        - ScheduleExpression: !Ref GlueCrawlerSchedule
-        - !Ref AWS::NoValue
+      Schedule:
+        ScheduleExpression: !Ref GlueCrawlerSchedule
 
   AthenaResultsBucket:
     Type: AWS::S3::Bucket
@@ -1041,6 +1099,7 @@ Resources:
 
   GlueCrawlerConfInfo:
     Type: AWS::Glue::Crawler
+    Condition: IsConfInfoGlueCrawlerScheduled
     Properties:
       Name: LogAnalyticsCrawlerConfInfo
       Role: !GetAtt GlueCrawlerRoleConfinfo.Arn
@@ -1063,10 +1122,8 @@ Resources:
           }
         }
       TablePrefix: ''
-      Schedule: !If
-        - IsConfInfoGlueCrawlerScheduled
-        - ScheduleExpression: !Ref ConfInfoGlueCrawlerSchedule
-        - !Ref AWS::NoValue
+      Schedule:
+        ScheduleExpression: !Ref ConfInfoGlueCrawlerSchedule
 
   AthenaWorkGroupConfInfo:
     Type: AWS::Athena::WorkGroup
