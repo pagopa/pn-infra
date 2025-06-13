@@ -29,12 +29,13 @@ Parameters:
   ClientRateLimit:
     Type: Number
     Description: "Request limit for the composite key rule (IP + Header). Effective only if ClientIdentifierHeaderName is specified."
-    Default: 0
+    Default: 100
 
-  RateLimitPeriodMinutes:
+  RateLimitEvaluationWindowSec:
     Type: Number
-    Description: "Evaluation period in minutes for all rate-based rules."
-    Default: 10
+    Description: "Evaluation period in seconds for all rate-based rules. Must be one of the following values: 60, 120, 300, 600."
+    AllowedValues: [60, 120, 300, 600]
+    Default: 600
 
   AlarmSNSTopicArn:
     Type: String
@@ -76,7 +77,7 @@ Resources:
             Statement:
               RateBasedStatement:
                 Limit: !Ref ClientRateLimit
-                EvaluationWindowSec: !Sub "${RateLimitPeriodMinutes} * 60"
+                EvaluationWindowSec: !Ref RateLimitEvaluationWindowSec
                 AggregateKeyType: CUSTOM_KEYS
                 CustomKeys:
                   - IP: {}
@@ -99,7 +100,7 @@ Resources:
             Statement:
               RateBasedStatement:
                 Limit: !Ref IpRateLimit
-                EvaluationWindowSec: !Sub "${RateLimitPeriodMinutes} * 60"
+                EvaluationWindowSec: !Ref RateLimitEvaluationWindowSec
                 AggregateKeyType: FORWARDED_IP
                 ForwardedIPConfig:
                   HeaderName: "X-Forwarded-For"
@@ -130,8 +131,13 @@ Resources:
       LogDestinationConfigs:
         - !GetAtt WafLogGroup.Arn
       LoggingFilter:
-        DefaultBehavior: KEEP
-        Filters: []
+        DefaultBehavior: DROP
+        Filters:
+          - Behavior: KEEP
+            Requirement: MEETS_ANY
+            Conditions:
+              - ActionCondition:
+                  Action: BLOCK
 
   ClientRateLimitAlarm:
     Type: AWS::CloudWatch::Alarm
