@@ -264,6 +264,7 @@ Conditions:
   ApiAlarmSegmentationDisabled: !Not [ Condition: ApiAlarmSegmentationEnabled ]
   IsNotBackofficeAndAlarmSegmentationDisabled: !And [ !Condition IsNotBackoffice, !Condition ApiAlarmSegmentationDisabled ]
   HasBasePathOverride: !Not [ !Equals [ !Ref ServiceApiPathOverride, '' ] ]
+  isProdEnvironment: !Equals [ !Ref EnvType, '' ] 
 
 Resources:
 
@@ -403,7 +404,7 @@ Resources:
   PublicApiLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      RetentionInDays: 14
+      RetentionInDays: !If [isProdEnvironment, 180, 14]
 
   # Expose API to custom domain
   APIMapping:
