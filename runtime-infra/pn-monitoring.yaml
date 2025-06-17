@@ -108,6 +108,21 @@ Parameters:
     Default: "30"
     Description: SSL certificare expiration threshold
 
+  SyntheticsMonitorEndpoints:
+    Type: String
+    Description: Comma-separated list of URLs da monitorare
+    Default: "https://cittadini.dev.notifichedigitali.it,https://selfcare.dev.notifichedigitali.it,https://imprese.dev.notifichedigitali.it,https://helpdesk.dev.notifichedigitali.it"
+
+  SyntheticsMonitorEndpointsApi:
+    Type: String
+    Description: Comma-separated list of URLs da monitorare
+    Default: "https://api-io.dev.notifichedigitali.it,https://api-selcpg.dev.notifichedigitali.it,https://api.bo.dev.notifichedigitali.it,https://api.cn.dev.notifichedigitali.it,https://api.dest.dev.notifichedigitali.it,https://api.dev.notifichedigitali.it,https://api.radd.dev.notifichedigitali.it,https://webapi.dev.notifichedigitali.it"
+
+  SyntheticsMonitorTimeout:
+    Type: Number
+    Default: 240
+    Description: Timeout (in seconds) for canary execution
+
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
 
@@ -844,6 +859,223 @@ Resources:
       Parameters:
         FunctionName: !Ref SSLCertCheckExpirationLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  ## SYNTHETIC MONITORING
+  SyntheticsMonitorBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub syntheticsmonitor-${AWS::AccountId}
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldArtifacts
+            Status: Enabled
+            ExpirationInDays: 30
+            Prefix: ''
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  SyntheticsMonitorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - synthetics.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SyntheticsMonitorExecution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - s3:PutObject
+                  - s3:GetBucketLocation
+                  - s3:ListAllMyBuckets
+                  - cloudwatch:PutMetricData
+                Resource: "*"
+
+  SyntheticsMonitorCanaryPortals:
+    Type: AWS::Synthetics::Canary
+    Properties:
+      Name: !Sub syntheticsmonitor-portals-${AWS::AccountId}
+      Code:
+        Handler: index.handler
+          const { URL } = require('url');
+          const synthetics = require('Synthetics');
+          const log = require('SyntheticsLogger');
+          const syntheticsConfiguration = synthetics.getConfiguration();
+          const syntheticsLogHelper = require('SyntheticsLogHelper');
+
+          const loadBlueprint = async function () {
+              const endpoints = process.env.ENDPOINTS;
+              if (!endpoints) {
+                  throw new Error("ENDPOINTS environment variable is not defined.");
+              }
+
+              const urls = endpoints.split(',');
+              const takeScreenshot = true;
+
+              syntheticsConfiguration.disableStepScreenshots();
+              syntheticsConfiguration.setConfig({
+                  continueOnStepFailure: true,
+                  includeRequestHeaders: true,
+                  includeResponseHeaders: true,
+                  restrictedHeaders: [],
+                  restrictedUrlParameters: []
+              });
+
+              const page = await synthetics.getPage();
+
+              for (const url of urls) {
+                  await loadUrl(page, url.trim(), takeScreenshot);
+              }
+          };
+
+          const resetPage = async function(page) {
+              try {
+                  await page.goto('about:blank', { waitUntil: ['load', 'networkidle0'], timeout: 30000 });
+              } catch (e) {
+                  synthetics.addExecutionError('Unable to open a blank page. ' + e.message, e);
+              }
+          };
+
+          const loadUrl = async function (page, url, takeScreenshot) {
+              let stepName = null;
+              let domcontentloaded = false;
+
+              try {
+                  stepName = new URL(url).hostname;
+              } catch (e) {
+                  const errorString = "Error parsing url: " + url + ". " + e.message;
+                  log.error(errorString);
+                  throw e;
+              }
+
+              await synthetics.executeStep(stepName, async function () {
+                  const sanitizedUrl = syntheticsLogHelper.getSanitizedUrl(url);
+                  const response = await page.goto(url, { waitUntil: ['domcontentloaded'], timeout: 30000 });
+                  if (response) {
+                      domcontentloaded = true;
+                      const status = response.status();
+                      const statusText = response.statusText();
+                      log.info("Response from url: " + sanitizedUrl + "  Status: " + status + "  Status Text: " + statusText);
+                      if (status < 200 || status > 299) {
+                          throw new Error("Failed to load url: " + sanitizedUrl + " " + status + " " + statusText);
+                      }
+                  } else {
+                      const logNoResponseString = "No response returned for url: " + sanitizedUrl;
+                      log.error(logNoResponseString);
+                      throw new Error(logNoResponseString);
+                  }
+              });
+
+              if (domcontentloaded && takeScreenshot) {
+                  await new Promise(r => setTimeout(r, 15000));
+                  await synthetics.takeScreenshot(stepName, 'loaded');
+              }
+
+              await resetPage(page);
+          };
+
+          exports.handler = async () => {
+              return await loadBlueprint();
+          };
+      ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
+      RuntimeVersion: syn-nodejs-puppeteer-10.0
+      Schedule:
+        Expression: rate(5 minutes)
+        DurationInSeconds: !Ref SyntheticsMonitorTimeout
+      RunConfig:
+        EnvironmentVariables:
+          ENDPOINTS: !Ref SyntheticsMonitorEndpoints
+        TimeoutInSeconds: !Ref SyntheticsMonitorTimeout
+        MemoryInMB: 960
+      ArtifactS3Location: !Sub "s3://syntheticsmonitor-${AWS::AccountId}/SyntheticsMonitorCanaryPortalsResult/"
+      StartCanaryAfterCreation: true
+
+  SyntheticsMonitorCanaryApi:
+    Type: AWS::Synthetics::Canary
+    Properties:
+      Name: !Sub syntheticsmonitor-api-${AWS::AccountId}
+      Code:
+        Handler: index.handler
+        Script: |
+          const synthetics = require('Synthetics');
+          const log = require('SyntheticsLogger');
+          const syntheticsConfiguration = synthetics.getConfiguration();
+
+          syntheticsConfiguration.setConfig({
+              continueOnStepFailure: false,
+              includeRequestHeaders: true,
+              includeResponseHeaders: true,
+              restrictedHeaders: [],
+              restrictedUrlParameters: []
+          });
+
+          const endpoints = process.env.ENDPOINTSAPI;
+          if (!endpoints) {
+              throw new Error("Missing ENDPOINTSAPI environment variable");
+          }
+
+          const urls = endpoints.split(',');
+
+          const apiCheck = async function () {
+              for (const rawUrl of urls) {
+                  const url = rawUrl.trim();
+                  const stepName = new URL(url).hostname;
+
+                  await synthetics.executeStep(stepName, async function () {
+                      const requestOptions = {
+                          hostname: new URL(url).hostname,
+                          method: 'GET',
+                          path: '/',
+                          port: 443,
+                          protocol: 'https:',
+                          headers: {
+                              'User-Agent': 'CloudWatchSyntheticsCanary'
+                          }
+                      };
+
+                      const response = await synthetics.makeHttpRequest(requestOptions);
+                      const statusCode = response.statusCode;
+                      log.info("URL: " + url + " - Status: " + statusCode);
+
+                      if ((statusCode >= 200 && statusCode < 300) || statusCode === 403) {
+                          log.info("Accepted response status: " + statusCode + " from " + url);
+                          synthetics.addStepSuccess(stepName);
+                      } else {
+                          throw new Error("Unexpected status code: " + statusCode + " from " + url);
+                      }
+                  });
+              }
+          };
+
+          exports.handler = async () => {
+              return await apiCheck();
+          };
+      ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
+      RuntimeVersion: syn-nodejs-puppeteer-10.0
+      Schedule:
+        Expression: rate(5 minutes)
+        DurationInSeconds: !Ref SyntheticsMonitorTimeout
+      RunConfig:
+        EnvironmentVariables:
+          ENDPOINTSAPI: !Ref SyntheticsMonitorEndpointsApi
+        TimeoutInSeconds: !Ref SyntheticsMonitorTimeout
+        MemoryInMB: 960
+      ArtifactS3Location: !Sub "s3://syntheticsmonitor-${AWS::AccountId}/SyntheticsMonitorCanaryApiResult/"
+      StartCanaryAfterCreation: true
 
 Outputs:
   OOMAlarmArn:
