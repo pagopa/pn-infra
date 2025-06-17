@@ -30,6 +30,11 @@ Parameters:
     Type: String
     Default: ''
 
+  PnCoreAwsAccountId:
+    Type: String
+    Description: Core Account ID (leave blank in Core account)
+    Default: ''
+
   CompositeMetricGeneratorScheduleExpression:
     Type: String
     Default: 'rate(10 minutes)'
@@ -125,6 +130,7 @@ Parameters:
 
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
+  IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
 
 Resources:
  ###                            Event adn Alarm                           ###
@@ -862,9 +868,10 @@ Resources:
 
   ## SYNTHETIC MONITORING
   SyntheticsMonitorBucket:
+    Condition: IsCoreAccount
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub syntheticsmonitor-${AWS::AccountId}
+      BucketName: !Sub syntheticsmonitor-results-${AWS::AccountId}
       LifecycleConfiguration:
         Rules:
           - Id: DeleteOldArtifacts
@@ -878,6 +885,7 @@ Resources:
         RestrictPublicBuckets: true
 
   SyntheticsMonitorRole:
+    Condition: IsCoreAccount
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -906,11 +914,13 @@ Resources:
                 Resource: "*"
 
   SyntheticsMonitorCanaryPortals:
+    Condition: IsCoreAccount
     Type: AWS::Synthetics::Canary
     Properties:
       Name: !Sub syntheticsmonitor-portals-${AWS::AccountId}
       Code:
         Handler: index.handler
+        Script: |
           const { URL } = require('url');
           const synthetics = require('Synthetics');
           const log = require('SyntheticsLogger');
@@ -1005,6 +1015,7 @@ Resources:
       StartCanaryAfterCreation: true
 
   SyntheticsMonitorCanaryApi:
+    Condition: IsCoreAccount
     Type: AWS::Synthetics::Canary
     Properties:
       Name: !Sub syntheticsmonitor-api-${AWS::AccountId}
