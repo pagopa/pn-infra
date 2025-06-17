@@ -91,6 +91,13 @@ Parameters:
     Description: Presigned URL Time of Expiration
     Default: 259200 
 
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: URL to load infrastructure model fragments from
+
+  AlarmSNSTopicArn:
+    Type: String
+
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
@@ -797,6 +804,15 @@ Resources:
         Fn::GetAtt:
           - PaperRequestErrorDumpFuctionRole
           - Arn
+
+  PaperRequestErrorDumpFuctionAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref PaperRequestErrorDumpFuction
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        FilterPattern: "ERROR"
 
   PaperRequestErrorDumpFuctionRole:
     Condition: IsCoreAccount
