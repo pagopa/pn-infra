@@ -79,7 +79,7 @@ Parameters:
   PaperRequestErrorDumpFuctionCronExpression:
     Type: String
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
-    Default: '-'
+    Default: ''
 
   PaperRequestErrorDumpFuctionDelete:
     Type: String
@@ -98,8 +98,7 @@ Conditions:
   IsDatalakeAccountInCore: !And [ !Condition IsDatalakeAccount, !Condition IsCoreAccount ]
   HasCronExpression: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
-  HasCronExpressionLambdaPaperError: !Not [ !Equals [!Ref PaperRequestErrorDumpFuctionCronExpression, '-' ] ]
-  HasLambdaPaperErrorInCoreAccountCronExp: !And [ !Condition HasCronExpressionLambdaPaperError, !Condition IsCoreAccount ]
+  HasCronExpressionLambdaPaperError: !Not [ !Equals [!Ref PaperRequestErrorDumpFuctionCronExpression, '' ] ]
 
 Resources:
   
@@ -671,7 +670,7 @@ Resources:
             - !Sub "arn:${AWS::Partition}:events:eu-central-1:${AWS::AccountId}:event-bus/default"
 
   PaperRequestErrorDumpFuction:
-    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Condition: IsCoreAccount
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.12
@@ -800,7 +799,7 @@ Resources:
           - Arn
 
   PaperRequestErrorDumpFuctionRole:
-    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Condition: IsCoreAccount
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -841,13 +840,13 @@ Resources:
                 Resource: !Ref EMailSnsTopic
 
   EMailSnsTopic:
-    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Condition: IsCoreAccount
     Type: AWS::SNS::Topic
     Properties:
       TopicName: pn-SnsToEmail
 
   EMailSnsTopicSubscription:
-    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Condition: IsCoreAccount
     Type: AWS::SNS::Subscription
     Properties:
       Protocol: email
@@ -855,7 +854,7 @@ Resources:
       TopicArn: !Ref EMailSnsTopic
 
   LambdaSNSTopicPolicy:
-    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Condition: IsCoreAccount
     Type: AWS::SNS::TopicPolicy
     Properties:
       Topics:
@@ -871,7 +870,7 @@ Resources:
             Resource: !Ref EMailSnsTopic
 
   ScheduleErrorDumpFuction:
-    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Condition: HasCronExpressionLambdaPaperError
     Type: AWS::Events::Rule
     Properties:
       ScheduleExpression: !Ref PaperRequestErrorDumpFuctionCronExpression
@@ -881,7 +880,7 @@ Resources:
           Id: PaperRequestErrorDumpFuction
 
   PermissionForEventsToInvokeErrorDumpFuction:
-    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Condition: HasCronExpressionLambdaPaperError
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
@@ -890,7 +889,7 @@ Resources:
       SourceArn: !GetAtt ScheduleErrorDumpFuction.Arn
 
   ErrorDumpFuctionLogroup:
-    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+    Condition: IsCoreAccount
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
     UpdateReplacePolicy : Delete
