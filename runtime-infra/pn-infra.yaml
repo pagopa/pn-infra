@@ -44,10 +44,12 @@ Parameters:
     Type: String
     Default: "001"
     Description: Suffix to the log bucket name
+  
   DataLakeAccountId1:
     Type: String
     Default: '-'
     Description: Data lake can read logs
+  
   DataLakeAccountId2:
     Type: String
     Default: '-'
@@ -321,7 +323,33 @@ Resources:
         DataLakeAccountId1: !Ref DataLakeAccountId1
         DataLakeAccountId2: !Ref DataLakeAccountId2
         SafeStorageAccountId: !Ref SafeStorageAccountId
-        BucketSuffix: !Ref BucketSuffix 
+        BucketSuffix: !Ref BucketSuffix
+        MoreBucketResourcePolicyStatements:
+          !Sub |
+            ,{
+              "Sid": "datalakeBucketReadonly",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": "arn:aws:iam::${DataLakeAccountId1}:root"
+              },
+              "Action": [
+                "s3:Get*",
+                "s3:List*"
+              ],
+              "Resource": [
+                "arn:${AWS::Partition}:s3:::${LogsBucketName}",
+                "arn:${AWS::Partition}:s3:::${LogsBucketName}/*"      
+              ],
+              "Condition": {
+                "ArnEquals": {
+                  "aws:PrincipalArn": [ 
+                    "arn:aws:iam::${DataLakeAccountId1}:role/pagopa-data_engineers",
+                    "arn:aws:iam::${DataLakeAccountId1}:role/pdnd-de_ext",
+                    "arn:aws:iam::${DataLakeAccountId1}:role/cdp_pagopa_dl_send_rw"
+                  ]                  
+                }
+              }
+            }
 
   ###                       CLOUDFORMATION TRANSFORM LAMBDAS              ###
   ###########################################################################
