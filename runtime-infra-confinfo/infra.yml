@@ -140,8 +140,15 @@ Parameters:
     Type: Number
     Default: 14
     
-  EnvType:
+  EnvironmentType:
     Type: String
+    Description: "Environment type (dev, test, uat, hotfix, prod)"
+    AllowedValues:
+      - dev
+      - test
+      - uat
+      - hotfix
+      - prod
 
   BackupCronExpression:
     Type: String
@@ -1200,9 +1207,6 @@ Outputs:
   LogRetention:
     Value: !Ref LogRetention
 
-  EnvType:
-    Value: !Ref EnvType
-
   BackupCronExpression:
     Value: !Ref BackupCronExpression
 
@@ -1248,7 +1252,7 @@ Outputs:
     
   # required for core compatibility
   EnvironmentType:
-    Value: !Ref EnvType
+    Value: !Ref EnvironmentType
   LambdasBucketName:
     Value: !Ref CdBucketName
 
