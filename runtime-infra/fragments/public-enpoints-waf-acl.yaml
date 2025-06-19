@@ -10,6 +10,10 @@ Parameters:
     Type: String
     Description: "The ARN of the resource to associate with the WAF (e.g., API Gateway Stage ARN or CloudFront Distribution ARN)."
 
+  ApiName:
+    Type: String
+    Description: "The exact name of the API Gateway RestApi resource, used for dimensioning the quota alarm."
+
   TargetType:
     Type: String
     Description: "The type of resource to protect, which determines the WAF scope."
@@ -256,8 +260,8 @@ Resources:
       Namespace: "AWS/ApiGateway"
       MetricName: "Count"
       Dimensions:
-        - Name: ApiId
-          Value: !Select [ 1, !Split [ '/', !Select [ 5, !Split [ ':', !Ref ResourceArn ] ] ] ]
+        - Name: ApiName
+          Value: !Ref ApiName
         - Name: Stage
           Value: !Select [ 3, !Split [ '/', !Select [ 5, !Split [ ':', !Ref ResourceArn ] ] ] ]
       Statistic: "Sum"
