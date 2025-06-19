@@ -264,7 +264,7 @@ Conditions:
   ApiAlarmSegmentationDisabled: !Not [ Condition: ApiAlarmSegmentationEnabled ]
   IsNotBackofficeAndAlarmSegmentationDisabled: !And [ !Condition IsNotBackoffice, !Condition ApiAlarmSegmentationDisabled ]
   HasBasePathOverride: !Not [ !Equals [ !Ref ServiceApiPathOverride, '' ] ]
-  isProdEnvironment: !Equals [ !Ref EnvType, '' ] 
+  isProdEnvironment: !Equals [ !Ref EnvType, 'prod' ] 
 
 Resources:
 
