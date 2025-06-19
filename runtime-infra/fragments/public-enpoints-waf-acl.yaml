@@ -47,6 +47,57 @@ Parameters:
     Description: "The number of days to retain WAF logs in the CloudWatch Log Group."
     Default: 14
 
+  ClientAlarmPeriod:
+    Type: Number
+    Default: 300
+    Description: "The period in seconds over which the statistic is applied for the ClientRateLimitAlarm."
+  
+  ClientAlarmEvaluationPeriods:
+    Type: Number
+    Default: 1
+    Description: "The number of periods over which data is compared to the specified threshold for the ClientRateLimitAlarm."
+
+  ClientAlarmThreshold:
+    Type: Number
+    Default: 1
+    Description: "The value against which the specified statistic is compared for the ClientRateLimitAlarm."
+
+  IpAlarmPeriod:
+    Type: Number
+    Default: 300
+    Description: "The period in seconds over which the statistic is applied for the IpRateLimitAlarm."
+
+  IpAlarmEvaluationPeriods:
+    Type: Number
+    Default: 1
+    Description: "The number of periods over which data is compared to the specified threshold for the IpRateLimitAlarm."
+
+  IpAlarmThreshold:
+    Type: Number
+    Default: 1
+    Description: "The value against which the specified statistic is compared for the IpRateLimitAlarm."
+
+  EnableDailyQuotaAlarm:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: "Enables the daily request count alarm."
+
+  DailyQuotaAlarmThreshold:
+    Type: Number
+    Description: "Sets a CloudWatch alarm threshold for the total number of requests in a 24-hour period"
+    Default: 2000000
+
+  DailyQuotaAlarmPeriod:
+    Type: Number
+    Default: 86400
+    Description: "The period in seconds over which the statistic is applied for the DailyQuotaAlarm."
+
+  DailyQuotaAlarmEvaluationPeriods:
+    Type: Number
+    Default: 1
+    Description: "The number of periods over which data is compared to the specified threshold for the DailyQuotaAlarm."
+
 Conditions:
   IsCloudFrontTarget: !Equals [ !Ref TargetType, CLOUDFRONT ]
   CreateIpRateLimitRule: !Not [ !Equals [ !Ref IpRateLimit, 0 ] ]
@@ -54,6 +105,11 @@ Conditions:
   CreateAlarms: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '' ] ]
   CreateIpRateLimitAlarm: !And [ !Condition CreateIpRateLimitRule, !Condition CreateAlarms ]
   CreateClientRateLimitAlarm: !And [ !Condition CreateClientRateLimitRule, !Condition CreateAlarms ]
+  CreateDailyQuotaAlarm: !And 
+    - !Equals [ !Ref EnableDailyQuotaAlarm, 'true' ]
+    - !Condition CreateAlarms
+    - !Not [ !Equals [ !Ref DailyQuotaAlarmThreshold, 0 ] ]
+    - !Not [ !Condition IsCloudFrontTarget ]
 
 Resources:
   PublicEndpointWebAcl:
@@ -155,10 +211,10 @@ Resources:
         - Name: "Rule"
           Value: "ClientRateLimitRule"
       Statistic: "Sum"
-      Period: 300
-      EvaluationPeriods: 1
+      Period: !Ref ClientAlarmPeriod
+      EvaluationPeriods: !Ref ClientAlarmEvaluationPeriods
       ComparisonOperator: "GreaterThanOrEqualToThreshold"
-      Threshold: 1
+      Threshold: !Ref ClientAlarmThreshold
       TreatMissingData: "notBreaching"
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -181,10 +237,34 @@ Resources:
         - Name: "Rule"
           Value: "IpRateLimitRule"
       Statistic: "Sum"
-      Period: 300
-      EvaluationPeriods: 1
+      Period: !Ref IpAlarmPeriod
+      EvaluationPeriods: !Ref IpAlarmEvaluationPeriods
       ComparisonOperator: "GreaterThanOrEqualToThreshold"
-      Threshold: 1
+      Threshold: !Ref IpAlarmThreshold
+      TreatMissingData: "notBreaching"
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+
+  DailyQuotaAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateDailyQuotaAlarm
+    Properties:
+      AlarmName: !Sub "${WAFName}-DailyRequestCount-Exceeded"
+      AlarmDescription: "Alarm for when the total number of requests exceeds the daily threshold."
+      Namespace: "AWS/ApiGateway"
+      MetricName: "Count"
+      Dimensions:
+        - Name: ApiId
+          Value: !Select [ 1, !Split [ '/', !Select [ 5, !Split [ ':', !Ref ResourceArn ] ] ] ]
+        - Name: Stage
+          Value: !Select [ 3, !Split [ '/', !Select [ 5, !Split [ ':', !Ref ResourceArn ] ] ] ]
+      Statistic: "Sum"
+      Period: !Ref DailyQuotaAlarmPeriod
+      EvaluationPeriods: !Ref DailyQuotaAlarmEvaluationPeriods
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      Threshold: !Ref DailyQuotaAlarmThreshold
       TreatMissingData: "notBreaching"
       AlarmActions:
         - !Ref AlarmSNSTopicArn
