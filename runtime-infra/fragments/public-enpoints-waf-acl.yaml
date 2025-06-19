@@ -1,0 +1,281 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Define an enhanced WebACL for public endpoints with layered rate limiting rules.
+
+Parameters:
+  WAFName:
+    Type: String
+    Description: "A unique name for the AWS::WAFv2::WebACL resource."
+
+  ResourceArn:
+    Type: String
+    Description: "The ARN of the resource to associate with the WAF (e.g., API Gateway Stage ARN or CloudFront Distribution ARN)."
+
+  ApiName:
+    Type: String
+    Description: "The exact name of the API Gateway RestApi resource, used for dimensioning the quota alarm."
+
+  TargetType:
+    Type: String
+    Description: "The type of resource to protect, which determines the WAF scope."
+    AllowedValues: [ APIGATEWAY, CLOUDFRONT ]
+    Default: APIGATEWAY
+
+  IpRateLimit:
+    Type: Number
+    Description: "Request limit for the rule based on IP/X-Forwarded-For. If 0, the rule is disabled."
+    Default: 5000
+
+  ClientIdentifierHeaderName:
+    Type: String
+    Description: "Custom header name for client-based rate limiting. If empty, this rule is disabled."
+    Default: ''
+
+  ClientRateLimit:
+    Type: Number
+    Description: "Request limit for the composite key rule (IP + Header). Effective only if ClientIdentifierHeaderName is specified."
+    Default: 100
+
+  RateLimitEvaluationWindowSec:
+    Type: Number
+    Description: "Evaluation period in seconds for all rate-based rules. Must be one of the following values: 60, 120, 300, 600."
+    AllowedValues: [60, 120, 300, 600]
+    Default: 600
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: "ARN of the SNS topic for alarm notifications. If empty, no alarms will be created."
+    Default: ''
+
+  LogRetentionDays:
+    Type: Number
+    Description: "The number of days to retain WAF logs in the CloudWatch Log Group."
+    Default: 14
+
+  ClientAlarmPeriod:
+    Type: Number
+    Default: 300
+    Description: "The period in seconds over which the statistic is applied for the ClientRateLimitAlarm."
+  
+  ClientAlarmEvaluationPeriods:
+    Type: Number
+    Default: 1
+    Description: "The number of periods over which data is compared to the specified threshold for the ClientRateLimitAlarm."
+
+  ClientAlarmThreshold:
+    Type: Number
+    Default: 1
+    Description: "The value against which the specified statistic is compared for the ClientRateLimitAlarm."
+
+  IpAlarmPeriod:
+    Type: Number
+    Default: 300
+    Description: "The period in seconds over which the statistic is applied for the IpRateLimitAlarm."
+
+  IpAlarmEvaluationPeriods:
+    Type: Number
+    Default: 1
+    Description: "The number of periods over which data is compared to the specified threshold for the IpRateLimitAlarm."
+
+  IpAlarmThreshold:
+    Type: Number
+    Default: 1
+    Description: "The value against which the specified statistic is compared for the IpRateLimitAlarm."
+
+  EnableDailyQuotaAlarm:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: "Enables the daily request count alarm."
+
+  DailyQuotaAlarmThreshold:
+    Type: Number
+    Description: "Sets a CloudWatch alarm threshold for the total number of requests in a 24-hour period"
+    Default: 1000000
+
+  DailyQuotaAlarmPeriod:
+    Type: Number
+    Default: 86400
+    Description: "The period in seconds over which the statistic is applied for the DailyQuotaAlarm."
+
+  DailyQuotaAlarmEvaluationPeriods:
+    Type: Number
+    Default: 1
+    Description: "The number of periods over which data is compared to the specified threshold for the DailyQuotaAlarm."
+
+Conditions:
+  IsCloudFrontTarget: !Equals [ !Ref TargetType, CLOUDFRONT ]
+  CreateIpRateLimitRule: !Not [ !Equals [ !Ref IpRateLimit, 0 ] ]
+  CreateClientRateLimitRule: !Not [ !Equals [ !Ref ClientIdentifierHeaderName, '' ] ]
+  CreateAlarms: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '' ] ]
+  CreateIpRateLimitAlarm: !And [ !Condition CreateIpRateLimitRule, !Condition CreateAlarms ]
+  CreateClientRateLimitAlarm: !And [ !Condition CreateClientRateLimitRule, !Condition CreateAlarms ]
+  CreateDailyQuotaAlarm: !And 
+    - !Equals [ !Ref EnableDailyQuotaAlarm, 'true' ]
+    - !Condition CreateAlarms
+    - !Not [ !Equals [ !Ref DailyQuotaAlarmThreshold, 0 ] ]
+    - !Not [ !Condition IsCloudFrontTarget ]
+
+Resources:
+  PublicEndpointWebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Ref WAFName
+      Scope: !If [ IsCloudFrontTarget, CLOUDFRONT, REGIONAL ]
+      DefaultAction:
+        Allow: {}
+      VisibilityConfig:
+        CloudWatchMetricsEnabled: true
+        MetricName: !Ref WAFName
+        SampledRequestsEnabled: true
+      Rules:
+        - !If
+          - CreateClientRateLimitRule
+          - Name: "ClientRateLimitRule"
+            Priority: 10
+            Action:
+              Block: {}
+            Statement:
+              RateBasedStatement:
+                Limit: !Ref ClientRateLimit
+                EvaluationWindowSec: !Ref RateLimitEvaluationWindowSec
+                AggregateKeyType: CUSTOM_KEYS
+                CustomKeys:
+                  - IP: {}
+                  - Header:
+                      Name: !Ref ClientIdentifierHeaderName
+                      TextTransformations:
+                        - Priority: 0
+                          Type: NONE
+            VisibilityConfig:
+              SampledRequestsEnabled: true
+              CloudWatchMetricsEnabled: true
+              MetricName: !Sub "${WAFName}-ClientRateLimit"
+          - !Ref AWS::NoValue
+        - !If
+          - CreateIpRateLimitRule
+          - Name: "IpRateLimitRule"
+            Priority: 20
+            Action:
+              Block: {}
+            Statement:
+              RateBasedStatement:
+                Limit: !Ref IpRateLimit
+                EvaluationWindowSec: !Ref RateLimitEvaluationWindowSec
+                AggregateKeyType: FORWARDED_IP
+                ForwardedIPConfig:
+                  HeaderName: "X-Forwarded-For"
+                  FallbackBehavior: "MATCH"
+            VisibilityConfig:
+              SampledRequestsEnabled: true
+              CloudWatchMetricsEnabled: true
+              MetricName: !Sub "${WAFName}-IpRateLimit"
+          - !Ref AWS::NoValue
+
+  WebAclAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn: !Ref ResourceArn
+      WebACLArn: !GetAtt PublicEndpointWebAcl.Arn
+
+  WafLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "aws-waf-logs-${WAFName}"
+      RetentionInDays: !Ref LogRetentionDays
+
+  WafLoggingConfiguration:
+    Type: AWS::WAFv2::LoggingConfiguration
+    DependsOn: WafLogGroup
+    Properties:
+      ResourceArn: !GetAtt PublicEndpointWebAcl.Arn
+      LogDestinationConfigs:
+        - !GetAtt WafLogGroup.Arn
+      LoggingFilter:
+        DefaultBehavior: DROP
+        Filters:
+          - Behavior: KEEP
+            Requirement: MEETS_ANY
+            Conditions:
+              - ActionCondition:
+                  Action: BLOCK
+
+  ClientRateLimitAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateClientRateLimitAlarm
+    Properties:
+      AlarmName: !Sub "${WAFName}-ClientRateLimit-BlockedRequests"
+      AlarmDescription: "Alarm for when the client-based rate limit rule blocks requests."
+      Namespace: "AWS/WAFV2"
+      MetricName: "BlockedRequests"
+      Dimensions:
+        - Name: "Region"
+          Value: !If [ IsCloudFrontTarget, "global", !Ref "AWS::Region" ]
+        - Name: "WebACL"
+          Value: !Ref WAFName
+        - Name: "Rule"
+          Value: "ClientRateLimitRule"
+      Statistic: "Sum"
+      Period: !Ref ClientAlarmPeriod
+      EvaluationPeriods: !Ref ClientAlarmEvaluationPeriods
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      Threshold: !Ref ClientAlarmThreshold
+      TreatMissingData: "notBreaching"
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+
+  IpRateLimitAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateIpRateLimitAlarm
+    Properties:
+      AlarmName: !Sub "${WAFName}-IpRateLimit-BlockedRequests"
+      AlarmDescription: "Alarm for when the IP-based rate limit rule blocks requests."
+      Namespace: "AWS/WAFV2"
+      MetricName: "BlockedRequests"
+      Dimensions:
+        - Name: "Region"
+          Value: !If [ IsCloudFrontTarget, "global", !Ref "AWS::Region" ]
+        - Name: "WebACL"
+          Value: !Ref WAFName
+        - Name: "Rule"
+          Value: "IpRateLimitRule"
+      Statistic: "Sum"
+      Period: !Ref IpAlarmPeriod
+      EvaluationPeriods: !Ref IpAlarmEvaluationPeriods
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      Threshold: !Ref IpAlarmThreshold
+      TreatMissingData: "notBreaching"
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+
+  DailyQuotaAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateDailyQuotaAlarm
+    Properties:
+      AlarmName: !Sub "${WAFName}-DailyRequestCount-Exceeded"
+      AlarmDescription: "Alarm for when the total number of requests exceeds the daily threshold."
+      Namespace: "AWS/ApiGateway"
+      MetricName: "Count"
+      Dimensions:
+        - Name: ApiName
+          Value: !Ref ApiName
+        - Name: Stage
+          Value: !Select [ 4, !Split [ '/', !Select [ 5, !Split [ ':', !Ref ResourceArn ] ] ] ]
+      Statistic: "Sum"
+      Period: !Ref DailyQuotaAlarmPeriod
+      EvaluationPeriods: !Ref DailyQuotaAlarmEvaluationPeriods
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      Threshold: !Ref DailyQuotaAlarmThreshold
+      TreatMissingData: "notBreaching"
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+
+Outputs:
+  WebAclArn:
+    Description: "The ARN of the created WebACL."
+    Value: !GetAtt PublicEndpointWebAcl.Arn
