@@ -871,7 +871,7 @@ Resources:
     Condition: IsCoreAccount
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub syntheticsmonitor-results-${AWS::AccountId}
+      BucketName: !Sub syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}
       LifecycleConfiguration:
         Rules:
           - Id: DeleteOldArtifacts
@@ -1011,7 +1011,7 @@ Resources:
           ENDPOINTS: !Ref SyntheticsMonitorEndpoints
         TimeoutInSeconds: !Ref SyntheticsMonitorTimeout
         MemoryInMB: 960
-      ArtifactS3Location: !Sub "s3://syntheticsmonitor-${AWS::AccountId}/SyntheticsMonitorCanaryPortalsResult/"
+      ArtifactS3Location: !Sub "s3://syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}/SyntheticsMonitorCanaryPortalsResult/"
       StartCanaryAfterCreation: true
 
   SyntheticsMonitorCanaryApi:
@@ -1085,7 +1085,7 @@ Resources:
           ENDPOINTSAPI: !Ref SyntheticsMonitorEndpointsApi
         TimeoutInSeconds: !Ref SyntheticsMonitorTimeout
         MemoryInMB: 960
-      ArtifactS3Location: !Sub "s3://syntheticsmonitor-${AWS::AccountId}/SyntheticsMonitorCanaryApiResult/"
+      ArtifactS3Location: !Sub "s3://syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}/SyntheticsMonitorCanaryApiResult/"
       StartCanaryAfterCreation: true
 
 Outputs:
