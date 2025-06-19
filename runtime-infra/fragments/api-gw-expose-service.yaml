@@ -103,7 +103,7 @@ Conditions:
   IsWebOrBackoffice: !Or [ !Condition IsWeb, !Condition IsBackoffice ]
   AlarmOn4xxEnabled: !Equals [ !Ref AlarmOn4xx, 'true' ]
   IsNotBackoffice: !Not [ !Condition IsBackoffice ]
-  isProdEnvironment: !Equals [ !Ref EnvType, 'prod' ] 
+  IsProdEnvironment: !Equals [ !Ref EnvType, 'prod' ] 
 
 Resources:
 
@@ -300,7 +300,7 @@ Resources:
   PublicApiLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      RetentionInDays: !If [isProdEnvironment, 180, 14]
+      RetentionInDays: !If [IsProdEnvironment, 180, 14]
 
   # B2B Authorizer
   ApiKeyLambdaPermission:
