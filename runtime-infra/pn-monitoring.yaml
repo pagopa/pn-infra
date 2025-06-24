@@ -1108,7 +1108,7 @@ Resources:
       ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
       RuntimeVersion: syn-nodejs-puppeteer-10.0
       Schedule:
-        Expression: cron(0 9 * * ? *)
+        Expression: rate(5 minutes)
         DurationInSeconds: 0
       RunConfig:
         EnvironmentVariables:
@@ -1208,7 +1208,7 @@ Resources:
       ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
       RuntimeVersion: syn-nodejs-puppeteer-10.0
       Schedule:
-        Expression: rate(5 minutes)
+        Expression: cron(0 9 * * ? *)
         DurationInSeconds: 0
       RunConfig:
         EnvironmentVariables:
