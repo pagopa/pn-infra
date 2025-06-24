@@ -17,6 +17,10 @@ Parameters:
   EvaluationPeriods:
     Type: Number
     Default: 1
+
+  Period:
+    Type: Number
+    Default: 300
   
 Resources:
 
@@ -31,7 +35,7 @@ Resources:
         - Name: SyntheticMonitorName
           Value: !Ref SyntheticMonitorName
       Statistic: Sum
-      Period: 300
+      Period: !Ref Period
       EvaluationPeriods: !Ref EvaluationPeriods
       DatapointsToAlarm: !Ref DataPointsToAlarm
       Threshold: 1

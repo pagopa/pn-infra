@@ -928,7 +928,7 @@ Resources:
     Condition: IsCoreAccount
     Type: AWS::Synthetics::Canary
     Properties:
-      Name: !Sub syntheticsmonitor-portals-${AWS::AccountId}
+      Name: synthetic-monitor-portals
       Code:
         Handler: index.handler
         Script: |
@@ -1038,7 +1038,7 @@ Resources:
     Condition: IsCoreAccount
     Type: AWS::Synthetics::Canary
     Properties:
-      Name: !Sub syntheticsmonitor-api-${AWS::AccountId}
+      Name: synthetic-monitor-api
       Code:
         Handler: index.handler
         Script: |
@@ -1131,7 +1131,7 @@ Resources:
     Condition: IsCoreAccount
     Type: AWS::Synthetics::Canary
     Properties:
-      Name: !Sub syntheticsmonitor-certificate-${AWS::AccountId}
+      Name: synthetic-monitor-certificate
       Code:
         Handler: index.handler
         Script: |
@@ -1216,7 +1216,7 @@ Resources:
           EXPIREDATE: !Ref SyntheticsMonitorCertificateExpireDays
         TimeoutInSeconds: !Ref SyntheticsMonitorTimeoutSeconds
         MemoryInMB: 960
-      ArtifactS3Location: !Sub "s3://syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}/SyntheticsMonitorCanaryApiResult/"
+      ArtifactS3Location: !Sub "s3://syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}/SyntheticsMonitorCertificateResult/"
       StartCanaryAfterCreation: true
 
   SyntheticsMonitorCertificateAlarms:
@@ -1227,6 +1227,7 @@ Resources:
       Parameters:
         SyntheticMonitorName: !Ref SyntheticsMonitorCertificate
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        Period: 86400
 
 Outputs:
   OOMAlarmArn:
