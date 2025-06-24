@@ -115,25 +115,25 @@ Parameters:
 
   SyntheticsMonitorEndpoints:
     Type: String
-    Description: Comma-separated list of URLs da monitorare
-    Default: "https://cittadini.dev.notifichedigitali.it,https://selfcare.dev.notifichedigitali.it,https://imprese.dev.notifichedigitali.it,https://helpdesk.dev.notifichedigitali.it"
+    Description: Synthetic Monitoring for Portals Endpoints
+    Default: ""
 
   SyntheticsMonitorEndpointsApi:
     Type: String
-    Description: Comma-separated list of URLs da monitorare
-    Default: "https://api-io.dev.notifichedigitali.it,https://api-selcpg.dev.notifichedigitali.it,https://api.bo.dev.notifichedigitali.it,https://api.cn.dev.notifichedigitali.it,https://api.dest.dev.notifichedigitali.it,https://api.dev.notifichedigitali.it,https://api.radd.dev.notifichedigitali.it,https://webapi.dev.notifichedigitali.it"
+    Description: Synthetic Monitoring for Api Endpoints
+    Default: ""
 
   SyntheticsMonitorEndpointsCert:
     Type: String
-    Description: Comma-separated list of URLs da monitorare
-    Default: "https://cittadini.dev.notifichedigitali.it,https://imprese.dev.notifichedigitali.it"
+    Description: Synthetic Monitoring for Expiring certificates
+    Default: ""
 
-  SyntheticsMonitorCertificateExpireDate:
+  SyntheticsMonitorCertificateExpireDays:
     Type: Number
     Default: 30
     Description: days of availability before the certificate expires
 
-  SyntheticsMonitorTimeout:
+  SyntheticsMonitorTimeoutSeconds:
     Type: Number
     Default: 300
     Description: Timeout (in seconds) for canary execution
@@ -1020,7 +1020,7 @@ Resources:
       RunConfig:
         EnvironmentVariables:
           ENDPOINTS: !Ref SyntheticsMonitorEndpoints
-        TimeoutInSeconds: !Ref SyntheticsMonitorTimeout
+        TimeoutInSeconds: !Ref SyntheticsMonitorTimeoutSeconds
         MemoryInMB: 960
       ArtifactS3Location: !Sub "s3://syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}/SyntheticsMonitorCanaryPortalsResult/"
       StartCanaryAfterCreation: true
@@ -1108,12 +1108,12 @@ Resources:
       ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
       RuntimeVersion: syn-nodejs-puppeteer-10.0
       Schedule:
-        Expression: rate(5 minutes)
+        Expression: cron(0 9 * * ? *)
         DurationInSeconds: 0
       RunConfig:
         EnvironmentVariables:
           ENDPOINTSAPI: !Ref SyntheticsMonitorEndpointsApi
-        TimeoutInSeconds: !Ref SyntheticsMonitorTimeout
+        TimeoutInSeconds: !Ref SyntheticsMonitorTimeoutSeconds
         MemoryInMB: 960
       ArtifactS3Location: !Sub "s3://syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}/SyntheticsMonitorCanaryApiResult/"
       StartCanaryAfterCreation: true
@@ -1213,8 +1213,8 @@ Resources:
       RunConfig:
         EnvironmentVariables:
           ENDPOINTSCERT: !Ref SyntheticsMonitorEndpointsCert
-          EXPIREDATE: !Ref SyntheticsMonitorCertificateExpireDate
-        TimeoutInSeconds: !Ref SyntheticsMonitorTimeout
+          EXPIREDATE: !Ref SyntheticsMonitorCertificateExpireDays
+        TimeoutInSeconds: !Ref SyntheticsMonitorTimeoutSeconds
         MemoryInMB: 960
       ArtifactS3Location: !Sub "s3://syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}/SyntheticsMonitorCanaryApiResult/"
       StartCanaryAfterCreation: true
