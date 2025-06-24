@@ -26,6 +26,11 @@ Parameters:
     Description: "AccessString for elasticache redis default user"
     Default: "on ~pn-emd::* +@all"
 
+  AccessStringAuthFleetSessionsUser:
+    Type: String
+    Description: "AccessString for elasticache redis default user"
+    Default: "on ~pn-session::* +@all"
+
   AccessStringUser1:
     Type: String
     Description: "AccessString for elasticache redis user"
@@ -60,6 +65,16 @@ Parameters:
     Type: String
     Description: "Username for elasticache redis user"
     Default: "iam-user-emdintegration"
+
+  UserIdAuthFleetSessions:
+    Type: String
+    Description: "UserId for elasticache redis user Logout Lambda"
+    Default: "iam-user-authfleetsessions"
+
+  UsernameAuthFleetSessions:
+    Type: String
+    Description: "Username for elasticache redis user Logout Lambda"
+    Default: "iam-user-authfleetsessions"
 
 Resources:
 
@@ -138,6 +153,7 @@ Resources:
         - !Ref ElasticCacheUser1
         - !Ref ElasticCacheLogExtractorUser
         - !Ref ElasticCacheEmdIntegrationUser
+        - !Ref ElasticCacheAuthFleetSessionsUser
 
   DefaultElasticCacheUser:
     Type: AWS::ElastiCache::User
@@ -179,6 +195,16 @@ Resources:
       UserId: !Ref UserIdEmdIntegration
       UserName: !Ref UsernameEmdIntegration
 
+  ElasticCacheAuthFleetSessionsUser:
+    Type: AWS::ElastiCache::User
+    Properties:
+      AccessString: !Ref AccessStringAuthFleetSessionsUser
+      AuthenticationMode: 
+        Type: iam
+      Engine: redis
+      UserId: !Ref UserIdAuthFleetSessions
+      UserName: !Ref UsernameAuthFleetSessions
+
 Outputs:
   ElasticacheSecurityGroup:
     Description: The id of the security group that can access the cache cluster
@@ -219,3 +245,11 @@ Outputs:
   ElasticCacheEmdIntegrationUserId:
     Description: Id of the EmdIntegration
     Value: !Ref UsernameEmdIntegration
+
+  ElasticCacheAuthFleetSessionsUserArn:
+    Description: ElasticCacheAuthFleetSessionsUser Arn
+    Value: !GetAtt ElasticCacheAuthFleetSessionsUser.Arn
+
+  ElasticCacheAuthFleetSessionsUserId:
+    Description: Id of the AuthFleetSessions
+    Value: !Ref UsernameAuthFleetSessions
