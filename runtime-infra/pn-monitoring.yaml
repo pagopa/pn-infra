@@ -123,6 +123,16 @@ Parameters:
     Description: Comma-separated list of URLs da monitorare
     Default: "https://api-io.dev.notifichedigitali.it,https://api-selcpg.dev.notifichedigitali.it,https://api.bo.dev.notifichedigitali.it,https://api.cn.dev.notifichedigitali.it,https://api.dest.dev.notifichedigitali.it,https://api.dev.notifichedigitali.it,https://api.radd.dev.notifichedigitali.it,https://webapi.dev.notifichedigitali.it"
 
+  SyntheticsMonitorEndpointsCert:
+    Type: String
+    Description: Comma-separated list of URLs da monitorare
+    Default: "https://cittadini.dev.notifichedigitali.it,https://imprese.dev.notifichedigitali.it"
+
+  SyntheticsMonitorCertificateExpireDate:
+    Type: Number
+    Default: 30
+    Description: days of availability before the certificate expires
+
   SyntheticsMonitorTimeout:
     Type: Number
     Default: 300
@@ -1099,6 +1109,98 @@ Resources:
       ArtifactS3Location: !Sub "s3://syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}/SyntheticsMonitorCanaryApiResult/"
       StartCanaryAfterCreation: true
 
+  SyntheticsMonitorCertificate:
+    Condition: IsCoreAccount
+    Type: AWS::Synthetics::Canary
+    Properties:
+      Name: !Sub syntheticsmonitor-certificate-${AWS::AccountId}
+      Code:
+        Handler: index.handler
+        Script: |
+          const synthetics = require('Synthetics');
+          const log = require('SyntheticsLogger');
+          const https = require('https');
+          const syntheticsConfiguration = synthetics.getConfiguration();
+
+          syntheticsConfiguration.setConfig({
+            continueOnStepFailure: false,
+            includeRequestHeaders: true,
+            includeResponseHeaders: true,
+            restrictedHeaders: [],
+            restrictedUrlParameters: []
+          });
+
+          const endpoints = process.env.ENDPOINTSCERT;
+          if (!endpoints) {
+            throw new Error("Missing ENDPOINTSCERT environment variable");
+          }
+
+          const expiryThresholdDays = parseInt(process.env.EXPIREDATE || "30", 10);
+          const urls = endpoints.split(',');
+
+          async function checkCertExpiry() {
+            for (const rawUrl of urls) {
+              const url = rawUrl.trim();
+              const parsed = new URL(url);
+              const hostname = parsed.hostname;
+              const path = parsed.pathname || '/';
+
+              await synthetics.executeStep(`CertCheck ${hostname}`, async () => {
+                await new Promise((resolve, reject) => {
+                  const req = https.request({
+                    host: hostname,
+                    port: 443,
+                    method: 'GET',
+                    path: path,
+                    agent: false,
+                    rejectUnauthorized: false
+                  }, (res) => {
+                    const cert = res.socket.getPeerCertificate();
+                    if (!cert || !cert.valid_to) {
+                      return reject(new Error(`No certificate found for ${hostname}`));
+                    }
+
+                    const expiryDate = new Date(cert.valid_to);
+                    const now = new Date();
+                    const daysLeft = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+
+                    log.info(`Certificate for ${hostname} expires on ${expiryDate.toISOString()} (${daysLeft} days left)`);
+
+                    if (daysLeft <= expiryThresholdDays) {
+                      return reject(new Error(`Certificate for ${hostname} expires in ${daysLeft} days (threshold: ${expiryThresholdDays})`));
+                    }
+
+                    resolve();
+                  });
+
+                  req.on('error', (err) => {
+                    reject(new Error(`HTTPS error for ${hostname}: ${err.message}`));
+                  });
+
+                  req.end();
+                });
+              });
+            }
+          }
+
+          exports.handler = async () => {
+            return checkCertExpiry();
+          };
+
+      ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
+      RuntimeVersion: syn-nodejs-puppeteer-10.0
+      Schedule:
+        Expression: rate(5 minutes)
+        DurationInSeconds: 0
+      RunConfig:
+        EnvironmentVariables:
+          ENDPOINTSCERT: !Ref SyntheticsMonitorEndpointsCert
+          EXPIREDATE: !Ref SyntheticsMonitorCertificateExpireDate
+        TimeoutInSeconds: !Ref SyntheticsMonitorTimeout
+        MemoryInMB: 960
+      ArtifactS3Location: !Sub "s3://syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}/SyntheticsMonitorCanaryApiResult/"
+      StartCanaryAfterCreation: true
+
 Outputs:
   OOMAlarmArn:
     Value: !GetAtt CloudWatchAlarmOOM.Arn
@@ -1114,7 +1216,6 @@ Outputs:
     Value: !GetAtt CompositeMetricGeneratorAlarm.Outputs.LambdaInvocationErrorLogsMetricAlarm
     Description: 'ARN of composite metric generator alarm'
 
-  
   DiagnosticTrailArn:
     Value: !GetAtt DiagnosticLambdaCloudTrail.Arn
     Description: 'ARN of diagnostic lambda cloudtrail'
