@@ -30,7 +30,7 @@ Resources:
       AlarmName: !Sub "SyntheticMonitorFailure-${SyntheticMonitorName}"
       AlarmDescription: !Sub "Alarm if ${SyntheticMonitorName} failed"
       Namespace: CloudWatchSynthetics
-      MetricName: Failed
+      MetricName: SuccessPercent
       Dimensions:
         - Name: SyntheticMonitorName
           Value: !Ref SyntheticMonitorName
@@ -38,7 +38,7 @@ Resources:
       Period: !Ref Period
       EvaluationPeriods: !Ref EvaluationPeriods
       DatapointsToAlarm: !Ref DataPointsToAlarm
-      Threshold: 1
+      Threshold: 99
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
       AlarmActions: 
