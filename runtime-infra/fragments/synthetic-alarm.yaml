@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic for alarms
+
+  SyntheticMonitorName:
+    Type: String
+    Description: Lambda function name
+
+  DataPointsToAlarm:
+    Type: Number
+    Default: 1
+
+  EvaluationPeriods:
+    Type: Number
+    Default: 1
+  
+Resources:
+
+  SyntheticMonitorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "SyntheticMonitorFailure-${SyntheticMonitorName}"
+      AlarmDescription: !Sub "Alarm if ${SyntheticMonitorName} failed"
+      Namespace: CloudWatchSynthetics
+      MetricName: Failed
+      Dimensions:
+        - Name: SyntheticMonitorName
+          Value: !Ref SyntheticMonitorName
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: !Ref EvaluationPeriods
+      DatapointsToAlarm: !Ref DataPointsToAlarm
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: 
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+
+Outputs:
+  SyntheticMonitorAlarm:
+    Description: 'Synthetic Monitor alarm ARN'
+    Value: !GetAtt SyntheticMonitorAlarm.Arn

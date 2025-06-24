@@ -1025,6 +1025,15 @@ Resources:
       ArtifactS3Location: !Sub "s3://syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}/SyntheticsMonitorCanaryPortalsResult/"
       StartCanaryAfterCreation: true
 
+  SyntheticsMonitorCanaryPortalsAlarms:
+    Condition: IsCoreAccount
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/synthetic-alarm.yaml"
+      Parameters:
+        SyntheticMonitorName: !Ref SyntheticsMonitorCanaryPortals
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
   SyntheticsMonitorCanaryApi:
     Condition: IsCoreAccount
     Type: AWS::Synthetics::Canary
@@ -1109,6 +1118,15 @@ Resources:
       ArtifactS3Location: !Sub "s3://syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}/SyntheticsMonitorCanaryApiResult/"
       StartCanaryAfterCreation: true
 
+  SyntheticsMonitorCanaryApiAlarms:
+    Condition: IsCoreAccount
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/synthetic-alarm.yaml"
+      Parameters:
+        SyntheticMonitorName: !Ref SyntheticsMonitorCanaryApi
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+  
   SyntheticsMonitorCertificate:
     Condition: IsCoreAccount
     Type: AWS::Synthetics::Canary
@@ -1200,6 +1218,15 @@ Resources:
         MemoryInMB: 960
       ArtifactS3Location: !Sub "s3://syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}/SyntheticsMonitorCanaryApiResult/"
       StartCanaryAfterCreation: true
+
+  SyntheticsMonitorCertificateAlarms:
+    Condition: IsCoreAccount
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/synthetic-alarm.yaml"
+      Parameters:
+        SyntheticMonitorName: !Ref SyntheticsMonitorCertificate
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 Outputs:
   OOMAlarmArn:
