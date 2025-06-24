@@ -917,10 +917,20 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cwsyn-*"
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cwsyn-*:*"
+              - Effect: Allow
+                Action:
                   - s3:PutObject
                   - s3:GetObject
+                Resource: !Sub "${SyntheticsMonitorBucket.Arn}/*"
+              - Effect: Allow
+                Action:
                   - s3:GetBucketLocation
-                  - s3:ListAllMyBuckets
+                Resource: !GetAtt SyntheticsMonitorBucket.Arn
+              - Effect: Allow
+                Action:
                   - cloudwatch:PutMetricData
                 Resource: "*"
 
@@ -1227,7 +1237,6 @@ Resources:
       Parameters:
         SyntheticMonitorName: !Ref SyntheticsMonitorCertificate
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        Period: 86400
 
 Outputs:
   OOMAlarmArn:
