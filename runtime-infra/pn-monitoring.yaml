@@ -125,8 +125,8 @@ Parameters:
 
   SyntheticsMonitorTimeout:
     Type: Number
-    Default: 240
-    Description: Timeout (in seconds) for canary execution
+    Default: 300
+    Description: Timeout (in seconds) for canary execution, same time of cron
 
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
@@ -1004,7 +1004,7 @@ Resources:
       ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
       RuntimeVersion: syn-nodejs-puppeteer-10.0
       Schedule:
-        Expression: rate(5 minutes)
+        Expression: cron(0/5 * * * ? *)
         DurationInSeconds: !Ref SyntheticsMonitorTimeout
       RunConfig:
         EnvironmentVariables:
@@ -1024,6 +1024,7 @@ Resources:
         Script: |
           const synthetics = require('Synthetics');
           const log = require('SyntheticsLogger');
+          const https = require('https');
           const syntheticsConfiguration = synthetics.getConfiguration();
 
           syntheticsConfiguration.setConfig({
@@ -1044,30 +1045,39 @@ Resources:
           const apiCheck = async function () {
               for (const rawUrl of urls) {
                   const url = rawUrl.trim();
-                  const stepName = new URL(url).hostname;
+                  const parsedUrl = new URL(url);
+                  const stepName = parsedUrl.hostname;
 
                   await synthetics.executeStep(stepName, async function () {
                       const requestOptions = {
-                          hostname: new URL(url).hostname,
+                          hostname: parsedUrl.hostname,
                           method: 'GET',
-                          path: '/',
+                          path: parsedUrl.pathname || '/',
                           port: 443,
-                          protocol: 'https:',
                           headers: {
                               'User-Agent': 'CloudWatchSyntheticsCanary'
                           }
                       };
 
-                      const response = await synthetics.makeHttpRequest(requestOptions);
-                      const statusCode = response.statusCode;
-                      log.info("URL: " + url + " - Status: " + statusCode);
+                      await new Promise((resolve, reject) => {
+                          const req = https.request(requestOptions, (res) => {
+                              const statusCode = res.statusCode;
+                              log.info(`URL: ${url} - Status code: ${statusCode}`);
 
-                      if ((statusCode >= 200 && statusCode < 300) || statusCode === 403) {
-                          log.info("Accepted response status: " + statusCode + " from " + url);
-                          synthetics.addStepSuccess(stepName);
-                      } else {
-                          throw new Error("Unexpected status code: " + statusCode + " from " + url);
-                      }
+                              if ((statusCode >= 200 && statusCode < 300) || statusCode === 403) {
+                                  log.info(`Accepted status: ${statusCode} from ${url}`);
+                                  resolve();
+                              } else {
+                                  reject(new Error(`Unexpected status: ${statusCode} from ${url}`));
+                              }
+                          });
+
+                          req.on('error', (err) => {
+                              reject(new Error(`Request failed for ${url}: ${err.message}`));
+                          });
+
+                          req.end();
+                      });
                   });
               }
           };
@@ -1078,7 +1088,7 @@ Resources:
       ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
       RuntimeVersion: syn-nodejs-puppeteer-10.0
       Schedule:
-        Expression: rate(5 minutes)
+        Expression: cron(0/5 * * * ? *)
         DurationInSeconds: !Ref SyntheticsMonitorTimeout
       RunConfig:
         EnvironmentVariables:
