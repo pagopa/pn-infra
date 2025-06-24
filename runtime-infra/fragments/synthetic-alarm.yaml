@@ -27,19 +27,19 @@ Resources:
   SyntheticMonitorAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "SyntheticMonitorFailure-${SyntheticMonitorName}"
+      AlarmName: !Sub "SyntheticMonitorPercentFailure-${SyntheticMonitorName}"
       AlarmDescription: !Sub "Alarm if ${SyntheticMonitorName} failed"
       Namespace: CloudWatchSynthetics
       MetricName: SuccessPercent
       Dimensions:
-        - Name: SyntheticMonitorName
+        - Name: CanaryName
           Value: !Ref SyntheticMonitorName
       Statistic: Average
       Period: !Ref Period
       EvaluationPeriods: !Ref EvaluationPeriods
       DatapointsToAlarm: !Ref DataPointsToAlarm
       Threshold: 99
-      ComparisonOperator: GreaterThanOrEqualToThreshold
+      ComparisonOperator: LessThanThreshold
       TreatMissingData: notBreaching
       AlarmActions: 
         - !Ref AlarmSNSTopicArn
