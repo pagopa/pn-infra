@@ -126,7 +126,7 @@ Parameters:
   SyntheticsMonitorTimeout:
     Type: Number
     Default: 300
-    Description: Timeout (in seconds) for canary execution, same time of cron
+    Description: Timeout (in seconds) for canary execution
 
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
@@ -1005,7 +1005,7 @@ Resources:
       ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
       RuntimeVersion: syn-nodejs-puppeteer-10.0
       Schedule:
-        Expression: cron(0/5 * * * ? *)
+        Expression: rate(5 minute)
         DurationInSeconds: !Ref SyntheticsMonitorTimeout
       RunConfig:
         EnvironmentVariables:
@@ -1089,7 +1089,7 @@ Resources:
       ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
       RuntimeVersion: syn-nodejs-puppeteer-10.0
       Schedule:
-        Expression: cron(0/5 * * * ? *)
+        Expression: rate(5 minute)
         DurationInSeconds: !Ref SyntheticsMonitorTimeout
       RunConfig:
         EnvironmentVariables:
