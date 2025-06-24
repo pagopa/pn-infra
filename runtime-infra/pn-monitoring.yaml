@@ -932,7 +932,13 @@ Resources:
               - Effect: Allow
                 Action:
                   - cloudwatch:PutMetricData
+                  - cloudwatch:GetMetricStatistics
                 Resource: "*"
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricAlarm
+                  - cloudwatch:DeleteAlarms
+                Resource: "aarn:aws:cloudwatch:*:*:alarm:SyntheticMonitorFailure-*"
 
   SyntheticsMonitorCanaryPortals:
     Condition: IsCoreAccount
