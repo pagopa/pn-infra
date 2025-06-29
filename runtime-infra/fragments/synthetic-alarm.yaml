@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic for alarms
+
+  SyntheticMonitorName:
+    Type: String
+    Description: Synthetic Canary Names
+
+  DataPointsToAlarm:
+    Type: Number
+    Default: 1
+
+  EvaluationPeriods:
+    Type: Number
+    Default: 1
+
+  Period:
+    Type: Number
+    Default: 300
+  
+Resources:
+
+  SyntheticMonitorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "SyntheticMonitorPercentFailure-${SyntheticMonitorName}"
+      AlarmDescription: !Sub "Alarm if ${SyntheticMonitorName} failed"
+      Namespace: CloudWatchSynthetics
+      MetricName: SuccessPercent
+      Dimensions:
+        - Name: CanaryName
+          Value: !Ref SyntheticMonitorName
+      Statistic: Average
+      Period: !Ref Period
+      EvaluationPeriods: !Ref EvaluationPeriods
+      DatapointsToAlarm: !Ref DataPointsToAlarm
+      Threshold: 99
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: 
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+
+Outputs:
+  SyntheticMonitorAlarm:
+    Description: 'Synthetic Monitor alarm ARN'
+    Value: !GetAtt SyntheticMonitorAlarm.Arn
