@@ -747,9 +747,9 @@ Resources:
             const domains = await getSSMParam();
             let errorFlag = false;
             for (const e of domains) {
+              const domain = e.domain
+              const iss = e.iss
               try {
-                const domain = e.domain
-                const iss = e.iss
                 const expiryDate = await checkCert(domain);
                 const daysLeft = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
                 logEMFMetric(iss, daysLeft);
