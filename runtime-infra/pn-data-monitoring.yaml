@@ -685,7 +685,7 @@ Resources:
       Timeout: 600
       MemorySize: 384
       Handler: index.lambda_handler
-      FunctionName: PaperRequestErrorDump-Lambda
+      FunctionName: PaperRequestError-Dump-Lambda
       Code:
         ZipFile: |
           import os
@@ -794,7 +794,7 @@ Resources:
         Variables:
           DynamoDbTableLambdaDump: pn-PaperRequestError
           S3Bucket: !Ref DataMonitoringBucket
-          Prefix: PaperRequestErrorDump-Lambda
+          Prefix: PaperRequestError-Dump-Lambda
           DeleteItems: !Ref PaperRequestErrorDumpFunctionDelete
           SnsTopicArn: !Ref EMailSnsTopic
           Region: !Ref AWS::Region
@@ -842,7 +842,7 @@ Resources:
                   - s3:PutObject
                   - s3:GetObject
                 Resource:
-                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/PaperRequestErrorDump-Lambda/*
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/PaperRequestError-Dump-Lambda/*
               - Effect: Allow
                 Action:
                   - logs:CreateLogStream
