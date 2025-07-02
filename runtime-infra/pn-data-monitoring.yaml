@@ -76,12 +76,12 @@ Parameters:
     Description: Slack Email channel
     Default: ''
 
-  PaperRequestErrorDumpFuctionCronExpression:
+  PaperRequestErrorDumpFunctionCronExpression:
     Type: String
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
     Default: ''
 
-  PaperRequestErrorDumpFuctionDelete:
+  PaperRequestErrorDumpFunctionDelete:
     Type: String
     Description: Condition for remove item form PaperRequestError DynamoDb table
     Default: 'false'
@@ -105,7 +105,8 @@ Conditions:
   IsDatalakeAccountInCore: !And [ !Condition IsDatalakeAccount, !Condition IsCoreAccount ]
   HasCronExpression: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
-  HasCronExpressionLambdaPaperError: !Not [ !Equals [!Ref PaperRequestErrorDumpFuctionCronExpression, '' ] ]
+  HasCronExpressionLambdaPaperError: !Not [ !Equals [!Ref PaperRequestErrorDumpFunctionCronExpression, '' ] ]
+  HasLambdaPaperErrorInCoreAccountCronExp: !And [ !Condition HasCronExpressionLambdaPaperError, !Condition IsCoreAccount ]
 
 Resources:
   
@@ -676,7 +677,7 @@ Resources:
             Resource:
             - !Sub "arn:${AWS::Partition}:events:eu-central-1:${AWS::AccountId}:event-bus/default"
 
-  PaperRequestErrorDumpFuction:
+  PaperRequestErrorDumpFunction:
     Condition: IsCoreAccount
     Type: AWS::Lambda::Function
     Properties:
@@ -794,7 +795,7 @@ Resources:
           DynamoDbTableLambdaDump: pn-PaperRequestError
           S3Bucket: !Ref DataMonitoringBucket
           Prefix: Lambda-PaperRequestErrorDump
-          DeleteItems: !Ref PaperRequestErrorDumpFuctionDelete
+          DeleteItems: !Ref PaperRequestErrorDumpFunctionDelete
           SnsTopicArn: !Ref EMailSnsTopic
           Region: !Ref AWS::Region
           AccountID: !Ref AWS::AccountId
@@ -802,19 +803,20 @@ Resources:
 
       Role:
         Fn::GetAtt:
-          - PaperRequestErrorDumpFuctionRole
+          - PaperRequestErrorDumpFunctionRole
           - Arn
 
-  PaperRequestErrorDumpFuctionAlarms:
+  PaperRequestErrorDumpFunctionAlarms:
+    Condition: IsCoreAccount
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
       Parameters:
-        FunctionName: !Ref PaperRequestErrorDumpFuction
+        FunctionName: !Ref PaperRequestErrorDumpFunction
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         FilterPattern: "ERROR"
 
-  PaperRequestErrorDumpFuctionRole:
+  PaperRequestErrorDumpFunctionRole:
     Condition: IsCoreAccount
     Type: AWS::IAM::Role
     Properties:
@@ -885,32 +887,32 @@ Resources:
             Action: sns:Publish
             Resource: !Ref EMailSnsTopic
 
-  ScheduleErrorDumpFuction:
-    Condition: HasCronExpressionLambdaPaperError
+  ScheduleErrorDumpFunction:
+    Condition: HasLambdaPaperErrorInCoreAccountCronExp
     Type: AWS::Events::Rule
     Properties:
-      ScheduleExpression: !Ref PaperRequestErrorDumpFuctionCronExpression
+      ScheduleExpression: !Ref PaperRequestErrorDumpFunctionCronExpression
       State: ENABLED
       Targets:
-        - Arn: !GetAtt PaperRequestErrorDumpFuction.Arn
-          Id: PaperRequestErrorDumpFuction
+        - Arn: !GetAtt PaperRequestErrorDumpFunction.Arn
+          Id: PaperRequestErrorDumpFunction
 
-  PermissionForEventsToInvokeErrorDumpFuction:
-    Condition: HasCronExpressionLambdaPaperError
+  PermissionForEventsToInvokeErrorDumpFunction:
+    Condition: HasLambdaPaperErrorInCoreAccountCronExp
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref PaperRequestErrorDumpFuction
+      FunctionName: !Ref PaperRequestErrorDumpFunction
       Principal: events.amazonaws.com
-      SourceArn: !GetAtt ScheduleErrorDumpFuction.Arn
+      SourceArn: !GetAtt ScheduleErrorDumpFunction.Arn
 
-  ErrorDumpFuctionLogroup:
+  ErrorDumpFunctionLogroup:
     Condition: IsCoreAccount
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
     UpdateReplacePolicy : Delete
     Properties:
-      LogGroupName: !Sub "/aws/lambda/${PaperRequestErrorDumpFuction}"
+      LogGroupName: !Sub "/aws/lambda/${PaperRequestErrorDumpFunction}"
       RetentionInDays: 3
      
 Outputs:
