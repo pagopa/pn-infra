@@ -64,10 +64,6 @@ Parameters:
     Description: 'List of external domains included in the certificate with relative zone ID (format: domain|zonename)'
     Default: ''
 
-  WebApiUrl:
-    Description: "The Url of web API: useful for content-security-policy"
-    Type: String
-
   #  Do not remove, we are waiting for DPIA approval about WAF on us-east-1 region
   #  Limit:
   #    Type: Number
@@ -385,12 +381,18 @@ Resources:
                     https://privacyportalde-cdn.onetrust.com/ \
                     https://pdnd-prod-dl-1-public-data.s3.eu-central-1.amazonaws.com/dashboard/send/ \
                     https://vega.github.io/schema/vega-lite/v5.json \
-                    ${WebApiUrl}; \
+                    https://maps.${WebBaseDnsZoneName}/ \
+                    https://webapi.${WebBaseDnsZoneName}/location/; \
                     style-src 'self' 'unsafe-inline' https://privacyportalde-cdn.onetrust.com/; \
-                    worker-src 'none'; \
+                    worker-src blob: ; \
+                    child-src blob: ; \
                     font-src 'self'; \
-                    frame-ancestors 'self' https://${WebBaseDnsZoneName}/ https://${CmsCloudfrontDistName}/ ; \
-                    img-src 'self' https://assets.cdn.io.italia.it/ data:"
+                    frame-ancestors 'self' \
+                    https://${WebBaseDnsZoneName}/ \ 
+                    https://${CmsCloudfrontDistName}/ \ 
+                    https://preview.b2bportals.pagopa.it/ \ 
+                    https://staging.send.b2bportals.pagopa.it/ ; \
+                    img-src 'self' https://assets.cdn.io.italia.it/ data: blob:"
             Override: true
           # add_header X-Content-Type-Options "nosniff";
           ContentTypeOptions:
@@ -402,7 +404,7 @@ Resources:
             Override: true
           # add_header Referrer-Policy "no-referrer";
           ReferrerPolicy:
-            ReferrerPolicy: "no-referrer"
+            ReferrerPolicy: "strict-origin-when-cross-origin"
             Override: true
           # add_header Strict-Transport-Security "max-age=31536000";
           StrictTransportSecurity:
