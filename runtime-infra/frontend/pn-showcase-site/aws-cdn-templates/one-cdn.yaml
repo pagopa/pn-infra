@@ -146,12 +146,15 @@ Conditions:
       - true
 
 Resources:
-  # - CloudFront User used for WebApp S3 Bucket access
-  CloudFrontOriginAccessIdentity:
-    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+  # - CloudFront Origin Access Control (OAC)
+  CloudfrontOAC:
+    Type: AWS::CloudFront::OriginAccessControl
     Properties:
-      CloudFrontOriginAccessIdentityConfig:
-        Comment: !Sub "CloudFront OAI for ${Name} WebApp"
+      OriginAccessControlConfig:
+        Name: !Sub "${Name}-WebApp-OAC"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
   # - WebApp S3 Bucket
   S3BucketForWebsiteContent:
     Type: AWS::S3::Bucket
@@ -175,10 +178,10 @@ Resources:
             Effect: Allow
             Resource: !Sub "${S3BucketForWebsiteContent.Arn}/*"
             Principal:
-              CanonicalUser:
-                Fn::GetAtt:
-                  - CloudFrontOriginAccessIdentity
-                  - S3CanonicalUserId
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${WebsiteCDN}"
 
   # - WebApp default one minute caching policy
   WebsiteCDNCachingPolicy:
@@ -343,12 +346,8 @@ Resources:
         Origins:
           - DomainName: !Sub "${S3BucketForWebsiteContent.RegionalDomainName}"
             Id: !Sub "S3-${S3BucketForWebsiteContent}"
-            S3OriginConfig:
-              OriginAccessIdentity:
-                Fn::Join:
-                  - ""
-                  - - origin-access-identity/cloudfront/
-                    - Ref: CloudFrontOriginAccessIdentity
+            OriginAccessControlId: !GetAtt CloudfrontOAC.Id
+            S3OriginConfig: {}
         Logging:
           Fn::If:
             - HasLogsBucket
