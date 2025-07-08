@@ -62,21 +62,28 @@ Resources:
           import json
           import logging
           import time
-
+          import os
+          
           env_type = os.environ['EnvironmentType']
           log = logging.getLogger()
           log.setLevel(logging.INFO)
           
+
           def add_env_type_to_stack(fragment, stack_templates):
-              if "Resources" in fragment:
-                  for resource_name, resource in fragment["Resources"].items():
-                      props = resource["Properties"]
-                      if "TemplateUrl" in props:
-                          template_url = props.get("TemplateURL", "")
-                          for stack in stack_templates:
-                            if stack in template_url:
-                              props["Parameters"]["EnvType"] = env_type
-              return fragment
+              try: 
+                  if "Resources" in fragment:
+                      for resource_name, resource in fragment["Resources"].items():
+                          props = resource["Properties"]
+                          if "TemplateURL" in props:
+                              template_url = props.get("TemplateURL", "")
+                              for stack in stack_templates:
+                                  if isinstance(template_url, dict) and "Fn::Sub" in template_url:
+                                      if stack in template_url['Fn::Sub']:
+                                          props["Parameters"]["EnvType"] = env_type
+                  return fragment
+              except Exception as e:
+                  log.error(f"Errore in add_env_type_to_stack: {e}")
+                  return fragment
 
           def process_template(event):
               """
@@ -92,7 +99,7 @@ Resources:
               """
               log.info(json.dumps(event))
               processed_template=process_template(event)
-              log.info('Processed template' + json.dumps(processed_template))
+              log.info('Processed template ' + json.dumps(processed_template))
 
               r = {}
               r['requestId'] = event['requestId']
