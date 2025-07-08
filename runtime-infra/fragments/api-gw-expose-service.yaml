@@ -78,6 +78,16 @@ Parameters:
     AllowedValues:
       - 'true'
       - 'false'
+  
+  EnvType:
+    Type: String
+    Description: "Environment type (dev, test, uat, hotfix, prod)"
+    AllowedValues:
+      - dev
+      - test
+      - uat
+      - hotfix
+      - prod
 
 Conditions:
   IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
@@ -93,6 +103,7 @@ Conditions:
   IsWebOrBackoffice: !Or [ !Condition IsWeb, !Condition IsBackoffice ]
   AlarmOn4xxEnabled: !Equals [ !Ref AlarmOn4xx, 'true' ]
   IsNotBackoffice: !Not [ !Condition IsBackoffice ]
+  IsProdEnvironment: !Equals [ !Ref EnvType, 'prod' ] 
 
 Resources:
 
@@ -289,7 +300,7 @@ Resources:
   PublicApiLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      RetentionInDays: 14
+      RetentionInDays: !If [IsProdEnvironment, 180, 14]
 
   # B2B Authorizer
   ApiKeyLambdaPermission:
