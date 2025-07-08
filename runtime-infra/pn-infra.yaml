@@ -225,6 +225,16 @@ Parameters:
     Type: String
     Description: path inside bucket where lambdas zip are saved
 
+  EnvironmentType:
+    Type: String
+    Description: "Environment type (dev, test, uat, hotfix, prod)"
+    AllowedValues:
+      - dev
+      - test
+      - uat
+      - hotfix
+      - prod
+
 Conditions:
   IsAlbArnEmpty: !Equals [!Ref ApplicationLoadBalancerArn, "-"]
   IsAlbArnDnsEmpty: !Equals [!Ref ApplicationLoadBalancerAwsDns, "-"]
@@ -246,6 +256,7 @@ Conditions:
   RequiresVpcEndpoints: !Equals [!Ref VpcEndpointsRequired, true]
 
   IsEgressDefined: !Not [!Equals [!Ref VpcEgressSubnetsIds, "-"]]
+
 Resources:
   ###                       VPC BASE CONFIGURATIONS                       ###
   ###########################################################################
@@ -358,6 +369,13 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-update-deployment-transform.yaml"
+
+  CfTransform:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-cf-transform.yaml"
+      Parameters:
+        EnvironmentType: !Ref EnvironmentType
 
   CloudWatchDashboardTransform:
     Type: AWS::CloudFormation::Stack
