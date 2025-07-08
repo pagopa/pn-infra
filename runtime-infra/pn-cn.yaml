@@ -46,6 +46,16 @@ Parameters:
     Type: Number
     Default: 30
 
+  EnvironmentType:
+    Type: String
+    Description: "Environment type (dev, test, uat, hotfix, prod)"
+    AllowedValues:
+      - dev
+      - test
+      - uat
+      - hotfix
+      - prod
+
 Resources:
 
   # Expose PN-Delivery microservice public API with API-GW for B2B usage
@@ -69,6 +79,7 @@ Resources:
         OpenApiMode: 'INCLUDE'
         ApiErrorDataPointsToAlarm: !Ref ApiErrorDataPointsToAlarm
         ApiErrorEvaluationPeriods: !Ref ApiErrorEvaluationPeriods
+        EnvType: !Ref EnvironmentType
 
   CNPublicApiWaf:
     Type: AWS::CloudFormation::Stack
