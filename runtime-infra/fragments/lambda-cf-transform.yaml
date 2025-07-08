@@ -72,10 +72,10 @@ Resources:
               if "Resources" in fragment:
                   for resource_name, resource in fragment["Resources"].items():
                       props = resource["Properties"]
-                      if "TemplateUrl" in props:
+                      if "TemplateURL" in props:
                           template_url = props.get("TemplateURL", "")
                           for stack in stack_templates:
-                            if stack in template_url:
+                            if stack in template_url['Fn::Sub']:
                               props["Parameters"]["EnvType"] = env_type
               return fragment
 
@@ -93,7 +93,7 @@ Resources:
               """
               log.info(json.dumps(event))
               processed_template=process_template(event)
-              log.info('Processed template' + json.dumps(processed_template))
+              log.info('Processed template ' + json.dumps(processed_template))
 
               r = {}
               r['requestId'] = event['requestId']
