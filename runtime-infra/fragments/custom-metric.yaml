@@ -41,6 +41,15 @@ Parameters:
     Type: Number
     Default: 1
     Description: "Number of data points that must be breaching to trigger the alarm"
+
+  ComparisonOperator:
+    Type: String
+    Description: "The arithmetic operation to use when comparing the specified statistic and threshold"
+
+  Statistic:
+    Type: String
+    Description: "The statistic for the metric associated with the alarm"
+    
 Resources:
   # CloudWatch metric to filer ERROR - FATAL lines, in Log group
   CustomErrorLogsMetricFilter: 
@@ -72,8 +81,8 @@ Resources:
       DatapointsToAlarm: !Ref DatapointsToAlarm
       MetricName: !Ref MetricName
       Namespace: !Ref MetricNamespace
-      ComparisonOperator: GreaterThanOrEqualToThreshold
+      ComparisonOperator: !Ref ComparisonOperator
       EvaluationPeriods: !Ref EvaluationPeriods
       Period: !Ref Period
-      Statistic: Sum
+      Statistic: !Ref Statistic 
       Threshold: !Ref Threshold
