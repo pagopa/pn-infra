@@ -49,6 +49,45 @@ Parameters:
   Statistic:
     Type: String
     Description: "The statistic for the metric associated with the alarm"
+
+  OncallPeriod: 
+    Type: Number
+    Default: 60
+    Description: "Period in seconds for the metric filter"
+
+  OncallThreshold:
+    Type: Number
+    Default: 1
+    Description: "Threshold for the alarm"
+
+  OncallEvaluationPeriods:
+    Type: Number
+    Default: 1
+    Description: "Number of periods over which data is compared to the specified threshold"
+
+  OncallDatapointsToAlarm:
+    Type: Number
+    Default: 1
+    Description: "Number of data points that must be breaching to trigger the alarm"
+
+  OncallComparisonOperator:
+    Type: String
+    Description: "The arithmetic operation to use when comparing the specified statistic and threshold"
+
+  OncallStatistic:
+    Type: String
+    Description: "The statistic for the metric associated with the alarm"
+
+  HasOncall:
+    Type: String
+    Description: "Create onCall alarm"
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
+Conditions:
+  hasOncallCondition: !Equals [ !Ref HasOncall, 'true' ]
     
 Resources:
   # CloudWatch metric to filer ERROR - FATAL lines, in Log group
@@ -86,3 +125,25 @@ Resources:
       Period: !Ref Period
       Statistic: !Ref Statistic 
       Threshold: !Ref Threshold
+
+  OncallCustomErrorLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: hasOncallCondition
+    Properties:
+      AlarmName: !Sub "oncall-${MetricName}-Alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on metric ${MetricName}."
+      TreatMissingData: notBreaching
+      AlarmActions: 
+        - !Ref AlarmSNSTopicArn
+      #InsufficientDataActions:
+      #  - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref OncallDatapointsToAlarm
+      MetricName: !Ref MetricName
+      Namespace: !Ref MetricNamespace
+      ComparisonOperator: !Ref OncallComparisonOperator
+      EvaluationPeriods: !Ref OncallEvaluationPeriods
+      Period: !Ref OncallPeriod
+      Statistic: !Ref OncallStatistic 
+      Threshold: !Ref OncallThreshold
