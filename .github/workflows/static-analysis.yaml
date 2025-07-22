@@ -2,6 +2,9 @@ name: static-analysis
 description: |
   This workflow runs static analysis on the infrastructure code using Trivy in IaC mode.
   It scans for vulnerabilities in the runtime infrastructure code and uploads the results to GitHub's Security tab.
+permissions:
+  contents: read
+  security-events: write
 on:
   push:
 jobs:
@@ -10,21 +13,31 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@v4
 
       - name: Run Trivy vulnerability scanner in IaC mode
-        uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5
+        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
         with:
           scan-type: 'config'
-          input: './runtime-infra ./runtime-infra-confinfo'
+          input: './src'
           hide-progress: true
           format: 'sarif'
-          output: 'trivy-results.sarif'
+          output: 'trivy-results-raw.sarif'
           exit-code: '0'
           trivyignores: '.trivyignore'
           severity: 'CRITICAL,HIGH'
+      
+      - name: Filter SARIF to exclude MEDIUM and LOW
+        run: |
+          jq '
+            .runs |= map(
+              .results |= map(select(
+                (.message.text | test("Severity: (HIGH|CRITICAL)"))
+              ))
+            )
+          ' trivy-results-raw.sarif > trivy-results.sarif
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
