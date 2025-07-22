@@ -44,10 +44,12 @@ Parameters:
     Type: String
     Default: "001"
     Description: Suffix to the log bucket name
+  
   DataLakeAccountId1:
     Type: String
     Default: '-'
     Description: Data lake can read logs
+  
   DataLakeAccountId2:
     Type: String
     Default: '-'
@@ -177,7 +179,7 @@ Parameters:
     Type: String
     Description: Slack Email channel
 
-  PaperRequestErrorDumpFuctionCronExpression:
+  PaperRequestErrorDumpFunctionCronExpression:
     Type: String
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
 
@@ -223,6 +225,16 @@ Parameters:
     Type: String
     Description: path inside bucket where lambdas zip are saved
 
+  EnvironmentType:
+    Type: String
+    Description: "Environment type (dev, test, uat, hotfix, prod)"
+    AllowedValues:
+      - dev
+      - test
+      - uat
+      - hotfix
+      - prod
+
 Conditions:
   IsAlbArnEmpty: !Equals [!Ref ApplicationLoadBalancerArn, "-"]
   IsAlbArnDnsEmpty: !Equals [!Ref ApplicationLoadBalancerAwsDns, "-"]
@@ -244,6 +256,7 @@ Conditions:
   RequiresVpcEndpoints: !Equals [!Ref VpcEndpointsRequired, true]
 
   IsEgressDefined: !Not [!Equals [!Ref VpcEgressSubnetsIds, "-"]]
+
 Resources:
   ###                       VPC BASE CONFIGURATIONS                       ###
   ###########################################################################
@@ -321,7 +334,33 @@ Resources:
         DataLakeAccountId1: !Ref DataLakeAccountId1
         DataLakeAccountId2: !Ref DataLakeAccountId2
         SafeStorageAccountId: !Ref SafeStorageAccountId
-        BucketSuffix: !Ref BucketSuffix 
+        BucketSuffix: !Ref BucketSuffix
+        MoreBucketResourcePolicyStatements:
+          !Sub |
+            ,{
+              "Sid": "datalakeBucketReadonly",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": "arn:aws:iam::${DataLakeAccountId1}:root"
+              },
+              "Action": [
+                "s3:Get*",
+                "s3:List*"
+              ],
+              "Resource": [
+                "arn:${AWS::Partition}:s3:::${LogsBucketName}",
+                "arn:${AWS::Partition}:s3:::${LogsBucketName}/*"      
+              ],
+              "Condition": {
+                "ArnEquals": {
+                  "aws:PrincipalArn": [ 
+                    "arn:aws:iam::${DataLakeAccountId1}:role/pagopa-data_engineers",
+                    "arn:aws:iam::${DataLakeAccountId1}:role/pdnd-de_ext",
+                    "arn:aws:iam::${DataLakeAccountId1}:role/cdp_pagopa_dl_send_rw"
+                  ]                  
+                }
+              }
+            }
 
   ###                       CLOUDFORMATION TRANSFORM LAMBDAS              ###
   ###########################################################################
@@ -330,6 +369,13 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-update-deployment-transform.yaml"
+
+  CfTransform:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-cf-transform.yaml"
+      Parameters:
+        EnvironmentType: !Ref EnvironmentType
 
   CloudWatchDashboardTransform:
     Type: AWS::CloudFormation::Stack
@@ -481,8 +527,8 @@ Outputs:
     Value: !Ref ConfinfoDynamoDbExportBucketName
   DataMonitoringSlackEmailTo:
     Value: !Ref DataMonitoringSlackEmailTo
-  PaperRequestErrorDumpFuctionCronExpression:
-    Value: !Ref PaperRequestErrorDumpFuctionCronExpression
+  PaperRequestErrorDumpFunctionCronExpression:
+    Value: !Ref PaperRequestErrorDumpFunctionCronExpression
   PaperRequestErrorDumpFuctionDelete:
     Value: !Ref PaperRequestErrorDumpFuctionDelete
   PresignedUrlTimeOfexpiration:

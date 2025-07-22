@@ -8,12 +8,14 @@ Parameters:
   Subnets:
     Type: List<AWS::EC2::Subnet::Id>
 
-  RoutingMode:
+  EnvironmentType:
     Type: String
-    Default: WHITELIST
     AllowedValues:
-      - WHITELIST
-      - BLACKLIST 
+      - dev
+      - test
+      - prod
+      - hotfix
+      - uat
 
   ExternalChannelBaseUrl:
     Type: String
@@ -237,7 +239,7 @@ Resources:
 
             return false
           }
-          
+
           function isNationalRegistriesWhitelisted(value, whitelistAsString, section){
             const whitelistAsJson = JSON.parse(whitelistAsString)
             if(!whitelistAsJson || !whitelistAsJson[section]){
@@ -249,11 +251,15 @@ Resources:
 
           function isDeliveryAddressWhitelisted(recipient, whitelistAsString){
               const whitelistAsArray = whitelistAsString.split(',').map((w) => {
-                  return w.trim().toLowerCase()
+                  return w.trim().toLowerCase();
               })
               
-              if(whitelistAsArray.indexOf(recipient.toLowerCase())>=0){
+              if(whitelistAsArray.indexOf(recipient.toLowerCase())>=0) {
                   return true;
+              }
+              const sercqWhitelist = whitelistAsArray.filter(w => w.startsWith("sercq:")).map(w => w.replace("sercq:", ""));
+                if (sercqWhitelist.length > 0) {
+                  return sercqWhitelist.some(whitelisted => recipient.toLowerCase().includes(whitelisted));
               }
               
               return false;
@@ -385,7 +391,7 @@ Resources:
               }
 
               if(body){
-                  fetchOptions.body = body // stringified
+                  fetchOptions.body = body // stringified        
               }
               
               if(qs){
@@ -435,13 +441,14 @@ Resources:
           async function actAsReversProxy(event){
               const { httpMethod, path } = event
               
-              const routingMode = process.env.RoutingMode
+              const environment = process.env.EnvironmentType
+              const isProd = environment && environment.toLowerCase() === 'prod'
+              console.log('Environment', environment)
 
               
               if(isExternalChannelCall(path)){
-                // in case of BLACKLIST, the defaultUrl is the real external channel system
-                const defaultUrl = routingMode==='BLACKLIST'?process.env.ExternalChannelBaseUrl:process.env.MockExternalChannelBaseUrl
-                const allowedOnlyUrl = routingMode==='BLACKLIST'?process.env.MockExternalChannelBaseUrl:process.env.ExternalChannelBaseUrl
+                const defaultUrl = process.env.MockExternalChannelBaseUrl
+                const allowedOnlyUrl = process.env.ExternalChannelBaseUrl
                 console.debug('[EC] - Call')
                 if(httpMethod=='PUT'){
                     console.debug('[EC] - Call PUT')
@@ -462,36 +469,37 @@ Resources:
               } 
 
               if(isConsolidatoreCall(path)) {
-                // in case of BLACKLIST, the defaultUrl is the real consolidatore system
-                const defaultUrl = routingMode==='BLACKLIST'?process.env.ConsolidatoreBaseUrl:process.env.MockConsolidatoreBaseUrl
-                const allowedOnlyUrl = routingMode==='BLACKLIST'?process.env.MockConsolidatoreBaseUrl:process.env.ConsolidatoreBaseUrl
+                const defaultUrl = process.env.MockConsolidatoreBaseUrl
+                const allowedOnlyUrl = process.env.ConsolidatoreBaseUrl
 
-                console.debug('[CONS] - Call')
-                if(httpMethod=='POST'){
-                    console.debug('[CONS] - Call POST')
-                    if(isConsolidatoreDeliveriesPath(path)){
-                        const jsonBody = JSON.parse(event.body)
-                        const paperDeliveryAddress = jsonBody
-                        console.log('[CONS] Paper Delivery Address', paperDeliveryAddress)
-                        const whitelist = await getParameterFromStore('pn-PaperDeliveriesWhitelist')
-                        console.log('[CONS] Whitelist', whitelist)
-                        if(isPaperDeliveryAddressWhitelisted(paperDeliveryAddress, whitelist)){
-                            return forwardRequest(event, allowedOnlyUrl)
-                        }
-                    }
-                } 
-                return forwardRequest(event, defaultUrl)
+                if(isProd){
+                  console.debug('[CONS] - Call - PROD - Forward to '+allowedOnlyUrl)
+                  return forwardRequest(event, allowedOnlyUrl)
+                } else {
+                  console.debug('[CONS] - Call')
+                  if(httpMethod=='POST'){
+                      console.debug('[CONS] - Call POST')
+                      if(isConsolidatoreDeliveriesPath(path)){
+                          const jsonBody = JSON.parse(event.body)
+                          const paperDeliveryAddress = jsonBody
+                          console.log('[CONS] Paper Delivery Address', paperDeliveryAddress)
+                          const whitelist = await getParameterFromStore('pn-PaperDeliveriesWhitelist')
+                          console.log('[CONS] Whitelist', whitelist)
+                          if(isPaperDeliveryAddressWhitelisted(paperDeliveryAddress, whitelist)){
+                              return forwardRequest(event, allowedOnlyUrl)
+                          }
+                      }
+                  } 
+                  return forwardRequest(event, defaultUrl)
+                }
               }
 
               if(isNationalRegistriesProxyPath(path)){
                 if(isInfocamerePath(path)){
-                  // in case of BLACKLIST, the defaultUrl is the real infocamere
-                  const infocamereMockUrl = process.env.MockNationalRegistriesBaseUrl
-                  const allowedOnlyUrl = routingMode==='BLACKLIST'?process.env.InfocamereBaseUrl:infocamereMockUrl
-                  const defaultUrl = routingMode==='BLACKLIST'?infocamereMockUrl:process.env.InfocamereBaseUrl
+                  const allowedOnlyUrl = process.env.MockNationalRegistriesBaseUrl
+                  const defaultUrl = process.env.InfocamereBaseUrl
                   console.debug('[INFOCAMERE] - Call', allowedOnlyUrl)
                   console.debug('[INFOCAMERE] - Default url', defaultUrl)
-                  console.log('routingMode' +routingMode)
                   
                   event.path = event.path.replace('national-registries-proxy/', '') // removed proxy path part
                   
@@ -514,34 +522,40 @@ Resources:
               }
               
               if(isNormalizzatoreCall(path)){
-                // in case of BLACKLIST, the defaultUrl is the real consolidatore system
-                const defaultUrl = routingMode==='BLACKLIST'?process.env.NormalizzatoreBaseUrl:process.env.MockNormalizzatoreBaseUrl
-                const allowedOnlyUrl = routingMode==='BLACKLIST'?process.env.MockNormalizzatoreBaseUrl:process.env.NormalizzatoreBaseUrl
+                const defaultUrl = process.env.MockNormalizzatoreBaseUrl
+                const allowedOnlyUrl = process.env.NormalizzatoreBaseUrl
 
                 console.debug('[NORM] - Call')
-                if(httpMethod=='POST'){
+                if(isProd){
+                  console.debug('[NORM] - Call - PROD - Forward to '+allowedOnlyUrl)
+                  event.path = path.replace('lambda-normalizzatore-ingress/', '')
+                  return forwardRequest(event, allowedOnlyUrl)
+                } else {
 
-                  const whitelist = await getParameterFromStore('pn-NormalizzatoreWhitelist')
+                  if(httpMethod=='POST'){
 
-                  // if deduplica
-                  if(isDeduplica(path)){
-                    // else if normalizzazione
-                    console.log('[NORM] Whitelist', whitelist)
-                    if(isNormalizzatoreEnabled(whitelist, 'deduplica')){
-                      event.path = path.replace('lambda-normalizzatore-ingress', 'PagoPaDeduplica')                    
-                      return forwardRequest(event, allowedOnlyUrl)
-                    }
-                  } else if(isNormalizzazione(path)){
-                    // else if normalizzazione
-                    console.log('[NORM] Whitelist', whitelist)
-                    if(isNormalizzatoreEnabled(whitelist, 'normalizzazione')){
-                        event.path = path.replace('lambda-normalizzatore-ingress', 'SINIHelper')
+                    const whitelist = await getParameterFromStore('pn-NormalizzatoreWhitelist')
+
+                    // if deduplica
+                    if(isDeduplica(path)){
+                      // else if normalizzazione
+                      console.log('[NORM] Whitelist', whitelist)
+                      if(isNormalizzatoreEnabled(whitelist, 'deduplica')){
+                        event.path = path.replace('lambda-normalizzatore-ingress', 'PagoPaDeduplica')                    
                         return forwardRequest(event, allowedOnlyUrl)
+                      }
+                    } else if(isNormalizzazione(path)){
+                      // else if normalizzazione
+                      console.log('[NORM] Whitelist', whitelist)
+                      if(isNormalizzatoreEnabled(whitelist, 'normalizzazione')){
+                          event.path = path.replace('lambda-normalizzatore-ingress', 'SINIHelper')
+                          return forwardRequest(event, allowedOnlyUrl)
+                      }
                     }
-                  }
-                } 
-                event.path = path.replace('lambda-normalizzatore-ingress/', '')
-                return forwardRequest(event, defaultUrl)
+                  } 
+                  event.path = path.replace('lambda-normalizzatore-ingress/', '')
+                  return forwardRequest(event, defaultUrl)
+                }
               }
               throw new Error('Unhandled event', event)            
           }
@@ -579,7 +593,7 @@ Resources:
           MockNormalizzatoreBaseUrl: !Ref MockNormalizzatoreBaseUrl
           InfocamereBaseUrl: !Ref InfocamereBaseUrl
           MockNationalRegistriesBaseUrl: !Ref MockNationalRegistriesBaseUrl
-          RoutingMode: !Ref RoutingMode
+          EnvironmentType: !Ref EnvironmentType
           SSM_PARAMETER_STORE_TIMEOUT_MILLIS: 5000
       VpcConfig:
         SecurityGroupIds:
@@ -590,7 +604,6 @@ Resources:
       TracingConfig:
         Mode: Active
       Layers:
-        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
         - !Sub "arn:aws:lambda:eu-south-1:325218067255:layer:AWS-Parameters-and-Secrets-Lambda-Extension:17"     
       Tags:
         - Key: "pn-eni-related"

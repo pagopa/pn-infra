@@ -30,6 +30,11 @@ Parameters:
     Type: String
     Default: ''
 
+  PnCoreAwsAccountId:
+    Type: String
+    Description: Core Account ID (leave blank in Core account)
+    Default: ''
+
   CompositeMetricGeneratorScheduleExpression:
     Type: String
     Default: 'rate(10 minutes)'
@@ -102,9 +107,51 @@ Parameters:
     Type: String
     Default: "/radd/ssl-monitoring-domains"
     Description: SSM parameter with JSON array of domains
+  
+  SSLCertificateExpirationAlarmThresholdDays:
+    Type: String
+    Default: "30"
+    Description: SSL certificare expiration threshold
+
+  SyntheticsMonitorEndpoints:
+    Type: String
+    Description: Synthetic Monitoring for Portals Endpoints
+    Default: ""
+
+  SyntheticsMonitorEndpointsApi:
+    Type: String
+    Description: Synthetic Monitoring for Api Endpoints
+    Default: ""
+
+  SyntheticsMonitorEndpointsCert:
+    Type: String
+    Description: Synthetic Monitoring for Expiring certificates
+    Default: ""
+
+  SyntheticsMonitorCertificateExpireDays:
+    Type: Number
+    Default: 30
+    Description: days of availability before the certificate expires
+
+  SyntheticsMonitorTimeoutSeconds:
+    Type: Number
+    Default: 300
+    Description: Timeout (in seconds) for canary execution
+
+  SyntheticsMonitorActive:
+    Type: String
+    Description: true if Synthetic Monitoring is active
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
 
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
+  IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
+  HasSyntheticMonitoring: !Equals [!Ref SyntheticsMonitorActive, 'true' ]
+  HasDeploySyntheticMonitoring: !And [ !Condition HasSyntheticMonitoring, !Condition IsCoreAccount ]
+
 
 Resources:
  ###                            Event adn Alarm                           ###
@@ -742,9 +789,9 @@ Resources:
             const domains = await getSSMParam();
             let errorFlag = false;
             for (const e of domains) {
+              const domain = e.domain
+              const iss = e.iss
               try {
-                const domain = e.domain
-                const iss = e.iss
                 const expiryDate = await checkCert(domain);
                 const daysLeft = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
                 logEMFMetric(iss, daysLeft);
@@ -817,7 +864,7 @@ Resources:
           Period: 10800
           ReturnData: False
         - Id: e2
-          Expression: "IF(q1 > 5, 0, 1)"
+          Expression: !Sub "IF(q1 > ${SSLCertificateExpirationAlarmThresholdDays}, 0, 1)"
           Period: 10800
       DatapointsToAlarm: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
@@ -840,6 +887,375 @@ Resources:
         FunctionName: !Ref SSLCertCheckExpirationLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
+  ## SYNTHETIC MONITORING
+  SyntheticsMonitorBucket:
+    Condition: IsCoreAccount
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldArtifacts
+            Status: Enabled
+            ExpirationInDays: 30
+            Prefix: ''
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  SyntheticsMonitorRole:
+    Condition: HasDeploySyntheticMonitoring
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - synthetics.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SyntheticsMonitorExecution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cwsyn-*"
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cwsyn-*:*"
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource: !Sub "${SyntheticsMonitorBucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                Resource: !GetAtt SyntheticsMonitorBucket.Arn
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                  - cloudwatch:GetMetricStatistics
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricAlarm
+                  - cloudwatch:DeleteAlarms
+                Resource: "aarn:aws:cloudwatch:*:*:alarm:SyntheticMonitorFailure-*"
+
+  SyntheticsMonitorCanaryPortals:
+    Condition: HasDeploySyntheticMonitoring
+    Type: AWS::Synthetics::Canary
+    Properties:
+      Name: synthetic-monitor-portals
+      Code:
+        Handler: index.handler
+        Script: |
+          const { URL } = require('url');
+          const synthetics = require('Synthetics');
+          const log = require('SyntheticsLogger');
+          const syntheticsConfiguration = synthetics.getConfiguration();
+          const syntheticsLogHelper = require('SyntheticsLogHelper');
+
+          const loadBlueprint = async function () {
+              const endpoints = process.env.ENDPOINTS;
+              if (!endpoints) {
+                  throw new Error("ENDPOINTS environment variable is not defined.");
+              }
+
+              const urls = endpoints.split(',');
+              const takeScreenshot = true;
+
+              syntheticsConfiguration.disableStepScreenshots();
+              syntheticsConfiguration.setConfig({
+                  continueOnStepFailure: true,
+                  includeRequestHeaders: true,
+                  includeResponseHeaders: true,
+                  restrictedHeaders: [],
+                  restrictedUrlParameters: []
+              });
+
+              const page = await synthetics.getPage();
+
+              for (const url of urls) {
+                  await loadUrl(page, url.trim(), takeScreenshot);
+              }
+          };
+
+          const resetPage = async function(page) {
+              try {
+                  await page.goto('about:blank', { waitUntil: ['load', 'networkidle0'], timeout: 30000 });
+              } catch (e) {
+                  synthetics.addExecutionError('Unable to open a blank page. ' + e.message, e);
+              }
+          };
+
+          const loadUrl = async function (page, url, takeScreenshot) {
+              let stepName = null;
+              let domcontentloaded = false;
+
+              try {
+                  stepName = new URL(url).hostname;
+              } catch (e) {
+                  const errorString = "Error parsing url: " + url + ". " + e.message;
+                  log.error(errorString);
+                  throw e;
+              }
+
+              await synthetics.executeStep(stepName, async function () {
+                  const sanitizedUrl = syntheticsLogHelper.getSanitizedUrl(url);
+                  const response = await page.goto(url, { waitUntil: ['domcontentloaded'], timeout: 30000 });
+                  if (response) {
+                      domcontentloaded = true;
+                      const status = response.status();
+                      const statusText = response.statusText();
+                      log.info("Response from url: " + sanitizedUrl + "  Status: " + status + "  Status Text: " + statusText);
+                      if (status < 200 || status > 299) {
+                          throw new Error("Failed to load url: " + sanitizedUrl + " " + status + " " + statusText);
+                      }
+                  } else {
+                      const logNoResponseString = "No response returned for url: " + sanitizedUrl;
+                      log.error(logNoResponseString);
+                      throw new Error(logNoResponseString);
+                  }
+              });
+
+              if (domcontentloaded && takeScreenshot) {
+                  await new Promise(r => setTimeout(r, 15000));
+                  await synthetics.takeScreenshot(stepName, 'loaded');
+              }
+
+              await resetPage(page);
+          };
+
+          exports.handler = async () => {
+              return await loadBlueprint();
+          };
+      ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
+      RuntimeVersion: syn-nodejs-puppeteer-10.0
+      Schedule:
+        Expression: rate(5 minutes)
+        DurationInSeconds: 0
+      RunConfig:
+        EnvironmentVariables:
+          ENDPOINTS: !Ref SyntheticsMonitorEndpoints
+        TimeoutInSeconds: !Ref SyntheticsMonitorTimeoutSeconds
+        MemoryInMB: 960
+      ArtifactS3Location: !Sub "s3://syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}/SyntheticsMonitorCanaryPortalsResult/"
+      StartCanaryAfterCreation: true
+
+  SyntheticsMonitorCanaryPortalsAlarms:
+    Condition: HasDeploySyntheticMonitoring
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/synthetic-alarm.yaml"
+      Parameters:
+        SyntheticMonitorName: !Ref SyntheticsMonitorCanaryPortals
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  SyntheticsMonitorCanaryApi:
+    Condition: HasDeploySyntheticMonitoring
+    Type: AWS::Synthetics::Canary
+    Properties:
+      Name: synthetic-monitor-api
+      Code:
+        Handler: index.handler
+        Script: |
+          const synthetics = require('Synthetics');
+          const log = require('SyntheticsLogger');
+          const https = require('https');
+          const syntheticsConfiguration = synthetics.getConfiguration();
+
+          syntheticsConfiguration.setConfig({
+              continueOnStepFailure: false,
+              includeRequestHeaders: true,
+              includeResponseHeaders: true,
+              restrictedHeaders: [],
+              restrictedUrlParameters: []
+          });
+
+          const endpoints = process.env.ENDPOINTSAPI;
+          if (!endpoints) {
+              throw new Error("Missing ENDPOINTSAPI environment variable");
+          }
+
+          const urls = endpoints.split(',');
+
+          const apiCheck = async function () {
+              for (const rawUrl of urls) {
+                  const url = rawUrl.trim();
+                  const parsedUrl = new URL(url);
+                  const stepName = parsedUrl.hostname;
+
+                  await synthetics.executeStep(stepName, async function () {
+                      const requestOptions = {
+                          hostname: parsedUrl.hostname,
+                          method: 'GET',
+                          path: parsedUrl.pathname || '/',
+                          port: 443,
+                          headers: {
+                              'User-Agent': 'CloudWatchSyntheticsCanary'
+                          }
+                      };
+
+                      await new Promise((resolve, reject) => {
+                          const req = https.request(requestOptions, (res) => {
+                              const statusCode = res.statusCode;
+                              log.info(`URL: ${url} - Status code: ${statusCode}`);
+
+                              if ((statusCode >= 200 && statusCode < 300) || statusCode === 403) {
+                                  log.info(`Accepted status: ${statusCode} from ${url}`);
+                                  resolve();
+                              } else {
+                                  reject(new Error(`Unexpected status: ${statusCode} from ${url}`));
+                              }
+                          });
+
+                          req.on('error', (err) => {
+                              reject(new Error(`Request failed for ${url}: ${err.message}`));
+                          });
+
+                          req.end();
+                      });
+                  });
+              }
+          };
+
+          exports.handler = async () => {
+              return await apiCheck();
+          };
+      ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
+      RuntimeVersion: syn-nodejs-puppeteer-10.0
+      Schedule:
+        Expression: rate(5 minutes)
+        DurationInSeconds: 0
+      RunConfig:
+        EnvironmentVariables:
+          ENDPOINTSAPI: !Ref SyntheticsMonitorEndpointsApi
+        TimeoutInSeconds: !Ref SyntheticsMonitorTimeoutSeconds
+        MemoryInMB: 960
+      ArtifactS3Location: !Sub "s3://syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}/SyntheticsMonitorCanaryApiResult/"
+      StartCanaryAfterCreation: true
+
+  SyntheticsMonitorCanaryApiAlarms:
+    Condition: HasDeploySyntheticMonitoring
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/synthetic-alarm.yaml"
+      Parameters:
+        SyntheticMonitorName: !Ref SyntheticsMonitorCanaryApi
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+  
+  SyntheticsMonitorCertificate:
+    Condition: HasDeploySyntheticMonitoring
+    Type: AWS::Synthetics::Canary
+    Properties:
+      Name: synthetic-monitor-certificate
+      Code:
+        Handler: index.handler
+        Script: |
+          const synthetics = require('Synthetics');
+          const log = require('SyntheticsLogger');
+          const https = require('https');
+          const syntheticsConfiguration = synthetics.getConfiguration();
+
+          syntheticsConfiguration.setConfig({
+            continueOnStepFailure: false,
+            includeRequestHeaders: true,
+            includeResponseHeaders: true,
+            restrictedHeaders: [],
+            restrictedUrlParameters: []
+          });
+
+          const endpoints = process.env.ENDPOINTSCERT;
+          if (!endpoints) {
+            throw new Error("Missing ENDPOINTSCERT environment variable");
+          }
+
+          const expiryThresholdDays = parseInt(process.env.EXPIREDATE || "30", 10);
+          const urls = endpoints.split(',');
+
+          async function checkCertExpiry() {
+            for (const rawUrl of urls) {
+              const url = rawUrl.trim();
+              const parsed = new URL(url);
+              const hostname = parsed.hostname;
+              const path = parsed.pathname || '/';
+
+              await synthetics.executeStep(`CertCheck ${hostname}`, async () => {
+                await new Promise((resolve, reject) => {
+                  const req = https.request({
+                    host: hostname,
+                    port: 443,
+                    method: 'GET',
+                    path: path,
+                    agent: false,
+                    rejectUnauthorized: false
+                  }, (res) => {
+                    const cert = res.socket.getPeerCertificate();
+                    if (!cert || !cert.valid_to) {
+                      return reject(new Error(`No certificate found for ${hostname}`));
+                    }
+
+                    const expiryDate = new Date(cert.valid_to);
+                    const now = new Date();
+                    const daysLeft = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+
+                    log.info(`Certificate for ${hostname} expires on ${expiryDate.toISOString()} (${daysLeft} days left)`);
+
+                    if (daysLeft <= expiryThresholdDays) {
+                      return reject(new Error(`Certificate for ${hostname} expires in ${daysLeft} days (threshold: ${expiryThresholdDays})`));
+                    }
+
+                    resolve();
+                  });
+
+                  req.on('error', (err) => {
+                    reject(new Error(`HTTPS error for ${hostname}: ${err.message}`));
+                  });
+
+                  req.end();
+                });
+              });
+            }
+          }
+
+          exports.handler = async () => {
+            return checkCertExpiry();
+          };
+
+      ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
+      RuntimeVersion: syn-nodejs-puppeteer-10.0
+      Schedule:
+        Expression: cron(0 9 * * ? *)
+        DurationInSeconds: 0
+      RunConfig:
+        EnvironmentVariables:
+          ENDPOINTSCERT: !Ref SyntheticsMonitorEndpointsCert
+          EXPIREDATE: !Ref SyntheticsMonitorCertificateExpireDays
+        TimeoutInSeconds: !Ref SyntheticsMonitorTimeoutSeconds
+        MemoryInMB: 960
+      ArtifactS3Location: !Sub "s3://syntheticsmonitor-results-${AWS::Region}-${AWS::AccountId}/SyntheticsMonitorCertificateResult/"
+      StartCanaryAfterCreation: true
+
+  SyntheticsMonitorCertificateAlarms:
+    Condition: HasDeploySyntheticMonitoring
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/synthetic-alarm.yaml"
+      Parameters:
+        SyntheticMonitorName: !Ref SyntheticsMonitorCertificate
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        Period: 86400
+
 Outputs:
   OOMAlarmArn:
     Value: !GetAtt CloudWatchAlarmOOM.Arn
@@ -855,7 +1271,6 @@ Outputs:
     Value: !GetAtt CompositeMetricGeneratorAlarm.Outputs.LambdaInvocationErrorLogsMetricAlarm
     Description: 'ARN of composite metric generator alarm'
 
-  
   DiagnosticTrailArn:
     Value: !GetAtt DiagnosticLambdaCloudTrail.Arn
     Description: 'ARN of diagnostic lambda cloudtrail'

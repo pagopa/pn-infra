@@ -70,10 +70,6 @@ Parameters:
     Type: String
     Default: ''
     Description: Intended usage of API
-
-  LogRetentionDays:
-    Type: Number
-    Default: 5
   
   AllowedCidrs:
     Type: String
@@ -893,7 +889,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub aws-waf-logs-${WAFName}
-      RetentionInDays: !Ref LogRetentionDays
+      RetentionInDays: 14
 
   # Create waf logging configuration
   ApiWafLoggingConfiguration:
