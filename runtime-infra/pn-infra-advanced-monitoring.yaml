@@ -34,7 +34,7 @@ Resources:
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         MetricName: !Sub "${ProjectName}-EMD_DownstreamDetection"
-        MetricNamespace: !!Ref MetricNamespace
+        MetricNamespace: !Ref MetricNamespace
         LogGroupName: /aws/ecs/pn-emd-integration
         FilterPattern: '{ $.level = "ERROR" && $.logger_name = "*ClientImpl" && $.message = "[DOWNSTREAM]*" && $.message = "*returned errors=*"}'
         Period: 300
