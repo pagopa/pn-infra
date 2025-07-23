@@ -36,7 +36,7 @@ Resources:
         MetricName: !Sub "${ProjectName}-EMD_DownstreamDetection
         MetricNamespace: !!Ref MetricNamespace
         LogGroupName: /aws/ecs/pn-emd-integration
-        FilterPattern: '{ $.level = "ERROR" && $.logger_name = "*ClientImpl" && $.message = "[DOWNSTREAM]*" && $.message = "*returned errors=*"}'
+        FilterPattern: '{ $.level = \"ERROR\" && $.logger_name = \"*ClientImpl\" && $.message = \"[DOWNSTREAM]*\" && $.message = \"*returned errors=*\"}'
         Period: 300
         Threshold: 1
         EvaluationPeriods: 12
@@ -44,3 +44,8 @@ Resources:
         Statistic: Sum
         ComparisonOperator: GreaterThanOrEqualToThreshold
         HasOncall: false
+
+Outputs:
+  Version:
+    Value: !Ref Version
+    Description: 'keep track of used projects commitIds'
