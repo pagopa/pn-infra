@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys advanced monitoring alarm'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: 'ARN of alarm SNS Topic'
+
+  MetricNamespace:
+    Type: String
+    Description: 'ARN of alarm SNS Topic'
+    Default: 'AdvancedMetric'
+
+  Version:
+    Type: String
+    Description: 'Version'
+
+  EMDDownstreamDetectionAlarmPeriodFilterPattern:
+    Type: String
+    Default: '{ $.level = "ERROR" }'
+
+  EMDDownstreamDetectionAlarmPeriod:
+    Type: Number
+    Default: 300 ### 5 minutes
+
+  EMDDownstreamDetectionAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  EMDDownstreamDetectionAlarmEvaluationPeriods:
+    Type: Number
+    Default: 12 ###12 * EMDDownstreamDetectionAlarmPeriod
+
+  EMDDownstreamDetectionAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  EMDDownstreamDetectionAlarmEnableOncall:
+    Type: String
+    Description: "Create onCall alarm"
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
+  OncallEMDDownstreamDetectionAlarmPeriod:
+    Type: Number
+    Default: 300 ### 5 minutes
+
+  OncallEMDDownstreamDetectionAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  OncallEMDDownstreamDetectionAlarmEvaluationPeriods:
+    Type: Number
+    Default: 12 ###12 * EMDDownstreamDetectionAlarmPeriod
+
+  OncallEMDDownstreamDetectionAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+Resources:
+
+  EMDDownstreamDetectionAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        MetricName: !Sub "${ProjectName}-emd-downstream-detection"
+        MetricNamespace: !Ref MetricNamespace
+        LogGroupName: /aws/ecs/pn-emd-integration
+        FilterPattern: !Ref EMDDownstreamDetectionAlarmPeriodFilterPattern
+        Period: !Ref EMDDownstreamDetectionAlarmPeriod
+        Threshold: !Ref EMDDownstreamDetectionAlarmThreshold
+        EvaluationPeriods: !Ref EMDDownstreamDetectionAlarmEvaluationPeriods
+        DatapointsToAlarm: !Ref EMDDownstreamDetectionAlarmPeriodDatapointsToAlarm
+        Statistic: Sum
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        HasOncall: !Ref EMDDownstreamDetectionAlarmEnableOncall
+        OncallPeriod: !Ref OncallEMDDownstreamDetectionAlarmPeriod
+        OncallThreshold: !Ref OncallEMDDownstreamDetectionAlarmThreshold
+        OncallEvaluationPeriods: !Ref OncallEMDDownstreamDetectionAlarmEvaluationPeriods
+        OncallDatapointsToAlarm: !Ref OncallEMDDownstreamDetectionAlarmPeriodDatapointsToAlarm
+        OncallComparisonOperator: GreaterThanOrEqualToThreshold
+        OncallStatistic: Sum
+
+Outputs:
+  Version:
+    Value: !Ref Version
+    Description: 'keep track of used projects commitIds'
