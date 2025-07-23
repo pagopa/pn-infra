@@ -24,6 +24,54 @@ Parameters:
     Type: String
     Description: 'Version'
 
+  EMDDownstreamDetectionAlarmPeriodFilterPattern:
+    Type: String
+    Default: '{ $.level = "ERROR" }'
+
+  EMDDownstreamDetectionAlarmPeriod:
+    Type: Number
+    Default: 300 ### 5 minutes
+
+  EMDDownstreamDetectionAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  EMDDownstreamDetectionAlarmEvaluationPeriods:
+    Type: Number
+    Default: 12 ###12 * EMDDownstreamDetectionAlarmPeriod
+
+  EMDDownstreamDetectionAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  EMDDownstreamDetectionAlarmEnableOncall:
+    Type: String
+    Description: "Create onCall alarm"
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
+  OncallEMDDownstreamDetectionAlarmPeriodFilterPattern:
+    Type: String
+    Default: '{ $.level = "ERROR" }'
+
+  OncallEMDDownstreamDetectionAlarmPeriod:
+    Type: Number
+    Default: 300 ### 5 minutes
+
+  OncallEMDDownstreamDetectionAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  OncallEMDDownstreamDetectionAlarmEvaluationPeriods:
+    Type: Number
+    Default: 12 ###12 * EMDDownstreamDetectionAlarmPeriod
+
+  OncallEMDDownstreamDetectionAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
 Resources:
 
   EMDDownstreamDetectionAlarm:
@@ -32,17 +80,17 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-EMD_DownstreamDetection"
+        MetricName: !Sub "${ProjectName}-emd-downstream-detection"
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: /aws/ecs/pn-emd-integration
-        FilterPattern: '{ $.level = "ERROR" && $.logger_name = "*ClientImpl" && $.message = "[DOWNSTREAM]*" && $.message = "*returned errors=*"}'
-        Period: 300
-        Threshold: 1
-        EvaluationPeriods: 12
-        DatapointsToAlarm: 1
+        FilterPattern: !Ref EMDDownstreamDetectionAlarmPeriodFilterPattern
+        Period: !Ref EMDDownstreamDetectionAlarmPeriod
+        Threshold: !Ref EMDDownstreamDetectionAlarmThreshold
+        EvaluationPeriods: !Ref EMDDownstreamDetectionAlarmEvaluationPeriods
+        DatapointsToAlarm: !Ref EMDDownstreamDetectionAlarmPeriodDatapointsToAlarm
         Statistic: Sum
         ComparisonOperator: GreaterThanOrEqualToThreshold
-        HasOncall: false
+        HasOncall: !Ref EMDDownstreamDetectionAlarmEnableOncall
 
 Outputs:
   Version:
