@@ -52,10 +52,6 @@ Parameters:
       - true
       - false
 
-  OncallEMDDownstreamDetectionAlarmPeriodFilterPattern:
-    Type: String
-    Default: '{ $.level = "ERROR" }'
-
   OncallEMDDownstreamDetectionAlarmPeriod:
     Type: Number
     Default: 300 ### 5 minutes
@@ -91,14 +87,13 @@ Resources:
         Statistic: Sum
         ComparisonOperator: GreaterThanOrEqualToThreshold
         HasOncall: !Ref EMDDownstreamDetectionAlarmEnableOncall
-        OncallFilterPattern: !Ref OncallEMDDownstreamDetectionAlarmPeriodFilterPattern
         OncallPeriod: !Ref OncallEMDDownstreamDetectionAlarmPeriod
         OncallThreshold: !Ref OncallEMDDownstreamDetectionAlarmThreshold
         OncallEvaluationPeriods: !Ref OncallEMDDownstreamDetectionAlarmEvaluationPeriods
         OncallDatapointsToAlarm: !Ref OncallEMDDownstreamDetectionAlarmPeriodDatapointsToAlarm
         OncallComparisonOperator: GreaterThanOrEqualToThreshold
         OncallStatistic: Sum
-        
+
 Outputs:
   Version:
     Value: !Ref Version
