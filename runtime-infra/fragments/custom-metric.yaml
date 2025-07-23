@@ -89,7 +89,7 @@ Parameters:
       - false
 
 Conditions:
-  hasOncallCondition: !Equals [ !Ref HasOncall, 'true' ]
+  HasOncallCondition: !Equals [ !Ref HasOncall, 'true' ]
     
 Resources:
   # CloudWatch metric to filer ERROR - FATAL lines, in Log group
@@ -130,7 +130,7 @@ Resources:
 
   OncallCustomErrorLogsMetricAlarm:
     Type: AWS::CloudWatch::Alarm
-    Condition: hasOncallCondition
+    Condition: HasOncallCondition
     Properties:
       AlarmName: !Sub "oncall-${MetricName}-Alarm"
       AlarmDescription: !Sub "CloudWatch oncall alarm on metric ${MetricName}."
