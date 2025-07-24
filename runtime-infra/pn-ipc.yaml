@@ -515,6 +515,22 @@ Resources:
         - Key: "Microservice"
           Value: "pn-radd-alt"
 
+  ### Communication FROM SafeStorage TO delayerReceiverOrdersSendersLambda ###
+  SafeStorageToDelayerReceiverOrdersSendersLambdaQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safestorage_to_delayer_orders_senders'
+        DelaySeconds: 1
+        VisibilityTimeout: 240 # 4 minutes
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-delayer"
+
   ### Communication between PN-DELIVERY and PN-DELIVERY-PUSH - FOR NOTIFICATION_VIEWED AND NOTIFICATION_PAID EVENTS###
   DeliveryPushInputsQueue:
     Type: AWS::CloudFormation::Stack
@@ -1063,6 +1079,20 @@ Outputs:
   SafeStorageToServiceDeskQueueAgeAlarmARN:
     Value: !GetAtt SafeStorageToServiceDeskQueue.Outputs.SqsAgeAlarmArn
     Description: SafeStorage-to-servicedesk queue age alarm ARN
+
+  # SafeStorage to delayerReceiverOrdersSendersLambda
+  SafeStorageToDelayerReceiverOrdersSendersLambdaQueueQueueName:
+    Value: !GetAtt SafeStorageToDelayerReceiverOrdersSendersLambdaQueue.Outputs.QueueName
+    Description: SafeStorage-to-delayerReceiverOrdersSendersLambda queue name
+  SafeStorageToDelayerReceiverOrdersSendersLambdaQueueURL:
+    Value: !GetAtt SafeStorageToDelayerReceiverOrdersSendersLambdaQueue.Outputs.QueueURL
+    Description: SafeStorage-to-delayerReceiverOrdersSendersLambda queue URL
+  SafeStorageToDelayerReceiverOrdersSendersLambdaQueueARN:
+    Value: !GetAtt SafeStorageToDelayerReceiverOrdersSendersLambdaQueue.Outputs.QueueARN
+    Description: SafeStorage-to-delayerReceiverOrdersSendersLambda queue ARN
+  SafeStorageToDelayerReceiverOrdersSendersLambdaQueueAlarmARN:
+    Value: !GetAtt SafeStorageToDelayerReceiverOrdersSendersLambdaQueue.Outputs.SqsDLQAlarmArn
+    Description: SafeStorage-to-delayerReceiverOrdersSendersLambda queue alarm ARN
 
   # Delivery push inputs
   DeliveryPushInputsQueueName:
