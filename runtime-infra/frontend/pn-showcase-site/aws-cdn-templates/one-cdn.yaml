@@ -1,0 +1,734 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::LanguageExtensions
+Description: Template CloudFormation for pn-showcase site.
+
+Parameters:
+  Name:
+    Description: "CDN Logical Name"
+    Type: String
+
+  WebDomain:
+    Description: "Domain for webapp"
+    Type: String
+
+  WebDomainReferenceToSite:
+    Description: true if the website must be reachable using the WebDomain
+    Type: String
+    Default: "true"
+
+  HostedZoneId:
+    Description: "Hosted Zone Id in which you want to add record"
+    Type: String
+
+  WebCertificateArn:
+    Description: "ACM Web Certificate ARN"
+    Type: String
+
+  MultiDomainCertificateArn:
+    Description: "ACM Multi-Domain Certificate ARN"
+    Type: String
+    Default: ""
+
+  MultiDomainAliases:
+    Description: "List of alternate names to use with the multi-domain certificate"
+    Type: CommaDelimitedList
+    Default: ""
+
+  Environment:
+    Type: String
+    Description: "Current environment (e.g. dev, test, uat, hotfix, prod) "
+    AllowedValues:
+      - dev
+      - test
+      - uat
+      - hotfix
+      - prod
+
+  WebBaseDnsZoneName:
+    Description: 'Base domain name used as main endpoint for pn-showcase site, used as alias on for the cloudfront distribution on CMS account'
+    Type: String
+    Default: ''
+
+  CmsCloudfrontDistName:
+    Description: 'Cloufront distibution used for hosting CMS version of showcase site, unique for all envs, located on CMS aws account '
+    Type: String
+    Default: 'd3g8ypiee9w1jl.cloudfront.net'
+
+  MultiDomainCertInternalAliasesWithZones:
+    Type: CommaDelimitedList
+    Description: 'List of internal domains included in the certificate with relative zone ID (format: domain|zoneid)'
+    Default: ''
+
+  MultiDomainCertExternalAliasesWithZones:
+    Type: CommaDelimitedList
+    Description: 'List of external domains included in the certificate with relative zone ID (format: domain|zonename)'
+    Default: ''
+
+  #  Do not remove, we are waiting for DPIA approval about WAF on us-east-1 region
+  #  Limit:
+  #    Type: Number
+  #    Description: The limit on requests per 5-minute period for a single originating IP address.
+  #    Default: 1000
+
+  RequestsAlarmMinimumLimit:
+    Type: Number
+    Default: 300000
+    Description: The limit of requests on 5 minutes period to raise an alarm
+
+  ErrorRateAlarmPercentageLimit:
+    Type: Number
+    Default: 20
+    Description: The limit of error rate percentage on 5 minutes period to raise an alarm
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the topic to send the alarm to
+
+  S3LogsBucket:
+    Type: String
+    Default: '-'
+    Description: Access Log bucket name
+  
+  EnableCdnRedirectFunction:
+    Type: String
+    Description: "If true, enble the creation and use of the cloudfront function used in the multidomain setup"
+    Default: false
+    AllowedValues:
+      - false
+      - true
+
+Conditions:
+  UseMultiDomainCertificate: !Not
+    - !Equals
+      - !Ref MultiDomainCertificateArn
+      - ''
+
+  NotUseMultiDomainCertificate: !Equals
+    - !Ref MultiDomainCertificateArn
+    - ''
+
+  HasLogsBucket: !Not [ !Equals [ !Ref S3LogsBucket, "-" ] ]
+
+  CreateExternalRecordsOutput: !And
+    - !Not
+      - !Equals
+        - !Ref MultiDomainCertificateArn
+        - ''
+    - !Not
+      - !Equals
+        - !Join
+          - ''
+          - !Ref MultiDomainCertExternalAliasesWithZones
+        - ''
+
+  CreateInternalRecords: !And
+    - !Not
+      - !Equals
+        - !Ref MultiDomainCertificateArn
+        - ''
+    - !Not
+      - !Equals
+        - !Join
+          - ''
+          - !Ref MultiDomainCertInternalAliasesWithZones
+        - ''
+
+  CreateDnsRecordToCmsCloudfrontDist: !And
+    - !Condition UseMultiDomainCertificate
+    - !Equals
+      - !Ref Environment
+      - prod
+  
+  UseMultiDomainRedirectFunction: !And
+    - !Condition UseMultiDomainCertificate
+    - !Equals
+      - !Ref EnableCdnRedirectFunction
+      - true
+
+Resources:
+  # - CloudFront Origin Access Control (OAC)
+  CloudfrontOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${Name}-Cloudfront-OAC"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  # - WebApp S3 Bucket
+  S3BucketForWebsiteContent:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  # - Webapp S3 Bucket policy
+  S3BucketForWebsiteContentPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref "S3BucketForWebsiteContent"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - s3:GetObject
+            Effect: Allow
+            Resource: !Sub "${S3BucketForWebsiteContent.Arn}/*"
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${WebsiteCDN}"
+
+  # - WebApp default one minute caching policy
+  WebsiteCDNCachingPolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub "${Name}-WebsiteCDNCachingPolicy"
+        Comment: "Keep cache for one minute."
+        DefaultTTL: 30
+        MaxTTL: 60
+        MinTTL: 10
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingBrotli: true
+          EnableAcceptEncodingGzip: true
+          CookiesConfig:
+            CookieBehavior: none
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: all
+
+  # - WebApp default one hour caching policy
+  WebsiteCDNCachingPolicyOneHour:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub "${Name}-WebsiteCDNCachingPolicyOneHour"
+        Comment: "Keep cache for one hour."
+        DefaultTTL: 3600 ## 1 hour
+        MaxTTL: 3600
+        MinTTL: 1
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingBrotli: true
+          EnableAcceptEncodingGzip: true
+          CookiesConfig:
+            CookieBehavior: none
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: all
+
+  # - WebApp default five minutes caching policy
+  WebsiteCDNCachingPolicyFiveMinutes:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub "${Name}-WebsiteCDNCachingPolicyFiveMinutes"
+        Comment: "Keep cache for five minutes."
+        DefaultTTL: 300
+        MaxTTL: 300
+        MinTTL: 1
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingBrotli: true
+          EnableAcceptEncodingGzip: true
+          CookiesConfig:
+            CookieBehavior: none
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+
+  # - WebApp CDN
+  WebsiteCDN:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: CDN for S3-backed website
+        Aliases: !If
+          - NotUseMultiDomainCertificate
+          - - !Ref WebDomain
+          - !Ref MultiDomainAliases
+        Enabled: "true"
+        CacheBehaviors:
+          - AllowedMethods:
+              - GET
+              - HEAD
+            CachedMethods:
+              - GET
+              - HEAD
+            TargetOriginId: !Sub "S3-${S3BucketForWebsiteContent}"
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: !Ref WebsiteCDNCachingPolicyFiveMinutes
+            ResponseHeadersPolicyId: !Ref DefaultHeaderPolicy
+            FunctionAssociations:
+              - !If
+                - UseMultiDomainRedirectFunction
+                - EventType: viewer-request
+                  FunctionARN: !GetAtt MultiDomainRedirectFunction.FunctionMetadata.FunctionARN
+                - EventType: viewer-request
+                  FunctionARN: !GetAtt RewriteFunction.FunctionMetadata.FunctionARN
+            PathPattern: /index.html
+          - AllowedMethods:
+              - GET
+              - HEAD
+            CachedMethods:
+              - GET
+              - HEAD
+            TargetOriginId: !Sub "S3-${S3BucketForWebsiteContent}"
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: b2884449-e4de-46a7-ac36-70bc7f1ddd6d ## CachingOptimizedForUncompressedObjects - Default TTL: 86,400 seconds (24 hours) - https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-cache-policies.html#managed-cache-policies-list
+            ResponseHeadersPolicyId: !Ref DefaultHeaderPolicy
+            PathPattern: /static*
+          - AllowedMethods:
+              - GET
+              - HEAD
+            CachedMethods:
+              - GET
+              - HEAD
+            TargetOriginId: !Sub "S3-${S3BucketForWebsiteContent}"
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: b2884449-e4de-46a7-ac36-70bc7f1ddd6d ## CachingOptimizedForUncompressedObjects - Default TTL: 86,400 seconds (24 hours) - https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-cache-policies.html#managed-cache-policies-list
+            ResponseHeadersPolicyId: !Ref DefaultHeaderPolicy
+            PathPattern: /onetrust*
+          - AllowedMethods:
+              - GET
+              - HEAD
+            CachedMethods:
+              - GET
+              - HEAD
+            TargetOriginId: !Sub "S3-${S3BucketForWebsiteContent}"
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: !Ref WebsiteCDNCachingPolicyOneHour
+            ResponseHeadersPolicyId: !Ref DefaultHeaderPolicy
+            PathPattern: /locales*
+          - AllowedMethods:
+              - GET
+              - HEAD
+            CachedMethods:
+              - GET
+              - HEAD
+            TargetOriginId: !Sub "S3-${S3BucketForWebsiteContent}"
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: !Ref WebsiteCDNCachingPolicyOneHour
+            ResponseHeadersPolicyId: !Ref DefaultHeaderPolicy
+            PathPattern: /icons*                 
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
+            - GET
+            - HEAD
+          TargetOriginId: !Sub "S3-${S3BucketForWebsiteContent}"
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: !Ref WebsiteCDNCachingPolicy
+          ResponseHeadersPolicyId: !Ref DefaultHeaderPolicy
+          FunctionAssociations:
+            - !If
+              - UseMultiDomainRedirectFunction
+              - EventType: viewer-request
+                FunctionARN: !GetAtt MultiDomainRedirectFunction.FunctionMetadata.FunctionARN
+              - EventType: viewer-request
+                FunctionARN: !GetAtt RewriteFunction.FunctionMetadata.FunctionARN
+        DefaultRootObject: index.html
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: "/404/index.html"
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: "/404/index.html"
+        Origins:
+          - DomainName: !Sub "${S3BucketForWebsiteContent.RegionalDomainName}"
+            Id: !Sub "S3-${S3BucketForWebsiteContent}"
+            OriginAccessControlId: !GetAtt CloudfrontOAC.Id
+            S3OriginConfig: {}
+        Logging:
+          Fn::If:
+            - HasLogsBucket
+            - Bucket: !Sub ${S3LogsBucket}.s3.eu-central-1.amazonaws.com
+              IncludeCookies: false
+            - !Ref AWS::NoValue
+        ViewerCertificate: !If
+          - UseMultiDomainCertificate
+          - AcmCertificateArn: !Ref MultiDomainCertificateArn
+            MinimumProtocolVersion: TLSv1.2_2021
+            SslSupportMethod: sni-only
+          - AcmCertificateArn: !Ref WebCertificateArn
+            MinimumProtocolVersion: TLSv1.2_2021
+            SslSupportMethod: sni-only
+
+  DefaultHeaderPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub "${Name}-headerPolicy"
+        SecurityHeadersConfig:
+          ContentSecurityPolicy:
+            ContentSecurityPolicy:
+              Fn::Join:
+                - " "
+                - - "default-src 'self';"
+                  - "object-src 'self' https://www.notifichedigitali.pagopa.it/ https://notifichedigitali.pagopa.it ;"
+                  - !Sub " connect-src 'self' \
+                    https://selfcare.pagopa.it/assets/ \
+                    https://privacyportalde-cdn.onetrust.com/ \
+                    https://pdnd-prod-dl-1-public-data.s3.eu-central-1.amazonaws.com/dashboard/send/ \
+                    https://vega.github.io/schema/vega-lite/v5.json \
+                    https://maps.${WebBaseDnsZoneName}/ \
+                    https://webapi.${WebBaseDnsZoneName}/location/; \
+                    style-src 'self' 'unsafe-inline' https://privacyportalde-cdn.onetrust.com/; \
+                    worker-src blob: ; \
+                    child-src blob: ; \
+                    font-src 'self'; \
+                    frame-ancestors 'self' \
+                    https://${WebBaseDnsZoneName}/ \ 
+                    https://${CmsCloudfrontDistName}/ \ 
+                    https://preview.b2bportals.pagopa.it/ \ 
+                    https://staging.send.b2bportals.pagopa.it/ ; \
+                    img-src 'self' https://assets.cdn.io.italia.it/ data: blob:"
+            Override: true
+          # add_header X-Content-Type-Options "nosniff";
+          ContentTypeOptions:
+            #ContentTypeOptions: "nosniff"
+            Override: true
+          # add_header X-Frame-Options "SAMEORIGIN";
+          FrameOptions:
+            FrameOption: "SAMEORIGIN"
+            Override: true
+          # add_header Referrer-Policy "no-referrer";
+          ReferrerPolicy:
+            ReferrerPolicy: "strict-origin-when-cross-origin"
+            Override: true
+          # add_header Strict-Transport-Security "max-age=31536000";
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 31536000
+            IncludeSubdomains: false
+            Preload: false
+            Override: true
+
+  #Fn::ForEach to create internal dns records dynamically
+  Fn::ForEach::DnsRecords:
+    - DomainIndex
+    - !If
+      - CreateInternalRecords
+      - !Ref MultiDomainCertInternalAliasesWithZones
+      - []
+    - DNSRecord&{DomainIndex}:
+        Type: AWS::Route53::RecordSet
+        Condition: UseMultiDomainCertificate
+        Properties:
+          Name: !Select
+            - 0
+            - !Split
+              - '|'
+              - !Ref DomainIndex
+          Type: A
+          HostedZoneId: !Select
+            - 1
+            - !Split
+              - '|'
+              - !Ref DomainIndex
+          AliasTarget:
+            DNSName: !GetAtt WebsiteCDN.DomainName
+            EvaluateTargetHealth: false
+            HostedZoneId: Z2FDTNDATAQYW2
+
+  Route53RecordSetGroup:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Ref WebDomain
+      Type: A
+      HostedZoneId: !Ref HostedZoneId
+      AliasTarget:
+        DNSName: !GetAtt WebsiteCDN.DomainName
+        EvaluateTargetHealth: false
+        HostedZoneId: Z2FDTNDATAQYW2
+  
+  Route53CmsWebsiteRecordSet:
+    Type: AWS::Route53::RecordSet
+    Condition: CreateDnsRecordToCmsCloudfrontDist
+    Properties:
+      Name: !Ref WebBaseDnsZoneName
+      Type: A
+      HostedZoneId: !Ref HostedZoneId
+      AliasTarget:
+        DNSName: !Ref CmsCloudfrontDistName
+        EvaluateTargetHealth: false
+        HostedZoneId: Z2FDTNDATAQYW2
+
+  ##
+  ## Rewrite rule based on example provided by aws at https://github.com/aws-samples/amazon-cloudfront-functions/blob/main/url-rewrite-single-page-apps/index.js
+  RewriteFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      AutoPublish: true
+      FunctionCode: |
+        function handler(event) {
+            var request = event.request;
+            var uri = request.uri;
+            
+            if( uri != '/' && uri != '' ) { // Do not override default root object
+              
+              // Check whether the URI is missing a file name.
+              if (uri.endsWith('/')) {
+                request.uri += 'index.html';
+              } 
+              // Check whether the URI is missing a file extension.
+              else if (!uri.includes('.')) {
+                request.uri += '/index.html';
+              }
+             }
+            
+            return request;
+        }
+      FunctionConfig:
+        Comment: "Rewriting the request between a CloudFront Distribution and an origin"
+        Runtime: cloudfront-js-1.0
+      Name: !Sub "${AWS::StackName}-RewriteDefaultIndexRequest"
+
+  MultiDomainRedirectFunction:
+    Type: AWS::CloudFront::Function
+    Condition: UseMultiDomainRedirectFunction
+    DependsOn: Route53CmsWebsiteRecordSet
+    Properties:
+      AutoPublish: true
+      FunctionCode: !Sub
+        - |
+          function handler(event) {
+              var request = event.request;
+              var host = request.headers.host ? request.headers.host.value.toLowerCase() : '';
+
+              // Showcase handling
+              if (host === 'showcase.${WebBaseDnsZoneName}') {
+                  if (request.uri !== '/' && request.uri !== '') {
+                      if (request.uri.endsWith('/')) {
+                          request.uri += 'index.html';
+                      } else if (!request.uri.includes('.')) {
+                          request.uri += '/index.html';
+                      }
+                  }
+                  return request;
+              }
+
+              //target domain
+              var targetDomain = '${WebBaseDnsZoneName}';
+
+              //split the string containing the joined array from parameter multiDomainAliases, needed as cloudformtaion resolve the parameter as array in yaml format not recognized by js
+              var multiDomainAliasesString = '${multiDomainAliasesString}';
+              var domainsToRedirect = multiDomainAliasesString.split('|');
+
+              //remove showcase from domains array to redirect
+              domainsToRedirect = domainsToRedirect.filter(function(domain) {
+                  return domain !== 'showcase.' + targetDomain;
+              });
+
+              if (domainsToRedirect.includes(host)) {
+                  // Remove '/it/' from path
+                  var path = request.uri;
+                  if (path.startsWith('/it/')) {
+                      path = path.replace('/it/', '/');
+                  }
+
+                  // Mapping slugs old -> new
+                  var slugMapping = {
+                      '/pubbliche-amministrazioni': '/enti',
+                      '/pubbliche-amministrazioni/documenti': '/enti-come-aderire',
+                      '/assistenza': '/', // Redirect to home
+                  };
+
+                  for (var oldSlug in slugMapping) {
+                      if (path === oldSlug || path === oldSlug + '/') {
+                          path = slugMapping[oldSlug];
+                          break;
+                      }
+                  }
+
+                  var response = {
+                      statusCode: 301,
+                      statusDescription: 'Moved Permanently',
+                      headers: {
+                          'location': {
+                              value: 'https://' + targetDomain + path
+                          },
+                          'cache-control': {
+                              value: 'no-store, no-cache, must-revalidate'
+                          }
+                      }
+                  };
+                  return response;
+              }
+
+              return request;
+          }
+        #join with | and split again for create an array inside the function, as the domains associated with the cert are in commadelimitedlist parameter:
+        #cloudformation resolve it as yaml formatted array not recognized by js
+        - multiDomainAliasesString: !Join
+            - '|'
+            - !Ref MultiDomainAliases
+      FunctionConfig:
+        Comment: URL redirects to CMS uri and slug mapping for legacy paths
+        Runtime: cloudfront-js-1.0
+      Name: !Sub ${AWS::StackName}-MultiDomainRedirectFunction
+
+  # Alarms
+  TooManyRequestsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${WebDomain}-DistributionRequestsAlarm"
+      AlarmDescription: "CloudWatch alarm for when distributions requests rate is too high."
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      InsufficientDataActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Threshold: !Ref RequestsAlarmMinimumLimit
+      TreatMissingData: notBreaching
+      Namespace: "AWS/CloudFront"
+      Period: 300
+      MetricName: "Requests"
+      Dimensions:
+        - Name: DistributionId
+          Value: !Ref WebsiteCDN
+      Statistic: "Sum"
+
+  TooManyErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${WebDomain}-DistributionErrorsAlarm"
+      AlarmDescription: "CloudWatch alarm for when distributions error rate is too high."
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      InsufficientDataActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Threshold: !Ref ErrorRateAlarmPercentageLimit
+      TreatMissingData: notBreaching
+      Namespace: "AWS/CloudFront"
+      MetricName: "TotalErrorRate"
+      Dimensions:
+        - Name: DistributionId
+          Value: !Ref WebsiteCDN
+      Statistic: "Average"
+
+  # AWS WAF Web ACLs for CloudFront
+  #ApiWafWebAcl:
+  #  Type: AWS::WAFv2::WebACL
+  #  Properties:
+  #    DefaultAction:
+  #      Allow: {}
+  #    Description: Web Application Firewall for AWS CloudFront
+  #    Name: !Join ["-", [CloudFront-WAF, !Ref Name]]
+  #    Rules:
+  #      - Name: AWSManagedRulesAmazonIpReputationList
+  #        OverrideAction:
+  #          None: {}
+  #        Priority: 0
+  #        Statement:
+  #          ManagedRuleGroupStatement:
+  #            VendorName: AWS
+  #            Name: AWSManagedRulesAmazonIpReputationList
+  #        VisibilityConfig:
+  #          CloudWatchMetricsEnabled: true
+  #          MetricName: AWSManagedRulesAmazonIpReputationList
+  #          SampledRequestsEnabled: true
+  #      - Name: AWSManagedRulesAnonymousIpList
+  #        OverrideAction:
+  #          None: {}
+  #        Priority: 1
+  #        Statement:
+  #          ManagedRuleGroupStatement:
+  #            VendorName: AWS
+  #            Name: AWSManagedRulesAnonymousIpList
+  #        VisibilityConfig:
+  #          CloudWatchMetricsEnabled: true
+  #          MetricName: AWSManagedRulesAnonymousIpList
+  #          SampledRequestsEnabled: true
+  #      - Action:
+  #          Block: {}
+  #        Name: "CloudFront_Rate_based_Rule"
+  #        Priority: 2
+  #        Statement:
+  #          RateBasedStatement:
+  #            Limit: !Ref Limit
+  #            AggregateKeyType: IP
+  #        VisibilityConfig:
+  #          SampledRequestsEnabled: true
+  #          CloudWatchMetricsEnabled: true
+  #          MetricName: "CloudFront_Rate_based_Rule"
+  #    Scope: CLOUDFRONT
+  #    VisibilityConfig:
+  #      CloudWatchMetricsEnabled: true
+  #      MetricName: !Join ["-", [CloudFront-WAF, !Ref Name]]
+  #      SampledRequestsEnabled: true
+
+Outputs:
+  # - WebApp Outputs
+  WebAppBucketName:
+    Value: !Ref "S3BucketForWebsiteContent"
+    Description: Name of S3 bucket to hold website content
+  WebAppCdnUrl:
+    Value: !Join ["", ["https://", !GetAtt WebsiteCDN.DomainName]]
+    Description: Site access URL
+  WebDomainUrl:
+    Value: !Sub "https://${WebDomain}"
+    Description: Site access URL
+  # AlternateWebDomainUrl:
+  #   Condition: CreateAlternateDNSname
+  #   Value: !Sub "http://${AlternateWebDomain}"
+  #   Description: Alternate site access URL
+
+  # Distribution ID
+  DistributionId:
+    Description: Cloudfront distribution ID
+    Value: !Ref WebsiteCDN
+    
+  TooManyErrorsAlarmArn:
+    Value: !GetAtt TooManyErrorsAlarm.Arn
+    Description: ARN of distribution too many errors alarm
+
+  TooManyRequestsAlarmArn:
+    Value: !GetAtt TooManyRequestsAlarm.Arn
+    Description: ARN of distribution too many requests alarm
+
+  #Fn::ForEach to print output with instructions related to the creation of dns records (for external zones)
+  Fn::ForEach::ManualRecords:
+    - ExternalDomain
+    - !If
+      - CreateExternalRecordsOutput
+      - !Ref MultiDomainCertExternalAliasesWithZones
+      - []
+    - ExternalDNSRecord&{ExternalDomain}:
+        Value: !Sub
+          - |
+            Create DNS record in the external zone -->
+            Domain: ${DomainName}
+            Zone: ${ZoneName}
+            Type: A (Alias)
+            Value: ${DistributionName}
+          - DomainName: !Select
+              - 0
+              - !Split
+                - '|'
+                - !Ref ExternalDomain
+            ZoneName: !Select
+              - 1
+              - !Split
+                - '|'
+                - !Ref ExternalDomain
+            DistributionName: !GetAtt WebsiteCDN.DomainName
+        Condition: CreateExternalRecordsOutput
