@@ -1,5 +1,10 @@
 AWSTemplateFormatVersion: 2010-09-09
 
+Parameters:
+  BucketRetention:
+    Type: String
+    Description: Retention of bucket 
+
 Resources:
   ### - S3 Bucket for logs storages
   ###########################################
@@ -19,6 +24,11 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpirationRule
+            Status: Enabled
+            ExpirationInDays: !Ref BucketRetention
 
   # - Bucket access policy
   LogsBucketPolicy:
