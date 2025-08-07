@@ -27,15 +27,10 @@ Resources:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Sub ${MacroServiceName}-ecs-cluster
-
-  ClusterCapacityProviderAssociations:
-    Type: AWS::ECS::ClusterCapacityProviderAssociations
-    Condition: IsSpotEnabledEnvironment
-    Properties:
-      Cluster: !Ref ECSCluster
-      CapacityProviders:
-        - 'FARGATE'
-        - 'FARGATE_SPOT'
+      CapacityProviders: !If
+        - IsSpotEnabledEnvironment
+        - [ 'FARGATE', 'FARGATE_SPOT' ]
+        - !Ref "AWS::NoValue"
 
 Outputs:
   ClusterName:
