@@ -628,6 +628,7 @@ Resources:
       FunctionName: !Ref DynamoDbExportFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt Schedule.Arn
+      SourceAccount: !Ref AWS::AccountId
 
   ExportFunctionLogroup:
     Type: AWS::Logs::LogGroup
@@ -905,6 +906,7 @@ Resources:
       FunctionName: !Ref PaperRequestErrorDumpFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt ScheduleErrorDumpFunction.Arn
+      SourceAccount: !Ref AWS::AccountId
 
   ErrorDumpFunctionLogroup:
     Condition: IsCoreAccount

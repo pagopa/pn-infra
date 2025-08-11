@@ -222,7 +222,8 @@ Resources:
       FunctionName: !Ref CognitoTriggerLambda
       Principal: cognito-idp.amazonaws.com
       SourceArn: !Sub "arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}"
-
+      SourceAccount: !Ref AWS::AccountId
+      
   S3BucketPolicy:  
     Type: AWS::S3::BucketPolicy
     Properties: 

@@ -1829,6 +1829,7 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !GetAtt TransformFunction.Arn
       Principal: 'cloudformation.amazonaws.com'
+      SourceAccount: !Ref AWS::AccountId
 
   TrimListFunctionPermissions:
     Type: AWS::Lambda::Permission
@@ -1836,6 +1837,7 @@ Resources:
         Action: 'lambda:InvokeFunction'
         FunctionName: !GetAtt TrimListFunction.Arn
         Principal: 'cloudformation.amazonaws.com'
+        SourceAccount: !Ref AWS::AccountId
 
   OerTransformFunctionPermissions:
     Type: AWS::Lambda::Permission
@@ -1843,3 +1845,4 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !GetAtt OerTransformFunction.Arn
       Principal: 'cloudformation.amazonaws.com'
+      SourceAccount: !Ref AWS::AccountId
