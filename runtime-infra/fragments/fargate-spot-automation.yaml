@@ -1,0 +1,302 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates resources for fargate spot adoption for non-production environment's microservices
+
+Parameters:
+  EnvironmentType:
+    Type: String
+    Description: "Environment type (dev, test, hotfix)"
+    AllowedValues:
+      - dev
+      - test
+      - hotfix
+  SpotStrategyDefinition:
+    Type: String
+    Description: JSON definition for Fargate Spot capacity provider strategy.
+  ProjectName:
+    Type: String
+    Description: The project name, used as a prefix for resource names.
+    Default: pn
+  MaxWorkers:
+    Type: Number
+    Description: Maximum number of parallel workers for updating ECS services.
+    Default: 10
+  ExcludedServicePrefixes:
+    Type: String
+    Description: Comma-separated list of service name prefixes to exclude from Fargate Spot updates (example 'pn-delivery-microsvc,mockconsolidatore')
+    Default: ''
+  FargateSpotOrchestratorReservedConcurrency:
+    Type: Number
+    Description: FargateSpotOrchestrator lambda reserved concurrency
+    Default: 1
+
+
+Resources:
+  
+  # CloudWatch Log Group for Spot statistics/monitoring
+  SpotInterruptionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/events/${ProjectName}-spot-interruption-monitoring
+      RetentionInDays: 90
+
+  FargateSpotOrchestratorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-FargateSpotOrchestratorRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: 'ECSUpdateAndSSMReadPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 'ecs:ListClusters'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ecs:ListServices'
+                  - 'ecs:DescribeServices'
+                  - 'ecs:DescribeClusters'
+                Resource:
+                  - !Sub 'arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:cluster/*'
+                  - !Sub 'arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:service/*/*'
+              - Effect: Allow
+                Action: 'ecs:UpdateService'
+                Resource: 
+                  - !Sub 'arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:service/*/*'
+                  - !Sub 'arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:cluster/*'
+              - Effect: Allow
+                Action: 'ssm:GetParameter'
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${EnvironmentType}/ecs/fargate-spot/enabled'
+
+  #Lambda FargateSpotOrchestrator: per env. logic
+  FargateSpotOrchestratorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${ProjectName}-FargateSpotOrchestrator
+      Runtime: python3.11
+      Role: !GetAtt FargateSpotOrchestratorRole.Arn
+      Handler: index.handler
+      Timeout: 120
+      MemorySize: 256
+      ReservedConcurrentExecutions: !Ref FargateSpotOrchestratorReservedConcurrency
+      Environment:
+        Variables:
+          SPOT_STRATEGY_DEFINITION: !Ref SpotStrategyDefinition
+          MAX_WORKERS: !Ref MaxWorkers
+          EXCLUDED_SERVICE_PREFIXES: !Ref ExcludedServicePrefixes
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import boto3
+          import logging
+          from botocore.exceptions import ClientError
+          from concurrent.futures import ThreadPoolExecutor, as_completed
+
+          # Setup logging
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          ecs_client = boto3.client('ecs')
+          ssm_client = boto3.client('ssm')
+
+          def is_service_excluded(service_name, excluded_prefixes):
+              """Check if service should be excluded based on prefix matching"""
+              for prefix in excluded_prefixes:
+                  if service_name.startswith(prefix):
+                      return True
+              return False
+
+          def update_service_strategy(cluster_arn, service_arn, is_enabled, strategy_definition):
+              service_name = service_arn.split('/')[-1]
+              try:
+                  logger.info(f"Updating service {service_name} to {'FARGATE_SPOT' if is_enabled else 'FARGATE'}")
+                  params = {
+                      'cluster': cluster_arn,
+                      'service': service_arn,
+                      'forceNewDeployment': True
+                  }
+                  if is_enabled:
+                      params['capacityProviderStrategy'] = strategy_definition
+                  else:
+                      params['capacityProviderStrategy'] = []
+
+                  ecs_client.update_service(**params)
+                  logger.info(f"Successfully updated service {service_name}")
+                  return {"service": service_name, "status": "SUCCESS"}
+              except Exception as e:
+                  logger.error(f"Failed to update service {service_name}: {e}")
+                  return {"service": service_name, "status": "FAILED", "error": str(e)}
+
+          def handler(event, context):
+              global_param_name = event['detail']['name']
+
+              try:
+                  response = ssm_client.get_parameter(Name=global_param_name)
+                  is_enabled_str = response['Parameter']['Value'].lower()
+
+                  if is_enabled_str not in ['true', 'false']:
+                      raise ValueError(f"Invalid value for parameter {global_param_name}: '{is_enabled_str}'")
+
+                  is_enabled = is_enabled_str == 'true'
+                  target_mode = 'FARGATE_SPOT' if is_enabled else 'FARGATE'
+                  logger.info(f"Global Spot setting is now: {is_enabled}. Target mode: {target_mode}")
+
+                  strategy_definition = json.loads(os.environ['SPOT_STRATEGY_DEFINITION'])
+                  max_workers = int(os.environ['MAX_WORKERS'])
+                  
+                  # Parse excluded service prefixes
+                  excluded_prefixes_str = os.environ.get('EXCLUDED_SERVICE_PREFIXES', '')
+                  excluded_prefixes = [prefix.strip() for prefix in excluded_prefixes_str.split(',') if prefix.strip()]
+                  
+                  if excluded_prefixes:
+                      logger.info(f"Excluded service prefixes: {excluded_prefixes}")
+
+                  # Discovery and Filtering
+                  services_to_update = []
+                  excluded_count = 0
+                  cluster_arns = ecs_client.list_clusters().get('clusterArns', [])
+
+                  for cluster_arn in cluster_arns:
+                      # Check cluster capacity providers
+                      cluster_info = ecs_client.describe_clusters(clusters=[cluster_arn])['clusters'][0]
+                      available_providers = cluster_info.get('capacityProviders', [])
+
+                      if 'FARGATE' not in available_providers or 'FARGATE_SPOT' not in available_providers:
+                          cluster_name = cluster_arn.split('/')[-1]
+                          logger.info(f"Skipping cluster {cluster_name} - missing required capacity providers")
+                          continue
+
+                      paginator = ecs_client.get_paginator('list_services')
+                      for page in paginator.paginate(cluster=cluster_arn):
+                          service_arns = page.get('serviceArns', [])
+                          if not service_arns:
+                              continue
+
+                          described_services = ecs_client.describe_services(cluster=cluster_arn, services=service_arns)['services']
+                          for service in described_services:
+                              service_name = service['serviceName']
+                              
+                              # Check if service is excluded
+                              if is_service_excluded(service_name, excluded_prefixes):
+                                  logger.info(f"Skipping excluded service: {service_name}")
+                                  excluded_count += 1
+                                  continue
+                              
+                              # Check current mode
+                              current_mode = 'FARGATE'
+                              if service.get('capacityProviderStrategy'):
+                                  if any(cs['capacityProvider'] == 'FARGATE_SPOT' for cs in service['capacityProviderStrategy']):
+                                      current_mode = 'FARGATE_SPOT'
+
+                              if current_mode != target_mode:
+                                  services_to_update.append({'clusterArn': cluster_arn, 'serviceArn': service['serviceArn']})
+
+                  if excluded_count > 0:
+                      logger.info(f"Total services excluded: {excluded_count}")
+
+                  if not services_to_update:
+                      logger.info("All services are already in the desired state. No action needed.")
+                      return {'status': 'SUCCESS', 'message': 'No services required updates.'}
+
+                  logger.info(f"Found {len(services_to_update)} services to update to mode '{target_mode}'.")
+
+                  # Parallel Execution
+                  results = []
+                  with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                      futures = [executor.submit(update_service_strategy, s['clusterArn'], s['serviceArn'], is_enabled, strategy_definition) for s in services_to_update]
+                      for future in as_completed(futures):
+                          results.append(future.result())
+
+                  # Summary
+                  success_count = sum(1 for r in results if r['status'] == 'SUCCESS')
+                  failed_count = len(results) - success_count
+
+                  logger.info(f"Execution summary: {success_count} succeeded, {failed_count} failed.")
+                  if failed_count > 0:
+                      failed_services = [r for r in results if r['status'] == 'FAILED']
+                      logger.error(f"Failed services: {json.dumps(failed_services, indent=2)}")
+                      raise Exception(f"{failed_count} services failed to update.")
+
+                  return {'status': 'SUCCESS', 'message': f'Successfully updated {success_count} services.'}
+
+              except Exception as error:
+                  logger.error(f"An error occurred in the orchestrator: {error}")
+                  raise
+
+  FargateSpotOrchestratorRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub ${ProjectName}-FargateSpotOrchestratorRule
+      Description: Triggers the Fargate Spot Orchestrator Lambda on global SSM parameter change.
+      EventPattern:
+        source:
+          - aws.ssm
+        detail-type:
+          - Parameter Store Change
+        detail:
+          name:
+            - !Sub /${EnvironmentType}/ecs/fargate-spot/enabled
+          operation:
+            - Update
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt FargateSpotOrchestratorFunction.Arn
+          Id: FargateSpotOrchestratorTarget
+
+  FargateSpotOrchestratorPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt FargateSpotOrchestratorFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt FargateSpotOrchestratorRule.Arn
+      SourceAccount: !Ref AWS::AccountId
+
+  #  EventBridge Rules for Spot interruptions monitoring
+  SpotInterruptionEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub ${ProjectName}-SpotInterruptionEventRule
+      Description: Monitors ECS Task State Changes due to Spot Interruptions
+      EventPattern:
+        source:
+          - aws.ecs
+        detail-type:
+          - ECS Task State Change
+        detail:
+          stopCode:
+            - SpotInterruption
+      State: ENABLED
+      Targets:
+        - Id: LogGroupTarget
+          Arn: !GetAtt SpotInterruptionLogGroup.Arn
+
+  TaskPlacementFailureEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub ${ProjectName}-TaskPlacementFailureEventRule
+      Description: Monitors ECS Deployment State Changes due to Task Placement Failures
+      EventPattern:
+        source:
+          - aws.ecs
+        detail-type:
+          - ECS Deployment State Change
+        detail:
+          eventName:
+            - SERVICE_TASK_PLACEMENT_FAILURE
+          reason:
+            - RESOURCE:FARGATE
+      State: ENABLED
+      Targets:
+        - Id: LogGroupTarget
+          Arn: !GetAtt SpotInterruptionLogGroup.Arn
