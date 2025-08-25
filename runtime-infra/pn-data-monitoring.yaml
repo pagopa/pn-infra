@@ -71,7 +71,7 @@ Parameters:
     Description: Datalake Role Name
     Default: 'pagopa-pn'
   
-  DataMonitoringSlackEmailTo:
+  DataAnalysisSlackEmail:
     Type: String
     Description: Slack Email channel
     Default: ''
@@ -796,7 +796,7 @@ Resources:
           S3Bucket: !Ref DataMonitoringBucket
           Prefix: PaperRequestError-Dump-Lambda
           DeleteItems: !Ref PaperRequestErrorDumpFunctionDelete
-          SnsTopicArn: !Ref EMailSnsTopic
+          SnsTopicArn: !Ref DataAnalysisTopicName
           Region: !Ref AWS::Region
           AccountID: !Ref AWS::AccountId
           PresignedUrlTime: !Ref PresignedUrlTimeOfexpiration
@@ -855,28 +855,28 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !Ref EMailSnsTopic
+                Resource: !Ref DataAnalysisTopicName
 
-  EMailSnsTopic:
+  DataAnalysisTopicName:
     Condition: IsCoreAccount
     Type: AWS::SNS::Topic
     Properties:
       TopicName: pn-SnsToEmail
 
-  EMailSnsTopicSubscription:
+  DataAnalysisTopicNameSubscription:
     Condition: IsCoreAccount
     Type: AWS::SNS::Subscription
     Properties:
       Protocol: email
-      Endpoint: !Ref DataMonitoringSlackEmailTo
-      TopicArn: !Ref EMailSnsTopic
+      Endpoint: !Ref DataAnalysisSlackEmail
+      TopicArn: !Ref DataAnalysisTopicName
 
   LambdaSNSTopicPolicy:
     Condition: IsCoreAccount
     Type: AWS::SNS::TopicPolicy
     Properties:
       Topics:
-        - !Ref EMailSnsTopic
+        - !Ref DataAnalysisTopicName
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -885,7 +885,7 @@ Resources:
               Service:
               - lambda.amazonaws.com
             Action: sns:Publish
-            Resource: !Ref EMailSnsTopic
+            Resource: !Ref DataAnalysisTopicName
 
   ScheduleErrorDumpFunction:
     Condition: HasLambdaPaperErrorInCoreAccountCronExp
