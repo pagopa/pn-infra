@@ -17,7 +17,7 @@ Parameters:
       - prod
 
 Conditions:
-  IsSpotEnabledEnvironment: !Or
+  IsSpotAllowedEnvironment: !Or
     - !Equals [!Ref EnvironmentType, "dev"]
     - !Equals [!Ref EnvironmentType, "test"]
     - !Equals [!Ref EnvironmentType, "hotfix"]
@@ -28,7 +28,7 @@ Resources:
     Properties:
       ClusterName: !Sub ${MacroServiceName}-ecs-cluster
       CapacityProviders: !If
-        - IsSpotEnabledEnvironment
+        - IsSpotAllowedEnvironment
         - [ 'FARGATE', 'FARGATE_SPOT' ]
         - !Ref "AWS::NoValue"
 

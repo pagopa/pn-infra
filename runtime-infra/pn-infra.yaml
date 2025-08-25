@@ -237,7 +237,9 @@ Parameters:
   
   SpotStrategyDefinition:
     Type: String
-    Description: 'JSON definition for Fargate Spot capacity provider strategy in lower envs.'
+    Description: |
+      JSON definition for Fargate Spot capacity provider strategy in lower envs.
+      For info about capacity provider strategy see: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_CapacityProviderStrategyItem.html
     Default: '[{"capacityProvider":"FARGATE_SPOT","weight":9,"base":0},{"capacityProvider":"FARGATE","weight":1,"base":0}]'
 
 Conditions:
@@ -262,7 +264,7 @@ Conditions:
 
   IsEgressDefined: !Not [!Equals [!Ref VpcEgressSubnetsIds, "-"]]
 
-  IsSpotEnabledEnvironment: !Or
+  IsSpotAllowedEnvironment: !Or
     - !Equals [!Ref EnvironmentType, "dev"]
     - !Equals [!Ref EnvironmentType, "test"]
     - !Equals [!Ref EnvironmentType, "hotfix"]
@@ -423,7 +425,7 @@ Resources:
   ###########################################################################
   FargateSpotAutomation:
     Type: AWS::CloudFormation::Stack
-    Condition: IsSpotEnabledEnvironment
+    Condition: IsSpotAllowedEnvironment
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/fargate-spot-automation.yaml"
       Parameters:
