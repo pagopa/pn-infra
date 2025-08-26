@@ -146,11 +146,6 @@ Parameters:
   ExternalChannels2PaperChannelQueueURL:
     Type: String
 
-  # External channels to pn-paper-tracker
-  ExternalChannels2PaperTrackerQueueARN:
-    Type: String
-    Description: pn-external-channels output to pn-paper-tracker queue ARN
-
   # Gateway service of NationalRegistry events
   NationalRegistryGatewayOutputsQueueARN:
     Type: String
@@ -266,11 +261,6 @@ Parameters:
     Type: Number
     Default: 0.1
     Description: Wakeup alarm ratio between messages written to DLQ and messages read from queue
-
-  AllowedPaperTrackerProductTypes:
-    Type: CommaDelimitedList
-    Default: "AR"
-    Description: productType list managed by paper tracker
 
   AllowedPaperChannelProductTypes:
     Type: CommaDelimitedList
@@ -463,7 +453,6 @@ Resources:
               - !Ref "ExternalChannelsOutputsQueueARN"
               - !Ref "ExternalChannels2UserAttributesQueueARN"
               - !Ref "ExternalChannels2PaperChannelQueueARN"
-              - !Ref "ExternalChannels2PaperTrackerQueueARN"
               - !Ref "PnPaperEventEnricherInputQueueARN"
               - !Ref "SafeStorageToDeliveryPushQueueARN"
               - !Ref "SafeStorageToRaddQueueARN"
@@ -949,41 +938,6 @@ Resources:
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
-  # Send ExternalChannel Response to pn-paper-tracker
-  # pn-external-channel
-  PnCoreEventBusToPaperTrackerQueue:
-    Type: AWS::Events::Rule
-    Properties:
-      Description: Route ExternalChannel Events to pn-paper-tracker
-      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
-      EventBusName: !Ref PnCoreEventBus
-      EventPattern:
-        detail-type: [ "ExternalChannelOutcomeEvent" ]
-        detail:
-          clientId: [ !Ref PaperChannelExtChUser ]
-          analogMail:
-            statusCode: [ { "anything-but": "CON020" } ]
-            productType: !Ref AllowedPaperTrackerProductTypes
-      Targets:
-        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
-          Id: !Sub ${ProjectName}-Logger-ExtCh2PaperTracker
-          InputTransformer:
-            InputPathsMap:
-              "timestamp": "$.time"
-            InputTemplate: |
-              {
-                  "timestamp": <timestamp>,
-                  "ruleArn": <aws.events.rule-arn>,
-                  "ruleName": <aws.events.rule-name>,
-                  "ingestionTime": <aws.events.event.ingestion-time>,
-                  "originalEvent": <aws.events.event.json>
-              }
-        - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2PaperTracker'
-          Arn: !Ref ExternalChannels2PaperTrackerQueueARN
-          InputPath: $.detail
-          DeadLetterConfig:
-            Arn: !GetAtt EventBusDeadLetterQueue.Arn
-
   # Send ExternalChannel Response to pn-paper-event-enricher
   PnCoreEventBusToPaperEventEnricherQueue:
     Type: AWS::Events::Rule
@@ -1209,40 +1163,6 @@ Resources:
           Arn: !Ref ExternalChannels2PaperChannelQueueARN
           InputPath: $.detail
           DeadLetterConfig: 
-            Arn: !GetAtt EventBusDeadLetterQueue.Arn
-
-  #rule CON020 to externalChannel2paperTracker queue
-  PnCoreEventBusCon020ToPaperTrackerQueue:
-    Type: AWS::Events::Rule
-    Properties:
-      Description: Route CON020 Events from PAPER ENRICHER to pn-paper-tracker
-      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
-      EventBusName: !Ref PnCoreEventBus
-      EventPattern:
-        detail-type: [ "ExternalChannelOutcomeEvent" ]
-        source: [ "PAPER ENRICHER" ]
-        detail:
-          analogMail:
-            statusCode: [ "CON020" ]
-            productType: !Ref AllowedPaperTrackerProductTypes
-      Targets:
-        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
-          Id: !Sub ${ProjectName}-Logger-Con020ToPaperTracker
-          InputTransformer:
-            InputPathsMap:
-              "timestamp": "$.time"
-            InputTemplate: |
-              {
-                  "timestamp": <timestamp>,
-                  "ruleArn": <aws.events.rule-arn>,
-                  "ruleName": <aws.events.rule-name>,
-                  "ingestionTime": <aws.events.event.ingestion-time>,
-                  "originalEvent": <aws.events.event.json>
-              }
-        - Id: !Sub '${ProjectName}-CoreEventBus-Con020ToPaperTracker'
-          Arn: !Ref ExternalChannels2PaperTrackerQueueARN
-          InputPath: $.detail
-          DeadLetterConfig:
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
 
   # pn-infra-logs
