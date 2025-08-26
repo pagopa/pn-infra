@@ -234,6 +234,13 @@ Parameters:
       - uat
       - hotfix
       - prod
+  
+  SpotStrategyDefinition:
+    Type: String
+    Description: |
+      JSON definition for Fargate Spot capacity provider strategy in lower envs.
+      For info about capacity provider strategy see: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_CapacityProviderStrategyItem.html
+    Default: '[{"capacityProvider":"FARGATE_SPOT","weight":9,"base":0},{"capacityProvider":"FARGATE","weight":1,"base":0}]'
 
 Conditions:
   IsAlbArnEmpty: !Equals [!Ref ApplicationLoadBalancerArn, "-"]
@@ -256,6 +263,11 @@ Conditions:
   RequiresVpcEndpoints: !Equals [!Ref VpcEndpointsRequired, true]
 
   IsEgressDefined: !Not [!Equals [!Ref VpcEgressSubnetsIds, "-"]]
+
+  IsSpotAllowedEnvironment: !Or
+    - !Equals [!Ref EnvironmentType, "dev"]
+    - !Equals [!Ref EnvironmentType, "test"]
+    - !Equals [!Ref EnvironmentType, "hotfix"]
 
 Resources:
   ###                       VPC BASE CONFIGURATIONS                       ###
@@ -321,6 +333,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-cluster.yaml"
       Parameters:
         MacroServiceName: !Sub '${ProjectName}-core'
+        EnvironmentType: !Ref EnvironmentType
   
   # Exporter role
   LogsExporterRole:
@@ -408,6 +421,17 @@ Resources:
         LambdasBucketName: !Ref LambdasBucketName
         LambdasBasePath: !Ref LambdasBasePath
   
+  ###               FARGATE CAPACITY PROVIDER UPDATE LOWER ENVS           ###
+  ###########################################################################
+  FargateSpotAutomation:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsSpotAllowedEnvironment
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/fargate-spot-automation.yaml"
+      Parameters:
+        EnvironmentType: !Ref EnvironmentType
+        SpotStrategyDefinition: !Ref SpotStrategyDefinition
+
 
 Outputs:
 
