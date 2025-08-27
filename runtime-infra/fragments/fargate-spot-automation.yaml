@@ -39,6 +39,40 @@ Resources:
       LogGroupName: !Sub /aws/events/${ProjectName}-spot-interruption-monitoring
       RetentionInDays: 90
 
+  SpotInterruptionLogGroupPolicy:
+    Type: AWS::Logs::ResourcePolicy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-SpotInterruptionLogResourcePolicy
+      PolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "EventBridgeSpotInterruptionLogsPolicy",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "events.amazonaws.com"
+              },
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Resource": "${SpotInterruptionLogGroup.Arn}:*",
+              "Condition": {
+                "ArnEquals": {
+                  "aws:SourceArn": [
+                    "${SpotInterruptionEventRule.Arn}",
+                    "${TaskPlacementFailureEventRule.Arn}"
+                  ]
+                },
+                "StringEquals": {
+                  "aws:SourceAccount": "${AWS::AccountId}"
+                }
+              }
+            }
+          ]
+        }
+
   FargateSpotOrchestratorRole:
     Type: AWS::IAM::Role
     Properties:
