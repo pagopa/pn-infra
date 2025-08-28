@@ -173,6 +173,7 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !GetAtt LambdaContextTransformFunction.Arn
       Principal: 'cloudformation.amazonaws.com'
+      SourceAccount: !Ref AWS::AccountId
 
   LambdaContextTransform:
     Type: AWS::CloudFormation::Macro
