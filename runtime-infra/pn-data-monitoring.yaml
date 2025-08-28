@@ -71,7 +71,7 @@ Parameters:
     Description: Datalake Role Name
     Default: 'pagopa-pn'
   
-  DataMonitoringSlackEmailTo:
+  DataAnalysisSlackEmail:
     Type: String
     Description: Slack Email channel
     Default: ''
@@ -97,6 +97,10 @@ Parameters:
 
   AlarmSNSTopicArn:
     Type: String
+
+  DataAnalysisTopicName:
+    Type: String
+    Default: ''
 
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
@@ -796,7 +800,7 @@ Resources:
           S3Bucket: !Ref DataMonitoringBucket
           Prefix: PaperRequestError-Dump-Lambda
           DeleteItems: !Ref PaperRequestErrorDumpFunctionDelete
-          SnsTopicArn: !Ref EMailSnsTopic
+          SnsTopicArn: !Ref DataAnalysisTopic
           Region: !Ref AWS::Region
           AccountID: !Ref AWS::AccountId
           PresignedUrlTime: !Ref PresignedUrlTimeOfexpiration
@@ -855,28 +859,28 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !Ref EMailSnsTopic
+                Resource: !Ref DataAnalysisTopic
 
-  EMailSnsTopic:
+  DataAnalysisTopic:
     Condition: IsCoreAccount
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: pn-SnsToEmail
+      TopicName: !Ref DataAnalysisTopicName
 
-  EMailSnsTopicSubscription:
+  DataAnalysisTopicSubscription:
     Condition: IsCoreAccount
     Type: AWS::SNS::Subscription
     Properties:
       Protocol: email
-      Endpoint: !Ref DataMonitoringSlackEmailTo
-      TopicArn: !Ref EMailSnsTopic
+      Endpoint: !Ref DataAnalysisSlackEmail
+      TopicArn: !Ref DataAnalysisTopic
 
   LambdaSNSTopicPolicy:
     Condition: IsCoreAccount
     Type: AWS::SNS::TopicPolicy
     Properties:
       Topics:
-        - !Ref EMailSnsTopic
+        - !Ref DataAnalysisTopic
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -885,7 +889,7 @@ Resources:
               Service:
               - lambda.amazonaws.com
             Action: sns:Publish
-            Resource: !Ref EMailSnsTopic
+            Resource: !Ref DataAnalysisTopic
 
   ScheduleErrorDumpFunction:
     Condition: HasLambdaPaperErrorInCoreAccountCronExp
