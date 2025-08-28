@@ -355,6 +355,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
+      SourceAccount: !Ref AWS::AccountId
 
   # WEB Authorizer
   JwtLambdaPermission:
@@ -366,6 +367,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
+      SourceAccount: !Ref AWS::AccountId
 
   # B2B Authorizer
   B2BLambdaPermission:
@@ -377,6 +379,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
+      SourceAccount: !Ref AWS::AccountId
 
   # IO Authorizer
   IoLambdaPermission:
@@ -388,6 +391,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
+      SourceAccount: !Ref AWS::AccountId
 
   # Backoffice Authorizer
   BackofficeLambdaPermission:
@@ -399,7 +403,8 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
-
+      SourceAccount: !Ref AWS::AccountId
+      
   # Log Group
   PublicApiLogGroup:
     Type: AWS::Logs::LogGroup

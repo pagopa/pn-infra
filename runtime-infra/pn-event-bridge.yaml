@@ -1166,6 +1166,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/pn-CoreEventBus/*"
+      SourceAccount: !Ref AWS::AccountId
 
   # pn-infra-logs
   MatchedEventsLoggerFunctionExecutionRole:
@@ -1229,6 +1230,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/pn-CoreEventBus/*"
+      SourceAccount: !Ref AWS::AccountId
 
   # pn-address-manager
   PNAddressManagerToDeliveryPushLimiterExecutionRole:

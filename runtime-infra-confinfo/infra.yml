@@ -714,6 +714,7 @@ Resources:
           Principal: sns.amazonaws.com
           SourceArn:  !Ref SesSnsTopic
           FunctionName: !Ref SesLambdaFunction
+          SourceAccount: !Ref AWS::AccountId
 
   SesLambdaFunctionRole:
     Type: AWS::IAM::Role
@@ -789,6 +790,7 @@ Resources:
           Principal: events.amazonaws.com
           SourceArn:  !GetAtt SesQuotaMonitoringLambdaScheduledRule.Arn
           FunctionName: !Ref SesQuotaMonitoringLambdaFunction
+          SourceAccount: !Ref AWS::AccountId
 
   SesQuotaMonitoringLambdaFunctionRole:
     Type: AWS::IAM::Role

@@ -388,7 +388,8 @@ Resources:
       FunctionName: !Ref KeyRotationFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt KeyRotationSchedule.Arn
-
+      SourceAccount: !Ref AWS::AccountId
+      
   KeyRotationFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
@@ -505,6 +506,7 @@ Resources:
       FunctionName: !Ref CleanCurrentBucketFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt CleanCurrentBucketSchedule.Arn
+      SourceAccount: !Ref AWS::AccountId
 
   CleanCurrentBucketFunctionLogGroup:
     Type: AWS::Logs::LogGroup

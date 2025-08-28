@@ -342,6 +342,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt SendAlarmChangeEventsToLambda.Arn
+      SourceAccount: !Ref AWS::AccountId
 
   DefaultEventBusScheduleMonitoringLambdaPermission:
     Type: AWS::Lambda::Permission
@@ -350,6 +351,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt CompositeMetricGeneratorScheduleRule.Arn
+      SourceAccount: !Ref AWS::AccountId
 
   SendAlarmChangeEventsToLambda:
     Type: AWS::Events::Rule
@@ -849,6 +851,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt SSLCertExpirationCheckLambdaSchedule.Arn
+      SourceAccount: !Ref AWS::AccountId
 
   SSLCertificateExpirationAlarm:
     Type: AWS::CloudWatch::Alarm
