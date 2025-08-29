@@ -121,6 +121,11 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       BucketName: !Sub pn-datamonitoring-${AWS::Region}-${AWS::AccountId}
+      PublicAccessBlockConfiguration: 
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
           
   DataMonitoringBucketPolicy:
     Condition: IsConfinfoAccount

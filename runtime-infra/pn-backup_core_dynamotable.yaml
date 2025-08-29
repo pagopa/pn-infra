@@ -34,6 +34,11 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       BucketName: !Sub pn-s3-batch-operation-${AWS::Region}-${AWS::AccountId}
+      PublicAccessBlockConfiguration: 
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
 
   BackupPlan:
     Type: "AWS::Backup::BackupPlan"
