@@ -312,6 +312,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${ApiKeyAuthorizerV2}"
+      SourceAccount: !Ref AWS::AccountId
 
   ApiKeyAuthorizerV2:
     Condition: IsB2B
@@ -334,6 +335,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${JwtAuthorizer}"
+      SourceAccount: !Ref AWS::AccountId
 
   JwtAuthorizer:
     Condition: IsWeb
@@ -357,7 +359,8 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${IoAuthorizer}"
-
+      SourceAccount: !Ref AWS::AccountId
+      
   IoAuthorizer:
     Condition: IsIO
     Type: AWS::ApiGateway::Authorizer
@@ -379,7 +382,8 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApi}/authorizers/${BackofficeAuthorizer}"
-
+      SourceAccount: !Ref AWS::AccountId
+      
   BackofficeAuthorizer:
     Condition: IsBackoffice
     Type: AWS::ApiGateway::Authorizer

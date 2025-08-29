@@ -65,6 +65,7 @@ Resources:
       Action: "lambda:InvokeFunction"
       FunctionName: !GetAtt GenerateCdcViewFunction.Arn
       Principal: "cloudformation.amazonaws.com"
+      SourceAccount: !Ref AWS::AccountId
   
   GenerateCdcViewFunction:
     Type: AWS::Lambda::Function

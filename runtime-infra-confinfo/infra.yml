@@ -299,16 +299,13 @@ Parameters:
     Type: String
     Description: Service endpoint for PdfRaster connections
     Default: ''
-
-  EnvironmentType:
+  
+  SpotStrategyDefinition:
     Type: String
-    Description: "Environment type (dev, test, uat, hotfix, prod)"
-    AllowedValues:
-      - dev
-      - test
-      - uat
-      - hotfix
-      - prod
+    Description: |
+      JSON definition for Fargate Spot capacity provider strategy in lower envs.
+      For info about capacity provider strategy see: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_CapacityProviderStrategyItem.html
+    Default: '[{"capacityProvider":"FARGATE_SPOT","weight":9,"base":0},{"capacityProvider":"FARGATE","weight":1,"base":0}]'
 
 Conditions:
   IsAlbArnEmpty: !Equals [ !Ref ApplicationLoadBalancerArn, '-' ]
@@ -323,6 +320,11 @@ Conditions:
   HasPnCoreAwsAccountId: !Not [ !Equals [ !Ref PnCoreAwsAccountId, '-' ] ]
 
   HasFixedSafeStorageBucketName: !Not [ !Equals [ !Ref SafeStorageBucketName, '-' ] ]
+
+  IsSpotAllowedEnvironment: !Or
+    - !Equals [!Ref EnvironmentType, "dev"]
+    - !Equals [!Ref EnvironmentType, "test"]
+    - !Equals [!Ref EnvironmentType, "hotfix"]
 
 Resources:
 
@@ -465,6 +467,9 @@ Resources:
       Subnets: !Split [ ',', !Ref VpcSubnets ]
       SecurityGroups:
         - !Ref WebappSecurityGroup
+      LoadBalancerAttributes:
+        - Key: routing.http.drop_invalid_header_fields.enabled
+          Value: true
 
   # Application load balancer listener
   ApplicationLoadBalancerListener:
@@ -520,6 +525,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-cluster.yaml"
       Parameters:
         MacroServiceName: !Sub '${ProjectName}-confidential'
+        EnvironmentType: !Ref EnvironmentType
 
   # The cluster for pn-pdfraster
   PdfRasterECSCluster:
@@ -528,6 +534,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-cluster.yaml"
       Parameters:
         MacroServiceName: !Sub '${ProjectName}-pdfraster'
+        EnvironmentType: !Ref EnvironmentType
 
  ###                             ELASTIC FILE SYSTEM                     ###
   ###########################################################################
@@ -707,6 +714,7 @@ Resources:
           Principal: sns.amazonaws.com
           SourceArn:  !Ref SesSnsTopic
           FunctionName: !Ref SesLambdaFunction
+          SourceAccount: !Ref AWS::AccountId
 
   SesLambdaFunctionRole:
     Type: AWS::IAM::Role
@@ -782,6 +790,7 @@ Resources:
           Principal: events.amazonaws.com
           SourceArn:  !GetAtt SesQuotaMonitoringLambdaScheduledRule.Arn
           FunctionName: !Ref SesQuotaMonitoringLambdaFunction
+          SourceAccount: !Ref AWS::AccountId
 
   SesQuotaMonitoringLambdaFunctionRole:
     Type: AWS::IAM::Role
@@ -1068,6 +1077,17 @@ Resources:
                 'AWS:SourceArn': 'arn:aws:ses:*'
       Topics:
         - !Ref SesSnsTopic
+  
+  ###               FARGATE CAPACITY PROVIDER UPDATE LOWER ENVS           ###
+  ###########################################################################
+  FargateSpotAutomation:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsSpotAllowedEnvironment
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/fargate-spot-automation.yaml"
+      Parameters:
+        EnvironmentType: !Ref EnvironmentType
+        SpotStrategyDefinition: !Ref SpotStrategyDefinition
 
 Outputs:
 

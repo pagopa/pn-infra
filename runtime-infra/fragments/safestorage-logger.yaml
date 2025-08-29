@@ -64,9 +64,9 @@ Resources:
               - Sid: allS3
                 Effect: Allow
                 Action:
-                  - 's3:*'
+                  - 's3:GetObject'
                 Resource: 
-                  - !Sub "arn:${AWS::Partition}:s3:::*"
+                  - !Sub "arn:${AWS::Partition}:s3:::pn-logs-bucket-${AWS::Region}-${SafeStorageAccountId}-001/diagnosticTrail/*"
                 Condition:
                   StringEquals:
                     s3:ResourceAccount:
