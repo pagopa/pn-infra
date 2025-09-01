@@ -140,6 +140,7 @@ Resources:
 
   GlueCrawler:
     Type: AWS::Glue::Crawler
+    DependsOn: GlueTable
     Properties:
       DatabaseName: !Ref GlueDatabaseName
       Name: !Sub ${GlueTableName}_crawler
