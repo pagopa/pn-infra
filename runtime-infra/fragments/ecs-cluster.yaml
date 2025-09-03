@@ -5,12 +5,32 @@ Parameters:
   MacroServiceName:
     Type: String
     Description: Name of the microservice logical group
+  
+  EnvironmentType:
+    Type: String
+    Description: "Environment type (dev, test, uat, hotfix, prod)"
+    AllowedValues:
+      - dev
+      - test
+      - uat
+      - hotfix
+      - prod
+
+Conditions:
+  IsSpotAllowedEnvironment: !Or
+    - !Equals [!Ref EnvironmentType, "dev"]
+    - !Equals [!Ref EnvironmentType, "test"]
+    - !Equals [!Ref EnvironmentType, "hotfix"]
 
 Resources:
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Sub ${MacroServiceName}-ecs-cluster
+      CapacityProviders: !If
+        - IsSpotAllowedEnvironment
+        - [ 'FARGATE', 'FARGATE_SPOT' ]
+        - !Ref "AWS::NoValue"
 
 Outputs:
   ClusterName:
