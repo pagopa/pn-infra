@@ -262,6 +262,11 @@ Parameters:
     Default: 0.1
     Description: Wakeup alarm ratio between messages written to DLQ and messages read from queue
 
+  AllowedPaperChannelProductTypes:
+    Type: CommaDelimitedList
+    Default: "AR, 890, RS, RIR, RIS"
+    Description: productType list managed by paper tracker
+
 Conditions:
   HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
   HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ]]
@@ -912,6 +917,7 @@ Resources:
           clientId: [ !Ref PaperChannelExtChUser ]
           analogMail:
             statusCode: [ { "anything-but": "CON020" } ]
+            productType: !Ref AllowedPaperChannelProductTypes
       Targets: 
         - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
           Id: !Sub ${ProjectName}-Logger-ExtCh2PaperChannel  
@@ -947,7 +953,7 @@ Resources:
             statusCode: [ "CON020" ]
       Targets: 
         - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
-          Id: !Sub ${ProjectName}-Logger-ExtCh2PaperChannel  
+          Id: !Sub ${ProjectName}-Logger-ExtCh2PaperChannel
           InputTransformer:
             InputPathsMap:
               "timestamp": "$.time"
@@ -1138,6 +1144,7 @@ Resources:
         detail: 
           analogMail:
             statusCode: [ "CON020" ]
+            productType: !Ref AllowedPaperChannelProductTypes
       Targets: 
         - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
           Id: !Sub ${ProjectName}-Logger-Con020ToPaperChannel  
@@ -1156,8 +1163,8 @@ Resources:
           Arn: !Ref ExternalChannels2PaperChannelQueueARN
           InputPath: $.detail
           DeadLetterConfig: 
-            Arn: !GetAtt EventBusDeadLetterQueue.Arn         
-   
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
   # pn-infra-logs
   MatchedEventLoggerLambdaPermission:
     Type: AWS::Lambda::Permission
