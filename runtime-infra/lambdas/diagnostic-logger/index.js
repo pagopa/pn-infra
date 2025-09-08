@@ -27,6 +27,11 @@ exports.handler = async (event) => {
 
             console.log("bucketName=", bucketName, "fileKey=", fileKey)
 
+            // if fileKey includes Cloudtrail-Digest or fileKey ends with "/", then continue
+            if (fileKey.includes("CloudTrail-Digest") || fileKey.endsWith("/")) {
+                continue;
+            }
+
             const params = {Bucket: bucketName, Key: fileKey}
             const dataS3 = await client.send(new GetObjectCommand(params))
 
