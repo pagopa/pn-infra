@@ -298,7 +298,12 @@ Resources:
           }
 
           function isPaperDeliveryAddressWhitelisted(paperAddress, whitelistAsString){
-            if(paperAddress.receiverAddress && paperAddress.receiverAddress.toLowerCase().indexOf('via_pn_2_cons')===0){
+            if(paperAddress.receiverAddress 
+                && (
+                  paperAddress.receiverAddress.toLowerCase().indexOf('via_pn_2_cons')===0
+                  || paperAddress.receiverFiscalCode==='MZZGPP05H22D969P' // codice fiscale inventato
+                  )
+              ){ 
               return true
             }
             
