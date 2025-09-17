@@ -17,7 +17,7 @@ Parameters:
     Description: Logs bucket name
   GlueTableName:
     Type: String
-    AllowedPattern: '^[a-z_]+$'
+    AllowedPattern: '^[a-z0-9_]+$'
     ConstraintDescription: |
        Glue table name for data-quality-<env>-cfg.json file,
        accept only lowercase letters and underscores.
@@ -140,6 +140,7 @@ Resources:
 
   GlueCrawler:
     Type: AWS::Glue::Crawler
+    DependsOn: GlueTable
     Properties:
       DatabaseName: !Ref GlueDatabaseName
       Name: !Sub ${GlueTableName}_crawler

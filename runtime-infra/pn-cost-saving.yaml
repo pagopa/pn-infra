@@ -148,6 +148,7 @@ Resources:
       FunctionName: !Ref StopEc2Function
       Principal: events.amazonaws.com
       SourceArn: !GetAtt StopEc2FunctionSchedule.Arn
+      SourceAccount: !Ref AWS::AccountId
 
   StopEc2FunctionLogGroup:
     Type: AWS::Logs::LogGroup
@@ -337,6 +338,7 @@ Resources:
       FunctionName: !Ref StopEcsFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt StopEcsFunctionSchedule.Arn
+      SourceAccount: !Ref AWS::AccountId
 
   StopEcsFunctionLogGroup:
     Condition: IsStopEcsService
@@ -482,6 +484,7 @@ Resources:
       FunctionName: !Ref StartEcsFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt StartEcsFunctionSchedule.Arn
+      SourceAccount: !Ref AWS::AccountId
 
   StartEcsFunctionLogGroup:
     Condition: IsStopEcsService

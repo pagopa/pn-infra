@@ -1,0 +1,151 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Metric Filter for CloudWatch Logs"
+
+Parameters:
+  AlarmSNSTopicArn:
+    Type: String
+    Description: "SNS Topic ARN to send alarm notifications"
+
+  MetricName:
+    Type: String
+    Description: "Name of the metric to create"
+
+  MetricNamespace:
+    Type: String
+    Description: "Namespace of the metric to create"
+
+  LogGroupName:
+    Type: String
+    Description: "Log group name to create metric filter for"
+
+  FilterPattern:
+    Type: String
+    Description: "Pattern to filter logs"
+
+  Period: 
+    Type: Number
+    Default: 60
+    Description: "Period in seconds for the metric filter"
+
+  Threshold:
+    Type: Number
+    Default: 1
+    Description: "Threshold for the alarm"
+
+  EvaluationPeriods:
+    Type: Number
+    Default: 1
+    Description: "Number of periods over which data is compared to the specified threshold"
+
+  DatapointsToAlarm:
+    Type: Number
+    Default: 1
+    Description: "Number of data points that must be breaching to trigger the alarm"
+
+  ComparisonOperator:
+    Type: String
+    Description: "The arithmetic operation to use when comparing the specified statistic and threshold"
+
+  Statistic:
+    Type: String
+    Description: "The statistic for the metric associated with the alarm"
+
+  OncallPeriod: 
+    Type: Number
+    Default: 60
+    Description: "Period in seconds for the metric filter"
+
+  OncallThreshold:
+    Type: Number
+    Default: 1
+    Description: "Threshold for the alarm"
+
+  OncallEvaluationPeriods:
+    Type: Number
+    Default: 1
+    Description: "Number of periods over which data is compared to the specified threshold"
+
+  OncallDatapointsToAlarm:
+    Type: Number
+    Default: 1
+    Description: "Number of data points that must be breaching to trigger the alarm"
+
+  OncallComparisonOperator:
+    Type: String
+    Default: ""
+    Description: "The arithmetic operation to use when comparing the specified statistic and threshold"
+
+  OncallStatistic:
+    Type: String
+    Default: ""
+    Description: "The statistic for the metric associated with the alarm"
+
+  HasOncall:
+    Type: String
+    Description: "Create onCall alarm"
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
+Conditions:
+  HasOncallCondition: !Equals [ !Ref HasOncall, 'true' ]
+    
+Resources:
+  # CloudWatch metric to filer ERROR - FATAL lines, in Log group
+  CustomErrorLogsMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: !Ref LogGroupName
+      FilterPattern: !Ref FilterPattern
+      MetricTransformations: 
+        - MetricValue: 1
+          MetricNamespace: !Ref MetricNamespace
+          MetricName: !Ref MetricName
+
+  
+  
+  # Create alarm
+  CustomErrorLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn: CustomErrorLogsMetricFilter
+    Properties:
+      AlarmName: !Sub "${MetricName}-Alarm"
+      AlarmDescription: !Sub "CloudWatch alarm on metric ${MetricName}."
+      TreatMissingData: notBreaching
+      AlarmActions: 
+        - !Ref AlarmSNSTopicArn
+      #InsufficientDataActions:
+      #  - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref DatapointsToAlarm
+      MetricName: !Ref MetricName
+      Namespace: !Ref MetricNamespace
+      ComparisonOperator: !Ref ComparisonOperator
+      EvaluationPeriods: !Ref EvaluationPeriods
+      Period: !Ref Period
+      Statistic: !Ref Statistic 
+      Threshold: !Ref Threshold
+
+  OncallCustomErrorLogsMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasOncallCondition
+    Properties:
+      AlarmName: !Sub "oncall-${MetricName}-Alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on metric ${MetricName}."
+      TreatMissingData: notBreaching
+      AlarmActions: 
+        - !Ref AlarmSNSTopicArn
+      #InsufficientDataActions:
+      #  - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref OncallDatapointsToAlarm
+      MetricName: !Ref MetricName
+      Namespace: !Ref MetricNamespace
+      ComparisonOperator: !Ref OncallComparisonOperator
+      EvaluationPeriods: !Ref OncallEvaluationPeriods
+      Period: !Ref OncallPeriod
+      Statistic: !Ref OncallStatistic 
+      Threshold: !Ref OncallThreshold

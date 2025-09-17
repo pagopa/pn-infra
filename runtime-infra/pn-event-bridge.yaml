@@ -947,7 +947,7 @@ Resources:
             statusCode: [ "CON020" ]
       Targets: 
         - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
-          Id: !Sub ${ProjectName}-Logger-ExtCh2PaperChannel  
+          Id: !Sub ${ProjectName}-Logger-ExtCh2PaperChannel
           InputTransformer:
             InputPathsMap:
               "timestamp": "$.time"
@@ -1156,8 +1156,8 @@ Resources:
           Arn: !Ref ExternalChannels2PaperChannelQueueARN
           InputPath: $.detail
           DeadLetterConfig: 
-            Arn: !GetAtt EventBusDeadLetterQueue.Arn         
-   
+            Arn: !GetAtt EventBusDeadLetterQueue.Arn
+
   # pn-infra-logs
   MatchedEventLoggerLambdaPermission:
     Type: AWS::Lambda::Permission
@@ -1166,6 +1166,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/pn-CoreEventBus/*"
+      SourceAccount: !Ref AWS::AccountId
 
   # pn-infra-logs
   MatchedEventsLoggerFunctionExecutionRole:
@@ -1229,6 +1230,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/pn-CoreEventBus/*"
+      SourceAccount: !Ref AWS::AccountId
 
   # pn-address-manager
   PNAddressManagerToDeliveryPushLimiterExecutionRole:

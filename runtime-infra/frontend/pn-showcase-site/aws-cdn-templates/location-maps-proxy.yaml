@@ -155,6 +155,12 @@ Resources:
       AccessLogSetting:
         DestinationArn: !GetAtt StyleApiLogGroup.Arn
         Format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","caller":"$context.identity.caller","user":"$context.identity.user","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength"}'
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          MetricsEnabled: 'true'
+          DataTraceEnabled: 'false'
+          LoggingLevel: 'INFO'
 
   StyleApiLogGroup:
     Type: AWS::Logs::LogGroup
