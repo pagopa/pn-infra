@@ -376,10 +376,10 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "oncall-${QueueName}-HasDLQMessage"
-      AlarmDescription: "Alarm dlq messages when the ration between number of messages received in queue and messages written to DLQ is greater than the threshold"
-      DatapointsToAlarm: 5
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 30
+      AlarmDescription: "Alarm triggered when the dead-letter queue (DLQ) for the queue contains messages and the number of visible messages is increasing"
+      DatapointsToAlarm: 6
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 300
       Threshold: 1
       TreatMissingData: notBreaching
       Metrics:
@@ -388,11 +388,11 @@ Resources:
             Metric:
               Dimensions:
                 - Name: QueueName
-                  Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
-              MetricName: NumberOfMessagesReceived
+                  Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ], "" ]
+              MetricName: ApproximateNumberOfMessagesVisible
               Namespace: AWS/SQS
-            Period: 60
-            Stat: Sum
+            Period: 300
+            Stat: Maximum
           ReturnData: False
         - Id: m2
           MetricStat:
@@ -400,13 +400,13 @@ Resources:
               Dimensions:
                 - Name: QueueName
                   Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ], "" ]
-              MetricName: NumberOfMessagesSent
+              MetricName: ApproximateNumberOfMessagesVisible
               Namespace: AWS/SQS
-            Period: 60
-            Stat: Sum
+            Period: 300
+            Stat: Minimum
           ReturnData: False
         - Id: e1
-          Expression: !Sub IF(m1>${OncallLimit} AND m2/m1>${OncallDlqRatio}, 1, 0)
+          Expression: IF(m1>m2, 1, 0)
           Label: !Sub "${QueueName}-HasDLQMessage-OnCall-Metric"       
       AlarmActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
