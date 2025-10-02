@@ -242,6 +242,81 @@ Parameters:
       For info about capacity provider strategy see: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_CapacityProviderStrategyItem.html
     Default: '[{"capacityProvider":"FARGATE_SPOT","weight":9,"base":0},{"capacityProvider":"FARGATE","weight":1,"base":0}]'
 
+  VPNVpcId:
+    Type: String
+    Description: VpcId of the VPC where to install PN-VPN
+    Default: ''
+
+  VPNVpcCidr:
+    Type: String
+    Description: Cidr of the VPC where to install PN-VPN
+    Default: ''
+
+  VPNDefaultSecurityGroupId:
+    Type: String
+    Description: Default security group of the VPC where to install PN-VPN
+    Default: ''
+
+  VPNServicesSubnets:
+    Type: String
+    Description: Subnets where to install PN-VPN services
+    Default: ''
+
+  VPNSubnetsCidrs:
+    Type: String
+    Description: CIDRs of the subnets where to install PN-VPN services
+    Default: ''
+    
+  VPNSubnetsIds:
+    Type: String
+    Description: Subnet IDs of the subnets where to install PN-VPN services
+    Default: ''
+
+  VPNApplicationLoadBalancerArn: 
+    Type: String
+    Default: '-'
+    Description: Application load balancer for PN-VPN
+
+  VPNApplicationLoadBalancerMetricsDimensionName: 
+    Type: String
+    Default: '-'
+    Description: Application load balancer name for PN-VPN
+
+  VPNApplicationLoadBalancerAwsDns:
+    Type: String
+    Default: '-'
+    Description: Application load balancer AWS DNS for PN-VPN
+
+  VPNApplicationLoadBalancerAwsDnsZoneId:
+    Type: String
+    Default: '-'
+    Description: Application load balancer AWS DNS Zone ID for PN-VPN
+
+  VPNApplicationLoadBalancerListenerArn:
+    Type: String
+    Default: '-'
+    Description: Application load balancer listener ARN for PN-VPN
+
+  VPNWebappSecurityGroupId:
+    Type: String
+    Default: '-'
+    Description: ALB security group ID for PN-VPN
+
+  VPNWebappSecurityGroupArn:
+    Type: String
+    Default: '-'
+    Description: ALB security group ARN for PN-VPN
+
+  VPNServiceLambdaEndpointId:
+    Type: String
+    Default: '-'
+    Description: Lambda VPC Endpoint id for PN-VPN
+
+  VPNServiceLambdaEndpointArn:
+    Type: String
+    Default: '-'
+    Description: Lambda VPC Endpoint ARN for PN-VPN
+
 Conditions:
   IsAlbArnEmpty: !Equals [!Ref ApplicationLoadBalancerArn, "-"]
   IsAlbArnDnsEmpty: !Equals [!Ref ApplicationLoadBalancerAwsDns, "-"]
@@ -569,3 +644,35 @@ Outputs:
     Value: !Ref DataLakeAccountId1
   DataMonitoringPrototypeVersion:
     Value: !Ref DataMonitoringPrototypeVersion
+
+  # VPN pass-through params
+  VPNVpcId:
+    Value: !Ref VPNVpcId
+  VPNVpcCidr:
+    Value: !Ref VPNVpcCidr
+  VPNDefaultSecurityGroupId:
+    Value: !Ref VPNDefaultSecurityGroupId
+  VPNServicesSubnets:
+    Value: !Ref VPNServicesSubnets
+  VPNSubnetsCidrs:
+    Value: !Ref VPNSubnetsCidrs
+  VPNSubnetsIds:
+    Value: !Ref VPNSubnetsIds
+  VPNApplicationLoadBalancerArn:
+    Value: !Ref VPNApplicationLoadBalancerArn
+  VPNApplicationLoadBalancerMetricsDimensionName:
+    Value: !Ref VPNApplicationLoadBalancerMetricsDimensionName
+  VPNApplicationLoadBalancerAwsDns:
+    Value: !Ref VPNApplicationLoadBalancerAwsDns
+  VPNApplicationLoadBalancerAwsDnsZoneId:
+    Value: !Ref VPNApplicationLoadBalancerAwsDnsZoneId
+  VPNApplicationLoadBalancerListenerArn:
+    Value: !Ref VPNApplicationLoadBalancerListenerArn
+  VPNWebappSecurityGroupId:
+    Value: !Ref VPNWebappSecurityGroupId
+  VPNWebappSecurityGroupArn:
+    Value: !Ref VPNWebappSecurityGroupArn
+  VPNServiceLambdaEndpointId:
+    Value: !Ref VPNServiceLambdaEndpointId
+  VPNServiceLambdaEndpointArn:
+    Value: !Ref VPNServiceLambdaEndpointArn
