@@ -377,7 +377,7 @@ Resources:
     Properties:
       AlarmName: !Sub "oncall-${QueueName}-HasDLQMessage"
       AlarmDescription: "Alarm triggered when the dead-letter queue (DLQ) for the queue contains messages and the number of visible messages is increasing"
-      DatapointsToAlarm: 2
+      DatapointsToAlarm: 6
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 6
       Threshold: 1
@@ -407,13 +407,32 @@ Resources:
           ReturnData: False
         - Id: e1
           Expression: IF(m1>m2, 1, 0)
-          Label: !Sub "${QueueName}-HasDLQMessage-OnCall-Metric"       
+          Label: !Sub "${QueueName}-HasDLQMessage-OnCall-Metric"
+
+  OncallDLQAlarm:
+    Condition: IsWithDLQ
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "oncall-${QueueName}-HasDLQMessage-12h"
+      AlarmDescription: "Triggered when DLQ alarm is active, remains for 12 hours"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Threshold: 1
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Namespace: "Custom/Derived"
+              MetricName: "WakeupDLQAlarmState"
+              Dimensions:
+                - Name: QueueName
+                  Value: !Ref QueueName
+            Period: 43200   # 12 ore
+            Stat: Maximum
+          ReturnData: True
       AlarmActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      InsufficientDataActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+
 Outputs:
   # Queue info
   QueueName:
