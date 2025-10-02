@@ -307,16 +307,6 @@ Parameters:
     Default: '-'
     Description: ALB security group ARN for PN-VPN
 
-  VPNServiceLambdaEndpointId:
-    Type: String
-    Default: '-'
-    Description: Lambda VPC Endpoint id for PN-VPN
-
-  VPNServiceLambdaEndpointArn:
-    Type: String
-    Default: '-'
-    Description: Lambda VPC Endpoint ARN for PN-VPN
-
 Conditions:
   IsAlbArnEmpty: !Equals [!Ref ApplicationLoadBalancerArn, "-"]
   IsAlbArnDnsEmpty: !Equals [!Ref ApplicationLoadBalancerAwsDns, "-"]
@@ -672,7 +662,3 @@ Outputs:
     Value: !Ref VPNWebappSecurityGroupId
   VPNWebappSecurityGroupArn:
     Value: !Ref VPNWebappSecurityGroupArn
-  VPNServiceLambdaEndpointId:
-    Value: !Ref VPNServiceLambdaEndpointId
-  VPNServiceLambdaEndpointArn:
-    Value: !Ref VPNServiceLambdaEndpointArn
