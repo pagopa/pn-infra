@@ -440,6 +440,15 @@ Resources:
               }
             }
 
+  # VPN ECS cluster
+  VPNECSCluster:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-cluster.yaml"
+      Parameters:
+        MacroServiceName: !Sub '${ProjectName}-vpn-cluster'
+        EnvironmentType: !Ref EnvironmentType
+
   ###                       CLOUDFORMATION TRANSFORM LAMBDAS              ###
   ###########################################################################
 
@@ -549,10 +558,14 @@ Outputs:
         !Ref WebappSecurityGroupId,
       ]
 
-  # ECS Cluster
+  # ECS Clusters
   ECSClusterName:
     Value: !GetAtt ECSCluster.Outputs.ClusterName
     Description: ECS cluster name
+
+  VPNECSClusterName:
+    Value: !GetAtt VPNECSCluster.Outputs.ClusterName
+    Description: VPN ECS cluster name
 
   # Log exports outputs
   LogsExporterRoleArn:
