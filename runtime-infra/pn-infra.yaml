@@ -257,12 +257,17 @@ Parameters:
     Description: Default security group of the VPC where to install PN-VPN
     Default: ''
 
-  VPNServicesSubnets:
+  VPNSubnetsIds:
+    Type: String
+    Description: Subnets where to install VPN 
+    Default: ''
+
+  VPNServicesSubnetsIds:
     Type: String
     Description: Subnets where to install PN-VPN services
     Default: ''
 
-  VPNSubnetsCidrs:
+  VPNServicesSubnetsCidrs:
     Type: String
     Description: CIDRs of the subnets where to install PN-VPN services
     Default: ''
@@ -655,8 +660,10 @@ Outputs:
     Value: !Ref VPNVpcCidr
   VPNDefaultSecurityGroupId:
     Value: !Ref VPNDefaultSecurityGroupId
-  VPNServicesSubnets:
-    Value: !Ref VPNServicesSubnets
+  VPNSubnetsIds:
+    Value: !Ref VPNSubnetsIds
+  VPNServicesSubnetsIds:
+    Value: !Ref VPNServicesSubnetsIds
   VPNSubnetsCidrs:
     Value: !Ref VPNSubnetsCidrs
   VPNSubnetsIds:
