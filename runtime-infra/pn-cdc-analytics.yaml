@@ -415,6 +415,70 @@ Resources:
                 Resource: 
                   - !GetAtt UpdateCdcJsonViewsLambda.Arn
 
+  AsseverationGlueTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabase
+      TableInput:
+        Name: "pn_asseveration_table"
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          EXTERNAL: "true"
+          "projection.enabled": "true"
+          "projection.p_year.type": "integer"
+          "projection.p_year.range": "2024,2099"
+          "projection.p_month.type": "integer"
+          "projection.p_month.range": "01,12"
+          "projection.p_month.digits": "2"
+          "projection.p_day.type": "integer"
+          "projection.p_day.range": "01,31"
+          "projection.p_day.digits": "2"
+          "projection.p_hour.type": "integer"
+          "projection.p_hour.range": "00,23"
+          "projection.p_hour.digits": "2"
+          storage.location.template: !Join
+            - ''
+            - - s3://
+              - !Ref LogsBucketName
+              - /flussi/pad26_asseverazione/${p_year}/${p_month}/${p_day}/${p_hour}/
+        StorageDescriptor:
+          Location: !Sub "s3://${LogsBucketName}/flussi/pad26_asseverazione/"
+          InputFormat: "org.apache.hadoop.mapred.TextInputFormat"
+          OutputFormat: "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat"
+          SerdeInfo:
+            SerializationLibrary: "org.openx.data.jsonserde.JsonSerDe"
+          Columns:
+            - Name: "iun"
+              Type: "string"
+            - Name: "senderPaId"
+              Type: "string"
+            - Name: "notificationSentAt"
+              Type: "string"
+            - Name: "noticeCode"
+              Type: "string"
+            - Name: "creditorTaxId"
+              Type: "string"
+            - Name: "debtorPosUpdateDate"
+              Type: "string"
+            - Name: "recordCreationDate"
+              Type: "string"
+            - Name: "recipientIdx"
+              Type: "int"
+            - Name: "version"
+              Type: "int"
+            - Name: "moreFields"
+              Type: "string"
+        PartitionKeys:
+          - Name: "p_year"
+            Type: "string"
+          - Name: "p_month"
+            Type: "string"
+          - Name: "p_day"
+            Type: "string"
+          - Name: "p_hour"
+            Type: "string"
+
 Outputs:
   GlueDatabaseName:
     Description: Name of the Glue Database
@@ -433,3 +497,7 @@ Outputs:
     Value: !GetAtt GlueServiceRole.Arn
     Export:
       Name: !Sub "${AWS::StackName}-GlueServiceRoleArn"
+
+  AsseverationGlueTableName:
+    Description: Name of the Glue Table for Asseveration
+    Value: !Ref AsseverationGlueTable
