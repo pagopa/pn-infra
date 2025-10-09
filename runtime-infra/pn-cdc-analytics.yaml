@@ -1,5 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Create base resources for CDC files analysis
+Description: Create base resources for CDC files analysis and daily count
+  reporting for Data Lake
 
 Parameters:
   ProjectName:
@@ -21,6 +22,14 @@ Parameters:
   AlarmSNSTopicArn:
     Type: String
     Description: ARN of the SNS topic for alarms
+  DataLakeCountQueryConfigParameterName:
+    Type: String
+    Description: SSM Parameter name for the JSON object containing custom count queries.
+    Default: /datalake/count_queries/queries.json
+  DataLakeCountTableList:
+    Type: CommaDelimitedList
+    Description: List of Athena table names to be processed for daily count.
+    Default: pn_timelines,pn_userattributes,pn_mandate,pn_notifications,pn_radd_transaction_alt,pn_paper_notifications_cost,pn_asseveration
 
 Resources:
   GlueServiceRole:
@@ -414,6 +423,7 @@ Resources:
                 Effect: Allow
                 Resource: 
                   - !GetAtt UpdateCdcJsonViewsLambda.Arn
+                  - !GetAtt CdcDailyCountLambda.Arn
 
   AsseverationGlueTable:
     Type: AWS::Glue::Table
@@ -421,63 +431,363 @@ Resources:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Ref GlueDatabase
       TableInput:
-        Name: "pn_asseveration_table"
+        Name: pn_asseveration
         TableType: EXTERNAL_TABLE
         Parameters:
-          EXTERNAL: "true"
-          "projection.enabled": "true"
-          "projection.p_year.type": "integer"
-          "projection.p_year.range": "2024,2099"
-          "projection.p_month.type": "integer"
-          "projection.p_month.range": "01,12"
-          "projection.p_month.digits": "2"
-          "projection.p_day.type": "integer"
-          "projection.p_day.range": "01,31"
-          "projection.p_day.digits": "2"
-          "projection.p_hour.type": "integer"
-          "projection.p_hour.range": "00,23"
-          "projection.p_hour.digits": "2"
+          EXTERNAL: 'true'
+          projection.enabled: 'true'
+          projection.p_year.type: integer
+          projection.p_year.range: 2024,2099
+          projection.p_month.type: integer
+          projection.p_month.range: 01,12
+          projection.p_month.digits: '2'
+          projection.p_day.type: integer
+          projection.p_day.range: 01,31
+          projection.p_day.digits: '2'
+          projection.p_hour.type: integer
+          projection.p_hour.range: 00,23
+          projection.p_hour.digits: '2'
           storage.location.template: !Join
             - ''
             - - s3://
               - !Ref LogsBucketName
               - /flussi/pad26_asseverazione/${p_year}/${p_month}/${p_day}/${p_hour}/
         StorageDescriptor:
-          Location: !Sub "s3://${LogsBucketName}/flussi/pad26_asseverazione/"
-          InputFormat: "org.apache.hadoop.mapred.TextInputFormat"
-          OutputFormat: "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat"
+          Location: !Sub s3://${LogsBucketName}/flussi/pad26_asseverazione/
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
           SerdeInfo:
-            SerializationLibrary: "org.openx.data.jsonserde.JsonSerDe"
+            SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
           Columns:
-            - Name: "iun"
-              Type: "string"
-            - Name: "senderPaId"
-              Type: "string"
-            - Name: "notificationSentAt"
-              Type: "string"
-            - Name: "noticeCode"
-              Type: "string"
-            - Name: "creditorTaxId"
-              Type: "string"
-            - Name: "debtorPosUpdateDate"
-              Type: "string"
-            - Name: "recordCreationDate"
-              Type: "string"
-            - Name: "recipientIdx"
-              Type: "int"
-            - Name: "version"
-              Type: "int"
-            - Name: "moreFields"
-              Type: "string"
+            - Name: iun
+              Type: string
+            - Name: senderPaId
+              Type: string
+            - Name: notificationSentAt
+              Type: string
+            - Name: noticeCode
+              Type: string
+            - Name: creditorTaxId
+              Type: string
+            - Name: debtorPosUpdateDate
+              Type: string
+            - Name: recordCreationDate
+              Type: string
+            - Name: recipientIdx
+              Type: int
+            - Name: version
+              Type: int
+            - Name: moreFields
+              Type: string
         PartitionKeys:
-          - Name: "p_year"
-            Type: "string"
-          - Name: "p_month"
-            Type: "string"
-          - Name: "p_day"
-            Type: "string"
-          - Name: "p_hour"
-            Type: "string"
+          - Name: p_year
+            Type: string
+          - Name: p_month
+            Type: string
+          - Name: p_day
+            Type: string
+          - Name: p_hour
+            Type: string
+
+  CdcDailyCountLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub pn-CdcDailyCountLambdaRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CdcDailyCountLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: SSMParameterAccess
+                Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${DataLakeCountQueryConfigParameterName}
+              - Sid: GlueCatalogAccess
+                Effect: Allow
+                Action:
+                  - glue:GetTable
+                  - glue:GetDatabase
+                Resource:
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabase}
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabase}/*
+              - Sid: AthenaQueryExecution
+                Effect: Allow
+                Action:
+                  - athena:StartQueryExecution
+                  - athena:GetQueryExecution
+                  - athena:GetQueryResults
+                Resource: !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${AthenaWorkGroup}
+              - Sid: AthenaResultsBucketAccess
+                Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource:
+                  - !Sub arn:aws:s3:::${AthenaResultsBucket}
+                  - !Sub arn:aws:s3:::${AthenaResultsBucket}/*
+              - Sid: LogsBucketReadAccess
+                Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${LogsBucketName}
+                  - !Sub arn:aws:s3:::${LogsBucketName}/*
+              - Sid: LogsBucketCountWriteAccess
+                Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub arn:aws:s3:::${LogsBucketName}/datalake_counts/*
+              - Sid: KMSKeyAccess
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:Encrypt
+                  - kms:GenerateDataKey
+                Resource: !Ref LogsBucketKmsKeyArn
+
+  CdcDailyCountLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-CdcDailyCountLambda"
+      Description: "Performs daily counts on Athena tables for Data Lake reconciliation."
+      Runtime: python3.12
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 900
+      Role: !GetAtt CdcDailyCountLambdaRole.Arn
+      Environment:
+        Variables:
+          CONFIG_SSM_PARAMETER_NAME: !Ref DataLakeCountQueryConfigParameterName
+          TABLE_LIST: !Join [ ",", !Ref DataLakeCountTableList ]
+          OUTPUT_S3_BUCKET: !Ref LogsBucketName
+          ATHENA_RESULTS_BUCKET: !Ref AthenaResultsBucket
+          ATHENA_DATABASE: !Ref GlueDatabase
+          ATHENA_WORKGROUP: !Ref AthenaWorkGroup
+          MAX_WORKERS: "15"
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import os
+          import time
+          from datetime import datetime, timedelta, timezone
+          from concurrent.futures import ThreadPoolExecutor
+          from logging import getLogger, INFO
+
+          # Module-level configuration
+          logger = getLogger()
+          logger.setLevel(INFO)
+          
+          ssm = boto3.client('ssm')
+          glue = boto3.client('glue')
+          athena = boto3.client('athena')
+          s3 = boto3.client('s3')
+
+          CONFIG_SSM_PARAM = os.environ['CONFIG_SSM_PARAMETER_NAME']
+          TABLE_LIST = os.environ['TABLE_LIST']
+          OUTPUT_BUCKET = os.environ['OUTPUT_S3_BUCKET']
+          ATHENA_RESULTS_BUCKET = os.environ['ATHENA_RESULTS_BUCKET']
+          DATABASE = os.environ['ATHENA_DATABASE']
+          WORKGROUP = os.environ['ATHENA_WORKGROUP']
+          MAX_WORKERS = int(os.environ['MAX_WORKERS'])
+
+          # Validate required configuration at startup
+          if not all([CONFIG_SSM_PARAM, TABLE_LIST, OUTPUT_BUCKET, ATHENA_RESULTS_BUCKET, DATABASE, WORKGROUP]):
+              raise ValueError("Missing required environment variables")
+
+          # --- Service Layer ---
+
+          def fetch_custom_queries():
+              """Fetch custom query configurations from SSM Parameter Store."""
+              response = ssm.get_parameter(Name=CONFIG_SSM_PARAM, WithDecryption=True)
+              return json.loads(response['Parameter']['Value'])
+
+          def check_table_exists(table_name):
+              """Check if table exists in Glue catalog."""
+              try:
+                  glue.get_table(DatabaseName=DATABASE, Name=table_name)
+                  return True
+              except glue.exceptions.EntityNotFoundException:
+                  return False
+
+          def execute_athena_count_query(query, output_prefix):
+              """Execute Athena query and return count result."""
+              response = athena.start_query_execution(
+                  QueryString=query,
+                  QueryExecutionContext={'Database': DATABASE},
+                  ResultConfiguration={'OutputLocation': f"s3://{ATHENA_RESULTS_BUCKET}/{output_prefix}"},
+                  WorkGroup=WORKGROUP
+              )
+              query_id = response['QueryExecutionId']
+              
+              # Wait for completion
+              while True:
+                  execution = athena.get_query_execution(QueryExecutionId=query_id)
+                  status = execution['QueryExecution']['Status']['State']
+                  if status in ['SUCCEEDED', 'FAILED', 'CANCELLED']:
+                      break
+                  time.sleep(2)
+              
+              if status != 'SUCCEEDED':
+                  reason = execution['QueryExecution']['Status'].get('StateChangeReason', 'Unknown')
+                  raise RuntimeError(f"Query {query_id} failed: {reason}")
+
+              # Get results
+              results = athena.get_query_results(QueryExecutionId=query_id)
+              rows = results['ResultSet']['Rows']
+              if len(rows) > 1:
+                  return int(rows[1]['Data'][0]['VarCharValue'])
+              return 0
+
+          def save_report_to_s3(report, date_path):
+              """Save count report to S3."""
+              key = f"datalake_counts/{date_path}/counts.json"
+              s3.put_object(
+                  Bucket=OUTPUT_BUCKET,
+                  Key=key,
+                  Body=json.dumps(report, indent=2)
+              )
+              logger.info(f"Report saved: s3://{OUTPUT_BUCKET}/{key}")
+
+          # --- Business Logic ---
+
+          def build_default_query(table_name, date_params):
+              """Build default count query for a table."""
+              # Default: count all CDC events (INSERT, MODIFY, REMOVE)
+              # Alternative (commented): count events by type separately
+              # SELECT 
+              #   SUM(CASE WHEN eventName = 'INSERT' THEN 1 ELSE 0 END) as inserts,
+              #   SUM(CASE WHEN eventName = 'MODIFY' THEN 1 ELSE 0 END) as modifies,
+              #   SUM(CASE WHEN eventName = 'REMOVE' THEN 1 ELSE 0 END) as removes
+              # FROM ...
+              
+              return (
+                  f"SELECT COUNT(*) as total_count "
+                  f"FROM \"{DATABASE}\".\"{table_name}\" "
+                  f"WHERE p_year = '{date_params['YEAR']}' "
+                  f"AND p_month = '{date_params['MONTH']}' "
+                  f"AND p_day = '{date_params['DAY']}'"
+              )
+
+          def build_custom_query(template, table_name, date_params):
+              """Build custom query from template."""
+              return template.replace('{TABLE_NAME}', table_name).format(**date_params)
+
+          def process_table(table_name, custom_configs, date_params):
+              """Process a single table: check existence, build query, execute count."""
+              if not check_table_exists(table_name):
+                  logger.warning(f"Table '{table_name}' not found in Glue catalog - skipping")
+                  return {
+                      'table_name': table_name.replace('pn_', ''),
+                      'send_count': None,
+                      'status': 'NOT_FOUND'
+                  }
+
+              # Determine output name and query
+              output_name = table_name.replace('pn_', '')
+              
+              if table_name in custom_configs:
+                  config = custom_configs[table_name]
+                  query = build_custom_query(config['query_template'], table_name, date_params)
+                  output_name = config.get('output_table_name', output_name)
+              else:
+                  query = build_default_query(table_name, date_params)
+
+              # Execute count
+              count = execute_athena_count_query(query, f"athena_results/{table_name}")
+              
+              return {
+                  'table_name': output_name,
+                  'send_count': count
+              }
+
+          def process_all_tables(tables, custom_configs, date_params):
+              """Process all tables in parallel."""
+              results = []
+              
+              with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                  futures = {
+                      executor.submit(process_table, table.strip(), custom_configs, date_params): table 
+                      for table in tables
+                  }
+                  
+                  for future in futures:
+                      table = futures[future]
+                      result = future.result()
+                      results.append(result)
+                      logger.info(f"Processed {table}: {result.get('send_count', 'N/A')}")
+              
+              return results
+
+          def build_final_report(results, execution_timestamp):
+              """Build final JSON report with execution timestamp."""
+              return {
+                  'tables': [
+                      {**result, 'execution_timestamp': execution_timestamp}
+                      for result in results
+                  ]
+              }
+
+          # --- Entry Point ---
+
+          def handler(event, context):
+              """Lambda entry point - delegates to business logic."""
+              # Calculate yesterday's date (T-1)
+              yesterday = datetime.now(timezone.utc) - timedelta(days=1)
+              date_params = {
+                  'YEAR': yesterday.strftime('%Y'),
+                  'MONTH': yesterday.strftime('%m'),
+                  'DAY': yesterday.strftime('%d')
+              }
+              date_path = yesterday.strftime('%Y/%m/%d')
+              execution_ts = datetime.now(timezone.utc).isoformat()
+              
+              logger.info(f"Processing counts for date: {yesterday.strftime('%Y-%m-%d')}")
+              
+              # Load configurations
+              custom_configs = fetch_custom_queries()
+              tables = [t.strip() for t in TABLE_LIST.split(',')]
+              
+              # Process all tables
+              results = process_all_tables(tables, custom_configs, date_params)
+              
+              # Build and save report
+              report = build_final_report(results, execution_ts)
+              save_report_to_s3(report, date_path)
+              
+              return {'statusCode': 200, 'message': 'Count completed successfully'}
+
+  # CdcDailyCountSchedule:
+  #   Type: AWS::Events::Rule
+  #   Properties:
+  #     Name: !Sub "${ProjectName}-CdcDailyCountSchedule"
+  #     Description: "Triggers the CdcDailyCountLambda daily at 01:00 UTC"
+  #     ScheduleExpression: "cron(0 1 * * ? *)"
+  #     State: "ENABLED"
+  #     Targets:
+  #       - Arn: !GetAtt CdcDailyCountLambda.Arn
+  #         Id: "CdcDailyCountLambdaTarget"
+
+  # CdcDailyCountLambdaPermission:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     Action: "lambda:InvokeFunction"
+  #     FunctionName: !GetAtt CdcDailyCountLambda.Arn
+  #     Principal: "events.amazonaws.com"
+  #     SourceArn: !GetAtt CdcDailyCountSchedule.Arn
+
 
 Outputs:
   GlueDatabaseName:
