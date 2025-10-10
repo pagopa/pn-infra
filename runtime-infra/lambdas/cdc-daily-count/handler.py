@@ -1,6 +1,7 @@
 import boto3
 import json
 import os
+import re
 import time
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -66,12 +67,22 @@ def fetch_custom_queries():
 
 
 def check_table_exists(table_name):
-    """Verify table existence in Glue Catalog."""
+    """Verify table existence in Glue Catalog and return table info."""
     try:
-        glue.get_table(DatabaseName=DATABASE, Name=table_name)
-        return True
+        response = glue.get_table(DatabaseName=DATABASE, Name=table_name)
+        return True, response['Table']
     except glue.exceptions.EntityNotFoundException:
-        return False
+        return False, None
+
+
+def extract_source_name(location):
+    """Extract source data name from S3 location path."""
+    match = re.search(r'TABLE_NAME_([^/]+)/', location)
+    if match:
+        return match.group(1)
+    
+    match = re.search(r'/([^/]+)/?$', location.rstrip('/'))
+    return match.group(1) if match else None
 
 
 def execute_count_query(query, output_prefix):
@@ -126,20 +137,22 @@ def build_custom_query(template, table_name, date_params):
 
 def process_table(table_name, custom_configs, date_params):
     """Process single table: verify existence, build query, execute count."""
-    if not check_table_exists(table_name):
+    exists, table_info = check_table_exists(table_name)
+    
+    if not exists:
         logger.warning(f"Table '{table_name}' not found in Glue catalog - skipping")
         return {
-            'table_name': table_name.replace('pn_', ''),
+            'table_name': table_name,
             'send_count': None,
             'status': 'NOT_FOUND'
         }
     
-    output_name = table_name.replace('pn_', '')
+    location = table_info['StorageDescriptor']['Location']
+    output_name = extract_source_name(location) or table_name
     
     if table_name in custom_configs:
         config = custom_configs[table_name]
         query = build_custom_query(config['query_template'], table_name, date_params)
-        output_name = config.get('output_table_name', output_name)
     else:
         query = build_default_query(table_name, date_params)
     
