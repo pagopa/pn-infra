@@ -138,7 +138,7 @@ Conditions:
   RequiresDLQOncallAgeAlarm: !Not [ !Equals [ !Ref OncallQueueDlqOldestAgeLimit, '0' ] ]
   RequiresOncallDLQAlarm: !And [ !Condition IsWithAlarm, !Condition HasOncallDLQLimit ]
   RequiresOncallDLQAgeAlarm: !And [ !Condition IsWithDLQ, !Condition RequiresDLQOncallAgeAlarm]
-  RequiresOncallDLQIncreasingAlarm: !And [ !Condition IsWithDLQ, !Condition HasOncallDLQIncreasingLimitThreshold ]
+  RequiresOncallDLQIncreasingAlarm: !And [ !Condition IsWithAlarm, !Condition HasOncallDLQIncreasingLimitThreshold ]
 
 Resources:
 
@@ -400,7 +400,7 @@ Resources:
             Metric:
               Dimensions:
                 - Name: QueueName
-                  Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ], "" ]
+                  Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ], !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ] ]
               MetricName: ApproximateNumberOfMessagesVisible
               Namespace: AWS/SQS
             Period: !Ref OncallDLQIncreasingTimePeriod
@@ -411,7 +411,7 @@ Resources:
             Metric:
               Dimensions:
                 - Name: QueueName
-                  Value: !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ]
+                  Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ], !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ] ]
               MetricName: ApproximateNumberOfMessagesVisible
               Namespace: AWS/SQS
             Period: !Ref OncallDLQIncreasingTimePeriod
