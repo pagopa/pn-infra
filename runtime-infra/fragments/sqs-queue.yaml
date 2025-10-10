@@ -387,7 +387,7 @@ Resources:
     Condition: RequiresOncallDLQIncreasingAlarm
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "oncall-${QueueName}-DLQ-IncreasingMessage"
+      AlarmName: !If [IsWithDLQ, !Sub "oncall-${DeadLetterQueue.QueueName}-IncreasingMessageAlarm", !Sub "oncall-${Queue.QueueName}-IncreasingMessageAlarm"]
       AlarmDescription: "Alarm triggered when the dead-letter queue (DLQ) for the queue contains messages and the number of visible messages is increasing"
       DatapointsToAlarm: 6
       ComparisonOperator: GreaterThanOrEqualToThreshold
