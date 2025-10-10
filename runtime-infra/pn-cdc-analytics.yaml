@@ -22,13 +22,27 @@ Parameters:
   AlarmSNSTopicArn:
     Type: String
     Description: ARN of the SNS topic for alarms
+  LambdasBucketName:
+    Type: String
+    Description: S3 bucket name containing Lambda deployment packages
+  LambdasBasePath:
+    Type: String
+    Description: S3 key prefix for Lambda deployment packages
   DataLakeCountQueryConfigParameterName:
     Type: String
-    Description: SSM Parameter name for the JSON object containing custom count queries.
+    Description: SSM Parameter name for the JSON object containing custom count queries
     Default: /datalake/count_queries/queries.json
+  DataLakeCountGitConfigUrl:
+    Type: String
+    Default: ''
+    Description: Git raw content URL for query config, falls back to SSM if empty
+  DataLakeCountGitConfigRef:
+    Type: String
+    Default: 'main'
+    Description: Git ref, branch, or tag for config retrieval
   DataLakeCountTableList:
     Type: CommaDelimitedList
-    Description: List of Athena table names to be processed for daily count.
+    Description: List of Athena table names to be processed for daily count
     Default: pn_timelines,pn_userattributes,pn_mandate,pn_notifications,pn_radd_transaction_alt,pn_paper_notifications_cost,pn_asseveration
 
 Resources:
@@ -561,7 +575,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub "${ProjectName}-CdcDailyCountLambda"
-      Description: "Performs daily counts on Athena tables for Data Lake reconciliation."
+      Description: Performs daily counts on Athena tables for Data Lake reconciliation
       Runtime: python3.12
       Handler: index.handler
       MemorySize: 256
@@ -570,6 +584,8 @@ Resources:
       Environment:
         Variables:
           CONFIG_SSM_PARAMETER_NAME: !Ref DataLakeCountQueryConfigParameterName
+          CONFIG_GIT_URL: !Ref DataLakeCountGitConfigUrl
+          CONFIG_GIT_REF: !Ref DataLakeCountGitConfigRef
           TABLE_LIST: !Join [ ",", !Ref DataLakeCountTableList ]
           OUTPUT_S3_BUCKET: !Ref LogsBucketName
           ATHENA_RESULTS_BUCKET: !Ref AthenaResultsBucket
@@ -577,215 +593,34 @@ Resources:
           ATHENA_WORKGROUP: !Ref AthenaWorkGroup
           MAX_WORKERS: "15"
       Code:
-        ZipFile: |
-          import boto3
-          import json
-          import os
-          import time
-          from datetime import datetime, timedelta, timezone
-          from concurrent.futures import ThreadPoolExecutor
-          from logging import getLogger, INFO
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/cdc-daily-count.zip
 
-          # Module-level configuration
-          logger = getLogger()
-          logger.setLevel(INFO)
-          
-          ssm = boto3.client('ssm')
-          glue = boto3.client('glue')
-          athena = boto3.client('athena')
-          s3 = boto3.client('s3')
-
-          CONFIG_SSM_PARAM = os.environ['CONFIG_SSM_PARAMETER_NAME']
-          TABLE_LIST = os.environ['TABLE_LIST']
-          OUTPUT_BUCKET = os.environ['OUTPUT_S3_BUCKET']
-          ATHENA_RESULTS_BUCKET = os.environ['ATHENA_RESULTS_BUCKET']
-          DATABASE = os.environ['ATHENA_DATABASE']
-          WORKGROUP = os.environ['ATHENA_WORKGROUP']
-          MAX_WORKERS = int(os.environ['MAX_WORKERS'])
-
-          # Validate required configuration at startup
-          if not all([CONFIG_SSM_PARAM, TABLE_LIST, OUTPUT_BUCKET, ATHENA_RESULTS_BUCKET, DATABASE, WORKGROUP]):
-              raise ValueError("Missing required environment variables")
-
-          # --- Service Layer ---
-
-          def fetch_custom_queries():
-              """Fetch custom query configurations from SSM Parameter Store."""
-              response = ssm.get_parameter(Name=CONFIG_SSM_PARAM, WithDecryption=True)
-              return json.loads(response['Parameter']['Value'])
-
-          def check_table_exists(table_name):
-              """Check if table exists in Glue catalog."""
-              try:
-                  glue.get_table(DatabaseName=DATABASE, Name=table_name)
-                  return True
-              except glue.exceptions.EntityNotFoundException:
-                  return False
-
-          def execute_athena_count_query(query, output_prefix):
-              """Execute Athena query and return count result."""
-              response = athena.start_query_execution(
-                  QueryString=query,
-                  QueryExecutionContext={'Database': DATABASE},
-                  ResultConfiguration={'OutputLocation': f"s3://{ATHENA_RESULTS_BUCKET}/{output_prefix}"},
-                  WorkGroup=WORKGROUP
-              )
-              query_id = response['QueryExecutionId']
-              
-              # Wait for completion
-              while True:
-                  execution = athena.get_query_execution(QueryExecutionId=query_id)
-                  status = execution['QueryExecution']['Status']['State']
-                  if status in ['SUCCEEDED', 'FAILED', 'CANCELLED']:
-                      break
-                  time.sleep(2)
-              
-              if status != 'SUCCEEDED':
-                  reason = execution['QueryExecution']['Status'].get('StateChangeReason', 'Unknown')
-                  raise RuntimeError(f"Query {query_id} failed: {reason}")
-
-              # Get results
-              results = athena.get_query_results(QueryExecutionId=query_id)
-              rows = results['ResultSet']['Rows']
-              if len(rows) > 1:
-                  return int(rows[1]['Data'][0]['VarCharValue'])
-              return 0
-
-          def save_report_to_s3(report, date_path):
-              """Save count report to S3."""
-              key = f"datalake_counts/{date_path}/counts.json"
-              s3.put_object(
-                  Bucket=OUTPUT_BUCKET,
-                  Key=key,
-                  Body=json.dumps(report, indent=2)
-              )
-              logger.info(f"Report saved: s3://{OUTPUT_BUCKET}/{key}")
-
-          # --- Business Logic ---
-
-          def build_default_query(table_name, date_params):
-              """Build default count query for a table."""
-              # Default: count all CDC events (INSERT, MODIFY, REMOVE)
-              # Alternative (commented): count events by type separately
-              # SELECT 
-              #   SUM(CASE WHEN eventName = 'INSERT' THEN 1 ELSE 0 END) as inserts,
-              #   SUM(CASE WHEN eventName = 'MODIFY' THEN 1 ELSE 0 END) as modifies,
-              #   SUM(CASE WHEN eventName = 'REMOVE' THEN 1 ELSE 0 END) as removes
-              # FROM ...
-              
-              return (
-                  f"SELECT COUNT(*) as total_count "
-                  f"FROM \"{DATABASE}\".\"{table_name}\" "
-                  f"WHERE p_year = '{date_params['YEAR']}' "
-                  f"AND p_month = '{date_params['MONTH']}' "
-                  f"AND p_day = '{date_params['DAY']}'"
-              )
-
-          def build_custom_query(template, table_name, date_params):
-              """Build custom query from template."""
-              return template.replace('{TABLE_NAME}', table_name).format(**date_params)
-
-          def process_table(table_name, custom_configs, date_params):
-              """Process a single table: check existence, build query, execute count."""
-              if not check_table_exists(table_name):
-                  logger.warning(f"Table '{table_name}' not found in Glue catalog - skipping")
-                  return {
-                      'table_name': table_name.replace('pn_', ''),
-                      'send_count': None,
-                      'status': 'NOT_FOUND'
-                  }
-
-              # Determine output name and query
-              output_name = table_name.replace('pn_', '')
-              
-              if table_name in custom_configs:
-                  config = custom_configs[table_name]
-                  query = build_custom_query(config['query_template'], table_name, date_params)
-                  output_name = config.get('output_table_name', output_name)
-              else:
-                  query = build_default_query(table_name, date_params)
-
-              # Execute count
-              count = execute_athena_count_query(query, f"athena_results/{table_name}")
-              
-              return {
-                  'table_name': output_name,
-                  'send_count': count
-              }
-
-          def process_all_tables(tables, custom_configs, date_params):
-              """Process all tables in parallel."""
-              results = []
-              
-              with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-                  futures = {
-                      executor.submit(process_table, table.strip(), custom_configs, date_params): table 
-                      for table in tables
-                  }
-                  
-                  for future in futures:
-                      table = futures[future]
-                      result = future.result()
-                      results.append(result)
-                      logger.info(f"Processed {table}: {result.get('send_count', 'N/A')}")
-              
-              return results
-
-          def build_final_report(results, execution_timestamp):
-              """Build final JSON report with execution timestamp."""
-              return {
-                  'tables': [
-                      {**result, 'execution_timestamp': execution_timestamp}
-                      for result in results
-                  ]
-              }
-
-          # --- Entry Point ---
-
-          def handler(event, context):
-              """Lambda entry point - delegates to business logic."""
-              # Calculate yesterday's date (T-1)
-              yesterday = datetime.now(timezone.utc) - timedelta(days=1)
-              date_params = {
-                  'YEAR': yesterday.strftime('%Y'),
-                  'MONTH': yesterday.strftime('%m'),
-                  'DAY': yesterday.strftime('%d')
-              }
-              date_path = yesterday.strftime('%Y/%m/%d')
-              execution_ts = datetime.now(timezone.utc).isoformat()
-              
-              logger.info(f"Processing counts for date: {yesterday.strftime('%Y-%m-%d')}")
-              
-              # Load configurations
-              custom_configs = fetch_custom_queries()
-              tables = [t.strip() for t in TABLE_LIST.split(',')]
-              
-              # Process all tables
-              results = process_all_tables(tables, custom_configs, date_params)
-              
-              # Build and save report
-              report = build_final_report(results, execution_ts)
-              save_report_to_s3(report, date_path)
-              
-              return {'statusCode': 200, 'message': 'Count completed successfully'}
+  # CdcDailyCountLambdaAlarms:
+  #   Type: AWS::CloudFormation::Stack
+  #   Properties:
+  #     TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+  #     Parameters:
+  #       FunctionName: !Ref CdcDailyCountLambda
+  #       AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   # CdcDailyCountSchedule:
   #   Type: AWS::Events::Rule
   #   Properties:
   #     Name: !Sub "${ProjectName}-CdcDailyCountSchedule"
-  #     Description: "Triggers the CdcDailyCountLambda daily at 01:00 UTC"
+  #     Description: Triggers the CdcDailyCountLambda daily at 01:00 UTC
   #     ScheduleExpression: "cron(0 1 * * ? *)"
-  #     State: "ENABLED"
+  #     State: ENABLED
   #     Targets:
   #       - Arn: !GetAtt CdcDailyCountLambda.Arn
-  #         Id: "CdcDailyCountLambdaTarget"
+  #         Id: CdcDailyCountLambdaTarget
 
   # CdcDailyCountLambdaPermission:
   #   Type: AWS::Lambda::Permission
   #   Properties:
-  #     Action: "lambda:InvokeFunction"
+  #     Action: lambda:InvokeFunction
   #     FunctionName: !GetAtt CdcDailyCountLambda.Arn
-  #     Principal: "events.amazonaws.com"
+  #     Principal: events.amazonaws.com
   #     SourceArn: !GetAtt CdcDailyCountSchedule.Arn
 
 
