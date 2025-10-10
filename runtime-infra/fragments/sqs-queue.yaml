@@ -94,6 +94,11 @@ Parameters:
     Default: 0
     Description: The minimum number of messages in DLQ to raise an oncall alarm (it applies to standalone DLQ only). When zero, the oncall alarm is not created.
 
+  OncallDLQIncreasingLimitThreshold:
+    Type: Number
+    Default: 10
+    Description: The minimum number of messages in DLQ to raise an oncall alarm (it applies to standalone DLQ only). When zero, the oncall alarm is not created.
+
   HighThroughput:
     Type: String
     Default: 'false'
@@ -123,10 +128,12 @@ Conditions:
     - !Condition IsWithDLQ
 
   HasOncallDLQLimit: !Not [ !Equals [ !Ref OncallDLQLimit, '0' ] ]
+  HasOncallDLQIncreasingLimitThreshold: !Not [ !Equals [ !Ref OncallDLQIncreasingLimitThreshold, '0' ] ]
 
   RequiresDLQOncallAgeAlarm: !Not [ !Equals [ !Ref OncallQueueDlqOldestAgeLimit, '0' ] ]
   RequiresOncallDLQAlarm: !And [ !Condition IsWithAlarm, !Condition HasOncallDLQLimit ]
   RequiresOncallDLQAgeAlarm: !And [ !Condition IsWithDLQ, !Condition RequiresDLQOncallAgeAlarm]
+  RequiresOncallDLQIncreasingAlarm: !And [ !Condition IsWithDLQ, !Condition HasOncallDLQIncreasingLimitThreshold ]
 
 Resources:
 
@@ -372,10 +379,10 @@ Resources:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
   WakeupDLQAlarm:
-    Condition: IsWithDLQ
+    Condition: HasOncallDLQIncreasingLimitThreshold
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "oncall-${QueueName}-HasDLQMessage"
+      AlarmName: !Sub "oncall-${QueueName}-DLQ-IncreasingMessage"
       AlarmDescription: "Alarm triggered when the dead-letter queue (DLQ) for the queue contains messages and the number of visible messages is increasing"
       DatapointsToAlarm: 6
       ComparisonOperator: GreaterThanOrEqualToThreshold
@@ -406,7 +413,7 @@ Resources:
             Stat: Minimum
           ReturnData: False
         - Id: e1
-          Expression: IF(m1 > m2 AND (m1 - m2) >= 10, 1, 0)
+          Expression: IF(m1 > m2 AND (m1 - m2) >= ${OncallDLQIncreasingLimitThreshold}, 1, 0)
           Label: !Sub "${QueueName}-HasDLQMessage-OnCall-Metric"
       AlarmActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
