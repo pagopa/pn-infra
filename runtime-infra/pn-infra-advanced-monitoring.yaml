@@ -30,7 +30,7 @@ Parameters:
 
   EMDDownstreamDetectionAlarmPeriod:
     Type: Number
-    Default: 300 ### 5 minutes
+    Default: 300
 
   EMDDownstreamDetectionAlarmThreshold:
     Type: Number
@@ -38,7 +38,7 @@ Parameters:
 
   EMDDownstreamDetectionAlarmEvaluationPeriods:
     Type: Number
-    Default: 12 ###12 * EMDDownstreamDetectionAlarmPeriod
+    Default: 12
 
   EMDDownstreamDetectionAlarmPeriodDatapointsToAlarm:
     Type: Number
@@ -54,7 +54,7 @@ Parameters:
 
   OncallEMDDownstreamDetectionAlarmPeriod:
     Type: Number
-    Default: 300 ### 5 minutes
+    Default: 300
 
   OncallEMDDownstreamDetectionAlarmThreshold:
     Type: Number
@@ -62,9 +62,53 @@ Parameters:
 
   OncallEMDDownstreamDetectionAlarmEvaluationPeriods:
     Type: Number
-    Default: 12 ###12 * EMDDownstreamDetectionAlarmPeriod
+    Default: 12
 
   OncallEMDDownstreamDetectionAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  ExternalRegistriesCheckoutAlarmPeriodFilterPattern:
+    Type: String
+    Default: '{ $.level = "ERROR" }'
+
+  ExternalRegistriesCheckoutAlarmPeriod:
+    Type: Number
+    Default: 300
+
+  ExternalRegistriesCheckoutAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  ExternalRegistriesCheckoutAlarmEvaluationPeriods:
+    Type: Number
+    Default: 12
+
+  ExternalRegistriesCheckoutAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  ExternalRegistriesCheckoutAlarmEnableOncall:
+    Type: String
+    Description: "Create onCall alarm"
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
+  OncallExternalRegistriesCheckoutAlarmPeriod:
+    Type: Number
+    Default: 300
+
+  OncallExternalRegistriesCheckoutAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  OncallExternalRegistriesCheckoutAlarmEvaluationPeriods:
+    Type: Number
+    Default: 12
+
+  OncallExternalRegistriesCheckoutAlarmPeriodDatapointsToAlarm:
     Type: Number
     Default: 1
 
@@ -91,6 +135,30 @@ Resources:
         OncallThreshold: !Ref OncallEMDDownstreamDetectionAlarmThreshold
         OncallEvaluationPeriods: !Ref OncallEMDDownstreamDetectionAlarmEvaluationPeriods
         OncallDatapointsToAlarm: !Ref OncallEMDDownstreamDetectionAlarmPeriodDatapointsToAlarm
+        OncallComparisonOperator: GreaterThanOrEqualToThreshold
+        OncallStatistic: Sum
+
+  ExternalRegistriesCheckoutAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        MetricName: !Sub "${ProjectName}-external-registries-checkout-payment-error-detection"
+        MetricNamespace: !Ref MetricNamespace
+        LogGroupName: /aws/ecs/pn-external-registries-checkout
+        FilterPattern: !Ref ExternalRegistriesCheckoutAlarmPeriodFilterPattern
+        Period: !Ref ExternalRegistriesCheckoutAlarmPeriod
+        Threshold: !Ref ExternalRegistriesCheckoutAlarmThreshold
+        EvaluationPeriods: !Ref ExternalRegistriesCheckoutAlarmEvaluationPeriods
+        DatapointsToAlarm: !Ref ExternalRegistriesCheckoutAlarmPeriodDatapointsToAlarm
+        Statistic: Sum
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        HasOncall: !Ref ExternalRegistriesCheckoutAlarmEnableOncall
+        OncallPeriod: !Ref OncallExternalRegistriesCheckoutAlarmPeriod
+        OncallThreshold: !Ref OncallExternalRegistriesCheckoutAlarmThreshold
+        OncallEvaluationPeriods: !Ref OncallExternalRegistriesCheckoutAlarmEvaluationPeriods
+        OncallDatapointsToAlarm: !Ref OncallExternalRegistriesCheckoutAlarmPeriodDatapointsToAlarm
         OncallComparisonOperator: GreaterThanOrEqualToThreshold
         OncallStatistic: Sum
 
