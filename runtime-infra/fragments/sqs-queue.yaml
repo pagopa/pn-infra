@@ -97,7 +97,12 @@ Parameters:
   OncallDLQIncreasingLimitThreshold:
     Type: Number
     Default: 10
-    Description: The minimum number of messages in DLQ to raise an oncall alarm (it applies to standalone DLQ only). When zero, the oncall alarm is not created.
+    Description: The minimum number of messages entering the DLQ within a given time window. When zero, the oncall alarm is not created.
+
+  OncallDLQIncreasingTimePeriod:
+    Type: Number
+    Default: 300
+    Description: The time period used to monitor the number of messages entering the DLQ.
 
   HighThroughput:
     Type: String
@@ -379,7 +384,7 @@ Resources:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
   WakeupDLQAlarm:
-    Condition: HasOncallDLQIncreasingLimitThreshold
+    Condition: RequiresOncallDLQIncreasingAlarm
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "oncall-${QueueName}-DLQ-IncreasingMessage"
@@ -398,7 +403,7 @@ Resources:
                   Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ], "" ]
               MetricName: ApproximateNumberOfMessagesVisible
               Namespace: AWS/SQS
-            Period: 300
+            Period: !Ref OncallDLQIncreasingTimePeriod
             Stat: Maximum
           ReturnData: False
         - Id: m2
@@ -406,10 +411,10 @@ Resources:
             Metric:
               Dimensions:
                 - Name: QueueName
-                  Value: !If [IsWithDLQ, !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ], "" ]
+                  Value: !If [ IsNotFifo, !GetAtt DeadLetterQueue.QueueName , !GetAtt DeadLetterQueueFifo.QueueName ]
               MetricName: ApproximateNumberOfMessagesVisible
               Namespace: AWS/SQS
-            Period: 300
+            Period: !Ref OncallDLQIncreasingTimePeriod
             Stat: Minimum
           ReturnData: False
         - Id: e1
