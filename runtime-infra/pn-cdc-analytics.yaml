@@ -437,7 +437,7 @@ Resources:
                 Effect: Allow
                 Resource: 
                   - !GetAtt UpdateCdcJsonViewsLambda.Arn
-                  - !GetAtt CdcDailyCountLambda.Arn
+                  - !GetAtt DataLakeCountExportLambda.Arn
 
   AsseverationGlueTable:
     Type: AWS::Glue::Table
@@ -503,10 +503,10 @@ Resources:
           - Name: p_hour
             Type: string
 
-  CdcDailyCountLambdaRole:
+  DataLakeCountExportLambdaRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub pn-CdcDailyCountLambdaRole
+      RoleName: !Sub pn-DataLakeCountExportLambdaRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -571,16 +571,16 @@ Resources:
                   - kms:GenerateDataKey
                 Resource: !Ref LogsBucketKmsKeyArn
 
-  CdcDailyCountLambda:
+  DataLakeCountExportLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub "${ProjectName}-CdcDailyCountLambda"
-      Description: Performs daily counts on Athena tables for Data Lake reconciliation
+      FunctionName: !Sub "${ProjectName}-DataLakeCountExportLambda"
+      Description: Exports daily counts from Athena tables for Data Lake reconciliation
       Runtime: python3.12
       Handler: index.handler
       MemorySize: 256
       Timeout: 900
-      Role: !GetAtt CdcDailyCountLambdaRole.Arn
+      Role: !GetAtt DataLakeCountExportLambdaRole.Arn
       Environment:
         Variables:
           CONFIG_SSM_PARAMETER_NAME: !Ref DataLakeCountQueryConfigParameterName
@@ -594,34 +594,34 @@ Resources:
           MAX_WORKERS: "15"
       Code:
         S3Bucket: !Ref LambdasBucketName
-        S3Key: !Sub ${LambdasBasePath}/cdc-daily-count.zip
+        S3Key: !Sub ${LambdasBasePath}/datalake-count-export.zip
 
-  # CdcDailyCountLambdaAlarms:
+  # DataLakeCountExportLambdaAlarms:
   #   Type: AWS::CloudFormation::Stack
   #   Properties:
   #     TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
   #     Parameters:
-  #       FunctionName: !Ref CdcDailyCountLambda
+  #       FunctionName: !Ref DataLakeCountExportLambda
   #       AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
-  # CdcDailyCountSchedule:
+  # DataLakeCountExportSchedule:
   #   Type: AWS::Events::Rule
   #   Properties:
-  #     Name: !Sub "${ProjectName}-CdcDailyCountSchedule"
-  #     Description: Triggers the CdcDailyCountLambda daily at 01:00 UTC
+  #     Name: !Sub "${ProjectName}-DataLakeCountExportSchedule"
+  #     Description: Triggers DataLakeCountExportLambda daily at 01:00 UTC
   #     ScheduleExpression: "cron(0 1 * * ? *)"
   #     State: ENABLED
   #     Targets:
-  #       - Arn: !GetAtt CdcDailyCountLambda.Arn
-  #         Id: CdcDailyCountLambdaTarget
+  #       - Arn: !GetAtt DataLakeCountExportLambda.Arn
+  #         Id: DataLakeCountExportLambdaTarget
 
-  # CdcDailyCountLambdaPermission:
+  # DataLakeCountExportLambdaPermission:
   #   Type: AWS::Lambda::Permission
   #   Properties:
   #     Action: lambda:InvokeFunction
-  #     FunctionName: !GetAtt CdcDailyCountLambda.Arn
+  #     FunctionName: !GetAtt DataLakeCountExportLambda.Arn
   #     Principal: events.amazonaws.com
-  #     SourceArn: !GetAtt CdcDailyCountSchedule.Arn
+  #     SourceArn: !GetAtt DataLakeCountExportSchedule.Arn
 
 
 Outputs:
