@@ -9,12 +9,10 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.error import HTTPError
 
 from config import (
-    logger, setup_logger, CONFIG_SSM_PARAM, CONFIG_GIT_URL, CONFIG_GIT_REF,
-    TABLE_LIST, OUTPUT_BUCKET, ATHENA_RESULTS_BUCKET, DATABASE, WORKGROUP, MAX_WORKERS
+    logger, setup_logger, CONFIG_GIT_URL,
+    OUTPUT_BUCKET, ATHENA_RESULTS_BUCKET, DATABASE, WORKGROUP, MAX_WORKERS
 )
 
-ssm = boto3.client('ssm')
-glue = boto3.client('glue')
 athena = boto3.client('athena')
 s3 = boto3.client('s3')
 
@@ -22,9 +20,9 @@ s3 = boto3.client('s3')
 def fetch_config_from_git():
     """Retrieve custom query configuration from Git repository."""
     if not CONFIG_GIT_URL:
-        raise ValueError("CONFIG_GIT_URL is required when using Git source")
+        raise ValueError("CONFIG_GIT_URL is required")
     
-    url = CONFIG_GIT_URL.replace('/main/', f'/{CONFIG_GIT_REF}/').replace('/master/', f'/{CONFIG_GIT_REF}/')
+    url = CONFIG_GIT_URL
     logger.info(f"Fetching config from Git: {url}")
     
     try:
@@ -32,8 +30,7 @@ def fetch_config_from_git():
             content = response.read().decode('utf-8').strip()
             
             if not content:
-                logger.info("Git config file is empty - using default queries")
-                return {}
+                raise ValueError("Git config file is empty")
             
             return json.loads(content)
             
@@ -45,44 +42,12 @@ def fetch_config_from_git():
         raise RuntimeError(f"Failed to fetch config from Git: {e}")
 
 
-def fetch_config_from_ssm():
-    """Retrieve custom query configuration from SSM Parameter Store."""
-    response = ssm.get_parameter(Name=CONFIG_SSM_PARAM, WithDecryption=True)
-    value = response['Parameter']['Value'].strip()
-    
-    if not value:
-        logger.info("SSM parameter is empty - using default queries")
-        return {}
-    
-    return json.loads(value)
-
-
 def fetch_custom_queries():
-    """Load custom queries with cascading fallback: Git → SSM → default."""
-    if CONFIG_GIT_URL:
-        return fetch_config_from_git()
+    """Load custom queries from Git (required)."""
+    if not CONFIG_GIT_URL:
+        raise ValueError("CONFIG_GIT_URL is required")
     
-    logger.info("CONFIG_GIT_URL not set - using SSM Parameter Store")
-    return fetch_config_from_ssm()
-
-
-def check_table_exists(table_name):
-    """Verify table existence in Glue Catalog and return table info."""
-    try:
-        response = glue.get_table(DatabaseName=DATABASE, Name=table_name)
-        return True, response['Table']
-    except glue.exceptions.EntityNotFoundException:
-        return False, None
-
-
-def extract_source_name(location):
-    """Extract source data name from S3 location path."""
-    match = re.search(r'TABLE_NAME_([^/]+)/', location)
-    if match:
-        return match.group(1)
-    
-    match = re.search(r'/([^/]+)/?$', location.rstrip('/'))
-    return match.group(1) if match else None
+    return fetch_config_from_git()
 
 
 def execute_count_query(query, output_prefix):
@@ -119,47 +84,13 @@ def execute_count_query(query, output_prefix):
     return 0
 
 
-def build_default_query(table_name, date_params):
-    """Build standard count query for date-partitioned table."""
-    return (
-        f"SELECT COUNT(*) as total_count "
-        f"FROM \"{DATABASE}\".\"{table_name}\" "
-        f"WHERE p_year = '{date_params['YEAR']}' "
-        f"AND p_month = '{date_params['MONTH']}' "
-        f"AND p_day = '{date_params['DAY']}'"
-    )
-
-
-def build_custom_query(template, table_name, date_params):
-    """Build query from custom template with parameter substitution."""
-    return template.replace('{TABLE_NAME}', table_name).format(**date_params)
-
-
-def process_table(table_name, custom_configs, date_params):
-    """Process single table: verify existence, build query, execute count."""
-    exists, table_info = check_table_exists(table_name)
-    
-    if not exists:
-        logger.warning(f"Table '{table_name}' not found in Glue catalog - skipping")
-        return {
-            'table_name': table_name,
-            'send_count': None,
-            'status': 'NOT_FOUND'
-        }
-    
-    location = table_info['StorageDescriptor']['Location']
-    output_name = extract_source_name(location) or table_name
-    
-    if table_name in custom_configs:
-        config = custom_configs[table_name]
-        query = build_custom_query(config['query_template'], table_name, date_params)
-    else:
-        query = build_default_query(table_name, date_params)
-    
-    count = execute_count_query(query, f"athena_results/{table_name}")
+def process_table(report_name, config, date_params):
+    """Process single table: format query and execute count."""
+    query = config['query'].format(**date_params)
+    count = execute_count_query(query, f"athena_results/{report_name}")
     
     return {
-        'table_name': output_name,
+        'table_name': report_name,
         'send_count': count
     }
 
@@ -193,20 +124,19 @@ def process_daily_count(event, context):
     logger.info(f"Processing counts for date: {yesterday.strftime('%Y-%m-%d')}")
     
     custom_configs = fetch_custom_queries()
-    tables = [t.strip() for t in TABLE_LIST.split(',')]
     
     results = []
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {
-            executor.submit(process_table, table, custom_configs, date_params): table
-            for table in tables
+            executor.submit(process_table, report_name, config, date_params): report_name
+            for report_name, config in custom_configs.items()
         }
         
         for future in futures:
-            table = futures[future]
+            report_name = futures[future]
             result = future.result()
             results.append(result)
-            logger.info(f"Processed {table}: {result.get('send_count', 'N/A')}")
+            logger.info(f"Processed {report_name}: {result.get('send_count', 'N/A')}")
     
     report = {
         'tables': [
