@@ -601,13 +601,13 @@ Resources:
       SourceArn: !GetAtt DataLakeCountExportSchedule.Arn
       SourceAccount: !Ref AWS::AccountId
 
-  # DataLakeCountExportAlarms:
-  #   Type: AWS::CloudFormation::Stack
-  #   Properties:
-  #     TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
-  #     Parameters:
-  #       FunctionName: !Ref DataLakeCountExport
-  #       AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+  DataLakeCountExportAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref DataLakeCountExport
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
 
 Outputs:
