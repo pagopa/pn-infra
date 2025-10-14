@@ -696,40 +696,40 @@ Mappings:
       Metric: personal-data-vault-SelfcarePG-downstream-detection
     PersonalDataVault:
       LogGroup: /aws/ecs/pn-data-vault-sep
-      Metric: personal-data-vault-PersonalDataVault-downstream-detection
+      Metric: pn-personal-data-vault-PersonalDataVault-downstream-detection
     OneTrust:
       LogGroup: /aws/ecs/pn-external-registries
-      Metric: external-registries-OneTrust-downstream-detection
+      Metric: pn-external-registries-OneTrust-downstream-detection
     IO:
       LogGroup: /aws/ecs/pn-external-registries
-      Metric: external-registries-IO-downstream-detection
+      Metric: pn-external-registries-IO-downstream-detection
     SelfcarePGPnExternalRegistries:
       LogGroup: /aws/ecs/pn-external-registries
-      Metric: external-registries-SelfcarePG-downstream-detection
+      Metric: pn-external-registries-SelfcarePG-downstream-detection
     SelfcarePA:
       LogGroup: /aws/ecs/pn-external-registries
-      Metric: external-registries-SelfcarePA-downstream-detection
+      Metric: pn-external-registries-SelfcarePA-downstream-detection
     Postel:
       LogGroup: /aws/ecs/pn-address-manager
-      Metric: address-manager-POSTEL-downstream-detection
+      Metric: pn-address-manager-POSTEL-downstream-detection
     AdE:
       LogGroup: /aws/ecs/pn-national-registries
-      Metric: national-registries-AdE-downstream-detection
+      Metric: pn-national-registries-AdE-downstream-detection
     IPA:
       LogGroup: /aws/ecs/pn-national-registries
-      Metric: national-registries-IPA-downstream-detection
+      Metric: pn-national-registries-IPA-downstream-detection
     ANPR:
       LogGroup: /aws/ecs/pn-national-registries
-      Metric: national-registries-ANPR-downstream-detection
+      Metric: pn-national-registries-ANPR-downstream-detection
     INAD:
       LogGroup: /aws/ecs/pn-national-registries
-      Metric: national-registries-INAD-downstream-detection
+      Metric: pn-national-registries-INAD-downstream-detection
     PDND:
       LogGroup: /aws/ecs/pn-national-registries
-      Metric: national-registries-PDND-downstream-detection
+      Metric: pn-national-registries-PDND-downstream-detection
     InfoCamere:
       LogGroup: /aws/ecs/pn-national-registries
-      Metric: national-registries-InfoCamere-downstream-detection
+      Metric: pn-national-registries-InfoCamere-downstream-detection
 
 Resources:
 
@@ -740,7 +740,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-${!FindInMap [DownstreamAlarms, EMD, Metric]}"
+        MetricName: !FindInMap [DownstreamAlarms, EMD, Metric]
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: !FindInMap [DownstreamAlarms, EMD, LogGroup]
         FilterPattern: !Ref EMDDownstreamAlarmPeriodFilterPattern
@@ -764,7 +764,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-${!FindInMap [DownstreamAlarms, ExternalRegistriesCheckout, Metric]}"
+        MetricName: !FindInMap [DownstreamAlarms, ExternalRegistriesCheckout, Metric]
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: !FindInMap [DownstreamAlarms, ExternalRegistriesCheckout, LogGroup]
         FilterPattern: !Ref ExternalRegistriesCheckoutAlarmPeriodFilterPattern
@@ -789,7 +789,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-${!FindInMap [DownstreamAlarms, SelfcarePG, Metric]}"
+        MetricName: !FindInMap [DownstreamAlarms, SelfcarePG, Metric]
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: !FindInMap [DownstreamAlarms, SelfcarePG, LogGroup]
         FilterPattern: !Ref SelfcarePGDownstreamAlarmPeriodFilterPattern
@@ -814,7 +814,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-${!FindInMap [DownstreamAlarms, PersonalDataVault, Metric]}"
+        MetricName: !FindInMap [DownstreamAlarms, PersonalDataVault, Metric]
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: !FindInMap [DownstreamAlarms, PersonalDataVault, LogGroup]
         FilterPattern: !Ref PersonalDataVaultDownstreamAlarmPeriodFilterPattern
@@ -838,7 +838,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-${!FindInMap [DownstreamAlarms, OneTrust, Metric]}"
+        MetricName: !FindInMap [DownstreamAlarms, OneTrust, Metric]
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: !FindInMap [DownstreamAlarms, OneTrust, LogGroup]
         FilterPattern: !Ref OneTrustDownstreamAlarmPeriodFilterPattern
@@ -862,7 +862,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-${!FindInMap [DownstreamAlarms, IO, Metric]}"
+        MetricName: !FindInMap [DownstreamAlarms, IO, Metric]
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: !FindInMap [DownstreamAlarms, IO, LogGroup]
         FilterPattern: !Ref IODownstreamAlarmPeriodFilterPattern
@@ -886,7 +886,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-${!FindInMap [DownstreamAlarms, SelfcarePGPnExternalRegistries, Metric]}"
+        MetricName: !FindInMap [DownstreamAlarms, SelfcarePGPnExternalRegistries, Metric]
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: !FindInMap [DownstreamAlarms, SelfcarePGPnExternalRegistries, LogGroup]
         FilterPattern: !Ref SelfcarePGPnExternalRegistriesDownstreamAlarmPeriodFilterPattern
@@ -911,7 +911,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-${!FindInMap [DownstreamAlarms, SelfcarePA, Metric]}"
+        MetricName: !FindInMap [DownstreamAlarms, SelfcarePA, Metric]
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: !FindInMap [DownstreamAlarms, SelfcarePA, LogGroup]
         FilterPattern: !Ref SelfcarePADownstreamAlarmPeriodFilterPattern
@@ -936,7 +936,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-${!FindInMap [DownstreamAlarms, Postel, Metric]}"
+        MetricName: !FindInMap [DownstreamAlarms, Postel, Metric]
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: !FindInMap [DownstreamAlarms, Postel, LogGroup]
         FilterPattern: !Ref PostelDownstreamAlarmPeriodFilterPattern
@@ -961,7 +961,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-${!FindInMap [DownstreamAlarms, AdE, Metric]}"
+        MetricName: !FindInMap [DownstreamAlarms, AdE, Metric]
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: !FindInMap [DownstreamAlarms, AdE, LogGroup]
         FilterPattern: !Ref AdEDownstreamAlarmPeriodFilterPattern
@@ -986,7 +986,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-${!FindInMap [DownstreamAlarms, IPA, Metric]}"
+        MetricName: !FindInMap [DownstreamAlarms, IPA, Metric]
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: !FindInMap [DownstreamAlarms, IPA, LogGroup]
         FilterPattern: !Ref IPADownstreamAlarmPeriodFilterPattern
@@ -1011,7 +1011,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-${!FindInMap [DownstreamAlarms, ANPR, Metric]}"
+        MetricName: !FindInMap [DownstreamAlarms, ANPR, Metric]
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: !FindInMap [DownstreamAlarms, ANPR, LogGroup]
         FilterPattern: !Ref ANPRDownstreamAlarmPeriodFilterPattern
@@ -1036,7 +1036,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-${!FindInMap [DownstreamAlarms, INAD, Metric]}"
+        MetricName: !FindInMap [DownstreamAlarms, INAD, Metric]
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: !FindInMap [DownstreamAlarms, INAD, LogGroup]
         FilterPattern: !Ref INADDownstreamAlarmPeriodFilterPattern
@@ -1061,7 +1061,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-${!FindInMap [DownstreamAlarms, PDND, Metric]}"
+        MetricName: !FindInMap [DownstreamAlarms, PDND, Metric]
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: !FindInMap [DownstreamAlarms, PDND, LogGroup]
         FilterPattern: !Ref PDNDDownstreamAlarmPeriodFilterPattern
@@ -1086,7 +1086,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        MetricName: !Sub "${ProjectName}-${!FindInMap [DownstreamAlarms, InfoCamere, Metric]}"
+        MetricName: !FindInMap [DownstreamAlarms, InfoCamere, Metric]
         MetricNamespace: !Ref MetricNamespace
         LogGroupName: !FindInMap [DownstreamAlarms, InfoCamere, LogGroup]
         FilterPattern: !Ref InfoCamereDownstreamAlarmPeriodFilterPattern
