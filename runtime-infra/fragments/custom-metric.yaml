@@ -22,10 +22,6 @@ Parameters:
     Type: String
     Description: "Pattern to filter logs"
 
-  ExcludeFilterPattern:
-    Type: String
-    Description: "Pattern to filter logs to ignore"
-
   Period: 
     Type: Number
     Default: 60
@@ -94,13 +90,10 @@ Parameters:
 
 Conditions:
   HasOncallCondition: !Equals [ !Ref HasOncall, 'true' ]
-  HasExcludeFilterPatternCondition: !Equals [ !Ref ExcludeFilterPattern, 'true' ]
-
-
+    
 Resources:
   # CloudWatch metric to filer ERROR - FATAL lines, in Log group
   CustomErrorLogsMetricFilter: 
-    !If HasExcludeFilterPatternCondition
     Type: AWS::Logs::MetricFilter
     Properties: 
       LogGroupName: !Ref LogGroupName
