@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Create base resources for CDC files analysis
+Description: Create base resources for CDC files analysis and daily count reporting for Data Lake
 
 Parameters:
   ProjectName:
@@ -21,6 +21,23 @@ Parameters:
   AlarmSNSTopicArn:
     Type: String
     Description: ARN of the SNS topic for alarms
+  LambdasBucketName:
+    Type: String
+    Description: S3 bucket name containing Lambda deployment packages
+  LambdasBasePath:
+    Type: String
+    Description: S3 key prefix for Lambda deployment packages
+  DataLakeCountGitConfigUrl:
+    Type: String
+    Default: ''
+    Description: >
+      Git raw content URL with embedded commit SHA or tag.
+      Examples: https://raw.githubusercontent.com/pagopa/pn-infra/1234567890abcdef1234567890abcdef12345678/runtime-infra/datalake/ingestion-count-queries.json
+      or https://raw.githubusercontent.com/pagopa/pn-infra/v1.0.0/runtime-infra/datalake/ingestion-count-queries.json
+  DataLakeCountExportScheduleCron:
+    Type: String
+    Default: 'cron(0 1 * * ? *)'
+    Description: Schedule expression for Data Lake count export. Default runs daily at 01:00 UTC
 
 Resources:
   GlueServiceRole:
@@ -414,6 +431,187 @@ Resources:
                 Effect: Allow
                 Resource: 
                   - !GetAtt UpdateCdcJsonViewsLambda.Arn
+                  - !GetAtt DataLakeCountExport.Arn
+
+  AsseverationGlueTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabase
+      TableInput:
+        Name: pn_asseveration
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          EXTERNAL: 'true'
+          projection.enabled: 'true'
+          projection.p_year.type: integer
+          projection.p_year.range: 2024,2099
+          projection.p_month.type: integer
+          projection.p_month.range: 01,12
+          projection.p_month.digits: '2'
+          projection.p_day.type: integer
+          projection.p_day.range: 01,31
+          projection.p_day.digits: '2'
+          projection.p_hour.type: integer
+          projection.p_hour.range: 00,23
+          projection.p_hour.digits: '2'
+          storage.location.template: !Join
+            - ''
+            - - s3://
+              - !Ref LogsBucketName
+              - /flussi/pad26_asseverazione/${p_year}/${p_month}/${p_day}/${p_hour}/
+        StorageDescriptor:
+          Location: !Sub s3://${LogsBucketName}/flussi/pad26_asseverazione/
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          SerdeInfo:
+            SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
+          Columns:
+            - Name: iun
+              Type: string
+            - Name: senderPaId
+              Type: string
+            - Name: notificationSentAt
+              Type: string
+            - Name: noticeCode
+              Type: string
+            - Name: creditorTaxId
+              Type: string
+            - Name: debtorPosUpdateDate
+              Type: string
+            - Name: recordCreationDate
+              Type: string
+            - Name: recipientIdx
+              Type: int
+            - Name: version
+              Type: int
+            - Name: moreFields
+              Type: string
+        PartitionKeys:
+          - Name: p_year
+            Type: string
+          - Name: p_month
+            Type: string
+          - Name: p_day
+            Type: string
+          - Name: p_hour
+            Type: string
+
+  DataLakeCountExportRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub pn-DataLakeCountExportLambdaRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CdcDailyCountLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: GlueCatalogAccess
+                Effect: Allow
+                Action:
+                  - glue:GetTable
+                  - glue:GetDatabase
+                Resource:
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabase}
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabase}/*
+              - Sid: AthenaQueryExecution
+                Effect: Allow
+                Action:
+                  - athena:StartQueryExecution
+                  - athena:GetQueryExecution
+                  - athena:GetQueryResults
+                Resource: !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${AthenaWorkGroup}
+              - Sid: AthenaResultsBucketAccess
+                Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource:
+                  - !Sub arn:aws:s3:::${AthenaResultsBucket}
+                  - !Sub arn:aws:s3:::${AthenaResultsBucket}/*
+              - Sid: LogsBucketReadAccess
+                Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${LogsBucketName}
+                  - !Sub arn:aws:s3:::${LogsBucketName}/*
+              - Sid: LogsBucketCountWriteAccess
+                Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub arn:aws:s3:::${LogsBucketName}/datalake_counts/*
+              - Sid: KMSKeyAccess
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:Encrypt
+                  - kms:GenerateDataKey
+                Resource: !Ref LogsBucketKmsKeyArn
+
+  DataLakeCountExport:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-DataLakeCountExport"
+      Description: Exports daily counts from Athena tables for Data Lake reconciliation
+      Runtime: python3.12
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 900
+      Role: !GetAtt DataLakeCountExportRole.Arn
+      Environment:
+        Variables:
+          CONFIG_GIT_URL: !Ref DataLakeCountGitConfigUrl
+          OUTPUT_S3_BUCKET: !Ref LogsBucketName
+          ATHENA_RESULTS_BUCKET: !Ref AthenaResultsBucket
+          ATHENA_DATABASE: !Ref GlueDatabase
+          ATHENA_WORKGROUP: !Ref AthenaWorkGroup
+          MAX_WORKERS: "15"
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/datalake-count-export.zip
+
+  DataLakeCountExportSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Description: Triggers Data Lake count export based on configured schedule
+      ScheduleExpression: !Ref DataLakeCountExportScheduleCron
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      State: "ENABLED"
+      Target:
+        Arn: !GetAtt DataLakeCountExport.Arn
+        RoleArn: !GetAtt EventBusRunLambdaRole.Arn
+
+  DataLakeCountExportInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt DataLakeCountExport.Arn
+      Principal: scheduler.amazonaws.com
+      SourceArn: !GetAtt DataLakeCountExportSchedule.Arn
+      SourceAccount: !Ref AWS::AccountId
+
+  DataLakeCountExportAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref DataLakeCountExport
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
 
 Outputs:
   GlueDatabaseName:
@@ -433,3 +631,7 @@ Outputs:
     Value: !GetAtt GlueServiceRole.Arn
     Export:
       Name: !Sub "${AWS::StackName}-GlueServiceRoleArn"
+
+  AsseverationGlueTableName:
+    Description: Name of the Glue Table for Asseveration
+    Value: !Ref AsseverationGlueTable
