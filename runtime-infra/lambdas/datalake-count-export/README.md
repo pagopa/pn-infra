@@ -90,13 +90,6 @@ CONFIG_GIT_URL: "https://raw.githubusercontent.com/pagopa/pn-infra/1234567890abc
 CONFIG_GIT_URL: "https://raw.githubusercontent.com/pagopa/pn-infra/v1.0.0/runtime-infra/datalake/ingestion-count-queries.json"
 ```
 
-**How to get commit SHA**:
-1. GitHub UI: Navigate to commit page and copy full SHA from URL
-2. Git CLI: Run `git rev-parse HEAD` on your branch
-3. GitHub API: `curl -s https://api.github.com/repos/pagopa/pn-infra/branches/main | jq -r '.commit.sha'`
-
-## Output
-
 ### Report Location
 
 `s3://{OUTPUT_S3_BUCKET}/datalake_counts/YYYY/MM/DD/counts.json`
@@ -159,20 +152,7 @@ aws lambda invoke --function-name pn-DataLakeCountExportLambda output.json
 
 No external dependencies required.
 
-## Architecture Changes
-
-### Version 2.0 (Current)
-
 - **Configuration**: Git-only (no SSM fallback)
 - **Table Discovery**: JSON keys define report names
 - **Query Source**: Complete queries in configuration (no default queries)
 - **Processing**: Direct iteration over JSON configuration
-- **Removed**: Glue table existence checks, S3 location parsing, default query builder
-
-### Benefits
-
-- Simpler codebase (~70 lines removed)
-- Deterministic output names (controlled by Data Lake)
-- No Glue API dependencies
-- Faster execution (no table metadata lookups)
-- Clear configuration ownership
