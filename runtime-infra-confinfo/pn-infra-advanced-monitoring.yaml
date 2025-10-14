@@ -1,0 +1,249 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template deploys advanced monitoring alarm'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: 'ARN of alarm SNS Topic'
+
+  MetricNamespace:
+    Type: String
+    Description: 'ARN of alarm SNS Topic'
+    Default: 'AdvancedMetric'
+
+  Version:
+    Type: String
+    Description: 'Version'
+
+  SelfcarePGDownstreamAlarmPeriodFilterPattern:
+    Type: String
+    Default: '{ $.level = "ERROR" }'
+
+  SelfcarePGDownstreamAlarmPeriod:
+    Type: Number
+    Default: 300
+
+  SelfcarePGDownstreamAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  SelfcarePGDownstreamAlarmEvaluationPeriods:
+    Type: Number
+    Default: 12
+
+  SelfcarePGDownstreamAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  SelfcarePGDownstreamAlarmEnableOncall:
+    Type: String
+    Description: "Create onCall alarm"
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
+  OncallSelfcarePGDownstreamAlarmPeriod:
+    Type: Number
+    Default: 300
+
+  OncallSelfcarePGDownstreamAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  OncallSelfcarePGDownstreamAlarmEvaluationPeriods:
+    Type: Number
+    Default: 12
+
+  OncallSelfcarePGDownstreamAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  PersonalDataVaultDownstreamAlarmPeriodFilterPattern:
+    Type: String
+    Default: '{ $.level = "ERROR" }'
+
+  PersonalDataVaultDownstreamAlarmPeriod:
+    Type: Number
+    Default: 300
+
+  PersonalDataVaultDownstreamAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  PersonalDataVaultDownstreamAlarmEvaluationPeriods:
+    Type: Number
+    Default: 12
+
+  PersonalDataVaultDownstreamAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  PersonalDataVaultDownstreamAlarmEnableOncall:
+    Type: String
+    Description: "Create onCall alarm"
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
+  OncallPersonalDataVaultDownstreamAlarmPeriod:
+    Type: Number
+    Default: 300
+
+  OncallPersonalDataVaultDownstreamAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  OncallPersonalDataVaultDownstreamAlarmEvaluationPeriods:
+    Type: Number
+    Default: 12
+
+  OncallPersonalDataVaultDownstreamAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  PostelDownstreamAlarmPeriodFilterPattern:
+    Type: String
+    Default: '{ $.level = "ERROR" }'
+
+  PostelDownstreamAlarmPeriod:
+    Type: Number
+    Default: 300
+
+  PostelDownstreamAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  PostelDownstreamAlarmEvaluationPeriods:
+    Type: Number
+    Default: 12
+
+  PostelDownstreamAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  PostelDownstreamAlarmEnableOncall:
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
+  OncallPostelDownstreamAlarmPeriod:
+    Type: Number
+    Default: 300
+
+  OncallPostelDownstreamAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  OncallPostelDownstreamAlarmEvaluationPeriods:
+    Type: Number
+    Default: 12
+
+  OncallPostelDownstreamAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+Mappings:
+  DownstreamAlarms:
+    SelfcarePG:
+      LogGroup: /aws/ecs/pn-data-vault-sep
+      Metric: personal-data-vault-SelfcarePG-downstream-detection
+    PersonalDataVault:
+      LogGroup: /aws/ecs/pn-data-vault-sep
+      Metric: pn-personal-data-vault-PersonalDataVault-downstream-detection
+    Postel:
+      LogGroup: /aws/ecs/pn-address-manager
+      Metric: pn-address-manager-POSTEL-downstream-detection
+    
+Resources:
+
+  ##SelfCare pn-data-vault Alarm
+  SelfcarePGDownstreamDetectionAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        MetricName: !FindInMap [DownstreamAlarms, SelfcarePG, Metric]
+        MetricNamespace: !Ref MetricNamespace
+        LogGroupName: !FindInMap [DownstreamAlarms, SelfcarePG, LogGroup]
+        FilterPattern: !Ref SelfcarePGDownstreamAlarmPeriodFilterPattern
+        Period: !Ref SelfcarePGDownstreamAlarmPeriod
+        Threshold: !Ref SelfcarePGDownstreamAlarmThreshold
+        EvaluationPeriods: !Ref SelfcarePGDownstreamAlarmEvaluationPeriods
+        DatapointsToAlarm: !Ref SelfcarePGDownstreamAlarmPeriodDatapointsToAlarm
+        Statistic: Sum
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        HasOncall: !Ref SelfcarePGDownstreamAlarmEnableOncall
+        OncallPeriod: !Ref OncallSelfcarePGDownstreamAlarmPeriod
+        OncallThreshold: !Ref OncallSelfcarePGDownstreamAlarmThreshold
+        OncallEvaluationPeriods: !Ref OncallSelfcarePGDownstreamAlarmEvaluationPeriods
+        OncallDatapointsToAlarm: !Ref OncallSelfcarePGDownstreamAlarmPeriodDatapointsToAlarm
+        OncallComparisonOperator: GreaterThanOrEqualToThreshold
+        OncallStatistic: Sum
+
+  ##Personal Data Vault pn-data-vault Alarm
+  PersonalDataVaultDownstreamDetectionAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        MetricName: !FindInMap [DownstreamAlarms, PersonalDataVault, Metric]
+        MetricNamespace: !Ref MetricNamespace
+        LogGroupName: !FindInMap [DownstreamAlarms, PersonalDataVault, LogGroup]
+        FilterPattern: !Ref PersonalDataVaultDownstreamAlarmPeriodFilterPattern
+        Period: !Ref PersonalDataVaultDownstreamAlarmPeriod
+        Threshold: !Ref PersonalDataVaultDownstreamAlarmThreshold
+        EvaluationPeriods: !Ref PersonalDataVaultDownstreamAlarmEvaluationPeriods
+        DatapointsToAlarm: !Ref PersonalDataVaultDownstreamAlarmPeriodDatapointsToAlarm
+        Statistic: Sum
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        HasOncall: !Ref PersonalDataVaultDownstreamAlarmEnableOncall
+        OncallPeriod: !Ref OncallPersonalDataVaultDownstreamAlarmPeriod
+        OncallThreshold: !Ref OncallPersonalDataVaultDownstreamAlarmThreshold
+        OncallEvaluationPeriods: !Ref OncallPersonalDataVaultDownstreamAlarmEvaluationPeriods
+        OncallDatapointsToAlarm: !Ref OncallPersonalDataVaultDownstreamAlarmPeriodDatapointsToAlarm
+        OncallComparisonOperator: GreaterThanOrEqualToThreshold
+        OncallStatistic: Sum
+
+  PostelDownstreamDetectionAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        MetricName: !FindInMap [DownstreamAlarms, Postel, Metric]
+        MetricNamespace: !Ref MetricNamespace
+        LogGroupName: !FindInMap [DownstreamAlarms, Postel, LogGroup]
+        FilterPattern: !Ref PostelDownstreamAlarmPeriodFilterPattern
+        Period: !Ref PostelDownstreamAlarmPeriod
+        Threshold: !Ref PostelDownstreamAlarmThreshold
+        EvaluationPeriods: !Ref PostelDownstreamAlarmEvaluationPeriods
+        DatapointsToAlarm: !Ref PostelDownstreamAlarmPeriodDatapointsToAlarm
+        Statistic: Sum
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        HasOncall: !Ref PostelDownstreamAlarmEnableOncall
+        OncallPeriod: !Ref OncallPostelDownstreamAlarmPeriod
+        OncallThreshold: !Ref OncallPostelDownstreamAlarmThreshold
+        OncallEvaluationPeriods: !Ref OncallPostelDownstreamAlarmEvaluationPeriods
+        OncallDatapointsToAlarm: !Ref OncallPostelDownstreamAlarmPeriodDatapointsToAlarm
+        OncallComparisonOperator: GreaterThanOrEqualToThreshold
+        OncallStatistic: Sum
+
+Outputs:
+  Version:
+    Value: !Ref Version
+    Description: 'keep track of used projects commitIds'
