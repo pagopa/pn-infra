@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Metric Filter for CloudWatch Logs with support for exclusion patterns via Metric Math."
+Description: "Metric Filter for CloudWatch Logs"
 
 Parameters:
   AlarmSNSTopicArn:
@@ -8,7 +8,7 @@ Parameters:
 
   MetricName:
     Type: String
-    Description: "Base name of the metric to create (e.g., ANPR-Errors)"
+    Description: "Name of the metric to create"
 
   MetricNamespace:
     Type: String
@@ -20,17 +20,16 @@ Parameters:
 
   FilterPattern:
     Type: String
-    Description: "Pattern to match the logs you want to count"
+    Description: "Pattern to filter logs"
 
   ExcludeFilterPattern:
     Type: String
-    Description: "Optional. Pattern to match logs you want to EXCLUDE from the count. Leave empty if not needed."
-    Default: ""
+    Description: "Pattern to filter logs to ignore"
 
   Period: 
     Type: Number
     Default: 60
-    Description: "Period in seconds for the alarm"
+    Description: "Period in seconds for the metric filter"
 
   Threshold:
     Type: Number
@@ -54,17 +53,16 @@ Parameters:
   Statistic:
     Type: String
     Description: "The statistic for the metric associated with the alarm"
-  
-  # On-call Parameters...
+
   OncallPeriod: 
     Type: Number
     Default: 60
-    Description: "Period in seconds for the on-call alarm"
+    Description: "Period in seconds for the metric filter"
 
   OncallThreshold:
     Type: Number
     Default: 1
-    Description: "Threshold for the on-call alarm"
+    Description: "Threshold for the alarm"
 
   OncallEvaluationPeriods:
     Type: Number
@@ -74,7 +72,7 @@ Parameters:
   OncallDatapointsToAlarm:
     Type: Number
     Default: 1
-    Description: "Number of data points that must be breaching to trigger the on-call alarm"
+    Description: "Number of data points that must be breaching to trigger the alarm"
 
   OncallComparisonOperator:
     Type: String
@@ -88,6 +86,7 @@ Parameters:
 
   HasOncall:
     Type: String
+    Description: "Create onCall alarm"
     Default: false
     AllowedValues:
       - true
@@ -95,11 +94,13 @@ Parameters:
 
 Conditions:
   HasOncallCondition: !Equals [ !Ref HasOncall, 'true' ]
-  HasExcludeFilterPatternCondition: !Not [!Equals [!Ref ExcludeFilterPattern, ""]]
+  HasExcludeFilterPatternCondition: !Equals [ !Ref ExcludeFilterPattern, 'true' ]
+
 
 Resources:
-  # Metric filter for logs to INCLUDE in the count
-  IncludeMetricFilter: 
+  # CloudWatch metric to filer ERROR - FATAL lines, in Log group
+  CustomErrorLogsMetricFilter: 
+    !If HasExcludeFilterPatternCondition
     Type: AWS::Logs::MetricFilter
     Properties: 
       LogGroupName: !Ref LogGroupName
@@ -109,89 +110,49 @@ Resources:
           MetricNamespace: !Ref MetricNamespace
           MetricName: !Ref MetricName
 
-  # CONDITIONAL metric filter for logs to EXCLUDE from the count
-  ExcludeMetricFilter:
-    Type: AWS::Logs::MetricFilter
-    Condition: HasExcludeFilterPatternCondition
-    Properties:
-      LogGroupName: !Ref LogGroupName
-      FilterPattern: !Ref ExcludeFilterPattern
-      MetricTransformations:
-        - MetricValue: 1
-          MetricNamespace: !Ref MetricNamespace
-          MetricName: !Sub "${MetricName}-Exclude" # e.g., ANPR-Errors-Exclude
-
-  # Standard Alarm using METRIC MATH
+  
+  
+  # Create alarm
   CustomErrorLogsMetricAlarm:
     Type: AWS::CloudWatch::Alarm
+    DependsOn: CustomErrorLogsMetricFilter
     Properties:
       AlarmName: !Sub "${MetricName}-Alarm"
-      AlarmDescription: !Sub "CloudWatch alarm for expression: (Total ${MetricName}) - (Excluded). Triggers if > ${Threshold}."
+      AlarmDescription: !Sub "CloudWatch alarm on metric ${MetricName}."
       TreatMissingData: notBreaching
       AlarmActions: 
         - !Ref AlarmSNSTopicArn
+      #InsufficientDataActions:
+      #  - !Ref AlarmSNSTopicArn
       OKActions:
         - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: !Ref DatapointsToAlarm
+      MetricName: !Ref MetricName
+      Namespace: !Ref MetricNamespace
       ComparisonOperator: !Ref ComparisonOperator
       EvaluationPeriods: !Ref EvaluationPeriods
+      Period: !Ref Period
+      Statistic: !Ref Statistic 
       Threshold: !Ref Threshold
-      Metrics:
-        - Id: "m1"
-          MetricStat:
-            Metric:
-              Namespace: !Ref MetricNamespace
-              MetricName: !Ref MetricName
-            Period: !Ref Period
-            Stat: !Ref Statistic
-          ReturnData: false
-        - Id: "m2"
-          MetricStat:
-            Metric:
-              Namespace: !Ref MetricNamespace
-              MetricName: !Sub "${MetricName}-Exclude"
-            Period: !Ref Period
-            Stat: !Ref Statistic
-          ReturnData: false
-        - Id: "e1"
-          Expression: "m1 - FILL(m2, 0)"
-          Label: !Ref MetricName
-          ReturnData: true
 
-  # On-Call Alarm using METRIC MATH
   OncallCustomErrorLogsMetricAlarm:
     Type: AWS::CloudWatch::Alarm
     Condition: HasOncallCondition
     Properties:
       AlarmName: !Sub "oncall-${MetricName}-Alarm"
-      AlarmDescription: !Sub "CloudWatch on-call alarm for expression: (Total ${MetricName}) - (Excluded). Triggers if > ${OncallThreshold}."
+      AlarmDescription: !Sub "CloudWatch oncall alarm on metric ${MetricName}."
       TreatMissingData: notBreaching
       AlarmActions: 
         - !Ref AlarmSNSTopicArn
+      #InsufficientDataActions:
+      #  - !Ref AlarmSNSTopicArn
       OKActions:
         - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: !Ref OncallDatapointsToAlarm
+      MetricName: !Ref MetricName
+      Namespace: !Ref MetricNamespace
       ComparisonOperator: !Ref OncallComparisonOperator
       EvaluationPeriods: !Ref OncallEvaluationPeriods
+      Period: !Ref OncallPeriod
+      Statistic: !Ref OncallStatistic 
       Threshold: !Ref OncallThreshold
-      Metrics:
-        - Id: "m1"
-          MetricStat:
-            Metric:
-              Namespace: !Ref MetricNamespace
-              MetricName: !Ref MetricName
-            Period: !Ref OncallPeriod
-            Stat: !Ref OncallStatistic
-          ReturnData: false
-        - Id: "m2"
-          MetricStat:
-            Metric:
-              Namespace: !Ref MetricNamespace
-              MetricName: !Sub "${MetricName}-Exclude"
-            Period: !Ref OncallPeriod
-            Stat: !Ref OncallStatistic
-          ReturnData: false
-        - Id: "e1"
-          Expression: "m1 - FILL(m2, 0)"
-          Label: !Ref MetricName
-          ReturnData: true
