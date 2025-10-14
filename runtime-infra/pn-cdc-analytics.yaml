@@ -494,10 +494,10 @@ Resources:
           - Name: p_hour
             Type: string
 
-  DataLakeCountExportRole:
+  DataLakeCountExportLambdaRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub pn-DataLakeCountExportRole
+      RoleName: !Sub pn-DataLakeCountExportLambdaRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -512,6 +512,15 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              - Sid: GlueCatalogAccess
+                Effect: Allow
+                Action:
+                  - glue:GetTable
+                  - glue:GetDatabase
+                Resource:
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabase}
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabase}/*
               - Sid: AthenaQueryExecution
                 Effect: Allow
                 Action:
