@@ -35,6 +35,10 @@ Parameters:
       Git raw content URL with embedded commit SHA or tag.
       Examples: https://raw.githubusercontent.com/pagopa/pn-infra/1234567890abcdef1234567890abcdef12345678/runtime-infra/datalake/ingestion-count-queries.json
       or https://raw.githubusercontent.com/pagopa/pn-infra/v1.0.0/runtime-infra/datalake/ingestion-count-queries.json
+  DataLakeCountExportScheduleCron:
+    Type: String
+    Default: 'cron(0 1 * * ? *)'
+    Description: Schedule expression for Data Lake count export. Default runs daily at 01:00 UTC
 
 Resources:
   GlueServiceRole:
@@ -583,8 +587,8 @@ Resources:
   DataLakeCountExportSchedule:
     Type: AWS::Scheduler::Schedule
     Properties:
-      Description: Triggers Data Lake count export daily at 01:00 UTC
-      ScheduleExpression: "cron(0 1 * * ? *)"
+      Description: Triggers Data Lake count export based on configured schedule
+      ScheduleExpression: !Ref DataLakeCountExportScheduleCron
       FlexibleTimeWindow:
         Mode: "OFF"
       State: "ENABLED"
