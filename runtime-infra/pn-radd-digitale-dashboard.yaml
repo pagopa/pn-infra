@@ -4,263 +4,243 @@ Description: 'CloudWatch Dashboard for RADD Digitale IO API monitoring'
 Parameters:
   ProjectName:
     Type: String
-    Default: 'pn'
     Description: 'Project name'
-
-  DeliveryMicroservicePublicIoAPIRestApiName:
-    Type: String
-    Default: 'pn-delivery-public-api-IO-openapi'
-    Description: 'Delivery IO API Gateway name'
-
-  MandateMicroservicePublicIoAPIRestApiName:
-    Type: String
-    Default: 'pn-mandate-public-api-IO-openapi'
-    Description: 'Mandate IO API Gateway name'
-
-  ApiGatewayStage:
-    Type: String
-    Default: 'Unique'
-    Description: 'API Gateway stage name'
 
 Resources:
   RaddDigitaleIoApiDashboard:
     Type: AWS::CloudWatch::Dashboard
     Properties:
       DashboardName: !Sub "${ProjectName}-Radd-Digitale-IO-API"
-      DashboardBody: !Sub
-        - |
-          {
-            "widgets": [
-              {
-                "type": "text", "x": 0, "y": 0, "width": 24, "height": 1,
-                "properties": { "markdown": "# Dashboard Monitoraggio API IO - RADD Digitale" }
-              },
-              {
-                "type": "text", "x": 0, "y": 1, "width": 24, "height": 1,
-                "properties": { "markdown": "## API pn-delivery" }
-              },
-              {
-                "type": "text", "x": 0, "y": 2, "width": 24, "height": 1,
-                "properties": { "markdown": "### Endpoint: POST /notifications/received/check-qr-code" }
-              },
-              {
-                "type": "metric", "x": 0, "y": 3, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "Count", "ApiName", "${PnDeliveryApiName}", "Method", "POST", "Resource", "/notifications/received/check-qr-code", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Count", "period": 300
-                }
-              },
-              {
-                "type": "metric", "x": 6, "y": 3, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "Latency", "ApiName", "${PnDeliveryApiName}", "Method", "POST", "Resource", "/notifications/received/check-qr-code", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Latency (avg)", "period": 300, "stat": "Average"
-                }
-              },
-              {
-                "type": "metric", "x": 12, "y": 3, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "4xx", "ApiName", "${PnDeliveryApiName}", "Method", "POST", "Resource", "/notifications/received/check-qr-code", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "4xx Errors", "period": 300
-                }
-              },
-              {
-                "type": "metric", "x": 18, "y": 3, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "5xx", "ApiName", "${PnDeliveryApiName}", "Method", "POST", "Resource", "/notifications/received/check-qr-code", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "5xx Errors", "period": 300
-                }
-              },
-              {
-                "type": "text", "x": 0, "y": 7, "width": 24, "height": 1,
-                "properties": { "markdown": "### Endpoint: GET /notifications/received/{iun}" }
-              },
-              {
-                "type": "metric", "x": 0, "y": 8, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "Count", "ApiName", "${PnDeliveryApiName}", "Method", "GET", "Resource", "/notifications/received/{iun}", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Count", "period": 300
-                }
-              },
-              {
-                "type": "metric", "x": 6, "y": 8, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "Latency", "ApiName", "${PnDeliveryApiName}", "Method", "GET", "Resource", "/notifications/received/{iun}", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Latency (avg)", "period": 300, "stat": "Average"
-                }
-              },
-              {
-                "type": "metric", "x": 12, "y": 8, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "4xx", "ApiName", "${PnDeliveryApiName}", "Method", "GET", "Resource", "/notifications/received/{iun}", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "4xx Errors", "period": 300
-                }
-              },
-              {
-                "type": "metric", "x": 18, "y": 8, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "5xx", "ApiName", "${PnDeliveryApiName}", "Method", "GET", "Resource", "/notifications/received/{iun}", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "5xx Errors", "period": 300
-                }
-              },
-              {
-                "type": "text", "x": 0, "y": 12, "width": 24, "height": 1,
-                "properties": { "markdown": "## API pn-mandate" }
-              },
-              {
-                "type": "text", "x": 0, "y": 13, "width": 24, "height": 1,
-                "properties": { "markdown": "### Endpoint: POST /mandate/authorization" }
-              },
-              {
-                "type": "metric", "x": 0, "y": 14, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "Count", "ApiName", "${PnMandateApiName}", "Method", "POST", "Resource", "/mandate/authorization", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Count", "period": 300
-                }
-              },
-              {
-                "type": "metric", "x": 6, "y": 14, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "Latency", "ApiName", "${PnMandateApiName}", "Method", "POST", "Resource", "/mandate/authorization", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Latency (avg)", "period": 300, "stat": "Average"
-                }
-              },
-              {
-                "type": "metric", "x": 12, "y": 14, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "4xx", "ApiName", "${PnMandateApiName}", "Method", "POST", "Resource", "/mandate/authorization", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "4xx Errors", "period": 300
-                }
-              },
-              {
-                "type": "metric", "x": 18, "y": 14, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "5xx", "ApiName", "${PnMandateApiName}", "Method", "POST", "Resource", "/mandate/authorization", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "5xx Errors", "period": 300
-                }
-              },
-              {
-                "type": "text", "x": 0, "y": 18, "width": 24, "height": 1,
-                "properties": { "markdown": "### Endpoint: POST /mandate/authorization/check" }
-              },
-              {
-                "type": "metric", "x": 0, "y": 19, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "Count", "ApiName", "${PnMandateApiName}", "Method", "POST", "Resource", "/mandate/authorization/check", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Count", "period": 300
-                }
-              },
-              {
-                "type": "metric", "x": 6, "y": 19, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "Latency", "ApiName", "${PnMandateApiName}", "Method", "POST", "Resource", "/mandate/authorization/check", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Latency (avg)", "period": 300, "stat": "Average"
-                }
-              },
-              {
-                "type": "metric", "x": 12, "y": 19, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "4xx", "ApiName", "${PnMandateApiName}", "Method", "POST", "Resource", "/mandate/authorization/check", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "4xx Errors", "period": 300
-                }
-              },
-              {
-                "type": "metric", "x": 18, "y": 19, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "5xx", "ApiName", "${PnMandateApiName}", "Method", "POST", "Resource", "/mandate/authorization/check", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "5xx Errors", "period": 300
-                }
-              },
-              {
-                "type": "text", "x": 0, "y": 23, "width": 24, "height": 1,
-                "properties": { "markdown": "### Endpoint: POST /mandate/rejection" }
-              },
-              {
-                "type": "metric", "x": 0, "y": 24, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "Count", "ApiName", "${PnMandateApiName}", "Method", "POST", "Resource", "/mandate/rejection", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Count", "period": 300
-                }
-              },
-              {
-                "type": "metric", "x": 6, "y": 24, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "Latency", "ApiName", "${PnMandateApiName}", "Method", "POST", "Resource", "/mandate/rejection", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Latency (avg)", "period": 300, "stat": "Average"
-                }
-              },
-              {
-                "type": "metric", "x": 12, "y": 24, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "4xx", "ApiName", "${PnMandateApiName}", "Method", "POST", "Resource", "/mandate/rejection", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "4xx Errors", "period": 300
-                }
-              },
-              {
-                "type": "metric", "x": 18, "y": 24, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "5xx", "ApiName", "${PnMandateApiName}", "Method", "POST", "Resource", "/mandate/rejection", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "5xx Errors", "period": 300
-                }
-              },
-              {
-                "type": "text", "x": 0, "y": 28, "width": 24, "height": 1,
-                "properties": { "markdown": "### Endpoint: GET /mandate/{mandateId}" }
-              },
-              {
-                "type": "metric", "x": 0, "y": 29, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "Count", "ApiName", "${PnMandateApiName}", "Method", "GET", "Resource", "/mandate/{mandateId}", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Count", "period": 300
-                }
-              },
-              {
-                "type": "metric", "x": 6, "y": 29, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "Latency", "ApiName", "${PnMandateApiName}", "Method", "GET", "Resource", "/mandate/{mandateId}", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Latency (avg)", "period": 300, "stat": "Average"
-                }
-              },
-              {
-                "type": "metric", "x": 12, "y": 29, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "4xx", "ApiName", "${PnMandateApiName}", "Method", "GET", "Resource", "/mandate/{mandateId}", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "4xx Errors", "period": 300
-                }
-              },
-              {
-                "type": "metric", "x": 18, "y": 29, "width": 6, "height": 4,
-                "properties": {
-                  "metrics": [
-                    [ "AWS/ApiGateway", "5xx", "ApiName", "${PnMandateApiName}", "Method", "GET", "Resource", "/mandate/{mandateId}", "Stage", "${Stage}" ]
-                  ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "5xx Errors", "period": 300
-                }
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "text", "x": 0, "y": 0, "width": 24, "height": 1,
+              "properties": { "markdown": "# Dashboard Monitoraggio API IO - RADD Digitale" }
+            },
+            {
+              "type": "text", "x": 0, "y": 1, "width": 24, "height": 1,
+              "properties": { "markdown": "## API pn-delivery" }
+            },
+            {
+              "type": "text", "x": 0, "y": 2, "width": 24, "height": 1,
+              "properties": { "markdown": "### Endpoint: POST /notifications/received/check-qr-code" }
+            },
+            {
+              "type": "metric", "x": 0, "y": 3, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "Count", "ApiName", "pn-delivery-public-api-IO-openapi", "Method", "POST", "Resource", "/notifications/received/check-qr-code", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Count", "period": 300
               }
-            ]
-          }
-        - PnDeliveryApiName: !Ref DeliveryMicroservicePublicIoAPIRestApiName
-          PnMandateApiName: !Ref MandateMicroservicePublicIoAPIRestApiName
-          Stage: !Ref ApiGatewayStage
+            },
+            {
+              "type": "metric", "x": 6, "y": 3, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "Latency", "ApiName", "pn-delivery-public-api-IO-openapi", "Method", "POST", "Resource", "/notifications/received/check-qr-code", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Latency (avg)", "period": 300, "stat": "Average"
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 3, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "4xx", "ApiName", "pn-delivery-public-api-IO-openapi", "Method", "POST", "Resource", "/notifications/received/check-qr-code", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "4xx Errors", "period": 300
+              }
+            },
+            {
+              "type": "metric", "x": 18, "y": 3, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "5xx", "ApiName", "pn-delivery-public-api-IO-openapi", "Method", "POST", "Resource", "/notifications/received/check-qr-code", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "5xx Errors", "period": 300
+              }
+            },
+            {
+              "type": "text", "x": 0, "y": 7, "width": 24, "height": 1,
+              "properties": { "markdown": "### Endpoint: GET /notifications/received/{iun}" }
+            },
+            {
+              "type": "metric", "x": 0, "y": 8, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "Count", "ApiName", "pn-delivery-public-api-IO-openapi", "Method", "GET", "Resource", "/notifications/received/{iun}", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Count", "period": 300
+              }
+            },
+            {
+              "type": "metric", "x": 6, "y": 8, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "Latency", "ApiName", "pn-delivery-public-api-IO-openapi", "Method", "GET", "Resource", "/notifications/received/{iun}", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Latency (avg)", "period": 300, "stat": "Average"
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 8, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "4xx", "ApiName", "pn-delivery-public-api-IO-openapi", "Method", "GET", "Resource", "/notifications/received/{iun}", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "4xx Errors", "period": 300
+              }
+            },
+            {
+              "type": "metric", "x": 18, "y": 8, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "5xx", "ApiName", "pn-delivery-public-api-IO-openapi", "Method", "GET", "Resource", "/notifications/received/{iun}", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "5xx Errors", "period": 300
+              }
+            },
+            {
+              "type": "text", "x": 0, "y": 12, "width": 24, "height": 1,
+              "properties": { "markdown": "## API pn-mandate" }
+            },
+            {
+              "type": "text", "x": 0, "y": 13, "width": 24, "height": 1,
+              "properties": { "markdown": "### Endpoint: POST /mandate/authorization" }
+            },
+            {
+              "type": "metric", "x": 0, "y": 14, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "Count", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "POST", "Resource", "/mandate/authorization", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Count", "period": 300
+              }
+            },
+            {
+              "type": "metric", "x": 6, "y": 14, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "Latency", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "POST", "Resource", "/mandate/authorization", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Latency (avg)", "period": 300, "stat": "Average"
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 14, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "4xx", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "POST", "Resource", "/mandate/authorization", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "4xx Errors", "period": 300
+              }
+            },
+            {
+              "type": "metric", "x": 18, "y": 14, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "5xx", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "POST", "Resource", "/mandate/authorization", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "5xx Errors", "period": 300
+              }
+            },
+            {
+              "type": "text", "x": 0, "y": 18, "width": 24, "height": 1,
+              "properties": { "markdown": "### Endpoint: POST /mandate/authorization/check" }
+            },
+            {
+              "type": "metric", "x": 0, "y": 19, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "Count", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "POST", "Resource", "/mandate/authorization/check", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Count", "period": 300
+              }
+            },
+            {
+              "type": "metric", "x": 6, "y": 19, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "Latency", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "POST", "Resource", "/mandate/authorization/check", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Latency (avg)", "period": 300, "stat": "Average"
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 19, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "4xx", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "POST", "Resource", "/mandate/authorization/check", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "4xx Errors", "period": 300
+              }
+            },
+            {
+              "type": "metric", "x": 18, "y": 19, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "5xx", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "POST", "Resource", "/mandate/authorization/check", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "5xx Errors", "period": 300
+              }
+            },
+            {
+              "type": "text", "x": 0, "y": 23, "width": 24, "height": 1,
+              "properties": { "markdown": "### Endpoint: POST /mandate/rejection" }
+            },
+            {
+              "type": "metric", "x": 0, "y": 24, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "Count", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "POST", "Resource", "/mandate/rejection", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Count", "period": 300
+              }
+            },
+            {
+              "type": "metric", "x": 6, "y": 24, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "Latency", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "POST", "Resource", "/mandate/rejection", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Latency (avg)", "period": 300, "stat": "Average"
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 24, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "4xx", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "POST", "Resource", "/mandate/rejection", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "4xx Errors", "period": 300
+              }
+            },
+            {
+              "type": "metric", "x": 18, "y": 24, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "5xx", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "POST", "Resource", "/mandate/rejection", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "5xx Errors", "period": 300
+              }
+            },
+            {
+              "type": "text", "x": 0, "y": 28, "width": 24, "height": 1,
+              "properties": { "markdown": "### Endpoint: GET /mandate/{mandateId}" }
+            },
+            {
+              "type": "metric", "x": 0, "y": 29, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "Count", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "GET", "Resource", "/mandate/{mandateId}", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Count", "period": 300
+              }
+            },
+            {
+              "type": "metric", "x": 6, "y": 29, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "Latency", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "GET", "Resource", "/mandate/{mandateId}", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "Latency (avg)", "period": 300, "stat": "Average"
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 29, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "4xx", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "GET", "Resource", "/mandate/{mandateId}", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "4xx Errors", "period": 300
+              }
+            },
+            {
+              "type": "metric", "x": 18, "y": 29, "width": 6, "height": 4,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "5xx", "ApiName", "pn-mandate-public-api-IO-openapi", "Method", "GET", "Resource", "/mandate/{mandateId}", "Stage", "Unique" ]
+                ], "view": "timeSeries", "stacked": false, "region": "${AWS::Region}", "title": "5xx Errors", "period": 300
+              }
+            }
+          ]
+        }
