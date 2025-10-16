@@ -41,7 +41,7 @@ jobs:
 
       - name: Merge Trivy SARIF results
         run: |
-          jq -s '{runs: (.[0].runs + .[1].runs)}' trivy-results-runtime-infra.sarif trivy-results-runtime-infra-confinfo.sarif > trivy-results-raw.sarif
+          jq -s '{version: .[0].version, runs: (.[0].runs + .[1].runs)}' trivy-results-runtime-infra.sarif trivy-results-runtime-infra-confinfo.sarif > trivy-results-raw.sarif
       
       - name: Filter SARIF to exclude MEDIUM and LOW
         run: |
