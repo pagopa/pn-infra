@@ -15,17 +15,33 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      - name: Run Trivy vulnerability scanner in IaC mode
+      - name: Run Trivy vulnerability scanner in IaC mode (runtime-infra)
         uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
         with:
           scan-type: 'config'
-          input: './src'
+          input: './runtime-infra'
           hide-progress: true
           format: 'sarif'
-          output: 'trivy-results-raw.sarif'
+          output: 'trivy-results-runtime-infra.sarif'
           exit-code: '0'
           trivyignores: '.trivyignore'
           severity: 'CRITICAL,HIGH'
+
+      - name: Run Trivy vulnerability scanner in IaC mode (runtime-infra-confinfo)
+        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
+        with:
+          scan-type: 'config'
+          input: './runtime-infra-confinfo'
+          hide-progress: true
+          format: 'sarif'
+          output: 'trivy-results-runtime-infra-confinfo.sarif'
+          exit-code: '0'
+          trivyignores: '.trivyignore'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Merge Trivy SARIF results
+        run: |
+          jq -s '{runs: (.[0].runs + .[1].runs)}' trivy-results-runtime-infra.sarif trivy-results-runtime-infra-confinfo.sarif > trivy-results-raw.sarif
       
       - name: Filter SARIF to exclude MEDIUM and LOW
         run: |
