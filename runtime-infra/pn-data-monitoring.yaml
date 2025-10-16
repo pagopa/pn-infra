@@ -112,6 +112,8 @@ Conditions:
   IsDatalakeAccountInCore: !And [ !Condition IsDatalakeAccount, !Condition IsCoreAccount ]
   HasCronExpression: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
+  HasCronExpressionLambdaPaperError: !Not [ !Equals [!Ref PaperRequestErrorDumpFunctionCronExpression, '' ] ]
+  HasLambdaPaperErrorInCoreAccountCronExp: !And [ !Condition HasCronExpressionLambdaPaperError, !Condition IsCoreAccount ]
 
 Resources:
   
@@ -899,7 +901,7 @@ Resources:
             Resource: !Ref DataAnalysisTopic
 
   ScheduleErrorDumpFunction:
-    Condition: IsCoreAccount
+    Condition: HasLambdaPaperErrorInCoreAccountCronExp
     Type: AWS::Events::Rule
     Properties:
       ScheduleExpression: !Ref PaperRequestErrorDumpFunctionCronExpression
@@ -909,7 +911,7 @@ Resources:
           Id: PaperRequestErrorDumpFunction
 
   PermissionForEventsToInvokeErrorDumpFunction:
-    Condition: IsCoreAccount
+    Condition: HasLambdaPaperErrorInCoreAccountCronExp
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
