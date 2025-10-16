@@ -40,7 +40,6 @@ Parameters:
   EngineVersion:
     Type: String
     Description: "Aurora PostgreSQL engine version (must be compatible with Serverless v2)"
-    Default: "14.12"
   DbClusterFamily:
     Type: String
     Description: "DB Cluster Parameter Group Family (e.g., aurora-postgresql14)"
@@ -73,6 +72,10 @@ Parameters:
   DbConnectionsAlarmThreshold:
     Type: Number
     Default: 1500
+  MaintenanceWindow:
+    Type: String
+    Description: "Preferred maintenance window (e.g., sun:03:00-sun:04:00)"
+    Default: "sun:03:00-sun:04:00"
 
 Conditions:
   IsDeletionProtectionTrue: !Equals [!Ref DeletionProtectionEnabled, "true"]
@@ -142,6 +145,7 @@ Resources:
     Type: AWS::RDS::DBCluster
     Properties:
       Engine: aurora-postgresql
+      AutoMinorVersionUpgrade: false
       EngineVersion: !Ref EngineVersion
       DatabaseName: !Ref DatabaseName
       DBClusterIdentifier: !Sub "pn-${ClusterIdentifierSuffix}-aurora-pg-cluster"
@@ -153,7 +157,7 @@ Resources:
       BackupRetentionPeriod: !Ref BackupRetentionPeriod
       Port: 5432
       PreferredBackupWindow: "02:00-03:00"
-      PreferredMaintenanceWindow: "sun:04:00-sun:05:00"
+      PreferredMaintenanceWindow: !Ref MaintenanceWindow
       StorageEncrypted: true
       VpcSecurityGroupIds:
         - !GetAtt PnAuroraDbSecurityGroup.GroupId
