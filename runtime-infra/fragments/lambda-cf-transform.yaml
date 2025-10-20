@@ -91,7 +91,7 @@ Resources:
                       for resource_name, resource in fragment["Resources"].items():
                           if resource["Type"] == "AWS::DynamoDB::Table":
                               props = resource["Properties"]
-                              props["Parameters"]["DeletionProtectionEnabled"] = true
+                              props["DeletionProtectionEnabled"] = True
                   return fragment
               except Exception as e:
                   log.error(f"Errore in add_dynamo_delete_protection: {e}")
