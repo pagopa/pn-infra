@@ -2,10 +2,9 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: "Backup Plan template for AWS Backups"
 Parameters:
 
-  LifecycleDeleteAfterDays:
+  BackupLifecycleDeleteAfterDays:
     Type: Number
     Default: 35
-    Description: Specifies the number of days after creation that a recovery point is deleted. Must be greater than 90 days plus MoveToColdStorageAfterDays.
 
   BackupCronExpression:
     Type: String
@@ -54,7 +53,7 @@ Resources:
             CompletionWindowMinutes : !Ref CompletionWindowMinutes
             EnableContinuousBackup: true
             Lifecycle:
-              DeleteAfterDays: !Ref LifecycleDeleteAfterDays
+              DeleteAfterDays: !Ref BackupLifecycleDeleteAfterDays
 
   BackupRole:
     Type: "AWS::IAM::Role"
