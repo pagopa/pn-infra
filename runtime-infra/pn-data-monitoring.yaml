@@ -737,7 +737,7 @@ Resources:
               region = os.environ['Region']
               sns_topic_arn = os.environ['SnsTopicArn']
               presignedurltime = int(os.environ['PresignedUrlTime'])
-              today_str = datetime.now().strftime('%Y-%m-%d')
+              timestamp = datetime.now().strftime('%Y%m%d_%H%M')
 
               presigned_url = None
               s3_key = None
@@ -776,7 +776,7 @@ Resources:
                       for item in all_items:
                           writer.writerow(item)
 
-                      s3_key = f"{prefix}/CSV_{table_name}_{today_str}.csv"
+                      s3_key = f"{prefix}/CSV_{table_name}_{timestamp}.csv"
                       s3.put_object(Bucket=s3_bucket, Key=s3_key, Body=csv_buffer.getvalue())
 
                       presigned_url = s3.generate_presigned_url(
@@ -792,7 +792,7 @@ Resources:
                           except Exception as e:
                               print(f"Error deleting item {item}: {e}")
 
-                  subject = f"CSV RENDICONTAZIONE SCARTATA {today_str}"
+                  subject = f"CSV RENDICONTAZIONE SCARTATA {timestamp}"
                   message = f"DYNAMODB dump completed.\n\nCSV file: {presigned_url if presigned_url else 'No data found.'}"
 
               elif dump_type == 'SQS':
@@ -835,7 +835,7 @@ Resources:
                               writer.writerow(msg)
 
                           safe_queue_name = queue_name.replace('/', '_')
-                          s3_key = f"{prefix}/CSV_{safe_queue_name}_{today_str}.csv"
+                          s3_key = f"{prefix}/CSV_{safe_queue_name}_{timestamp}.csv"
                           s3.put_object(Bucket=s3_bucket, Key=s3_key, Body=csv_buffer.getvalue())
 
                           presigned_url = s3.generate_presigned_url(
@@ -844,7 +844,7 @@ Resources:
                               ExpiresIn=presignedurltime
                           )
 
-                  subject = f"CSV {queue_name} {today_str}"
+                  subject = f"CSV {queue_name} {timestamp}"
                   message = (
                       f"SQS dump completed.\n\n"
                       f"Messages found: {len(all_messages)}\n"
