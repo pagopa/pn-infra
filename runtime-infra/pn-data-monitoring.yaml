@@ -707,7 +707,7 @@ Resources:
       Timeout: 600
       MemorySize: 384
       Handler: index.lambda_handler
-      FunctionName: Lambda-PnSupport-Export
+      FunctionName: !Sub pn-support-export-lambda-${EnvironmentType}
       Code:
         ZipFile: |
           import os
@@ -920,7 +920,7 @@ Resources:
                   - s3:PutObject
                   - s3:GetObject
                 Resource:
-                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/PaperRequestError-Dump-Lambda/*
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/LambdaPnSupport-Export/*
               - Effect: Allow
                 Action:
                   - logs:CreateLogStream
