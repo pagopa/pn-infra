@@ -970,7 +970,7 @@ Resources:
             Action: sns:Publish
             Resource: !Ref DataAnalysisTopic
 
-  ScheduleLambdaPnSupportExportDynamoDb:
+  ScheduleExportDynamoDb:
     Condition: HasCronExpressionLambdaPnSupportDynamoDBInCoreAccount
     Type: AWS::Events::Rule
     Properties:
@@ -984,7 +984,7 @@ Resources:
               "DumpType": "DYNAMODB"
             }
     
-  ScheduleLambdaPnSupportExportSqs:
+  ScheduleExportSqs:
     Condition: HasCronExpressionLambdaPnSupportSqsInCoreAccount
     Type: AWS::Events::Rule
     Properties:
@@ -1005,7 +1005,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref LambdaPnSupportExport
       Principal: events.amazonaws.com
-      SourceArn: !GetAtt ScheduleLambdaPnSupportExportDynamoDb.Arn
+      SourceArn: !GetAtt ScheduleExportDynamoDb.Arn
       SourceAccount: !Ref AWS::AccountId
 
   PermissionForEventsToInvokeLambdaPnSupportExportSQS:
@@ -1015,7 +1015,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref LambdaPnSupportExport
       Principal: events.amazonaws.com
-      SourceArn: !GetAtt ScheduleLambdaPnSupportExportSqs.Arn
+      SourceArn: !GetAtt ScheduleExportSqs.Arn
       SourceAccount: !Ref AWS::AccountId
 
   LambdaPnSupportExportLogroup:
