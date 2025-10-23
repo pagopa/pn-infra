@@ -76,7 +76,12 @@ Parameters:
     Description: Slack Email channel
     Default: ''
 
-  LambdaPnSupportExportCronExpression:
+  LambdaPnSupportExportDynamoDbCronExpression:
+    Type: String
+    Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
+    Default: ''
+
+  LambdaPnSupportExportSqsCronExpression:
     Type: String
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
     Default: ''
@@ -116,8 +121,8 @@ Conditions:
   IsDatalakeAccountInCore: !And [ !Condition IsDatalakeAccount, !Condition IsCoreAccount ]
   HasCronExpression: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
-  HasCronExpressionLambdaPnSupport: !Not [ !Equals [!Ref LambdaPnSupportExportCronExpression, '' ] ]
-  HasLambdaLambdaPnSupportInCoreAccountCronExp: !And [ !Condition HasCronExpressionLambdaPnSupport, !Condition IsCoreAccount ]
+  HasCronExpressionLambdaPnSupportDynamoDBInCoreAccount: !And [!Not [!Equals [!Ref LambdaPnSupportExportDynamoDbCronExpression, '']], !Equals [!Ref PnCoreAwsAccountId, '']]
+  HasCronExpressionLambdaPnSupportSqsInCoreAccount: !And [!Not [!Equals [!Ref LambdaPnSupportExportSqsCronExpression, '']], !Equals [!Ref PnCoreAwsAccountId, '']]
 
 Resources:
   
@@ -965,24 +970,52 @@ Resources:
             Action: sns:Publish
             Resource: !Ref DataAnalysisTopic
 
-  ScheduleLambdaPnSupportExport:
-    Condition: HasLambdaLambdaPnSupportInCoreAccountCronExp
+  ScheduleLambdaPnSupportExportDynamoDb:
+    Condition: HasCronExpressionLambdaPnSupportDynamoDBInCoreAccount
     Type: AWS::Events::Rule
     Properties:
-      ScheduleExpression: !Ref LambdaPnSupportExportCronExpression
+      ScheduleExpression: !Ref LambdaPnSupportExportDynamoDbCronExpression
       State: ENABLED
       Targets:
         - Arn: !GetAtt LambdaPnSupportExport.Arn
-          Id: LambdaPnSupportExport
+          Id: LambdaPnSupportExportDynamoDb
+          Input: |
+            {
+              "DumpType": "DYNAMODB"
+            }
+    
+  ScheduleLambdaPnSupportExportSqs:
+    Condition: HasCronExpressionLambdaPnSupportSqsInCoreAccount
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: !Ref LambdaPnSupportExportSqsCronExpression
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaPnSupportExport.Arn
+          Id: LambdaPnSupportExportSqs
+          Input: |
+            {
+              "DumpType": "SQS"
+            }
 
-  PermissionForEventsToInvokeLambdaPnSupportExport:
-    Condition: HasLambdaLambdaPnSupportInCoreAccountCronExp
+  PermissionForEventsToInvokeLambdaPnSupportExportDB:
+    Condition: HasCronExpressionLambdaPnSupportDynamoDBInCoreAccount
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref LambdaPnSupportExport
       Principal: events.amazonaws.com
-      SourceArn: !GetAtt ScheduleLambdaPnSupportExport.Arn
+      SourceArn: !GetAtt ScheduleLambdaPnSupportExportDynamoDb.Arn
+      SourceAccount: !Ref AWS::AccountId
+
+  PermissionForEventsToInvokeLambdaPnSupportExportSQS:
+    Condition: HasCronExpressionLambdaPnSupportSqsInCoreAccount
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaPnSupportExport
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ScheduleLambdaPnSupportExportSqs.Arn
       SourceAccount: !Ref AWS::AccountId
 
   LambdaPnSupportExportLogroup:
