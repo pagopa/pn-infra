@@ -216,6 +216,10 @@ Parameters:
   Subnets:
     Type: List<AWS::EC2::Subnet::Id>
     Description: the subnets where the service is going to be deployed
+  MicroserviceVpcCidr:
+    Type: String
+    Description: CIDR of the VPC where the microservice is deployed
+    Default: '0.0.0.0/0'
   EcsDefaultSecurityGroup:
     Type: String
     Description: default security group
@@ -1070,7 +1074,7 @@ Resources:
           - IpProtocol: tcp
             FromPort: 8080
             ToPort: 8080
-            CidrIp: 0.0.0.0/0
+            CidrIp: !Ref MicroserviceVpcCidr
 
   EfsFargateAccessPoint:
     Type: AWS::EFS::AccessPoint
