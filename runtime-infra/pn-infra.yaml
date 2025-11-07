@@ -179,14 +179,6 @@ Parameters:
     Type: String
     Description: 'Data analysis topic name'
 
-  PaperRequestErrorDumpFunctionCronExpression:
-    Type: String
-    Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
-
-  PaperRequestErrorDumpFuctionDelete:
-    Type: String
-    Description: Condition for remove item form PaperRequestError DynamoDb table
-
   PresignedUrlTimeOfexpiration:
     Type: Number
     Description: Presigned URL Time of Expiration
@@ -241,6 +233,76 @@ Parameters:
       JSON definition for Fargate Spot capacity provider strategy in lower envs.
       For info about capacity provider strategy see: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_CapacityProviderStrategyItem.html
     Default: '[{"capacityProvider":"FARGATE_SPOT","weight":9,"base":0},{"capacityProvider":"FARGATE","weight":1,"base":0}]'
+
+  VPNVpcId:
+    Type: String
+    Description: VpcId of the VPC where to install PN-VPN
+    Default: ''
+
+  VPNVpcCidr:
+    Type: String
+    Description: Cidr of the VPC where to install PN-VPN
+    Default: ''
+
+  VPNDefaultSecurityGroupId:
+    Type: String
+    Description: Default security group of the VPC where to install PN-VPN
+    Default: ''
+
+  VPNSubnetsIds:
+    Type: String
+    Description: Subnets where to install VPN 
+    Default: ''
+
+  VPNServicesSubnetsIds:
+    Type: String
+    Description: Subnets where to install PN-VPN services
+    Default: ''
+
+  VPNServicesSubnetsCidrs:
+    Type: String
+    Description: CIDRs of the subnets where to install PN-VPN services
+    Default: ''
+    
+  VPNSubnetsIds:
+    Type: String
+    Description: Subnet IDs of the subnets where to install PN-VPN services
+    Default: ''
+
+  VPNApplicationLoadBalancerArn: 
+    Type: String
+    Default: '-'
+    Description: Application load balancer for PN-VPN
+
+  VPNApplicationLoadBalancerMetricsDimensionName: 
+    Type: String
+    Default: '-'
+    Description: Application load balancer name for PN-VPN
+
+  VPNApplicationLoadBalancerAwsDns:
+    Type: String
+    Default: '-'
+    Description: Application load balancer AWS DNS for PN-VPN
+
+  VPNApplicationLoadBalancerAwsDnsZoneId:
+    Type: String
+    Default: '-'
+    Description: Application load balancer AWS DNS Zone ID for PN-VPN
+
+  VPNApplicationLoadBalancerListenerArn:
+    Type: String
+    Default: '-'
+    Description: Application load balancer listener ARN for PN-VPN
+
+  VPNWebappSecurityGroupId:
+    Type: String
+    Default: '-'
+    Description: ALB security group ID for PN-VPN
+
+  VPNWebappSecurityGroupArn:
+    Type: String
+    Default: '-'
+    Description: ALB security group ARN for PN-VPN
 
 Conditions:
   IsAlbArnEmpty: !Equals [!Ref ApplicationLoadBalancerArn, "-"]
@@ -375,6 +437,15 @@ Resources:
               }
             }
 
+  # VPN ECS cluster
+  VPNECSCluster:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/ecs-cluster.yaml"
+      Parameters:
+        MacroServiceName: !Sub '${ProjectName}-vpn-cluster'
+        EnvironmentType: !Ref EnvironmentType
+
   ###                       CLOUDFORMATION TRANSFORM LAMBDAS              ###
   ###########################################################################
 
@@ -484,10 +555,14 @@ Outputs:
         !Ref WebappSecurityGroupId,
       ]
 
-  # ECS Cluster
+  # ECS Clusters
   ECSClusterName:
     Value: !GetAtt ECSCluster.Outputs.ClusterName
     Description: ECS cluster name
+
+  VPNECSClusterName:
+    Value: !GetAtt VPNECSCluster.Outputs.ClusterName
+    Description: VPN ECS cluster name
 
   # Log exports outputs
   LogsExporterRoleArn:
@@ -551,10 +626,6 @@ Outputs:
     Value: !Ref ConfinfoDynamoDbExportBucketName
   DataAnalysisTopicName:
     Value: !Ref DataAnalysisTopicName
-  PaperRequestErrorDumpFunctionCronExpression:
-    Value: !Ref PaperRequestErrorDumpFunctionCronExpression
-  PaperRequestErrorDumpFuctionDelete:
-    Value: !Ref PaperRequestErrorDumpFuctionDelete
   PresignedUrlTimeOfexpiration:
     Value: !Ref PresignedUrlTimeOfexpiration
   ParquetBucketPath:
@@ -569,3 +640,33 @@ Outputs:
     Value: !Ref DataLakeAccountId1
   DataMonitoringPrototypeVersion:
     Value: !Ref DataMonitoringPrototypeVersion
+
+  # VPN pass-through params
+  VPNVpcId:
+    Value: !Ref VPNVpcId
+  VPNVpcCidr:
+    Value: !Ref VPNVpcCidr
+  VPNDefaultSecurityGroupId:
+    Value: !Ref VPNDefaultSecurityGroupId
+  VPNSubnetsIds:
+    Value: !Ref VPNSubnetsIds
+  VPNServicesSubnetsIds:
+    Value: !Ref VPNServicesSubnetsIds
+  VPNServicesSubnetsCidrs:
+    Value: !Ref VPNServicesSubnetsCidrs
+  VPNSubnetsIds:
+    Value: !Ref VPNSubnetsIds
+  VPNApplicationLoadBalancerArn:
+    Value: !Ref VPNApplicationLoadBalancerArn
+  VPNApplicationLoadBalancerMetricsDimensionName:
+    Value: !Ref VPNApplicationLoadBalancerMetricsDimensionName
+  VPNApplicationLoadBalancerAwsDns:
+    Value: !Ref VPNApplicationLoadBalancerAwsDns
+  VPNApplicationLoadBalancerAwsDnsZoneId:
+    Value: !Ref VPNApplicationLoadBalancerAwsDnsZoneId
+  VPNApplicationLoadBalancerListenerArn:
+    Value: !Ref VPNApplicationLoadBalancerListenerArn
+  VPNWebappSecurityGroupId:
+    Value: !Ref VPNWebappSecurityGroupId
+  VPNWebappSecurityGroupArn:
+    Value: !Ref VPNWebappSecurityGroupArn
