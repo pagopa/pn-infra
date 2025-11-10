@@ -48,6 +48,10 @@ jobs:
               ))
             )
           ' trivy-results-runtime-infra.sarif > trivy-results-runtime-infra-highcritical.sarif
+      - name: Print number of HIGH/CRITICAL vulnerabilities (runtime-infra)
+        run: |
+          count=$(jq '[.runs[].results[] | select(.message.text | test("Severity: (HIGH|CRITICAL)"))] | length' trivy-results-runtime-infra.sarif)
+          echo "Number of HIGH/CRITICAL vulnerabilities (runtime-infra): $count"
 
       - name: Filter SARIF to exclude MEDIUM and LOW (runtime-infra-confinfo)
         run: |
@@ -58,6 +62,10 @@ jobs:
               ))
             )
           ' trivy-results-runtime-infra-confinfo.sarif > trivy-results-runtime-infra-confinfo-highcritical.sarif
+      - name: Print number of HIGH/CRITICAL vulnerabilities (runtime-infra-confinfo)
+        run: |
+          count=$(jq '[.runs[].results[] | select(.message.text | test("Severity: (HIGH|CRITICAL)"))] | length' trivy-results-runtime-infra-confinfo.sarif)
+          echo "Number of HIGH/CRITICAL vulnerabilities (runtime-infra-confinfo): $count"
 
       - name: Upload Trivy scan results to GitHub Security tab (runtime-infra)
         uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f
