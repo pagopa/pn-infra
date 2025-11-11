@@ -1,0 +1,57 @@
+{
+  "global_config": {
+    "athena_database": "cdc_analytics_database",
+    "athena_workgroup": "cdc_analytics_workgroup",
+    "date_variables": {
+      "YEAR": "auto",
+      "MONTH": "auto",
+      "DAY": "auto"
+    },
+    "execution_timeout_seconds": 600,
+    "max_retries": 2
+  },
+  "queries": {
+    "daily-notifications-status-report": {
+      "type": "export",
+      "description": "EXAMPLE: Daily report of notification status counts (taken in charge, accepted, refused)",
+      "schedule": "cron(0 2 * * ? *)",
+      "query": "SELECT paid, date(date_parse(timestamp, '%Y-%m-%dT%H:%i:%s.%fZ')) AS event_day, COUNT(DISTINCT CASE WHEN timelineelementid LIKE '%VALIDATE_NORMALIZE%' THEN iun END) as takenincharge, COUNT(DISTINCT CASE WHEN timelineelementid LIKE '%REQUEST_ACCEPTED%' THEN iun END) as accepted, COUNT(DISTINCT CASE WHEN timelineelementid LIKE '%REQUEST_REFUSED%' THEN iun END) as refused FROM cdc_analytics_database.pn_timeline WHERE p_year = '{YEAR}' AND p_month = '{MONTH}' AND p_day = '{DAY}' AND (timelineelementid LIKE '%VALIDATE_NORMALIZE%' OR timelineelementid LIKE '%REQUEST_ACCEPTED%' OR timelineelementid LIKE '%REQUEST_REFUSED%') GROUP BY paid, date(date_parse(timestamp, '%Y-%m-%dT%H:%i:%s.%fZ')) ORDER BY paid, event_day",
+      "csv_export": true,
+      "csv_filename_template": "notifications-status-daily-{date}.csv",
+      "slack": {
+        "enabled": true,
+        "message_template": "Daily Notifications Status Report\n\nDate: {date}\nTotal records: {total_rows}\n\nCSV Export: {s3_url}\n\nExecuted at: {timestamp}"
+      }
+    },
+    
+    "high-refused-notifications-alert": {
+      "type": "alerts",
+      "description": "EXAMPLE: Alert when refused notifications exceed threshold",
+      "schedule": "cron(0 */6 * * ? *)",
+      "query": "SELECT paid, COUNT(DISTINCT iun) as refused_count FROM cdc_analytics_database.pn_timeline WHERE p_year = '{YEAR}' AND p_month = '{MONTH}' AND p_day = '{DAY}' AND timelineelementid LIKE '%REQUEST_REFUSED%' GROUP BY paid",
+      "alerts": [
+        {
+          "name": "critical-refused-rate",
+          "threshold": {
+            "operator": ">",
+            "value": 100
+          },
+          "csv_export": true
+        },
+        {
+          "name": "warning-refused-rate",
+          "threshold": {
+            "operator": ">",
+            "value": 50
+          },
+          "csv_export": false
+        }
+      ],
+      "csv_filename_template": "refused-notifications-alert-{date}-{alert_name}.csv",
+      "slack": {
+        "enabled": true,
+        "message_template": "ALERT: {alert_name}\n\nQuery: {query_id}\nDate: {date}\nPA with refused notifications: {alert_count}\nThreshold: {operator} {threshold}\n\nDetails: {s3_url}\n\nExecuted at: {timestamp}"
+      }
+    }
+  }
+}
