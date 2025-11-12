@@ -1,0 +1,80 @@
+"""S3 service layer for CSV export"""
+import boto3
+import csv
+from io import StringIO
+from datetime import datetime, timezone
+from config import logger, OUTPUT_S3_BUCKET, CSV_S3_PREFIX
+
+s3 = boto3.client('s3')
+
+
+def export_results_to_csv(query_id, config, results, execution_date, alert_name=None):
+    """
+    Export query results to CSV on S3
+    
+    Args:
+        query_id: Query identifier
+        config: Query configuration
+        results: List of result rows (list of dicts)
+        execution_date: Execution date string (YYYY-MM-DD)
+        alert_name: Optional alert name for alerts mode
+    
+    Returns:
+        S3 URL of exported CSV
+    """
+    logger.info(f"Exporting {len(results)} rows to CSV for query: {query_id}")
+    
+    # Build filename from template
+    filename_template = config.get('csv_filename_template', '{query_id}-{date}.csv')
+    
+    timestamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
+    filename = filename_template.format(
+        query_id=query_id,
+        date=execution_date,
+        timestamp=timestamp,
+        alert_name=alert_name or 'default'
+    )
+    
+    # Build S3 path: prefix/query_id/YYYY/MM/DD/filename
+    date_parts = execution_date.split('-')
+    year, month, day = date_parts[0], date_parts[1], date_parts[2]
+    
+    s3_key = f"{CSV_S3_PREFIX}/{query_id}/{year}/{month}/{day}/{filename}"
+    
+    # Generate CSV content
+    csv_buffer = StringIO()
+    
+    if results:
+        # Use keys from first row as headers
+        fieldnames = results[0].keys()
+        writer = csv.DictWriter(csv_buffer, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(results)
+    else:
+        # Empty results, just write headers if available
+        logger.warning(f"No results to export for query: {query_id}")
+        csv_buffer.write("# No results\n")
+    
+    # Upload to S3
+    try:
+        s3.put_object(
+            Bucket=OUTPUT_S3_BUCKET,
+            Key=s3_key,
+            Body=csv_buffer.getvalue().encode('utf-8'),
+            ContentType='text/csv',
+            Metadata={
+                'query_id': query_id,
+                'execution_date': execution_date,
+                'record_count': str(len(results)),
+                'timestamp': timestamp
+            }
+        )
+        
+        s3_url = f"s3://{OUTPUT_S3_BUCKET}/{s3_key}"
+        logger.info(f"CSV exported successfully to: {s3_url}")
+        
+        return s3_url
+        
+    except Exception as e:
+        logger.error(f"Failed to export CSV to S3: {e}")
+        raise RuntimeError(f"CSV export failed: {e}")
