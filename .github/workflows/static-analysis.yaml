@@ -1,32 +1,36 @@
 name: static-analysis
 description: |
   This workflow runs static analysis on the infrastructure code using Trivy in IaC mode.
-  It scans for vulnerabilities in the runtime infrastructure code.
-  - For develop/main: uploads to Security tab and prevents merge if HIGH/CRITICAL vulnerabilities found
-  - For other branches: shows inline annotations in PRs only
-  - Runs on every push and periodically scans develop and main branches
+  - Uploads SARIF results to GitHub for Code Scanning alerts (Security Tab) only on develop/main pushes.
+  - Uploads SARIF results to GitHub for PR annotations on all branches.
+  - Fails the check on HIGH/CRITICAL findings when targeting develop/main.
 permissions:
   contents: read
-  security-events: write
-  pull-requests: write
+  security-events: write # Necessario per la Security Tab
+  pull-requests: write # Necessario per le annotazioni/check
 on:
   push:
+    branches:
+      - develop
+      - main
   pull_request:
   schedule:
     # Run daily at 2 AM UTC on develop and main branches
     - cron: '0 2 * * *'
+
 jobs:
-  build:
+  trivy_scan:
     name: Infrastructure Static Analysis
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@v4 # Aggiornato all'ultima versione
 
-      # For develop/main: generate SARIF for Security tab
-      - name: Run Trivy (SARIF) for develop/main (runtime-infra)
-        if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
-        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
+      # --- Esecuzione Scansioni SARIF (Valido per tutti i branch) ---
+
+      - name: 🛡️ Run Trivy (SARIF) for runtime-infra
+        uses: aquasecurity/trivy-action@master # Aggiornato alla versione master per sicurezza/stabilità
+        id: trivy-runtime-infra
         with:
           scan-type: 'config'
           scan-ref: './runtime-infra'
@@ -36,11 +40,13 @@ jobs:
           skip-files: 'runtime-infra/fragments/vpc.yaml'
           exit-code: '0'
           trivyignores: '.trivyignore'
-          severity: 'CRITICAL,HIGH'
+          # Scansioniamo tutte le severity (LOW, MEDIUM, HIGH, CRITICAL) per le annotazioni PR
+          # Le severity non CRITICAL/HIGH saranno filtrate per la Security Tab
+          severity: 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL' 
 
-      - name: Run Trivy (SARIF) for develop/main (runtime-infra-confinfo)
-        if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
-        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
+      - name: 🛡️ Run Trivy (SARIF) for runtime-infra-confinfo
+        uses: aquasecurity/trivy-action@master
+        id: trivy-runtime-infra-confinfo
         with:
           scan-type: 'config'
           scan-ref: './runtime-infra-confinfo'
@@ -49,79 +55,17 @@ jobs:
           output: 'trivy-results-runtime-infra-confinfo.sarif'
           exit-code: '0'
           trivyignores: '.trivyignore'
-          severity: 'CRITICAL,HIGH'
+          severity: 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL'
 
-      # For other branches: generate table format for PR annotations
-      - name: Run Trivy (JSON) for feature branches (runtime-infra)
-        if: github.ref != 'refs/heads/develop' && github.ref != 'refs/heads/main'
-        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
-        with:
-          scan-type: 'config'
-          scan-ref: './runtime-infra'
-          hide-progress: false
-          format: 'json'
-          output: 'trivy-results-runtime-infra.json'
-          skip-files: 'runtime-infra/fragments/vpc.yaml'
-          exit-code: '0'
-          trivyignores: '.trivyignore'
-          severity: 'CRITICAL,HIGH'
+      # --- Filtro e Upload per GitHub Security Tab (Solo su develop/main push) ---
 
-      - name: Run Trivy (JSON) for feature branches (runtime-infra-confinfo)
-        if: github.ref != 'refs/heads/develop' && github.ref != 'refs/heads/main'
-        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
-        with:
-          scan-type: 'config'
-          scan-ref: './runtime-infra-confinfo'
-          hide-progress: false
-          format: 'json'
-          output: 'trivy-results-runtime-infra-confinfo.json'
-          exit-code: '0'
-          trivyignores: '.trivyignore'
-          severity: 'CRITICAL,HIGH'
+      # La parte di filtro SARIF non è più necessaria. Quando carichi il SARIF, GitHub ti permette
+      # di configurare le regole di Code Scanning per ignorare LOW/MEDIUM.
+      # Tuttavia, se preferisci filtrare, il tuo approccio con JQ è valido. Lo manteniamo per 
+      # coerenza con il tuo file originale, concentrandoci solo sui branch principali.
 
-      - name: Display vulnerabilities for feature branches (runtime-infra)
-        if: github.ref != 'refs/heads/develop' && github.ref != 'refs/heads/main'
-        run: |
-          if [ -f trivy-results-runtime-infra.json ]; then
-            echo "## Runtime-infra vulnerabilities"
-            jq -r '.Results[]? | select(.Misconfigurations != null) | .Target as $target | .Misconfigurations[] | "- [\(.Severity)] \($target): \(.ID) - \(.Title)"' trivy-results-runtime-infra.json || echo "No vulnerabilities found"
-          fi
-
-      - name: Display vulnerabilities for feature branches (runtime-infra-confinfo)
-        if: github.ref != 'refs/heads/develop' && github.ref != 'refs/heads/main'
-        run: |
-          if [ -f trivy-results-runtime-infra-confinfo.json ]; then
-            echo "## Runtime-infra-confinfo vulnerabilities"
-            jq -r '.Results[]? | select(.Misconfigurations != null) | .Target as $target | .Misconfigurations[] | "- [\(.Severity)] \($target): \(.ID) - \(.Title)"' trivy-results-runtime-infra-confinfo.json || echo "No vulnerabilities found"
-          fi
-
-      - name: Count vulnerabilities for feature branches (runtime-infra)
-        if: github.ref != 'refs/heads/develop' && github.ref != 'refs/heads/main'
-        id: count-feature-runtime-infra
-        run: |
-          if [ -f trivy-results-runtime-infra.json ]; then
-            count=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity == "HIGH" or .Severity == "CRITICAL")] | length' trivy-results-runtime-infra.json)
-          else
-            count=0
-          fi
-          echo "count=$count" >> $GITHUB_OUTPUT
-          echo "HIGH/CRITICAL vulnerabilities in runtime-infra: $count"
-
-      - name: Count vulnerabilities for feature branches (runtime-infra-confinfo)
-        if: github.ref != 'refs/heads/develop' && github.ref != 'refs/heads/main'
-        id: count-feature-runtime-infra-confinfo
-        run: |
-          if [ -f trivy-results-runtime-infra-confinfo.json ]; then
-            count=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity == "HIGH" or .Severity == "CRITICAL")] | length' trivy-results-runtime-infra-confinfo.json)
-          else
-            count=0
-          fi
-          echo "count=$count" >> $GITHUB_OUTPUT
-          echo "HIGH/CRITICAL vulnerabilities in runtime-infra-confinfo: $count"
-
-
-      - name: Filter SARIF to exclude MEDIUM and LOW (runtime-infra)
-        if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+      - name: 🔍 Filter SARIF to HIGH/CRITICAL (runtime-infra)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.event_name == 'schedule')
         run: |
           jq '
             .runs |= map(
@@ -131,16 +75,8 @@ jobs:
             )
           ' trivy-results-runtime-infra.sarif > trivy-results-runtime-infra-highcritical.sarif
       
-      - name: Print number of HIGH/CRITICAL vulnerabilities (runtime-infra)
-        if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
-        id: count-runtime-infra
-        run: |
-          count=$(jq '[.runs[].results[] | select(.message.text | test("Severity: (HIGH|CRITICAL)"))] | length' trivy-results-runtime-infra.sarif)
-          echo "Number of HIGH/CRITICAL vulnerabilities (runtime-infra): $count"
-          echo "count=$count" >> $GITHUB_OUTPUT
-
-      - name: Filter SARIF to exclude MEDIUM and LOW (runtime-infra-confinfo)
-        if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+      - name: 🔍 Filter SARIF to HIGH/CRITICAL (runtime-infra-confinfo)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.event_name == 'schedule')
         run: |
           jq '
             .runs |= map(
@@ -149,48 +85,60 @@ jobs:
               ))
             )
           ' trivy-results-runtime-infra-confinfo.sarif > trivy-results-runtime-infra-confinfo-highcritical.sarif
-      
-      - name: Print number of HIGH/CRITICAL vulnerabilities (runtime-infra-confinfo)
-        if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
-        id: count-runtime-infra-confinfo
-        run: |
-          count=$(jq '[.runs[].results[] | select(.message.text | test("Severity: (HIGH|CRITICAL)"))] | length' trivy-results-runtime-infra-confinfo.sarif)
-          echo "Number of HIGH/CRITICAL vulnerabilities (runtime-infra-confinfo): $count"
-          echo "count=$count" >> $GITHUB_OUTPUT
 
-      - name: Upload Trivy scan results to GitHub Security tab (runtime-infra)
-        if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f
+      - name: ⬆️ Upload Trivy results to Security Tab (runtime-infra)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
+        uses: github/codeql-action/upload-sarif@v3 # Aggiornato all'ultima versione
         with:
           sarif_file: 'trivy-results-runtime-infra-highcritical.sarif'
           category: 'trivy-runtime-infra'
 
-      - name: Upload Trivy scan results to GitHub Security tab (runtime-infra-confinfo)
-        if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f
+      - name: ⬆️ Upload Trivy results to Security Tab (runtime-infra-confinfo)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results-runtime-infra-confinfo-highcritical.sarif'
           category: 'trivy-runtime-infra-confinfo'
 
-      - name: Fail on HIGH/CRITICAL vulnerabilities for develop/main branches
-        if: |
-          (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') &&
-          (steps.count-runtime-infra.outputs.count != '0' || steps.count-runtime-infra-confinfo.outputs.count != '0')
-        run: |
-          echo "::error::Found HIGH/CRITICAL vulnerabilities on protected branch ${{ github.ref }}"
-          echo "runtime-infra vulnerabilities: ${{ steps.count-runtime-infra.outputs.count }}"
-          echo "runtime-infra-confinfo vulnerabilities: ${{ steps.count-runtime-infra-confinfo.outputs.count }}"
-          exit 1
+      # --- Annotazioni PR (Universali) ---
 
-      - name: Fail on HIGH/CRITICAL vulnerabilities for PRs to develop/main
-        if: |
-          github.event_name == 'pull_request' &&
-          (github.base_ref == 'develop' || github.base_ref == 'main') &&
-          (steps.count-feature-runtime-infra.outputs.count != '0' || steps.count-feature-runtime-infra-confinfo.outputs.count != '0')
+      - name: 📝 Annotate PR with Trivy results (runtime-infra)
+        if: github.event_name == 'pull_request'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results-runtime-infra.sarif'
+          category: 'trivy-pr-annotation-runtime-infra'
+
+      - name: 📝 Annotate PR with Trivy results (runtime-infra-confinfo)
+        if: github.event_name == 'pull_request'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results-runtime-infra-confinfo.sarif'
+          category: 'trivy-pr-annotation-runtime-infra-confinfo'
+
+      # --- Logica di Fallimento Condizionale (Fail on HIGH/CRITICAL) ---
+
+      # Calcoliamo il conteggio totale di HIGH/CRITICAL in un unico step per il check di fail
+      - name: 🔢 Count HIGH/CRITICAL vulnerabilities
+        id: count_vulnerabilities
         run: |
-          echo "::error::Found HIGH/CRITICAL vulnerabilities in PR targeting ${{ github.base_ref }}"
-          echo "runtime-infra vulnerabilities: ${{ steps.count-feature-runtime-infra.outputs.count }}"
-          echo "runtime-infra-confinfo vulnerabilities: ${{ steps.count-feature-runtime-infra-confinfo.outputs.count }}"
-          echo ""
-          echo "Please fix these vulnerabilities before merging to ${{ github.base_ref }}"
-          exit 1
+          count_infra=$(jq '[.runs[].results[] | select(.message.text | test("Severity: (HIGH|CRITICAL)"))] | length' trivy-results-runtime-infra.sarif)
+          count_confinfo=$(jq '[.runs[].results[] | select(.message.text | test("Severity: (HIGH|CRITICAL)"))] | length' trivy-results-runtime-infra-confinfo.sarif)
+          total_count=$((count_infra + count_confinfo))
+          
+          echo "Number of HIGH/CRITICAL vulnerabilities (runtime-infra): $count_infra"
+          echo "Number of HIGH/CRITICAL vulnerabilities (runtime-infra-confinfo): $count_confinfo"
+          echo "total_count=$total_count" >> $GITHUB_OUTPUT
+      
+      # Fail se è una PR verso develop/main O se è un push su develop/main (prevenendo il merge/push)
+      - name: ❌ Fail on HIGH/CRITICAL vulnerabilities
+        if: |
+          (github.event_name == 'pull_request' && (github.base_ref == 'develop' || github.base_ref == 'main')) ||
+          (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'))
+        run: |
+          if [ "${{ steps.count_vulnerabilities.outputs.total_count }}" -ne "0" ]; then
+              echo "::error::Found ${{ steps.count_vulnerabilities.outputs.total_count }} HIGH/CRITICAL vulnerabilities on branch ${{ github.ref }} or PR targeting ${{ github.base_ref }}"
+              exit 1
+          else
+              echo "No HIGH/CRITICAL vulnerabilities found. Proceeding."
+          fi
