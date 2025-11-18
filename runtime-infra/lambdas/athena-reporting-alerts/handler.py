@@ -68,14 +68,14 @@ def handle_export_mode(query_id, query_config, results, execution_date, executio
     logger.info(f"Handling export mode for query: {query_id}")
     
     # Export CSV to S3
-    csv_url = export_results_to_csv(
+    csv_export = export_results_to_csv(
         query_id=query_id,
         config=query_config,
         results=results,
         execution_date=execution_date
     )
     
-    logger.info(f"CSV exported to: {csv_url}")
+    logger.info(f"CSV exported to: {csv_export['s3_path']}")
     
     # Send Slack notification if enabled
     if query_config.get('slack', {}).get('enabled', False):
@@ -83,7 +83,8 @@ def handle_export_mode(query_id, query_config, results, execution_date, executio
         message_vars = {
             'date': execution_date,
             'total_rows': len(results),
-            's3_url': csv_url,
+            's3_path': csv_export['s3_path'],
+            'presigned_url': csv_export['presigned_url'],
             'timestamp': execution_timestamp,
             'query_id': query_id,
             'description': query_config.get('description', 'N/A')
@@ -143,16 +144,16 @@ def handle_alerts_mode(query_id, query_config, results, execution_date, executio
             logger.info(f"Alert '{alert_name}' TRIGGERED: condition {record_count} {operator} {value} is TRUE")
             
             # Export CSV if requested for this alert
-            csv_url = 'N/A'
+            csv_export_result = None
             if csv_export:
-                csv_url = export_results_to_csv(
+                csv_export_result = export_results_to_csv(
                     query_id=query_id,
                     config=query_config,
                     results=results,
                     execution_date=execution_date,
                     alert_name=alert_name
                 )
-                logger.info(f"CSV exported for alert: {csv_url}")
+                logger.info(f"CSV exported for alert: {csv_export_result['s3_path']}")
             
             # Send Slack notification if enabled
             if query_config.get('slack', {}).get('enabled', False):
@@ -163,7 +164,8 @@ def handle_alerts_mode(query_id, query_config, results, execution_date, executio
                     'alert_count': record_count,
                     'threshold': value,
                     'operator': operator,
-                    's3_url': csv_url,
+                    's3_path': csv_export_result['s3_path'] if csv_export_result else 'N/A',
+                    'presigned_url': csv_export_result['presigned_url'] if csv_export_result else 'N/A',
                     'timestamp': execution_timestamp,
                     'query_id': query_id,
                     'description': query_config.get('description', 'N/A')

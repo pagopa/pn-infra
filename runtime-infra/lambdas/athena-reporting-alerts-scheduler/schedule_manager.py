@@ -29,10 +29,11 @@ def setup_logger(aws_request_id):
 
 # Environment variables
 CONFIG_GIT_URL = os.environ['CONFIG_GIT_URL']
-QUERY_EXECUTOR_ARN = os.environ['QUERY_EXECUTOR_ARN']
+REPORTING_ALERTS_ARN = os.environ['REPORTING_ALERTS_ARN']
 SCHEDULE_ROLE_ARN = os.environ['SCHEDULE_ROLE_ARN']
-SCHEDULE_GROUP_NAME = os.environ.get('SCHEDULE_GROUP_NAME', 'pn-athena-queries')
+SCHEDULE_GROUP_NAME = os.environ.get('SCHEDULE_GROUP_NAME', 'pn-athena-reporting-alerts')
 PROJECT_NAME = os.environ.get('PROJECT_NAME', 'pn')
+LAMBDA_FUNCTION_NAME = os.environ.get('AWS_LAMBDA_FUNCTION_NAME', 'pn-AthenaReportingAlertsScheduler')
 
 scheduler = boto3.client('scheduler')
 
@@ -178,10 +179,16 @@ def create_schedule(query_id, query_config):
             FlexibleTimeWindow={'Mode': 'OFF'},
             State='ENABLED',
             Target={
-                'Arn': QUERY_EXECUTOR_ARN,
+                'Arn': REPORTING_ALERTS_ARN,
                 'RoleArn': SCHEDULE_ROLE_ARN,
                 'Input': json.dumps({'query_id': query_id})
-            }
+            },
+            Tags=[
+                {
+                    'Key': 'ManagedBy',
+                    'Value': LAMBDA_FUNCTION_NAME
+                }
+            ]
         )
         logger.info(f"Successfully created schedule: {schedule_name}")
         return True
@@ -207,10 +214,16 @@ def update_schedule(query_id, query_config):
             FlexibleTimeWindow={'Mode': 'OFF'},
             State='ENABLED',
             Target={
-                'Arn': QUERY_EXECUTOR_ARN,
+                'Arn': REPORTING_ALERTS_ARN,
                 'RoleArn': SCHEDULE_ROLE_ARN,
                 'Input': json.dumps({'query_id': query_id})
-            }
+            },
+            Tags=[
+                {
+                    'Key': 'ManagedBy',
+                    'Value': LAMBDA_FUNCTION_NAME
+                }
+            ]
         )
         logger.info(f"Successfully updated schedule: {schedule_name}")
         return True
