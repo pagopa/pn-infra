@@ -36,10 +36,10 @@ def fetch_config_from_git():
         raise RuntimeError(f"Failed to fetch config from Git: {e}")
 
 
-def calculate_t_minus_1():
-    """Calculate T-1 date (yesterday) in YYYY-MM-DD format"""
-    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
-    return yesterday.strftime('%Y-%m-%d')
+def calculate_today():
+    """Calculate today's date in YYYY-MM-DD format"""
+    today = datetime.now(timezone.utc)
+    return today.strftime('%Y-%m-%d')
 
 
 def build_date_variables(execution_date_str):
@@ -192,7 +192,7 @@ def lambda_handler(event, context):
     if not query_id:
         raise ValueError("Missing required parameter: query_id")
     
-    execution_date = event.get('execution_date') or calculate_t_minus_1()
+    execution_date = event.get('execution_date') or calculate_today()
     execution_timestamp = datetime.now(timezone.utc).isoformat()
     
     logger.info(f"Executing query '{query_id}' for date: {execution_date}")
@@ -207,15 +207,21 @@ def lambda_handler(event, context):
     
     logger.info(f"Query type: {query_config.get('type', 'export')}")
     
-    # Build date variables
-    date_vars = build_date_variables(execution_date)
+    # Get base query
+    query_sql = query_config['query']
     
-    # Add THRESHOLD variable if defined (for alerts mode)
-    if 'alert_threshold' in query_config:
-        date_vars['THRESHOLD'] = query_config['alert_threshold']
-    
-    # Substitute variables in query
-    query_sql = substitute_query_variables(query_config['query'], date_vars)
+    # Substitute date variables ONLY if present in query
+    if '{YEAR}' in query_sql or '{MONTH}' in query_sql or '{DAY}' in query_sql or '{DATE}' in query_sql:
+        date_vars = build_date_variables(execution_date)
+        
+        # Add THRESHOLD variable if defined (for alerts mode)
+        if 'alert_threshold' in query_config:
+            date_vars['THRESHOLD'] = query_config['alert_threshold']
+        
+        query_sql = substitute_query_variables(query_sql, date_vars)
+        logger.info(f"Date variables substituted in query")
+    else:
+        logger.info(f"No date variables in query - executing as-is")
     
     logger.info(f"Executing Athena query with {len(results) if 'results' in locals() else 'unknown'} variable substitutions")
     
