@@ -644,6 +644,8 @@ Resources:
       WorkGroupConfiguration:
         ResultConfiguration:
           OutputLocation: !Sub s3://${AthenaResultsBucket}/
+          EncryptionConfiguration:
+            EncryptionOption: SSE_KMS
 
   GlueDatabaseConfInfo:
     Type: AWS::Glue::Database
@@ -1135,3 +1137,5 @@ Resources:
       WorkGroupConfiguration:
         ResultConfiguration:
           OutputLocation: !Sub s3://${AthenaResultsBucket}/confinfo-results/
+          EncryptionConfiguration:
+            EncryptionOption: SSE_KMS
