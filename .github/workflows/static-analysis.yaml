@@ -24,12 +24,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4 # Aggiornato all'ultima versione
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       # --- Esecuzione Scansioni SARIF (Valido per tutti i branch) ---
 
       - name: 🛡️ Run Trivy (SARIF) for runtime-infra
-        uses: aquasecurity/trivy-action@master # Aggiornato alla versione master per sicurezza/stabilità
+        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
         id: trivy-runtime-infra
         with:
           scan-type: 'config'
@@ -45,7 +45,7 @@ jobs:
           severity: 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL' 
 
       - name: 🛡️ Run Trivy (SARIF) for runtime-infra-confinfo
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
         id: trivy-runtime-infra-confinfo
         with:
           scan-type: 'config'
@@ -88,14 +88,14 @@ jobs:
 
       - name: ⬆️ Upload Trivy results to Security Tab (runtime-infra)
         if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
-        uses: github/codeql-action/upload-sarif@v3 # Aggiornato all'ultima versione
+        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f
         with:
           sarif_file: 'trivy-results-runtime-infra-highcritical.sarif'
           category: 'trivy-runtime-infra'
 
       - name: ⬆️ Upload Trivy results to Security Tab (runtime-infra-confinfo)
         if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f
         with:
           sarif_file: 'trivy-results-runtime-infra-confinfo-highcritical.sarif'
           category: 'trivy-runtime-infra-confinfo'
@@ -104,14 +104,14 @@ jobs:
 
       - name: 📝 Annotate PR with Trivy results (runtime-infra)
         if: github.event_name == 'pull_request'
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f
         with:
           sarif_file: 'trivy-results-runtime-infra.sarif'
           category: 'trivy-pr-annotation-runtime-infra'
 
       - name: 📝 Annotate PR with Trivy results (runtime-infra-confinfo)
         if: github.event_name == 'pull_request'
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f
         with:
           sarif_file: 'trivy-results-runtime-infra-confinfo.sarif'
           category: 'trivy-pr-annotation-runtime-infra-confinfo'
