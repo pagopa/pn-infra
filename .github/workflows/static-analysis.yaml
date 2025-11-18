@@ -29,11 +29,11 @@ jobs:
         uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
         with:
           scan-type: 'config'
-          input: './runtime-infra'
+          scan-ref: './runtime-infra'
           hide-progress: true
           format: 'sarif'
           output: 'trivy-results-runtime-infra.sarif'
-          skip-files: './runtime-infra/fragments/vpc.yaml'
+          skip-files: 'runtime-infra/fragments/vpc.yaml'
           exit-code: '0'
           trivyignores: '.trivyignore'
           severity: 'CRITICAL,HIGH'
@@ -43,7 +43,7 @@ jobs:
         uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
         with:
           scan-type: 'config'
-          input: './runtime-infra-confinfo'
+          scan-ref: './runtime-infra-confinfo'
           hide-progress: true
           format: 'sarif'
           output: 'trivy-results-runtime-infra-confinfo.sarif'
@@ -52,30 +52,72 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       # For other branches: generate table format for PR annotations
-      - name: Run Trivy (Table) for feature branches (runtime-infra)
+      - name: Run Trivy (JSON) for feature branches (runtime-infra)
         if: github.ref != 'refs/heads/develop' && github.ref != 'refs/heads/main'
         uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
         with:
           scan-type: 'config'
-          input: './runtime-infra'
+          scan-ref: './runtime-infra'
           hide-progress: false
-          format: 'table'
-          skip-files: './runtime-infra/fragments/vpc.yaml'
+          format: 'json'
+          output: 'trivy-results-runtime-infra.json'
+          skip-files: 'runtime-infra/fragments/vpc.yaml'
           exit-code: '0'
           trivyignores: '.trivyignore'
           severity: 'CRITICAL,HIGH'
 
-      - name: Run Trivy (Table) for feature branches (runtime-infra-confinfo)
+      - name: Run Trivy (JSON) for feature branches (runtime-infra-confinfo)
         if: github.ref != 'refs/heads/develop' && github.ref != 'refs/heads/main'
         uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
         with:
           scan-type: 'config'
-          input: './runtime-infra-confinfo'
+          scan-ref: './runtime-infra-confinfo'
           hide-progress: false
-          format: 'table'
+          format: 'json'
+          output: 'trivy-results-runtime-infra-confinfo.json'
           exit-code: '0'
           trivyignores: '.trivyignore'
           severity: 'CRITICAL,HIGH'
+
+      - name: Display vulnerabilities for feature branches (runtime-infra)
+        if: github.ref != 'refs/heads/develop' && github.ref != 'refs/heads/main'
+        run: |
+          if [ -f trivy-results-runtime-infra.json ]; then
+            echo "## Runtime-infra vulnerabilities"
+            jq -r '.Results[]? | select(.Misconfigurations != null) | .Target as $target | .Misconfigurations[] | "- [\(.Severity)] \($target): \(.ID) - \(.Title)"' trivy-results-runtime-infra.json || echo "No vulnerabilities found"
+          fi
+
+      - name: Display vulnerabilities for feature branches (runtime-infra-confinfo)
+        if: github.ref != 'refs/heads/develop' && github.ref != 'refs/heads/main'
+        run: |
+          if [ -f trivy-results-runtime-infra-confinfo.json ]; then
+            echo "## Runtime-infra-confinfo vulnerabilities"
+            jq -r '.Results[]? | select(.Misconfigurations != null) | .Target as $target | .Misconfigurations[] | "- [\(.Severity)] \($target): \(.ID) - \(.Title)"' trivy-results-runtime-infra-confinfo.json || echo "No vulnerabilities found"
+          fi
+
+      - name: Count vulnerabilities for feature branches (runtime-infra)
+        if: github.ref != 'refs/heads/develop' && github.ref != 'refs/heads/main'
+        id: count-feature-runtime-infra
+        run: |
+          if [ -f trivy-results-runtime-infra.json ]; then
+            count=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity == "HIGH" or .Severity == "CRITICAL")] | length' trivy-results-runtime-infra.json)
+          else
+            count=0
+          fi
+          echo "count=$count" >> $GITHUB_OUTPUT
+          echo "HIGH/CRITICAL vulnerabilities in runtime-infra: $count"
+
+      - name: Count vulnerabilities for feature branches (runtime-infra-confinfo)
+        if: github.ref != 'refs/heads/develop' && github.ref != 'refs/heads/main'
+        id: count-feature-runtime-infra-confinfo
+        run: |
+          if [ -f trivy-results-runtime-infra-confinfo.json ]; then
+            count=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity == "HIGH" or .Severity == "CRITICAL")] | length' trivy-results-runtime-infra-confinfo.json)
+          else
+            count=0
+          fi
+          echo "count=$count" >> $GITHUB_OUTPUT
+          echo "HIGH/CRITICAL vulnerabilities in runtime-infra-confinfo: $count"
 
 
       - name: Filter SARIF to exclude MEDIUM and LOW (runtime-infra)
@@ -138,4 +180,17 @@ jobs:
           echo "::error::Found HIGH/CRITICAL vulnerabilities on protected branch ${{ github.ref }}"
           echo "runtime-infra vulnerabilities: ${{ steps.count-runtime-infra.outputs.count }}"
           echo "runtime-infra-confinfo vulnerabilities: ${{ steps.count-runtime-infra-confinfo.outputs.count }}"
+          exit 1
+
+      - name: Fail on HIGH/CRITICAL vulnerabilities for PRs to develop/main
+        if: |
+          github.event_name == 'pull_request' &&
+          (github.base_ref == 'develop' || github.base_ref == 'main') &&
+          (steps.count-feature-runtime-infra.outputs.count != '0' || steps.count-feature-runtime-infra-confinfo.outputs.count != '0')
+        run: |
+          echo "::error::Found HIGH/CRITICAL vulnerabilities in PR targeting ${{ github.base_ref }}"
+          echo "runtime-infra vulnerabilities: ${{ steps.count-feature-runtime-infra.outputs.count }}"
+          echo "runtime-infra-confinfo vulnerabilities: ${{ steps.count-feature-runtime-infra-confinfo.outputs.count }}"
+          echo ""
+          echo "Please fix these vulnerabilities before merging to ${{ github.base_ref }}"
           exit 1
