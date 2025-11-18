@@ -42,7 +42,7 @@ jobs:
           trivyignores: '.trivyignore'
           # Scansioniamo tutte le severity (LOW, MEDIUM, HIGH, CRITICAL) per le annotazioni PR
           # Le severity non CRITICAL/HIGH saranno filtrate per la Security Tab
-          severity: 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL' 
+          severity: 'HIGH,CRITICAL' 
 
       - name: 🛡️ Run Trivy (SARIF) for runtime-infra-confinfo
         uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
@@ -55,7 +55,7 @@ jobs:
           output: 'trivy-results-runtime-infra-confinfo.sarif'
           exit-code: '0'
           trivyignores: '.trivyignore'
-          severity: 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL'
+          severity: 'HIGH,CRITICAL'
 
       # --- Filtro e Upload per GitHub Security Tab (Solo su develop/main push) ---
 
@@ -106,14 +106,14 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f
         with:
-          sarif_file: 'trivy-results-runtime-infra.sarif'
+          sarif_file: 'trivy-results-runtime-infra-highcritical.sarif'
           category: 'trivy-pr-annotation-runtime-infra'
 
       - name: 📝 Annotate PR with Trivy results (runtime-infra-confinfo)
         if: github.event_name == 'pull_request'
         uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f
         with:
-          sarif_file: 'trivy-results-runtime-infra-confinfo.sarif'
+          sarif_file: 'trivy-results-runtime-infra-confinfo-highcritical.sarif'
           category: 'trivy-pr-annotation-runtime-infra-confinfo'
 
       # --- Logica di Fallimento Condizionale (Fail on HIGH/CRITICAL) ---
@@ -122,8 +122,8 @@ jobs:
       - name: 🔢 Count HIGH/CRITICAL vulnerabilities
         id: count_vulnerabilities
         run: |
-          count_infra=$(jq '[.runs[].results[] | select(.message.text | test("Severity: (HIGH|CRITICAL)"))] | length' trivy-results-runtime-infra.sarif)
-          count_confinfo=$(jq '[.runs[].results[] | select(.message.text | test("Severity: (HIGH|CRITICAL)"))] | length' trivy-results-runtime-infra-confinfo.sarif)
+          count_infra=$(jq '[.runs[].results[] | select(.message.text | test("Severity: (HIGH|CRITICAL)"))] | length' trivy-results-runtime-infra-highcritical.sarif)
+          count_confinfo=$(jq '[.runs[].results[] | select(.message.text | test("Severity: (HIGH|CRITICAL)"))] | length' trivy-results-runtime-infra-confinfo-highcritical.sarif)
           total_count=$((count_infra + count_confinfo))
           
           echo "Number of HIGH/CRITICAL vulnerabilities (runtime-infra): $count_infra"
