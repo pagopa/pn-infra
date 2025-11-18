@@ -70,7 +70,6 @@ def handle_export_mode(query_id, query_config, results, execution_date, executio
     # Export CSV to S3
     csv_export = export_results_to_csv(
         query_id=query_id,
-        config=query_config,
         results=results,
         execution_date=execution_date
     )
@@ -90,7 +89,7 @@ def handle_export_mode(query_id, query_config, results, execution_date, executio
             'description': query_config.get('description', 'N/A')
         }
         
-        send_slack_notification(slack_config, message_vars, sns_topic_arn)
+        send_slack_notification(slack_config, message_vars, sns_topic_arn, mode='export')
         logger.info(f"Slack notification sent for export: {query_id}")
 
 
@@ -148,7 +147,6 @@ def handle_alerts_mode(query_id, query_config, results, execution_date, executio
             if csv_export:
                 csv_export_result = export_results_to_csv(
                     query_id=query_id,
-                    config=query_config,
                     results=results,
                     execution_date=execution_date,
                     alert_name=alert_name
@@ -171,7 +169,7 @@ def handle_alerts_mode(query_id, query_config, results, execution_date, executio
                     'description': query_config.get('description', 'N/A')
                 }
                 
-                send_slack_notification(slack_config, message_vars, sns_topic_arn)
+                send_slack_notification(slack_config, message_vars, sns_topic_arn, mode='alert')
                 logger.info(f"Slack notification sent for alert: {alert_name}")
         else:
             logger.info(f"Alert '{alert_name}' NOT triggered: condition {record_count} {operator} {value} is FALSE")
@@ -206,7 +204,6 @@ def lambda_handler(event, context):
         raise ValueError(f"Query '{query_id}' not found in config")
     
     query_config = config['queries'][query_id]
-    global_config = config.get('global_config', {})
     
     logger.info(f"Query type: {query_config.get('type', 'export')}")
     
@@ -225,8 +222,8 @@ def lambda_handler(event, context):
     # Execute Athena query
     results = execute_athena_query(
         query=query_sql,
-        database=global_config.get('athena_database', ATHENA_DATABASE),
-        workgroup=global_config.get('athena_workgroup', ATHENA_WORKGROUP)
+        database=ATHENA_DATABASE,
+        workgroup=ATHENA_WORKGROUP
     )
     
     logger.info(f"Query returned {len(results)} records")

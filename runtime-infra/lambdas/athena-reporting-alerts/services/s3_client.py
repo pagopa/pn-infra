@@ -8,32 +8,28 @@ from config import logger, OUTPUT_S3_BUCKET, CSV_S3_PREFIX
 s3 = boto3.client('s3')
 
 
-def export_results_to_csv(query_id, config, results, execution_date, alert_name=None):
+def export_results_to_csv(query_id, results, execution_date, alert_name=None):
     """
     Export query results to CSV on S3
     
     Args:
         query_id: Query identifier
-        config: Query configuration
         results: List of result rows (list of dicts)
         execution_date: Execution date string (YYYY-MM-DD)
         alert_name: Optional alert name for alerts mode
     
     Returns:
-        S3 URL of exported CSV
+        Dict with s3_path and presigned_url
     """
     logger.info(f"Exporting {len(results)} rows to CSV for query: {query_id}")
     
-    # Build filename from template
-    filename_template = config.get('csv_filename_template', '{query_id}-{date}.csv')
-    
+    # Build filename automatically
     timestamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
-    filename = filename_template.format(
-        query_id=query_id,
-        date=execution_date,
-        timestamp=timestamp,
-        alert_name=alert_name or 'default'
-    )
+    
+    if alert_name:
+        filename = f"{query_id}-{alert_name}-{execution_date}.csv"
+    else:
+        filename = f"{query_id}-{execution_date}.csv"
     
     # Build S3 path: prefix/query_id/YYYY/MM/DD/filename
     date_parts = execution_date.split('-')
