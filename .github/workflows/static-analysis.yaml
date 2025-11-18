@@ -65,7 +65,6 @@ jobs:
       # coerenza con il tuo file originale, concentrandoci solo sui branch principali.
 
       - name: 🔍 Filter SARIF to HIGH/CRITICAL (runtime-infra)
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.event_name == 'schedule')
         run: |
           jq '
             .runs |= map(
@@ -76,7 +75,6 @@ jobs:
           ' trivy-results-runtime-infra.sarif > trivy-results-runtime-infra-highcritical.sarif
       
       - name: 🔍 Filter SARIF to HIGH/CRITICAL (runtime-infra-confinfo)
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.event_name == 'schedule')
         run: |
           jq '
             .runs |= map(
