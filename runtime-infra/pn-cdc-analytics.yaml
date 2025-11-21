@@ -705,12 +705,12 @@ Resources:
       Handler: index.handler
       MemorySize: 256
       Timeout: 300
-      Role: !GetAtt ReportingAlertsSchedulerRole.Arn
+      Role: !GetAtt ReportingAlertsSchedulerLambdaRole.Arn
       Environment:
         Variables:
           CONFIG_GIT_URL: !Ref AthenaReportingAlertsConfigGitUrl
           REPORTING_ALERTS_ARN: !GetAtt ReportingAlertsLambda.Arn
-          SCHEDULE_ROLE_ARN: !GetAtt ReportingAlertsSchedulerRole.Arn
+          SCHEDULE_ROLE_ARN: !GetAtt ReportingAlertsScheduleExecutionRole.Arn
           SCHEDULE_GROUP_NAME: !Sub ${ProjectName}-athena-reporting-alerts
           PROJECT_NAME: !Ref ProjectName
       Code:
@@ -867,10 +867,10 @@ Resources:
   ###            SCHEDULER EXECUTION ROLE & SCHEDULE GROUP                    ###
   ###############################################################################
 
-  ReportingAlertsSchedulerRole:
+  ReportingAlertsScheduleExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub ${ProjectName}-AthenaReportingAlertsSchedulerRole
+      RoleName: !Sub ${ProjectName}-AthenaReportingAlertsScheduleExecutionRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
