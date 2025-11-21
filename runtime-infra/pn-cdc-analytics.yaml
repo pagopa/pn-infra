@@ -650,10 +650,10 @@ Resources:
   ###        ATHENA REPORTING ALERTS SCHEDULER LAMBDA                         ###
   ###############################################################################
 
-  ReportingAlertsSchedulerRole:
+  ReportingAlertsSchedulerLambdaRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub ${ProjectName}-AthenaReportingAlertsSchedulerRole
+      RoleName: !Sub ${ProjectName}-AthenaReportingAlertsSchedulerLambdaRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -680,7 +680,7 @@ Resources:
               - Sid: PassSchedulerRole
                 Effect: Allow
                 Action: iam:PassRole
-                Resource: !GetAtt ReportingAlertsSchedulerRole.Arn
+                Resource: !GetAtt ReportingAlertsScheduleExecutionRole.Arn
                 Condition:
                   StringEquals:
                     'iam:PassedToService': scheduler.amazonaws.com
