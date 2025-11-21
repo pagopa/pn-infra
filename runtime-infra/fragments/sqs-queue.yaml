@@ -131,14 +131,17 @@ Conditions:
   IsDLQHasMessagesAlarm: !And
     - !Condition DlqHasAlarm
     - !Condition IsWithDLQ
+  HasDLQOrHasAlarm: !Or 
+    - !Condition IsWithDLQ
+    - !Condition IsWithAlarm
 
   HasOncallDLQLimit: !Not [ !Equals [ !Ref OncallDLQLimit, '0' ] ]
   HasOncallDLQIncreasingLimitThreshold: !Not [ !Equals [ !Ref OncallDLQIncreasingLimitThreshold, '0' ] ]
 
   RequiresDLQOncallAgeAlarm: !Not [ !Equals [ !Ref OncallQueueDlqOldestAgeLimit, '0' ] ]
   RequiresOncallDLQAlarm: !And [ !Condition IsWithAlarm, !Condition HasOncallDLQLimit ]
-  RequiresOncallDLQAgeAlarm: !And [ !Condition IsWithDLQ, !Condition RequiresDLQOncallAgeAlarm]
-  RequiresOncallDLQIncreasingAlarm: !And [ !Condition IsWithAlarm, !Condition HasOncallDLQIncreasingLimitThreshold ]
+  RequiresOncallDLQAgeAlarm: !And [ !Condition IsWithDLQ, !Condition RequiresDLQOncallAgeAlarm ]
+  RequiresOncallDLQIncreasingAlarm: !And [ !Condition HasDLQOrHasAlarm, !Condition HasOncallDLQIncreasingLimitThreshold ]
 
 Resources:
 
