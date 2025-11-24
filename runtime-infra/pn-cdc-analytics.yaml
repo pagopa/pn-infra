@@ -668,15 +668,31 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              - Sid: ManageSchedules
+              - Sid: ListAndGetSchedules
                 Effect: Allow
                 Action:
-                  - scheduler:CreateSchedule
+                  - scheduler:ListSchedules
+                  - scheduler:GetSchedule
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    'aws:ResourceAccount': !Ref AWS::AccountId
+              - Sid: CreateScheduleWithTag
+                Effect: Allow
+                Action: scheduler:CreateSchedule
+                Resource: !Sub arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${ProjectName}-athena-reporting-alerts/*
+                Condition:
+                  StringEquals:
+                    'aws:RequestTag/ManagedBy': !Sub ${ProjectName}-AthenaReportingAlertsScheduler
+              - Sid: UpdateDeleteScheduleWithTag
+                Effect: Allow
+                Action:
                   - scheduler:UpdateSchedule
                   - scheduler:DeleteSchedule
-                  - scheduler:GetSchedule
-                  - scheduler:ListSchedules
                 Resource: !Sub arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${ProjectName}-athena-reporting-alerts/*
+                Condition:
+                  StringEquals:
+                    'aws:ResourceTag/ManagedBy': !Sub ${ProjectName}-AthenaReportingAlertsScheduler
               - Sid: PassSchedulerRole
                 Effect: Allow
                 Action: iam:PassRole
