@@ -688,22 +688,13 @@ Resources:
                 Condition:
                   StringEquals:
                     'aws:ResourceAccount': !Ref AWS::AccountId
-              - Sid: CreateScheduleWithTag
-                Effect: Allow
-                Action: scheduler:CreateSchedule
-                Resource: !Sub arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${ProjectName}-athena-reporting-alerts/*
-                Condition:
-                  StringEquals:
-                    'aws:RequestTag/ManagedBy': !GetAtt ReportingAlertsSchedulerLogGroup.Outputs.LogGroupNameNoPrefix
-              - Sid: UpdateDeleteScheduleWithTag
+              - Sid: ManageSchedules
                 Effect: Allow
                 Action:
+                  - scheduler:CreateSchedule
                   - scheduler:UpdateSchedule
                   - scheduler:DeleteSchedule
                 Resource: !Sub arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${ProjectName}-athena-reporting-alerts/*
-                Condition:
-                  StringEquals:
-                    'aws:ResourceTag/ManagedBy': !GetAtt ReportingAlertsSchedulerLogGroup.Outputs.LogGroupNameNoPrefix
               - Sid: PassSchedulerRole
                 Effect: Allow
                 Action: iam:PassRole
