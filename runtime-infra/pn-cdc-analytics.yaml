@@ -650,6 +650,17 @@ Resources:
   ###        ATHENA REPORTING ALERTS SCHEDULER LAMBDA                         ###
   ###############################################################################
 
+  ReportingAlertsSchedulerLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-AthenaReportingAlertsScheduler
+        LogGroupRetention: 14
+        LogGroupPrefix: /aws/lambda
+
   ReportingAlertsSchedulerLambdaRole:
     Type: AWS::IAM::Role
     Properties:
@@ -683,7 +694,7 @@ Resources:
                 Resource: !Sub arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${ProjectName}-athena-reporting-alerts/*
                 Condition:
                   StringEquals:
-                    'aws:RequestTag/ManagedBy': !Sub ${ProjectName}-AthenaReportingAlertsScheduler
+                    'aws:RequestTag/ManagedBy': !GetAtt ReportingAlertsSchedulerLogGroup.Outputs.LogGroupNameNoPrefix
               - Sid: UpdateDeleteScheduleWithTag
                 Effect: Allow
                 Action:
@@ -692,7 +703,7 @@ Resources:
                 Resource: !Sub arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${ProjectName}-athena-reporting-alerts/*
                 Condition:
                   StringEquals:
-                    'aws:ResourceTag/ManagedBy': !Sub ${ProjectName}-AthenaReportingAlertsScheduler
+                    'aws:ResourceTag/ManagedBy': !GetAtt ReportingAlertsSchedulerLogGroup.Outputs.LogGroupNameNoPrefix
               - Sid: PassSchedulerRole
                 Effect: Allow
                 Action: iam:PassRole
@@ -701,21 +712,10 @@ Resources:
                   StringEquals:
                     'iam:PassedToService': scheduler.amazonaws.com
 
-  ReportingAlertsSchedulerLogGroup:
-    Type: AWS::CloudFormation::Stack
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
-    Properties:
-      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
-      Parameters:
-        LogGroupName: !Sub ${ProjectName}-AthenaReportingAlertsScheduler
-        LogGroupRetention: 14
-        LogGroupPrefix: /aws/lambda
-
   ReportingAlertsSchedulerLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub ${ProjectName}-AthenaReportingAlertsScheduler
+      FunctionName: !GetAtt ReportingAlertsSchedulerLogGroup.Outputs.LogGroupNameNoPrefix
       Description: Manages EventBridge Schedules dynamically for reporting and alerts queries
       Runtime: python3.12
       Handler: index.handler
@@ -765,6 +765,17 @@ Resources:
   ###############################################################################
   ###             ATHENA REPORTING ALERTS LAMBDA                              ###
   ###############################################################################
+
+  ReportingAlertsLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-AthenaReportingAlerts
+        LogGroupRetention: 14
+        LogGroupPrefix: /aws/lambda
 
   ReportingAlertsRole:
     Type: AWS::IAM::Role
@@ -834,21 +845,10 @@ Resources:
                 Action: sns:Publish
                 Resource: !Ref AthenaReportingAlertsTopic
 
-  ReportingAlertsLogGroup:
-    Type: AWS::CloudFormation::Stack
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
-    Properties:
-      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
-      Parameters:
-        LogGroupName: !Sub ${ProjectName}-AthenaReportingAlerts
-        LogGroupRetention: 14
-        LogGroupPrefix: /aws/lambda
-
   ReportingAlertsLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub ${ProjectName}-AthenaReportingAlerts
+      FunctionName: !GetAtt ReportingAlertsLogGroup.Outputs.LogGroupNameNoPrefix
       Description: Executes Athena reporting and alerts queries with CSV export and Slack notifications
       Runtime: python3.12
       Handler: index.handler
