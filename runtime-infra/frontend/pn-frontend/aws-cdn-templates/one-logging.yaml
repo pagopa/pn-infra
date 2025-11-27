@@ -29,6 +29,11 @@ Resources:
           - Id: ExpirationRule
             Status: Enabled
             ExpirationInDays: !Ref BucketRetention
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256               
 
   # - Bucket access policy
   LogsBucketPolicy:
