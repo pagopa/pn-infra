@@ -78,6 +78,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt LambdaFunction.Arn
       Principal: sns.amazonaws.com
+      SourceArn: !Ref AlarmSNSTopic
 
   LambdaFunctionExecutionRole:
     Type: AWS::IAM::Role
