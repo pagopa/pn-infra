@@ -85,12 +85,25 @@ Resources:
                   log.error(f"Errore in add_env_type_to_stack: {e}")
                   return fragment
 
+          def add_dynamo_delete_protection(fragment):
+              try:
+                  if "Resources" in fragment:
+                      for resource_name, resource in fragment["Resources"].items():
+                          if resource["Type"] == "AWS::DynamoDB::Table":
+                              props = resource["Properties"]
+                              props["DeletionProtectionEnabled"] = True
+                  return fragment
+              except Exception as e:
+                  log.error(f"Errore in add_dynamo_delete_protection: {e}")
+                  return fragment
+
           def process_template(event):
               """
               Update the Deployment name and respective references using Epoch time.
               """
               fragment = event['fragment']
               transformed_template = add_env_type_to_stack(fragment, ['api-gw-expose-service-openapi.yaml', 'api-gw-expose-service.yaml'])
+              transformed_template = add_dynamo_delete_protection(transformed_template)
               return transformed_template
 
           def handler(event, context):
@@ -118,6 +131,8 @@ Resources:
       FunctionName: !GetAtt rTransformFunction.Arn
       Principal: 'cloudformation.amazonaws.com'
       SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*"
+      
   rTransform:
     Type: AWS::CloudFormation::Macro
     Properties:

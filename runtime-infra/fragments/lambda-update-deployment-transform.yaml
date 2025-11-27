@@ -86,6 +86,7 @@ Resources:
       FunctionName: !GetAtt rTransformFunction.Arn
       Principal: 'cloudformation.amazonaws.com'
       SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*"
   rTransform:
     Type: AWS::CloudFormation::Macro
     Properties:

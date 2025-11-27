@@ -181,6 +181,11 @@ Parameters:
     Type: String
     Description: add system properties and other parameters to the JVM
 
+  AwsRetryMode :
+    Default: ''
+    Type: String
+    Description: AWS SDK retry mode
+
   # - Log exports parameters
   CloudwatchFilterPattern:
     Default: ''
@@ -795,6 +800,7 @@ Conditions:
   HasOtelXRayDisable: !Equals [ !Ref DisableOtelXRay, 'true' ] 
   
   HasJavaToolOptions: !Not [ !Equals [ !Ref JavaToolOptions, '' ] ]
+  HasAwsRetryMode: !Not [ !Equals [ !Ref AwsRetryMode, '' ] ]
 
   HasKinesisStreamArn: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
   RequiresLogGroupCreation: !Equals [ !Ref EcsLogGroup, '-' ]
@@ -1208,6 +1214,12 @@ Resources:
               - Name: 'OTEL_TRACES_EXPORTER'
                 Value: 'none'
               - !Ref "AWS::NoValue"
+            - 'Fn::If':
+              - HasAwsRetryMode
+              - Name: 'AWS_RETRY_MODE'
+                Value: !Ref AwsRetryMode
+              - Name: 'AWS_RETRY_MODE'
+                Value: 'STANDARD'
             - Name: 'MICROSERVICE_NAME'
               Value: !Ref MicroServiceUniqueName
             - Name: 'APPLICATION_ENV_FILE_CHECKSUM'

@@ -1830,6 +1830,7 @@ Resources:
       FunctionName: !GetAtt TransformFunction.Arn
       Principal: 'cloudformation.amazonaws.com'
       SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*
 
   TrimListFunctionPermissions:
     Type: AWS::Lambda::Permission
@@ -1838,6 +1839,7 @@ Resources:
         FunctionName: !GetAtt TrimListFunction.Arn
         Principal: 'cloudformation.amazonaws.com'
         SourceAccount: !Ref AWS::AccountId
+        SourceArn: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*
 
   OerTransformFunctionPermissions:
     Type: AWS::Lambda::Permission
@@ -1846,3 +1848,4 @@ Resources:
       FunctionName: !GetAtt OerTransformFunction.Arn
       Principal: 'cloudformation.amazonaws.com'
       SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*

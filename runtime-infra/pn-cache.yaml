@@ -26,6 +26,11 @@ Parameters:
     Description: "AccessString for elasticache redis default user"
     Default: "on ~pn-emd::* +@all"
 
+  AccessStringDeliveryUser:
+    Type: String
+    Description: "AccessString for elasticache redis default user"
+    Default: "on ~pn-delivery::* +@all"
+
   AccessStringAuthFleetSessionsUser:
     Type: String
     Description: "AccessString for elasticache redis default user"
@@ -61,10 +66,20 @@ Parameters:
     Description: "UserId for elasticache redis user"
     Default: "iam-user-emdintegration"
 
+  UserIdDelivery:
+    Type: String
+    Description: "UserId for elasticache redis user"
+    Default: "iam-user-delivery"
+
   UsernameEmdIntegration:
     Type: String
     Description: "Username for elasticache redis user"
     Default: "iam-user-emdintegration"
+
+  UsernameDelivery:
+    Type: String
+    Description: "Username for elasticache redis user"
+    Default: "iam-user-delivery"
 
   UserIdAuthFleetSessions:
     Type: String
@@ -154,6 +169,7 @@ Resources:
         - !Ref ElasticCacheLogExtractorUser
         - !Ref ElasticCacheEmdIntegrationUser
         - !Ref ElasticCacheAuthFleetSessionsUser
+        - !Ref ElasticCacheDeliveryUser
 
   DefaultElasticCacheUser:
     Type: AWS::ElastiCache::User
@@ -194,6 +210,16 @@ Resources:
       Engine: redis
       UserId: !Ref UserIdEmdIntegration
       UserName: !Ref UsernameEmdIntegration
+
+  ElasticCacheDeliveryUser:
+    Type: AWS::ElastiCache::User
+    Properties:
+      AccessString: !Ref AccessStringDeliveryUser
+      AuthenticationMode: 
+        Type: iam
+      Engine: redis
+      UserId: !Ref UserIdDelivery
+      UserName: !Ref UsernameDelivery
 
   ElasticCacheAuthFleetSessionsUser:
     Type: AWS::ElastiCache::User
@@ -237,6 +263,14 @@ Outputs:
   ElasticCacheLogExtractorUserId:
     Description: Id of the LogExtractorUser
     Value: !Ref UsernameLogExtractor
+
+  ElasticCacheDeliveryUserArn:
+    Description: ElasticCacheDeliveryUser Arn
+    Value: !GetAtt ElasticCacheDeliveryUser.Arn
+
+  ElasticCacheDeliveryUserId:
+    Description: Id of the Delivery
+    Value: !Ref UsernameDelivery
 
   ElasticCacheEmdIntegrationUserArn:
     Description: ElasticCacheEmdIntegrationUser Arn

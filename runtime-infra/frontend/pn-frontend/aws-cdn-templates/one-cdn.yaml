@@ -156,6 +156,11 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256           
   # - Webapp S3 Bucket policy
   S3BucketForWebsiteContentPolicy:
     Type: AWS::S3::BucketPolicy
@@ -233,7 +238,7 @@ Resources:
             HeaderBehavior: none
           QueryStringsConfig:
             QueryStringBehavior: whitelist
-            QueryStrings: 
+            QueryStrings:
               - productId
               - data
 
@@ -634,6 +639,7 @@ Resources:
               https://pnpg.uat.selfcare.pagopa.it/assets/ \
               https://pnpg.selfcare.pagopa.it/assets/ \
               https://privacyportalde-cdn.onetrust.com/ \
+              https://privacyportal-de.onetrust.com/ \
               https://api-pnpg.selfcare.pagopa.it \
               https://api-pnpg.uat.selfcare.pagopa.it ; \
               style-src 'self' 'unsafe-inline' \
@@ -679,6 +685,7 @@ Resources:
                   - !Sub " connect-src 'self' https://api-eu.mixpanel.com/  \
                     https://selfcare.pagopa.it/assets/ \
                     https://privacyportalde-cdn.onetrust.com/ \
+                    https://privacyportal-de.onetrust.com/ \
                     ${WebApiUrl}; \
                     style-src 'self' 'unsafe-inline' https://privacyportalde-cdn.onetrust.com/; \
                     worker-src 'none'; \
