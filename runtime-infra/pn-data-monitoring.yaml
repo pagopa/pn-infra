@@ -76,12 +76,17 @@ Parameters:
     Description: Slack Email channel
     Default: ''
 
-  PaperRequestErrorDumpFunctionCronExpression:
+  LambdaPnSupportExportDynamoDbCronExpression:
     Type: String
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
     Default: ''
 
-  PaperRequestErrorDumpFunctionDelete:
+  LambdaPnSupportExportSqsCronExpression:
+    Type: String
+    Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
+    Default: ''
+
+  LambdaPnSupportExportDelete:
     Type: String
     Description: Condition for remove item form PaperRequestError DynamoDb table
     Default: "false"
@@ -89,10 +94,14 @@ Parameters:
       - "true"
       - "false"
 
-  PresignedUrlTimeOfexpiration:
+  LambdaPnSupportExportPresignedUrlTimeOfexpiration:
     Type: Number
     Description: Presigned URL Time of Expiration
-    Default: 259200 
+    Default: 259200
+
+  LambdaPnSupportExportSqsVisibilityTimeoutInSeconds:
+    Type: Number
+    Description: SQS queue visibility timeout Lambda export function for pn-support
 
   TemplateBucketBaseUrl:
     Type: String
@@ -112,8 +121,8 @@ Conditions:
   IsDatalakeAccountInCore: !And [ !Condition IsDatalakeAccount, !Condition IsCoreAccount ]
   HasCronExpression: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
-  HasCronExpressionLambdaPaperError: !Not [ !Equals [!Ref PaperRequestErrorDumpFunctionCronExpression, '' ] ]
-  HasLambdaPaperErrorInCoreAccountCronExp: !And [ !Condition HasCronExpressionLambdaPaperError, !Condition IsCoreAccount ]
+  HasCronExpressionLambdaPnSupportDynamoDBInCoreAccount: !And [!Not [!Equals [!Ref LambdaPnSupportExportDynamoDbCronExpression, '']], !Equals [!Ref PnCoreAwsAccountId, '']]
+  HasCronExpressionLambdaPnSupportSqsInCoreAccount: !And [!Not [!Equals [!Ref LambdaPnSupportExportSqsCronExpression, '']], !Equals [!Ref PnCoreAwsAccountId, '']]
 
 Resources:
   
@@ -129,6 +138,12 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256         
+        
           
   DataMonitoringBucketPolicy:
     Condition: IsConfinfoAccount
@@ -690,7 +705,7 @@ Resources:
             Resource:
             - !Sub "arn:${AWS::Partition}:events:eu-central-1:${AWS::AccountId}:event-bus/default"
 
-  PaperRequestErrorDumpFunction:
+  LambdaPnSupportExport:
     Condition: IsCoreAccount
     Type: AWS::Lambda::Function
     Properties:
@@ -698,7 +713,7 @@ Resources:
       Timeout: 600
       MemorySize: 384
       Handler: index.lambda_handler
-      FunctionName: PaperRequestError-Dump-Lambda
+      FunctionName: !Sub pn-support-export-lambda-${EnvironmentType}
       Code:
         ZipFile: |
           import os
@@ -706,7 +721,6 @@ Resources:
           import csv
           import io
           from datetime import datetime
-          from email.message import EmailMessage
           from botocore.config import Config
 
           dynamodb = boto3.resource('dynamodb')
@@ -716,120 +730,177 @@ Resources:
               config=Config(s3={'addressing_style': 'virtual'})
           )
           sns = boto3.client('sns')
-          sts = boto3.client('sts')
+          sqs = boto3.client('sqs', region_name=os.environ['Region'])
 
           def lambda_handler(event, context):
-              dynamo_table_name = os.environ['DynamoDbTableLambdaDump']
+              dump_type = event.get('DumpType')
+              if not dump_type:
+                  raise ValueError("Error: missing 'DumpType' parameter in event. Must be 'DYNAMODB' or 'SQS'.")
+              dump_type = dump_type.upper()
+
               s3_bucket = os.environ['S3Bucket']
               prefix = os.environ['Prefix']
               region = os.environ['Region']
-              accountid = os.environ['AccountID']
-              category_filter = 'RENDICONTAZIONE_SCARTATA'
-              delete_items = os.environ.get('DeleteItems', 'false').lower() == 'true'
               sns_topic_arn = os.environ['SnsTopicArn']
-              presignedurltime = os.environ['PresignedUrlTime']
+              presignedurltime = int(os.environ['PresignedUrlTime'])
               timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-              timestampSubject = datetime.now().strftime('%Y-%m-%d')
-              s3_key = f'{prefix}/rendicontazione_scartata_{timestamp}.csv'
 
-              table = dynamodb.Table(dynamo_table_name)
-              all_items = []
-              exclusive_start_key = None
+              presigned_url = None
+              s3_key = None
+              subject = None
+              message = None
 
-              while True:
-                  scan_params = {
-                      'FilterExpression': 'category = :val',
-                      'ExpressionAttributeValues': {':val': category_filter}
-                  }
-                  if exclusive_start_key:
-                      scan_params['ExclusiveStartKey'] = exclusive_start_key
+              if dump_type == 'DYNAMODB':
+                  table_name = os.environ['DynamoDbTableLambdaDump']
+                  delete_items = os.environ.get('DeleteItems', 'false').lower() == 'true'
+                  category_filter = 'RENDICONTAZIONE_SCARTATA'
+                  table = dynamodb.Table(table_name)
 
-                  response = table.scan(**scan_params)
-                  all_items.extend(response.get('Items', []))
-                  exclusive_start_key = response.get('LastEvaluatedKey')
-                  if not exclusive_start_key:
-                      break
+                  print(f"Running DYNAMODB dump from table {table_name}")
+                  all_items = []
+                  exclusive_start_key = None
 
-              csv_buffer = io.StringIO()
-              if all_items:
-                  headers = all_items[0].keys()
-                  writer = csv.DictWriter(csv_buffer, fieldnames=headers)
-                  writer.writeheader()
-                  for item in all_items:
-                      writer.writerow(item)
+                  while True:
+                      scan_params = {
+                          'FilterExpression': 'category = :val',
+                          'ExpressionAttributeValues': {':val': category_filter}
+                      }
+                      if exclusive_start_key:
+                          scan_params['ExclusiveStartKey'] = exclusive_start_key
 
-              s3.put_object(
-                  Bucket=s3_bucket,
-                  Key=s3_key,
-                  Body=csv_buffer.getvalue()
-              )
+                      response = table.scan(**scan_params)
+                      all_items.extend(response.get('Items', []))
+                      exclusive_start_key = response.get('LastEvaluatedKey')
+                      if not exclusive_start_key:
+                          break
 
-              presigned_url = s3.generate_presigned_url(
-                  ClientMethod='get_object',
-                  Params={
-                      'Bucket': s3_bucket,
-                      'Key': s3_key,
-                      'ResponseContentDisposition': 'inline'
-                  },
-                  ExpiresIn=presignedurltime
-              )
+                  if all_items:
+                      csv_buffer = io.StringIO()
+                      headers = all_items[0].keys()
+                      writer = csv.DictWriter(csv_buffer, fieldnames=headers)
+                      writer.writeheader()
+                      for item in all_items:
+                          writer.writerow(item)
+
+                      s3_key = f"{prefix}/CSV_{table_name}_{timestamp}.csv"
+                      s3.put_object(Bucket=s3_bucket, Key=s3_key, Body=csv_buffer.getvalue())
+
+                      presigned_url = s3.generate_presigned_url(
+                          ClientMethod='get_object',
+                          Params={'Bucket': s3_bucket, 'Key': s3_key},
+                          ExpiresIn=presignedurltime
+                      )
+
+                  if delete_items:
+                      for item in all_items:
+                          try:
+                              table.delete_item(Key={'requestId': item['requestId'], 'created': item['created']})
+                          except Exception as e:
+                              print(f"Error deleting item {item}: {e}")
+
+                  subject = f"CSV RENDICONTAZIONE SCARTATA {timestamp}"
+                  message = f"DYNAMODB dump completed.\n\nCSV file: {presigned_url if presigned_url else 'No data found.'}"
+
+              elif dump_type == 'SQS':
+                  queue_name = os.environ['SqsDumpQueueName']
+                  visibility_timeout = int(os.environ.get('SqsDumpVisibilityTimeout', '5'))
+
+                  try:
+                      queue_url = sqs.get_queue_url(QueueName=queue_name)['QueueUrl']
+                  except Exception as e:
+                      print(f"Error getting URL for queue {queue_name}: {e}")
+                      queue_url = None
+
+                  all_messages = []
+                  if queue_url:
+                      print(f"Reading messages from queue: {queue_name}")
+                      while True:
+                          response = sqs.receive_message(
+                              QueueUrl=queue_url,
+                              MaxNumberOfMessages=10,
+                              VisibilityTimeout=visibility_timeout,
+                              WaitTimeSeconds=1
+                          )
+                          msgs = response.get('Messages', [])
+                          if not msgs:
+                              break
+
+                          for m in msgs:
+                              all_messages.append({
+                                  'MessageId': m['MessageId'],
+                                  'Body': m['Body']
+                              })
+
+                      print(f"Found {len(all_messages)} messages.")
+
+                      if all_messages:
+                          csv_buffer = io.StringIO()
+                          writer = csv.DictWriter(csv_buffer, fieldnames=all_messages[0].keys())
+                          writer.writeheader()
+                          for msg in all_messages:
+                              writer.writerow(msg)
+
+                          safe_queue_name = queue_name.replace('/', '_')
+                          s3_key = f"{prefix}/CSV_{safe_queue_name}_{timestamp}.csv"
+                          s3.put_object(Bucket=s3_bucket, Key=s3_key, Body=csv_buffer.getvalue())
+
+                          presigned_url = s3.generate_presigned_url(
+                              ClientMethod='get_object',
+                              Params={'Bucket': s3_bucket, 'Key': s3_key},
+                              ExpiresIn=presignedurltime
+                          )
+
+                  subject = f"CSV {queue_name} {timestamp}"
+                  message = (
+                      f"SQS dump completed.\n\n"
+                      f"Messages found: {len(all_messages)}\n"
+                      f"CSV file: {presigned_url if presigned_url else 'No messages available.'}"
+                  )
+
+              else:
+                  raise ValueError("Error: invalid 'DumpType' parameter. Must be 'DYNAMODB' or 'SQS'.")
 
               sns.publish(
                   TopicArn=sns_topic_arn,
-                  Subject=f'CSV Rendicontazione Scartata {timestampSubject}',
-                  Message=f"In allegato il link per scaricare il file CSV:\n\n{presigned_url}"
+                  Subject=subject,
+                  Message=message
               )
-
-              if delete_items:
-                  for item in all_items:
-                      request_id = item.get('requestId')
-                      created = item.get('created')
-                      if request_id and created:
-                          try:
-                              response = table.delete_item(
-                                  Key={
-                                      'requestId': request_id,
-                                      'created': created
-                                  }
-                              )
-                              print(f"Deleted item with requestId: {request_id} and created: {created}")
-                          except Exception as e:
-                              print(f'Error During cancellation of item {request_id}: {str(e)}')    
 
               return {
                   'statusCode': 200,
-                  'body': f'CSV with {len(all_items)} records uploaded on s3://{s3_bucket}/{s3_key} and link send by Email.'
+                  'body': message
               }
-
-
 
       Environment:
         Variables:
           DynamoDbTableLambdaDump: pn-PaperRequestError
           S3Bucket: !Ref DataMonitoringBucket
-          Prefix: PaperRequestError-Dump-Lambda
-          DeleteItems: !Ref PaperRequestErrorDumpFunctionDelete
+          Prefix: LambdaPnSupport-Export
+          DeleteItems: !Ref LambdaPnSupportExportDelete
           SnsTopicArn: !Ref DataAnalysisTopic
           Region: !Ref AWS::Region
           AccountID: !Ref AWS::AccountId
-          PresignedUrlTime: !Ref PresignedUrlTimeOfexpiration
+          PresignedUrlTime: !Ref LambdaPnSupportExportPresignedUrlTimeOfexpiration
+          SqsDumpQueueName: pn-external_channel_to_paper_channel_dry_run-DLQ
+          SqsDumpVisibilityTimeoutInSeconds: !Ref LambdaPnSupportExportSqsVisibilityTimeoutInSeconds
+
 
       Role:
         Fn::GetAtt:
-          - PaperRequestErrorDumpFunctionRole
+          - LambdaPnSupportExportRole
           - Arn
 
-  PaperRequestErrorDumpFunctionAlarms:
+  LambdaPnSupportExportAlarms:
     Condition: IsCoreAccount
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
       Parameters:
-        FunctionName: !Ref PaperRequestErrorDumpFunction
+        FunctionName: !Ref LambdaPnSupportExport
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         FilterPattern: "ERROR"
 
-  PaperRequestErrorDumpFunctionRole:
+  LambdaPnSupportExportRole:
     Condition: IsCoreAccount
     Type: AWS::IAM::Role
     Properties:
@@ -841,7 +912,7 @@ Resources:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: ExportPolicy
+        - PolicyName: LambdaPnSupportExportPolicy
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -855,7 +926,7 @@ Resources:
                   - s3:PutObject
                   - s3:GetObject
                 Resource:
-                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/PaperRequestError-Dump-Lambda/*
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/LambdaPnSupport-Export/*
               - Effect: Allow
                 Action:
                   - logs:CreateLogStream
@@ -869,6 +940,11 @@ Resources:
                 Action:
                   - sns:Publish
                 Resource: !Ref DataAnalysisTopic
+              - Effect: Allow
+                Action:
+                  - sqs:GetQueueUrl
+                  - sqs:ReceiveMessage
+                Resource: !Sub  arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:pn-external_channel_to_paper_channel_dry_run-DLQ
 
   DataAnalysisTopic:
     Condition: IsCoreAccount
@@ -900,33 +976,61 @@ Resources:
             Action: sns:Publish
             Resource: !Ref DataAnalysisTopic
 
-  ScheduleErrorDumpFunction:
-    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+  ScheduleExportDynamoDb:
+    Condition: HasCronExpressionLambdaPnSupportDynamoDBInCoreAccount
     Type: AWS::Events::Rule
     Properties:
-      ScheduleExpression: !Ref PaperRequestErrorDumpFunctionCronExpression
+      ScheduleExpression: !Ref LambdaPnSupportExportDynamoDbCronExpression
       State: ENABLED
       Targets:
-        - Arn: !GetAtt PaperRequestErrorDumpFunction.Arn
-          Id: PaperRequestErrorDumpFunction
+        - Arn: !GetAtt LambdaPnSupportExport.Arn
+          Id: LambdaPnSupportExportDynamoDb
+          Input: |
+            {
+              "DumpType": "DYNAMODB"
+            }
+    
+  ScheduleExportSqs:
+    Condition: HasCronExpressionLambdaPnSupportSqsInCoreAccount
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: !Ref LambdaPnSupportExportSqsCronExpression
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaPnSupportExport.Arn
+          Id: LambdaPnSupportExportSqs
+          Input: |
+            {
+              "DumpType": "SQS"
+            }
 
-  PermissionForEventsToInvokeErrorDumpFunction:
-    Condition: HasLambdaPaperErrorInCoreAccountCronExp
+  PermissionForEventsToInvokeLambdaPnSupportExportDB:
+    Condition: HasCronExpressionLambdaPnSupportDynamoDBInCoreAccount
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref PaperRequestErrorDumpFunction
+      FunctionName: !Ref LambdaPnSupportExport
       Principal: events.amazonaws.com
-      SourceArn: !GetAtt ScheduleErrorDumpFunction.Arn
+      SourceArn: !GetAtt ScheduleExportDynamoDb.Arn
       SourceAccount: !Ref AWS::AccountId
 
-  ErrorDumpFunctionLogroup:
+  PermissionForEventsToInvokeLambdaPnSupportExportSQS:
+    Condition: HasCronExpressionLambdaPnSupportSqsInCoreAccount
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaPnSupportExport
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ScheduleExportSqs.Arn
+      SourceAccount: !Ref AWS::AccountId
+
+  LambdaPnSupportExportLogroup:
     Condition: IsCoreAccount
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
     UpdateReplacePolicy : Delete
     Properties:
-      LogGroupName: !Sub "/aws/lambda/${PaperRequestErrorDumpFunction}"
+      LogGroupName: !Sub "/aws/lambda/${LambdaPnSupportExport}"
       RetentionInDays: 3
      
 Outputs:

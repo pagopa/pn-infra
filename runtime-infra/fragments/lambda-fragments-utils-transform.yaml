@@ -80,6 +80,7 @@ Resources:
       FunctionName: !GetAtt DynamicEnvVariablesFunction.Arn
       Principal: "cloudformation.amazonaws.com"
       SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*"
 
   ###########
   DynamicTagListMacro:
@@ -160,3 +161,4 @@ Resources:
       FunctionName: !GetAtt DynamicTagFunction.Arn
       Principal: "cloudformation.amazonaws.com"
       SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*"
