@@ -98,6 +98,9 @@ Resources:
         EnforceWorkGroupConfiguration: false
         ResultConfiguration:
           OutputLocation: !Sub s3://${AthenaResultsBucket}/
+#          EncryptionConfiguration:
+#            EncryptionOption: SSE_KMS
+#            KmsKey: !Ref LogsBucketKmsKeyArn
 
   GlueDatabase:
     Type: AWS::Glue::Database
