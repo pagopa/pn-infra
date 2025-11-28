@@ -38,6 +38,20 @@ Parameters:
     Type: String
     Default: 'cron(0 1 * * ? *)'
     Description: Schedule expression for Data Lake count export. Default runs daily at 01:00 UTC
+  AthenaReportingAlertsConfigGitUrl:
+    Type: String
+    Default: ''
+    Description: >
+      Git raw content URL with embedded commit SHA for Athena reporting and alerts config JSON.
+      Example: https://raw.githubusercontent.com/pagopa/pn-infra/abc123def456.../runtime-infra/athena/reporting-alerts-config.json
+  AthenaReportingAlertsSlackEmail:
+    Type: String
+    Default: ''
+    Description: 'Slack channel email address for Athena reporting and alerts notifications. Format: channel-name@workspace.slack.com'
+  AthenaReportingAlertsSchedulerRate:
+    Type: String
+    Default: 'rate(1 minute)'
+    Description: Schedule rate for Reporting Alerts Scheduler reconciliation loop. Default is 1 minute.
 
 Resources:
   GlueServiceRole:
@@ -617,8 +631,276 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt DataLakeCountExport.Arn
       Principal: scheduler.amazonaws.com
-      SourceArn: !GetAtt DataLakeCountExportSchedule.Arn
-      SourceAccount: !Ref AWS::AccountId
+
+  ###############################################################################
+  ###                ATHENA REPORTING ALERTS - SNS TOPIC                      ###
+  ###############################################################################
+
+  AthenaReportingAlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub ${ProjectName}-athena-reporting-alerts
+      DisplayName: Athena Reporting and Alerts Notifications
+
+  AthenaReportingAlertsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Ref AthenaReportingAlertsSlackEmail
+      TopicArn: !Ref AthenaReportingAlertsTopic
+
+  ###############################################################################
+  ###        ATHENA REPORTING ALERTS SCHEDULER LAMBDA                         ###
+  ###############################################################################
+
+  ReportingAlertsSchedulerLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-AthenaReportingAlertsScheduler
+        LogGroupRetention: 14
+        LogGroupPrefix: /aws/lambda
+
+  ReportingAlertsSchedulerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-AthenaReportingAlertsSchedulerLambdaRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ManageEventBridgeSchedules
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ListAndGetSchedules
+                Effect: Allow
+                Action:
+                  - scheduler:ListSchedules
+                  - scheduler:GetSchedule
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    'aws:ResourceAccount': !Ref AWS::AccountId
+              - Sid: ManageSchedules
+                Effect: Allow
+                Action:
+                  - scheduler:CreateSchedule
+                  - scheduler:UpdateSchedule
+                  - scheduler:DeleteSchedule
+                Resource: !Sub arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${ProjectName}-athena-reporting-alerts/*
+              - Sid: PassSchedulerRole
+                Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt ReportingAlertsScheduleExecutionRole.Arn
+                Condition:
+                  StringEquals:
+                    'iam:PassedToService': scheduler.amazonaws.com
+
+  ReportingAlertsSchedulerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !GetAtt ReportingAlertsSchedulerLogGroup.Outputs.LogGroupNameNoPrefix
+      Description: Manages EventBridge Schedules dynamically for reporting and alerts queries
+      Runtime: python3.12
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 300
+      Role: !GetAtt ReportingAlertsSchedulerLambdaRole.Arn
+      Environment:
+        Variables:
+          CONFIG_GIT_URL: !Ref AthenaReportingAlertsConfigGitUrl
+          REPORTING_ALERTS_ARN: !GetAtt ReportingAlertsLambda.Arn
+          SCHEDULE_ROLE_ARN: !GetAtt ReportingAlertsScheduleExecutionRole.Arn
+          SCHEDULE_GROUP_NAME: !Sub ${ProjectName}-athena-reporting-alerts
+          PROJECT_NAME: !Ref ProjectName
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/athena-reporting-alerts-scheduler.zip
+      LoggingConfig:
+        LogGroup: !GetAtt ReportingAlertsSchedulerLogGroup.Outputs.LogGroupName
+
+  ReportingAlertsSchedulerAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml
+      Parameters:
+        FunctionName: !Ref ReportingAlertsSchedulerLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  ReportingAlertsSchedulerTriggerRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub ${ProjectName}-athena-reporting-alerts-scheduler-trigger
+      Description: Triggers Reporting Alerts Scheduler for reconciliation
+      ScheduleExpression: !Ref AthenaReportingAlertsSchedulerRate
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt ReportingAlertsSchedulerLambda.Arn
+          Id: reporting-alerts-scheduler-target
+
+  ReportingAlertsSchedulerTriggerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt ReportingAlertsSchedulerLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ReportingAlertsSchedulerTriggerRule.Arn
+
+  ###############################################################################
+  ###             ATHENA REPORTING ALERTS LAMBDA                              ###
+  ###############################################################################
+
+  ReportingAlertsLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-AthenaReportingAlerts
+        LogGroupRetention: 14
+        LogGroupPrefix: /aws/lambda
+
+  ReportingAlertsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-AthenaReportingAlertsRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: AthenaQueryExecution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: GlueCatalogAccess
+                Effect: Allow
+                Action:
+                  - glue:GetTable
+                  - glue:GetDatabase
+                Resource:
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabase}
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabase}/*
+              - Sid: AthenaExecution
+                Effect: Allow
+                Action:
+                  - athena:StartQueryExecution
+                  - athena:GetQueryExecution
+                  - athena:GetQueryResults
+                Resource: !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${AthenaWorkGroup}
+              - Sid: AthenaResultsBucketAccess
+                Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource:
+                  - !Sub arn:aws:s3:::${AthenaResultsBucket}
+                  - !Sub arn:aws:s3:::${AthenaResultsBucket}/*
+              - Sid: LogsBucketReadAccess
+                Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${LogsBucketName}
+                  - !Sub arn:aws:s3:::${LogsBucketName}/*
+              - Sid: CSVExportAccess
+                Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub arn:aws:s3:::${AthenaResultsBucket}/athena_query_results/*
+              - Sid: KMSKeyAccess
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:Encrypt
+                  - kms:GenerateDataKey
+                Resource: !Ref LogsBucketKmsKeyArn
+              - Sid: PublishToSNS
+                Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref AthenaReportingAlertsTopic
+
+  ReportingAlertsLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !GetAtt ReportingAlertsLogGroup.Outputs.LogGroupNameNoPrefix
+      Description: Executes Athena reporting and alerts queries with CSV export and Slack notifications
+      Runtime: python3.12
+      Handler: index.handler
+      MemorySize: 512
+      Timeout: 900
+      Role: !GetAtt ReportingAlertsRole.Arn
+      Environment:
+        Variables:
+          CONFIG_GIT_URL: !Ref AthenaReportingAlertsConfigGitUrl
+          OUTPUT_S3_BUCKET: !Ref AthenaResultsBucket
+          CSV_S3_PREFIX: athena_query_results
+          ATHENA_RESULTS_BUCKET: !Ref AthenaResultsBucket
+          ATHENA_DATABASE: !Ref GlueDatabase
+          ATHENA_WORKGROUP: !Ref AthenaWorkGroup
+          SNS_TOPIC_ARN: !Ref AthenaReportingAlertsTopic
+          MAX_WORKERS: "10"
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/athena-reporting-alerts.zip
+      LoggingConfig:
+        LogGroup: !GetAtt ReportingAlertsLogGroup.Outputs.LogGroupName
+
+  ReportingAlertsAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml
+      Parameters:
+        FunctionName: !Ref ReportingAlertsLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  ###############################################################################
+  ###            SCHEDULER EXECUTION ROLE & SCHEDULE GROUP                    ###
+  ###############################################################################
+
+  ReportingAlertsScheduleExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-AthenaReportingAlertsScheduleExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt ReportingAlertsLambda.Arn
+
+  ReportingAlertsScheduleGroup:
+    Type: AWS::Scheduler::ScheduleGroup
+    Properties:
+      Name: !Sub ${ProjectName}-athena-reporting-alerts
 
   DataLakeCountExportAlarms:
     Type: AWS::CloudFormation::Stack

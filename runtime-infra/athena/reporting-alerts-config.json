@@ -1,0 +1,41 @@
+{
+  "queries": {
+    "daily-notifications-status-report": {
+      "type": "export",
+      "description": "EXAMPLE: Daily report of notification status counts",
+      "schedule": "cron(0 2 * * ? *)",
+      "query": "SELECT paid, date(date_parse(timestamp, '%Y-%m-%dT%H:%i:%s.%fZ')) AS event_day, COUNT(DISTINCT CASE WHEN timelineelementid LIKE '%VALIDATE_NORMALIZE%' THEN iun END) as takenincharge, COUNT(DISTINCT CASE WHEN timelineelementid LIKE '%REQUEST_ACCEPTED%' THEN iun END) as accepted, COUNT(DISTINCT CASE WHEN timelineelementid LIKE '%REQUEST_REFUSED%' THEN iun END) as refused FROM cdc_analytics_database.pn_timelines_json_view WHERE p_year = '{YEAR}' AND p_month = '{MONTH}' AND (timelineelementid LIKE '%VALIDATE_NORMALIZE%' OR timelineelementid LIKE '%REQUEST_ACCEPTED%' OR timelineelementid LIKE '%REQUEST_REFUSED%') GROUP BY paid, date(date_parse(timestamp, '%Y-%m-%dT%H:%i:%s.%fZ')) ORDER BY paid, event_day",
+      "slack": {
+        "enabled": true
+      }
+    },
+    
+    "high-refused-notifications-alert": {
+      "type": "alerts",
+      "description": "EXAMPLE: Alert when refused notifications count exceeds threshold",
+      "schedule": "cron(0 */6 * * ? *)",
+      "query": "SELECT paid, COUNT(DISTINCT iun) as refused_count FROM cdc_analytics_database.pn_timelines_json_view WHERE p_year = '{YEAR}' AND p_month = '{MONTH}' AND timelineelementid LIKE '%REQUEST_REFUSED%' GROUP BY paid",
+      "alerts": [
+        {
+          "name": "critical-refused-rate",
+          "threshold": {
+            "operator": ">",
+            "value": 2
+          },
+          "csv_export": true
+        },
+        {
+          "name": "warning-refused-rate",
+          "threshold": {
+            "operator": ">",
+            "value": 2
+          },
+          "csv_export": false
+        }
+      ],
+      "slack": {
+        "enabled": true
+      }
+    }
+  }
+}
