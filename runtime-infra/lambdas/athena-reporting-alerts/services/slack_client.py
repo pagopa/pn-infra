@@ -16,14 +16,14 @@ Date: {execution_date}
 Total Records: {total_rows}
 
 S3 Path: {s3_path}
-Download CSV (valid 24h): {presigned_url}
+Download Report: <{presigned_url}|Click here to download CSV> (valid 24h)
 
 Executed at: {timestamp}"""
 
 
 def build_alert_message(query_id, alert_name, alert_count, threshold, operator, s3_path, presigned_url, execution_date, timestamp):
     """Build standard message for alert mode"""
-    csv_section = f"\nS3 Path: {s3_path}\nDownload CSV (valid 24h): {presigned_url}" if s3_path != 'N/A' else ""
+    csv_section = f"\nS3 Path: {s3_path}\nDownload Report: <{presigned_url}|Click here to download CSV> (valid 24h)" if s3_path != 'N/A' else ""
     
     return f"""Athena Reporting - ALERT Triggered
 
