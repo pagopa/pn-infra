@@ -68,14 +68,14 @@ def export_results_to_csv(query_id, results, execution_date, alert_name=None):
         
         s3_path = f"s3://{OUTPUT_S3_BUCKET}/{s3_key}"
         
-        # Generate presigned URL (valid for 24 hours)
+        # Generate presigned URL (valid for 3 days)
         presigned_url = s3.generate_presigned_url(
             'get_object',
             Params={
                 'Bucket': OUTPUT_S3_BUCKET,
                 'Key': s3_key
             },
-            ExpiresIn=86400  # 24 hours
+            ExpiresIn=259200  # 3 days (72 hours)
         )
         
         logger.info(f"CSV exported successfully to: {s3_path}")
