@@ -66,6 +66,7 @@ Resources:
       FunctionName: !GetAtt GenerateCdcViewFunction.Arn
       Principal: "cloudformation.amazonaws.com"
       SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*"
   
   GenerateCdcViewFunction:
     Type: AWS::Lambda::Function

@@ -165,6 +165,12 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256        
+                 
   # - Webapp S3 Bucket policy
   S3BucketForWebsiteContentPolicy:
     Type: AWS::S3::BucketPolicy

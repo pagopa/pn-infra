@@ -51,6 +51,7 @@ Resources:
       FunctionName: !GetAtt GenerateLBPriorityIdFunction.Arn
       Principal: "cloudformation.amazonaws.com"
       SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*"
   
   GenerateLBPriorityIdFunction:
     Type: AWS::Lambda::Function

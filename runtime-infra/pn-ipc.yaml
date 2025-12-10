@@ -280,6 +280,9 @@ Parameters:
   BackupCronExpression:
     Type: String
 
+  BackupLifecycleDeleteAfterDays:
+    Type: Number
+
   ApplicationLoadBalancerMetricsDimensionName:
     Type: String
     Default: ''
@@ -776,23 +779,6 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub '${ProjectName}-f24_to_paperchannel'
-        DelaySeconds: 1
-        VisibilityTimeout: 60
-        MaxReceiveCount: 10        
-        AlarmSNSTopicName: !Ref AlarmSNSTopicName
-      Tags:
-        - Key: "Microservice"
-          Value: "pn-paper-channel"
-
-  ### Communication FROM pn-f24 TO pn-paper-channel ###
-  RaddAltToPaperChannelQueue:
-    Type: AWS::CloudFormation::Stack
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain      
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
-      Parameters:
-        QueueName: !Sub '${ProjectName}-raddalt_to_paperchannel'
         DelaySeconds: 1
         VisibilityTimeout: 60
         MaxReceiveCount: 10        
@@ -1437,23 +1423,6 @@ Outputs:
   #   Value: !GetAtt F24ToPaperChannelQueue.Outputs.SqsAgeAlarmArn
   #   Description: f24-to-paperchannel queue age alarm ARN
 
-  # Radd Alt to Paper Channel events
-  RaddAltToPaperChannelQueueName:
-    Value: !GetAtt RaddAltToPaperChannelQueue.Outputs.QueueName
-    Description: raddalt-to-paperchannel queue name
-  RaddAltToPaperChannelQueueURL:
-    Value: !GetAtt RaddAltToPaperChannelQueue.Outputs.QueueURL
-    Description: raddalt-to-paperchannel queue URL
-  RaddAltToPaperChannelQueueARN:
-    Value: !GetAtt RaddAltToPaperChannelQueue.Outputs.QueueARN
-    Description: radd-alt-to-paperchannel queue ARN
-  # RaddAltToPaperChannelQueueAlarmARN:
-  #   Value: !GetAtt RaddAltToPaperChannelQueue.Outputs.SqsDLQAlarmArn
-  #   Description: raddalt-to-paperchannel queue alarm ARN
-  # RaddAltToPaperChannelQueueAgeAlarmARN:
-  #   Value: !GetAtt RaddAltToPaperChannelQueue.Outputs.SqsAgeAlarmArn
-  #   Description: raddalt-to-paperchannel queue age alarm ARN
-
   # pn-paperchannel_to_delayer
   PaperChannelToDelayerQueueName:
     Value: !GetAtt PaperChannelToDelayerQueue.Outputs.QueueName
@@ -1642,6 +1611,8 @@ Outputs:
     Value: !Ref ExternalChannelBaseUrl
   BackupCronExpression:
     Value: !Ref BackupCronExpression
+  BackupLifecycleDeleteAfterDays:
+    Value: !Ref BackupLifecycleDeleteAfterDays
   # LogRetention:
   #   Value: !Ref LogRetention
   ApplicationLoadBalancerMetricsDimensionName:

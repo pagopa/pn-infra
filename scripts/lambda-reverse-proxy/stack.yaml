@@ -214,6 +214,10 @@ Resources:
               return path.toLowerCase().indexOf('/digital-deliveries/')>0;
           }
 
+          function isNotificationReworkPath(path){
+              return path.toLowerCase().indexOf('/paper-request-metadata/')>0;
+          }
+
           function isPaperDeliveriesPath(path){
               return path.toLowerCase().indexOf('/paper-deliveries-engagements')>0;
           }
@@ -472,7 +476,13 @@ Resources:
                     } else if(isPaperDeliveriesPath(path)) {
                         return forwardRequest(event, process.env.ExternalChannelBaseUrl)
                     }
-                } 
+                }
+                if(httpMethod=='PATCH'){
+                    console.debug('[EC] - Call PATCH')
+                    if(isNotificationReworkPath(path)) {
+                        return forwardRequest(event, process.env.ExternalChannelBaseUrl)
+                    }
+                }
                 return forwardRequest(event, defaultUrl)
               } 
 
