@@ -642,7 +642,7 @@ Resources:
     Type: AWS::Events::Rule
     Condition: HasDynamoDbExportTableNames
     Properties:
-      ScheduleExpression: cron(0 5 * * ? *)
+      ScheduleExpression: cron(0 1 * * ? *)
       State: ENABLED
       Targets:
         - Arn: !GetAtt DynamoDbExportFunction.Arn
