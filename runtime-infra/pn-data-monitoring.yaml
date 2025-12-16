@@ -1144,6 +1144,9 @@ Resources:
     Properties:
       ScheduleExpression: !Ref QuickSightDataImportLambdaCronExpression
       State: !Ref QuickSightDataImportLambdaScheduleState
+      Targets:
+        - Arn: !GetAtt QuickSightDataImportLambda.Arn
+          Id: QuickSightDataImportLambdaTarget
 
   InvokeQuickSightDataImportLambdaPermission:
     Condition: HasQuickSightDataImportLambdaScheduleStateEnabled
