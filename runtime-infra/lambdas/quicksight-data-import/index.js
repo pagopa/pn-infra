@@ -1,11 +1,9 @@
 const { uploadFileToS3 } = require("./lib/s3");
 const { scanRequest } = require("./lib/dynamo");
-const fs = require('fs');
 const { unmarshall } = require("@aws-sdk/util-dynamodb");
-const path = require('path');
 
-async function writeInFile(result, filename ) {
-  fs.mkdirSync("result", { recursive: true });
+
+async function prepareDataObject(result ) {
   const delimiter = ';' // Using semicolon as delimiter
   const headers = Object.keys(unmarshall(result[0]))
   let str = ''
@@ -18,11 +16,10 @@ async function writeInFile(result, filename ) {
     }
     str += row.join(delimiter) + '\n'
   }
-  fs.writeFileSync(`result/${filename}.json`, str, 'utf-8')
-  return `result/${filename}.json`
+  return str
 }
 
-async function _exportDynamoTableData(tableName, json = true) {
+async function _exportDynamoTableData(tableName) {
   let first = true;
   var results = []
   var lastEvaluatedKey = null
@@ -37,9 +34,9 @@ async function _exportDynamoTableData(tableName, json = true) {
     }
     results = results.concat(res.Items);
   }
-  const filePath = await writeInFile(results, `${tableName}`)
-  console.log('Sono stati memorizzati n° ' + results.length + ' elementi.');
-  return filePath;
+  const data = await prepareDataObject(results);
+  console.log('Sono stati recuperati n° ' + results.length + ' elementi.');
+  return data;
 }
 
 const handler = async (event) => {
@@ -56,8 +53,8 @@ const handler = async (event) => {
 
   for (const tableName of tableNames) {
     console.log("Esportazione dati tabella DynamoDB: " + tableName);
-    const filePath = await _exportDynamoTableData(tableName.trim(), false);
-    await uploadFileToS3(bucketName, `QuickSightDataImport/${tableName}/${tableName}.json`, filePath)
+    const results = await _exportDynamoTableData(tableName.trim());
+    await uploadFileToS3(bucketName, `QuickSightDataImport/${tableName}/${tableName}.csv`, results)
     console.log("Esportazione dati tabella DynamoDB completata: " + tableName);
   }
 
