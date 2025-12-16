@@ -1062,7 +1062,6 @@ Resources:
       RetentionInDays: 3
 
   QuickSightDataImportLambda:
-    Condition: IsCoreAccount
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.12
@@ -1083,6 +1082,7 @@ Resources:
           - Arn
 
   QuickSightDataImportLambdaAlarms:
+  DependsOn: QuickSightDataImportLambda
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
