@@ -115,6 +115,16 @@ Parameters:
     Type: String
     Default: ''
 
+  LambdasBucketName:
+    Type: String
+    Description: S3 bucket name containing Lambda deployment packages
+
+  LambdasBasePath:
+    Type: String
+    Description: S3 key prefix for Lambda deployment packages
+  
+  
+
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
@@ -1033,6 +1043,100 @@ Resources:
     Properties:
       LogGroupName: !Sub "/aws/lambda/${LambdaPnSupportExport}"
       RetentionInDays: 3
+
+  QuickSightDataImportLambda:
+    Condition: IsCoreAccount
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Timeout: 300
+      MemorySize: 512
+      Handler: index.handler
+      FunctionName: quicksight-data-import-lambda
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/quicksight-data-import.zip
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAMES: !Ref QuickSightTableNames
+          MONITORING_BUCKET_NAME: !Ref DataMonitoringBucket
+      Role:
+        Fn::GetAtt:
+          - QuickSightDataImportLambdaRole
+          - Arn
+
+  QuickSightDataImportLambdaAlarms:
+    Condition: IsCoreAccount
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref QuickSightDataImportLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        FilterPattern: "ERROR"
+
+  QuickSightDataImportLambdaRole:
+    Condition: IsCoreAccount
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: QuickSightDataImportLambdaPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Scan
+                Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/*
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource:
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/QuickSightDataImport/*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !!Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/quicksight-data-import-lambda:*
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                Resource: "*"
+
+  QuickSightDataImportLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Ref QuickSightDataImportLambda
+        LogGroupRetention: 14
+        LogGroupPrefix: /aws/lambda
+
+  ScheduleQuickSightDataImport:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: !Ref QuickSightDataImportLambdaCronExpression
+      State: !Ref QuickSightDataImportLambdaScheduleState
+
+  InvokeQuickSightDataImportLambdaPermission:
+    Condition: HasCronExpressionLambdaPnSupportDynamoDBInCoreAccount
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref QuickSightDataImportLambda
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ScheduleQuickSightDataImport.Arn
+      SourceAccount: !Ref AWS::AccountId
      
 Outputs:
   DataMonitoringBucketName: 
