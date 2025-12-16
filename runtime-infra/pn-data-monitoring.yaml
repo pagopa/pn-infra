@@ -123,6 +123,10 @@ Parameters:
     Type: String
     Description: S3 key prefix for Lambda deployment packages
   
+  QuickSightTableNames:
+    Type: String
+    Description: Comma separated QuickSight Table Names to import
+    Default: ''
   
 
 Conditions:
@@ -1066,7 +1070,6 @@ Resources:
           - Arn
 
   QuickSightDataImportLambdaAlarms:
-    Condition: IsCoreAccount
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
@@ -1076,7 +1079,6 @@ Resources:
         FilterPattern: "ERROR"
 
   QuickSightDataImportLambdaRole:
-    Condition: IsCoreAccount
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -1105,7 +1107,7 @@ Resources:
                 Action:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: !!Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/quicksight-data-import-lambda:*
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/quicksight-data-import-lambda:*
               - Effect: Allow
                 Action:
                   - kms:Decrypt
