@@ -131,7 +131,7 @@ Parameters:
   QuickSightDataImportLambdaCronExpression:
     Type: String
     Description: Cron expression for the QuickSight Data Import Lambda scheduled rule, e.g. cron(0 7 ? * 3 *)
-    Default: ''
+    Default: 'cron(0 7 ? * 3 *)'
   
   QuickSightDataImportLambdaScheduleState:
     Type: String
@@ -151,6 +151,7 @@ Conditions:
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
   HasCronExpressionLambdaPnSupportDynamoDBInCoreAccount: !And [!Not [!Equals [!Ref LambdaPnSupportExportDynamoDbCronExpression, '']], !Equals [!Ref PnCoreAwsAccountId, '']]
   HasCronExpressionLambdaPnSupportSqsInCoreAccount: !And [!Not [!Equals [!Ref LambdaPnSupportExportSqsCronExpression, '']], !Equals [!Ref PnCoreAwsAccountId, '']]
+  HasQuickSightDataImportLambdaScheduleStateEnabled: !Not [ !Equals [!Ref QuickSightDataImportLambdaScheduleState, 'DISABLED' ] ]
 
 Resources:
   
@@ -1138,13 +1139,14 @@ Resources:
         LogGroupPrefix: /aws/lambda
 
   ScheduleQuickSightDataImport:
+    Condition: HasQuickSightDataImportLambdaScheduleStateEnabled
     Type: AWS::Events::Rule
     Properties:
       ScheduleExpression: !Ref QuickSightDataImportLambdaCronExpression
       State: !Ref QuickSightDataImportLambdaScheduleState
 
   InvokeQuickSightDataImportLambdaPermission:
-    Condition: HasCronExpressionLambdaPnSupportDynamoDBInCoreAccount
+    Condition: HasQuickSightDataImportLambdaScheduleStateEnabled
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction

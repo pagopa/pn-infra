@@ -9,6 +9,7 @@ async function uploadFileToS3(bucketName, key, body) {
         Bucket: bucketName,
         Key: key, // required
         Body: body,
+        ContentType: "text/csv; charset=utf-8"
     };
     const command = new PutObjectCommand(input);
     const response = await s3Client.send(command);
