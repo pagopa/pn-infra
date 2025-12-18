@@ -804,7 +804,7 @@ Resources:
 
               elif dump_type == 'SQS':
                   queue_name = os.environ['SqsDumpQueueName']
-                  visibility_timeout = int(os.environ.get('SqsDumpVisibilityTimeout', '5'))
+                  visibility_timeout = int(os.environ.get('SqsDumpVisibilityTimeoutInSeconds', '5'))
 
                   try:
                       queue_url = sqs.get_queue_url(QueueName=queue_name)['QueueUrl']
