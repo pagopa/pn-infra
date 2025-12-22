@@ -118,9 +118,11 @@ Parameters:
   LambdasBucketName:
     Type: String
     Description: S3 bucket name containing Lambda deployment packages
+    Default: ''
 
   LambdasBasePath:
     Type: String
+    Default: ''
     Description: S3 key prefix for Lambda deployment packages
   
   QuickSightTableNames:
@@ -151,7 +153,7 @@ Conditions:
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
   HasCronExpressionLambdaPnSupportDynamoDBInCoreAccount: !And [!Not [!Equals [!Ref LambdaPnSupportExportDynamoDbCronExpression, '']], !Equals [!Ref PnCoreAwsAccountId, '']]
   HasCronExpressionLambdaPnSupportSqsInCoreAccount: !And [!Not [!Equals [!Ref LambdaPnSupportExportSqsCronExpression, '']], !Equals [!Ref PnCoreAwsAccountId, '']]
-  HasQuickSightDataImportLambdaScheduleStateEnabled: !Not [ !Equals [!Ref QuickSightDataImportLambdaScheduleState, 'DISABLED' ] ]
+  HasQuickSightDataImportLambdaScheduleStateEnabled: !And [ !Condition IsCoreAccount, !Equals [!Ref QuickSightDataImportLambdaScheduleState, 'ENABLED' ] ]
 
 Resources:
   
@@ -1064,6 +1066,7 @@ Resources:
 
   QuickSightDataImportLambda:
     Type: AWS::Lambda::Function
+    Condition: IsCoreAccount
     Properties:
       Runtime: nodejs22.x
       Timeout: 300
@@ -1084,6 +1087,7 @@ Resources:
 
   QuickSightDataImportLambdaAlarms:
     DependsOn: QuickSightDataImportLambdaLogGroup
+    Condition: IsCoreAccount
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
@@ -1094,6 +1098,7 @@ Resources:
 
   QuickSightDataImportLambdaRole:
     Type: AWS::IAM::Role
+    Condition: IsCoreAccount
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -1129,6 +1134,7 @@ Resources:
 
   QuickSightDataImportLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
     UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
     Properties:
