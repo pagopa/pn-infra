@@ -1427,15 +1427,11 @@ Resources:
                             y_value = y_value+10
                         
 
-                    if 'LogsBucketName' in event["params"] or 'OpenSearchArn' in event["params"] or 'StorageWidgetFunction' in event["params"]:
+                    if 'OpenSearchArn' in event["params"] or 'StorageWidgetFunction' in event["params"]:
                         titleWidget = textSeparator('Storage', y_value)
                         dashboardList.append(titleWidget)
                         y_value = y_value+2
                         storage_x_value = 0
-                        if 'LogsBucketName' in event["params"] and event["params"]["LogsBucketName"]!='':
-                            theS3StorageWidget = s3StorageWidget(event["params"]["LogsBucketName"], "S3 Logs Bucket", 10, 6, storage_x_value, y_value, localRegion)
-                            dashboardList.append(theS3StorageWidget)
-                            storage_x_value = storage_x_value+6
 
                         if 'OpenSearchArn' in event["params"] and event["params"]["OpenSearchArn"]!='':
                             theOpenSearchStorageWidget = openSearchStorageWidget(event["params"]["OpenSearchArn"], "OpenSearch Free/Used Space", 10, 8, storage_x_value, y_value, localRegion)
