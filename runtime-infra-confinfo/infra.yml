@@ -659,51 +659,6 @@ Resources:
       OKActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
-  OncallDLQHasMessagesAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub 'oncall-${ProjectName}-ConfinfoEventBus-DLQ-HasMessage'
-      AlarmDescription: "CloudWatch alarm for when DLQ has 1 or more messages."
-      TreatMissingData: "notBreaching"
-      Threshold: 1
-      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
-      EvaluationPeriods: 5      
-      Metrics:
-        - Id: m1
-          MetricStat:
-            Metric:
-              Dimensions:
-                - Name: QueueName
-                  Value: !Sub '${EventBusDeadLetterQueue.QueueName}'
-              MetricName: NumberOfMessagesReceived
-              Namespace: AWS/SQS
-            Period: 60
-            Stat: Sum
-          ReturnData: False
-        - Id: m2
-          MetricStat:
-            Metric:
-              Dimensions:
-                - Name: EventBusName
-                  Value: !Sub '${ProjectName}-ConfinfoEventBus'
-              MetricName: MatchedEvents
-              Namespace: AWS/Events
-            Period: 60
-            Stat: Sum
-          ReturnData: False
-        - Id: t1
-          Expression: SUM(METRICS())
-          ReturnData: false
-        - Id: e1
-          Expression: !Sub IF(t1>0 AND m1/t1>${OncallDlqRatio}, 1, 0)
-          Label: !Sub "${ProjectName}-ConfinfoEventBus-HasDLQMessage-OnCall-Metric"         
-      AlarmActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      InsufficientDataActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-
 # SNS Subscription for SES log
   SnsSubscription:
       Type: AWS::SNS::Subscription
