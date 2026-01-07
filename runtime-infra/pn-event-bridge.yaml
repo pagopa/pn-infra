@@ -250,11 +250,6 @@ Parameters:
   AddressManagerToRaddAltQueueURL:
     Type: String
 
-  OncallDlqRatio:
-    Type: Number
-    Default: 0.1
-    Description: Wakeup alarm ratio between messages written to DLQ and messages read from queue
-
 Conditions:
   HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
   HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ]]
@@ -1319,48 +1314,6 @@ Resources:
       OKActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
-  # pn-infra-monitoring
-  OncallDLQHasMessagesAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub 'oncall-${ProjectName}-CoreEventBus-DLQ-HasMessage'
-      AlarmDescription: "CloudWatch alarm for when DLQ has 1 or more messages."
-      TreatMissingData: "notBreaching"
-      Threshold: 5
-      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
-      EvaluationPeriods: 30      
-      Metrics:
-        - Id: m1
-          MetricStat:
-            Metric:
-              Dimensions:
-                - Name: QueueName
-                  Value: !Sub '${EventBusDeadLetterQueue.QueueName}'
-              MetricName: NumberOfMessagesReceived
-              Namespace: AWS/SQS
-            Period: 60
-            Stat: Sum
-          ReturnData: False
-        - Id: m2
-          MetricStat:
-            Metric:
-              Dimensions:
-                - Name: EventBusName
-                  Value: !Sub '${ProjectName}-CoreEventBus'
-              MetricName: MatchedEvents
-              Namespace: AWS/Events
-            Period: 60
-            Stat: Sum
-          ReturnData: False
-        - Id: e1
-          Expression: !Sub IF(m2>0 AND m1/m2>${OncallDlqRatio}, 1, 0)
-          Label: !Sub "${ProjectName}-CoreEventBus-HasDLQMessage-OnCall-Metric"        
-      AlarmActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      InsufficientDataActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
-      OKActions:
-        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
   ###          Allow  EVENTS FROM CONFIDENTIAL AND HELPDESK         ###
   #####################################################################
