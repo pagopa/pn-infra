@@ -209,29 +209,6 @@ Resources:
       AlarmActions:
         - !Ref AlarmSNSTopicArn
 
-  LogsBucketAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: "LogsBucket-Storage-Limit-Exceeded"
-      AlarmDescription: "Alarm messages when the logs bucket used space exceeds the limit"
-      Namespace: "AWS/S3"
-      MetricName: "BucketSizeBytes"
-      TreatMissingData: "notBreaching"
-      Dimensions:
-        - Name: "BucketName"
-          Value: !Ref LogsBucketName
-        - Name: "StorageType"
-          Value: "StandardStorage"
-      Statistic: "Average"
-      Period: 86400  
-      Threshold: !Ref LogsBucketLimit
-      ComparisonOperator: "GreaterThanOrEqualToThreshold" 
-      EvaluationPeriods: 1       
-      AlarmActions:
-        - !Ref AlarmSNSTopicArn
-      OKActions:
-        - !Ref AlarmSNSTopicArn
-
   InfraMicroserviceCloudWatchDashboard:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -245,7 +222,6 @@ Resources:
             - !Ref CdcToS3KinesisDeliveryStreamAlarmArn
             - !Ref LogsToS3KinesisDeliveryStreamAlarmArn
             - !Ref OpenSearchDeliveryLambdaAlarmArn
-            - !GetAtt LogsBucketAlarm.Arn
             - !Ref OOMAlarmArn
             - !If [ HasOpenSearchCluster, !GetAtt ClusterStatusRedAlarm.Arn, '' ]
             - !If [ HasOpenSearchCluster, !GetAtt ClusterStatusYellowAlarm.Arn, '' ]            
@@ -276,7 +252,3 @@ Outputs:
   Version:
     Value: !Ref Version
     Description: 'keep track of used projects commitIds'
-
-  LogsBucketAlarmArn:
-    Value: !GetAtt LogsBucketAlarm.Arn
-    Description: Logs bucket alarm arn
