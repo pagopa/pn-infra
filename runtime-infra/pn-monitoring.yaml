@@ -957,7 +957,7 @@ Resources:
                 Action:
                   - cloudwatch:PutMetricAlarm
                   - cloudwatch:DeleteAlarms
-                Resource: "aarn:aws:cloudwatch:*:*:alarm:SyntheticMonitorFailure-*"
+                Resource: "arn:aws:cloudwatch:*:*:alarm:SyntheticMonitorFailure-*"
 
   SyntheticsMonitorCanaryPortals:
     Condition: HasDeploySyntheticMonitoring
@@ -1048,7 +1048,7 @@ Resources:
               return await loadBlueprint();
           };
       ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
-      RuntimeVersion: syn-nodejs-puppeteer-10.0
+      RuntimeVersion: syn-nodejs-puppeteer-13.0
       Schedule:
         Expression: rate(5 minutes)
         DurationInSeconds: 0
@@ -1141,7 +1141,7 @@ Resources:
               return await apiCheck();
           };
       ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
-      RuntimeVersion: syn-nodejs-puppeteer-10.0
+      RuntimeVersion: syn-nodejs-puppeteer-13.0
       Schedule:
         Expression: rate(5 minutes)
         DurationInSeconds: 0
@@ -1241,7 +1241,7 @@ Resources:
           };
 
       ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
-      RuntimeVersion: syn-nodejs-puppeteer-10.0
+      RuntimeVersion: syn-nodejs-puppeteer-13.0
       Schedule:
         Expression: cron(0 9 * * ? *)
         DurationInSeconds: 0
