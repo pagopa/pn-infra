@@ -103,6 +103,11 @@ Parameters:
     Type: Number
     Description: SQS queue visibility timeout Lambda export function for pn-support
     Default: 360
+  
+  LambdaPrepareBlockedAnalysisCronExpression:
+    Type: String
+    Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
+    Default: 'cron(30 6 * * ? *)'
 
   TemplateBucketBaseUrl:
     Type: String
@@ -1033,7 +1038,264 @@ Resources:
     Properties:
       LogGroupName: !Sub "/aws/lambda/${LambdaPnSupportExport}"
       RetentionInDays: 3
-     
+
+  # Lambda for Blocked Analysis
+  LambdaPrepareBlockedAnalysis:
+    Condition: IsCoreAccount
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.14
+      Timeout: 900
+      MemorySize: 512
+      Handler: index.lambda_handler
+      FunctionName: !Sub pn-prepare-blocked-analysis-lambda-${EnvironmentType}
+      Code:
+        ZipFile: |
+          import os
+          import boto3
+          import subprocess
+          import sys
+          import shutil
+          from pathlib import Path
+
+          def lambda_handler(event, context):
+              print("Starting PrepareBlockedAnalysis Lambda")
+              
+              # Get environment variables
+              region = os.environ['Region']
+              database = os.environ.get('AthenaDatabase', 'cdc_analytics_database')
+              table = os.environ.get('AthenaTable', 'pn_timelines_json_view')
+              workgroup = os.environ.get('AthenaWorkgroup', 'primary')
+              s3_result_bucket = os.environ['S3ResultBucket']
+              
+              # Clone pn-troubleshooting repository (public repo, no authentication needed)
+              repo_url = "https://github.com/pagopa/pn-troubleshooting.git"
+              repo_path = "/tmp/pn-troubleshooting"
+              
+              # Clean up if exists
+              if os.path.exists(repo_path):
+                  shutil.rmtree(repo_path)
+              
+              print("Cloning pn-troubleshooting repository...")
+              try:
+                  subprocess.run(
+                      ["git", "clone", "--depth", "1", repo_url, repo_path],
+                      check=True,
+                      capture_output=True,
+                      text=True
+                  )
+                  print("Repository cloned successfully")
+              except subprocess.CalledProcessError as e:
+                  print(f"Error cloning repository: {e.stderr}")
+                  raise
+              
+              # Change to script directory
+              script_dir = os.path.join(repo_path, "prepare_blocked_analisys")
+              script_path = os.path.join(script_dir, "prepare_blocked_analisys.py")
+              
+              if not os.path.exists(script_path):
+                  print(f"Script not found at {script_path}")
+                  raise FileNotFoundError(f"Script not found at {script_path}")
+              
+              print(f"Found script at {script_path}")
+              
+              # Execute the script
+              print("Executing prepare_blocked_analisys.py...")
+              cmd = [
+                  sys.executable,
+                  script_path,
+                  "--profile", "default",  # Lambda uses default credentials
+                  "--database", database,
+                  "--table", table,
+                  "--workgroup", workgroup,
+                  "--s3-result-bucket", s3_result_bucket,
+                  "--timeout", "840"  # 60 secondi meno del timeout Lambda per salvare i progressi
+              ]
+              
+              print(f"Running command: {' '.join(cmd)}")
+              
+              try:
+                  # Run the script
+                  result = subprocess.run(
+                      cmd,
+                      check=True,
+                      capture_output=True,
+                      text=True,
+                      cwd=script_dir,
+                      env={**os.environ, 'AWS_DEFAULT_REGION': region}
+                  )
+                  print("Script output:")
+                  print(result.stdout)
+                  if result.stderr:
+                      print("Script stderr:")
+                      print(result.stderr)
+                  
+                  # Copy result files to S3
+                  result_dir = os.path.join(script_dir, "result")
+                  if os.path.exists(result_dir):
+                      print(f"Copying result files from {result_dir} to S3...")
+                      s3_client = boto3.client('s3', region_name=region)
+                      bucket_name = s3_result_bucket.replace('s3://', '').split('/')[0]
+                      s3_prefix = '/'.join(s3_result_bucket.replace('s3://', '').split('/')[1:])
+                      
+                      uploaded_files = []
+                      for filename in os.listdir(result_dir):
+                          file_path = os.path.join(result_dir, filename)
+                          if os.path.isfile(file_path):
+                              s3_key = f"{s3_prefix}/{filename}".lstrip('/')
+                              print(f"Uploading {filename} to s3://{bucket_name}/{s3_key}")
+                              s3_client.upload_file(file_path, bucket_name, s3_key)
+                              uploaded_files.append(filename)
+                      
+                      print(f"Successfully uploaded {len(uploaded_files)} files to S3: {uploaded_files}")
+                  else:
+                      print(f"Result directory not found at {result_dir}")
+                  
+                  return {
+                      'statusCode': 200,
+                      'body': 'PrepareBlockedAnalysis completed successfully'
+                  }
+              except subprocess.CalledProcessError as e:
+                  print(f"Script execution failed with return code {e.returncode}")
+                  print(f"stdout: {e.stdout}")
+                  print(f"stderr: {e.stderr}")
+                  
+                  # Return code 2 means timeout, which is acceptable
+                  if e.returncode == 2:
+                      print("Script reached timeout but saved progress")
+                      
+                      # Try to upload any result files even after timeout
+                      result_dir = os.path.join(script_dir, "result")
+                      if os.path.exists(result_dir):
+                          print(f"Attempting to copy result files after timeout...")
+                          try:
+                              s3_client = boto3.client('s3', region_name=region)
+                              bucket_name = s3_result_bucket.replace('s3://', '').split('/')[0]
+                              s3_prefix = '/'.join(s3_result_bucket.replace('s3://', '').split('/')[1:])
+                              
+                              uploaded_files = []
+                              for filename in os.listdir(result_dir):
+                                  file_path = os.path.join(result_dir, filename)
+                                  if os.path.isfile(file_path):
+                                      s3_key = f"{s3_prefix}/{filename}".lstrip('/')
+                                      s3_client.upload_file(file_path, bucket_name, s3_key)
+                                      uploaded_files.append(filename)
+                              
+                              print(f"Uploaded {len(uploaded_files)} files after timeout: {uploaded_files}")
+                          except Exception as upload_error:
+                              print(f"Error uploading files after timeout: {upload_error}")
+                      
+                      return {
+                          'statusCode': 200,
+                          'body': 'PrepareBlockedAnalysis reached timeout but progress was saved'
+                      }
+                  raise
+
+      Environment:
+        Variables:
+          Region: !Ref AWS::Region
+          AthenaDatabase: cdc_analytics_database
+          AthenaTable: pn_timelines_json_view
+          AthenaWorkgroup: primary
+          S3ResultBucket: !Sub s3://${DataMonitoringBucket}/prepare-blocked-analysis/
+      Role: !GetAtt LambdaPrepareBlockedAnalysisRole.Arn
+
+  LambdaPrepareBlockedAnalysisRole:
+    Condition: IsCoreAccount
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub pn-prepare-blocked-analysis-lambda-role-${EnvironmentType}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: LambdaPrepareBlockedAnalysisPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # S3 access for results and Athena output
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/*
+              # Athena permissions
+              - Effect: Allow
+                Action:
+                  - athena:StartQueryExecution
+                  - athena:GetQueryExecution
+                  - athena:GetQueryResults
+                  - athena:GetWorkGroup
+                Resource:
+                  - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/*
+              # Glue permissions for Athena
+              - Effect: Allow
+                Action:
+                  - glue:GetDatabase
+                  - glue:GetTable
+                  - glue:GetPartitions
+                Resource:
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/*
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/*/*
+              # DynamoDB access for pn-PaperRequestError
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperRequestError
+
+  LambdaPrepareBlockedAnalysisLogGroup:
+    Condition: IsCoreAccount
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${LambdaPrepareBlockedAnalysis}"
+      RetentionInDays: 7
+
+  LambdaPrepareBlockedAnalysisAlarms:
+    Condition: IsCoreAccount
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref LambdaPrepareBlockedAnalysis
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        FilterPattern: "ERROR"
+
+  # EventBridge rule to trigger PrepareBlockedAnalysis Lambda
+  LambdaPrepareBlockedAnalysisScheduleRule:
+    Condition: IsCoreAccount
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Scheduled rule to trigger PrepareBlockedAnalysis Lambda UTC"
+      ScheduleExpression: !Ref LambdaPrepareBlockedAnalysisCronExpression
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaPrepareBlockedAnalysis.Arn
+          Id: LambdaPrepareBlockedAnalysisTarget
+
+  LambdaPrepareBlockedAnalysisPermission:
+    Condition: IsCoreAccount
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaPrepareBlockedAnalysis
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt LambdaPrepareBlockedAnalysisScheduleRule.Arn
+      SourceAccount: !Ref AWS::AccountId
+
 Outputs:
   DataMonitoringBucketName: 
     Value: !Ref DataMonitoringBucket
