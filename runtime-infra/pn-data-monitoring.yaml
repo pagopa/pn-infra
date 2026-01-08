@@ -1056,6 +1056,8 @@ Resources:
           import subprocess
           import sys
           import shutil
+          import urllib.request
+          import zipfile
           from pathlib import Path
 
           def lambda_handler(event, context):
@@ -1068,25 +1070,35 @@ Resources:
               workgroup = os.environ.get('AthenaWorkgroup', 'primary')
               s3_result_bucket = os.environ['S3ResultBucket']
               
-              # Clone pn-troubleshooting repository (public repo, no authentication needed)
-              repo_url = "https://github.com/pagopa/pn-troubleshooting.git"
+              # Download pn-troubleshooting repository as ZIP
+              repo_zip_url = "https://github.com/pagopa/pn-troubleshooting/archive/refs/heads/main.zip"
+              zip_path = "/tmp/pn-troubleshooting.zip"
               repo_path = "/tmp/pn-troubleshooting"
               
               # Clean up if exists
               if os.path.exists(repo_path):
                   shutil.rmtree(repo_path)
+              if os.path.exists(zip_path):
+                  os.remove(zip_path)
               
-              print("Cloning pn-troubleshooting repository...")
+              print(f"Downloading pn-troubleshooting repository from {repo_zip_url}...")
               try:
-                  subprocess.run(
-                      ["git", "clone", "--depth", "1", repo_url, repo_path],
-                      check=True,
-                      capture_output=True,
-                      text=True
-                  )
-                  print("Repository cloned successfully")
-              except subprocess.CalledProcessError as e:
-                  print(f"Error cloning repository: {e.stderr}")
+                  urllib.request.urlretrieve(repo_zip_url, zip_path)
+                  print("Repository downloaded successfully")
+                  
+                  # Extract ZIP
+                  print("Extracting ZIP...")
+                  with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                      zip_ref.extractall("/tmp")
+                  
+                  # Rename extracted folder to expected name
+                  extracted_folder = "/tmp/pn-troubleshooting-main"
+                  if os.path.exists(extracted_folder):
+                      os.rename(extracted_folder, repo_path)
+                  
+                  print("Repository extracted successfully")
+              except Exception as e:
+                  print(f"Error downloading/extracting repository: {e}")
                   raise
               
               # Change to script directory
@@ -1101,10 +1113,10 @@ Resources:
               
               # Execute the script
               print("Executing prepare_blocked_analisys.py...")
+              
               cmd = [
                   sys.executable,
                   script_path,
-                  "--profile", "default",  # Lambda uses default credentials
                   "--database", database,
                   "--table", table,
                   "--workgroup", workgroup,
