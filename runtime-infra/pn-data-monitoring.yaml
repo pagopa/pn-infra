@@ -1251,7 +1251,7 @@ Resources:
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-              # S3 access for results and Athena output
+              # S3 write access for results
               - Effect: Allow
                 Action:
                   - s3:GetObject
@@ -1264,6 +1264,13 @@ Resources:
                   - !Sub arn:aws:s3:::${DataMonitoringBucket}/*
                   - !Sub arn:aws:s3:::${AthenaResultsBucketName}
                   - !Sub arn:aws:s3:::${AthenaResultsBucketName}/*
+              # S3 read-only access for logs bucket (Athena data source)
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Resource:
                   - !Sub arn:aws:s3:::${LogsBucketName}
                   - !Sub arn:aws:s3:::${LogsBucketName}/*
               # S3 additional permissions for Athena bucket verification
