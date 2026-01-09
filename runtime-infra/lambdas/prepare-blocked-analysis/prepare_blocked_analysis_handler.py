@@ -144,14 +144,14 @@ def lambda_handler(event, context):
         print("Downloading result files from S3 for metrics publishing...")
         s3_client = boto3.client('s3', region_name=region)
         bucket_name = s3_result_bucket.replace('s3://', '').split('/')[0]
-        s3_prefix = '/'.join(s3_result_bucket.replace('s3://', '').split('/')[1:])
+        s3_prefix = '/'.join(s3_result_bucket.replace('s3://', '').split('/')[1:]).rstrip('/')
         
         # Create local result directory
         result_dir = "/tmp/prepare_blocked_results"
         os.makedirs(result_dir, exist_ok=True)
         
-        # Download statistics.json and analysis.json from S3
-        required_files = ['statistics.json', 'analysis.json']
+        # Download statistics.json and prepare_analog_domicile_latest.json from S3
+        required_files = ['statistics.json', 'prepare_analog_domicile_latest.json']
         downloaded_files = []
         
         for filename in required_files:
@@ -192,13 +192,13 @@ def lambda_handler(event, context):
                 print("Attempting to download results from S3 after timeout...")
                 s3_client = boto3.client('s3', region_name=region)
                 bucket_name = s3_result_bucket.replace('s3://', '').split('/')[0]
-                s3_prefix = '/'.join(s3_result_bucket.replace('s3://', '').split('/')[1:])
+                s3_prefix = '/'.join(s3_result_bucket.replace('s3://', '').split('/')[1:]).rstrip('/')
                 
                 result_dir = "/tmp/prepare_blocked_results_timeout"
                 os.makedirs(result_dir, exist_ok=True)
                 
-                # Try to download statistics.json and analysis.json
-                required_files = ['statistics.json', 'analysis.json']
+                # Try to download statistics.json and prepare_analog_domicile_latest.json
+                required_files = ['statistics.json', 'prepare_analog_domicile_latest.json']
                 downloaded_files = []
                 
                 for filename in required_files:
@@ -235,7 +235,7 @@ def publish_metrics_to_cloudwatch(result_dir, cloudwatch, region, namespace,
                                   metric_name_total_open_case, metric_name_resolved_case,
                                   metric_name_new_case, metric_name_affected):
     """
-    Reads statistics.json and analysis.json and publishes metrics to CloudWatch
+    Reads statistics.json and prepare_analog_domicile_latest.json and publishes metrics to CloudWatch
     """
     try:
         # Read statistics.json
@@ -283,7 +283,7 @@ def publish_metrics_to_cloudwatch(result_dir, cloudwatch, region, namespace,
         
         # Read analysis.json for affected prepare count
         affected_count = 0
-        analysis_file = os.path.join(result_dir, 'analysis.json')
+        analysis_file = os.path.join(result_dir, 'prepare_analog_domicile_latest.json')
         if os.path.exists(analysis_file):
             with open(analysis_file, 'r', encoding='utf-8') as f:
                 analysis_data = json.load(f)
@@ -302,7 +302,7 @@ def publish_metrics_to_cloudwatch(result_dir, cloudwatch, region, namespace,
                 }
                 print(json.dumps(log_entry))
         else:
-            print("WARNING: analysis.json not found, setting affected count to 0")
+            print("WARNING: prepare_analog_domicile_latest.json not found, setting affected count to 0")
         
         # Always publish the affected prepare metric (even if 0)
         metrics.append({
