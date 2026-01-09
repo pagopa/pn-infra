@@ -56,6 +56,14 @@ Parameters:
     Type: Number
     Description: Monthly Budget for send SMS in USD
 
+  SesBounceRateAlarmThreshold:
+    Type: Number
+    Description: SES Bounce Rate Alarm Threshold
+
+  SesComplaintRateAlarmThreshold:
+    Type: Number
+    Description: SES Complaint Rate Alarm Threshold 
+
   SESSentDailyAlarmThresholdPercentage:
     Type: Number
     Description: Daily Max Number for Email Sent from SES Service
@@ -710,7 +718,7 @@ Resources:
   SesLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
-      Runtime: python3.10
+      Runtime: python3.14
       Timeout: 5
       Handler: index.lambda_handler
       Role: !GetAtt SesLambdaFunctionRole.Arn
@@ -789,7 +797,7 @@ Resources:
   SesQuotaMonitoringLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
-      Runtime: python3.10
+      Runtime: python3.14
       Timeout: 30
       Handler: index.lambda_handler
       Role: !GetAtt SesQuotaMonitoringLambdaFunctionRole.Arn
@@ -859,18 +867,19 @@ Resources:
         {
             "widgets": [
                 {
-                    "height": 3,
-                    "width": 12,
-                    "y": 0,
-                    "x": 0,
                     "type": "metric",
+                    "x": 0,
+                    "y": 0,
+                    "width": 12,
+                    "height": 3,
                     "properties": {
                         "metrics": [
                             [ "AWS/SES", "Reputation.BounceRate", { "region": "eu-south-1", "visible": false } ],
                             [ ".", "Reputation.ComplaintRate", { "region": "eu-south-1", "visible": false } ],
                             [ ".", "Send", { "region": "eu-south-1" } ],
                             [ ".", "Delivery", { "region": "eu-south-1" } ],
-                            [ ".", "Bounce", { "region": "eu-south-1" } ]
+                            [ ".", "Bounce", { "region": "eu-south-1" } ],
+                            [ ".", "Complaint", { "region": "eu-south-1" } ]
                         ],
                         "view": "singleValue",
                         "stacked": false,
@@ -886,11 +895,11 @@ Resources:
                     }
                 },
                 {
-                    "height": 3,
-                    "width": 11,
-                    "y": 0,
-                    "x": 12,
                     "type": "metric",
+                    "x": 12,
+                    "y": 0,
+                    "width": 11,
+                    "height": 3,
                     "properties": {
                         "metrics": [
                             [ "AWS/SNS", "SMSSuccessRate", "SMSType", "Transactional", "Country", "IT" ]
@@ -910,11 +919,11 @@ Resources:
                     }
                 },
                 {
-                    "height": 4,
-                    "width": 12,
-                    "y": 3,
-                    "x": 0,
                     "type": "log",
+                    "x": 0,
+                    "y": 3,
+                    "width": 12,
+                    "height": 4,
                     "properties": {
                         "query": "SOURCE '${SesLambdaFunctionLogGroup}' | fields @timestamp, @message, @logStream, @log\n| filter @message like /eventType/\n| sort @timestamp desc\n| limit 20",
                         "region": "eu-south-1",
@@ -923,11 +932,11 @@ Resources:
                     }
                 },
                 {
-                    "height": 4,
-                    "width": 11,
-                    "y": 3,
-                    "x": 12,
                     "type": "metric",
+                    "x": 12,
+                    "y": 3,
+                    "width": 11,
+                    "height": 4,
                     "properties": {
                         "metrics": [
                             [ "AWS/SNS", "SMSMonthToDateSpentUSD", { "region": "eu-south-1" } ]
@@ -961,9 +970,33 @@ Resources:
                         "region": "eu-south-1",
                         "stat": "Maximum",
                         "period": 300,
-                        "stacked": true
+                        "stacked": true,
+                        "setPeriodToTimeRange": false,
+                        "singleValueFullPrecision": false,
+                        "title": "Mail Usage Last 24 Hours"
                     }
-                  }
+                },
+                {
+                    "type": "metric",
+                    "x": 0,
+                    "y": 11,
+                    "width": 24,
+                    "height": 4,
+                    "properties": {
+                        "metrics": [
+                            [ { "expression": "m1*100", "label": "Compliant Rate Percentage", "id": "e1", "region": "eu-south-1" } ],
+                            [ { "expression": "m2*100", "label": "Bounce Rate Percentage", "id": "e2", "region": "eu-south-1" } ],
+                            [ "AWS/SES", "Reputation.ComplaintRate", "ses:configuration-set", "sestocloudwatch", { "id": "m1", "yAxis": "left", "visible": false, "region": "eu-south-1" } ],
+                            [ "AWS/SES", "Reputation.BounceRate", "ses:configuration-set", "sestocloudwatch", { "id": "m2", "visible": false, "region": "eu-south-1" } ]
+                        ],
+                        "sparkline": true,
+                        "view": "singleValue",
+                        "region": "eu-south-1",
+                        "stat": "Maximum",
+                        "period": 3600,
+                        "title": "Bounce and Compliant Rate"
+                    }
+                }
             ]
         }
 
@@ -982,7 +1015,7 @@ Resources:
         DatapointsToAlarm: 1
         Threshold: !Ref SMSUsdMonthlyAlarmThreshold
         ComparisonOperator: GreaterThanOrEqualToThreshold
-        TreatMissingData: missing
+        TreatMissingData: notBreaching
         AlarmActions:
           - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
         OKActions:
@@ -1003,11 +1036,54 @@ Resources:
         DatapointsToAlarm: 1
         Threshold: !Ref SESSentDailyAlarmThresholdPercentage
         ComparisonOperator: GreaterThanOrEqualToThreshold
-        TreatMissingData: missing
+        TreatMissingData: notBreaching
         AlarmActions:
           - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
         OKActions:
           - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+
+  SesBounceRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-SES-Reputation-BounceRate'
+      AlarmDescription: Alarm when SES Reputation Bounce Rate exceeds 3%
+      ActionsEnabled: true
+      MetricName: Reputation.BounceRate
+      Namespace: AWS/SES
+      Statistic: Maximum
+      Dimensions: []
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: !Ref SesBounceRateAlarmThreshold
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+
+  SESComplaintRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-SES-Reputation-ComplaintRate'
+      AlarmDescription: Alarm when SES Reputation Complaint Rate exceeds 0.07%
+      ActionsEnabled: true
+      MetricName: Reputation.ComplaintRate
+      Namespace: AWS/SES
+      Statistic: Maximum
+      Dimensions: []
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: !Ref SesComplaintRateAlarmThreshold
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+      OKActions:
+        - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
+
 
 
   # Define the SNS topic for SES log
