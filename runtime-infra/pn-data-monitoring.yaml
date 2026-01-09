@@ -35,6 +35,10 @@ Parameters:
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
     Default: 'cron(30 6 * * ? *)'
 
+  AthenaResultsBucketName:
+    Type: String
+    Description: Name of the Athena results bucket
+
   #Dynamodb export parameters:
 
   DynamoDbExportTableNames:
@@ -1069,6 +1073,7 @@ Resources:
               table = os.environ.get('AthenaTable', 'pn_timelines_json_view')
               workgroup = os.environ.get('AthenaWorkgroup', 'primary')
               s3_result_bucket = os.environ['S3ResultBucket']
+              athena_results_bucket = os.environ['AthenaResultsBucket']
               
               # Download pn-troubleshooting repository as ZIP
               repo_zip_url = "https://github.com/pagopa/pn-troubleshooting/archive/refs/heads/main.zip"
@@ -1120,6 +1125,7 @@ Resources:
                   "--database", database,
                   "--table", table,
                   "--workgroup", workgroup,
+                  "--output-location", f"s3://{athena_results_bucket}/",
                   "--s3-result-bucket", s3_result_bucket,
                   "--timeout", "840"  # 60 secondi meno del timeout Lambda per salvare i progressi
               ]
@@ -1210,6 +1216,7 @@ Resources:
           AthenaTable: pn_timelines_json_view
           AthenaWorkgroup: primary
           S3ResultBucket: !Sub s3://${DataMonitoringBucket}/prepare-blocked-analysis/
+          AthenaResultsBucket: !Ref AthenaResultsBucketName
       Role: !GetAtt LambdaPrepareBlockedAnalysisRole.Arn
 
   LambdaPrepareBlockedAnalysisRole:
@@ -1240,6 +1247,8 @@ Resources:
                 Resource:
                   - !Sub arn:aws:s3:::${DataMonitoringBucket}
                   - !Sub arn:aws:s3:::${DataMonitoringBucket}/*
+                  - !Sub arn:aws:s3:::${AthenaResultsBucketName}
+                  - !Sub arn:aws:s3:::${AthenaResultsBucketName}/*
               # Athena permissions
               - Effect: Allow
                 Action:
