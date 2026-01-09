@@ -228,18 +228,13 @@ def publish_metrics_to_cloudwatch(result_dir, cloudwatch, region, namespace,
         ]
         
         # Read analysis.json for affected prepare count
+        affected_count = 0
         analysis_file = os.path.join(result_dir, 'analysis.json')
         if os.path.exists(analysis_file):
             with open(analysis_file, 'r', encoding='utf-8') as f:
                 analysis_data = json.load(f)
             
             affected_count = len(analysis_data.get('analysis', []))
-            metrics.append({
-                'MetricName': metric_name_affected,
-                'Value': float(affected_count),
-                'Unit': 'Count',
-                'Timestamp': timestamp
-            })
             
             # Log each affected case for CloudWatch Logs Insights table visualization
             for case in analysis_data.get('analysis', []):
@@ -253,7 +248,15 @@ def publish_metrics_to_cloudwatch(result_dir, cloudwatch, region, namespace,
                 }
                 print(json.dumps(log_entry))
         else:
-            print("WARNING: analysis.json not found")
+            print("WARNING: analysis.json not found, setting affected count to 0")
+        
+        # Always publish the affected prepare metric (even if 0)
+        metrics.append({
+            'MetricName': metric_name_affected,
+            'Value': float(affected_count),
+            'Unit': 'Count',
+            'Timestamp': timestamp
+        })
         
         # Publish metrics to CloudWatch (namespace passed as parameter)
         
