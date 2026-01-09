@@ -121,10 +121,10 @@ Parameters:
     Description: Memory size for the Lambda Prepare Blocked Analysis function
     Default: 512
 
-  LambdaPrepareBlockedAnalysisRepoZipUrl:
+  LambdaPrepareBlockedAnalysisPnTroubleshootingBranch:
     Type: String
-    Description: URL to download pn-troubleshooting repository ZIP (branch or tag)
-    Default: ''
+    Description: pn-troubleshooting repository branch or tag name (e.g. main, develop)
+    Default: 'main'
 
   CloudWatchNamespace:
     Type: String
@@ -1110,7 +1110,7 @@ Resources:
           AthenaWorkgroup: primary
           S3ResultBucket: !Sub s3://${DataMonitoringBucket}/prepare-blocked-analysis/
           AthenaResultsBucket: !Sub pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
-          RepoZipUrl: !Ref LambdaPrepareBlockedAnalysisRepoZipUrl
+          RepoZipUrl: !Sub 'https://github.com/pagopa/pn-troubleshooting/archive/refs/heads/${LambdaPrepareBlockedAnalysisPnTroubleshootingBranch}.zip'
           CloudWatchNamespace: !Ref CloudWatchNamespace
           MetricNameTotalOpenCases: !Ref MetricNameTotalOpenCases
           MetricNameResolvedInLastRun: !Ref MetricNameResolvedInLastRun
