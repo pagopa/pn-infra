@@ -81,6 +81,23 @@ def lambda_handler(event, context):
     # Execute the script
     print("Executing prepare_blocked_analisys.py...")
     
+    # Allow override of environment variables from event
+    database = event.get('database', database)
+    table = event.get('table', table)
+    workgroup = event.get('workgroup', workgroup)
+    
+    # Calculate script timeout based on remaining Lambda execution time
+    # Leave 60 seconds buffer for cleanup and file upload
+    if 'timeout' in event:
+        # Allow explicit override from event
+        timeout = event['timeout']
+        print(f"Using timeout from event: {timeout} seconds")
+    else:
+        # Calculate dynamically: remaining time - 60 seconds buffer
+        remaining_time_ms = context.get_remaining_time_in_millis()
+        timeout = max(60, int(remaining_time_ms / 1000) - 60)
+        print(f"Calculated timeout: {timeout} seconds (Lambda remaining: {remaining_time_ms/1000:.0f}s - 60s buffer)")
+    
     cmd = [
         sys.executable,
         script_path,
@@ -89,8 +106,21 @@ def lambda_handler(event, context):
         "--workgroup", workgroup,
         "--output-location", f"s3://{athena_results_bucket}/",
         "--s3-result-bucket", s3_result_bucket,
-        "--timeout", "840"  # 60 seconds less than Lambda max timeout
+        "--timeout", str(timeout)
     ]
+    
+    # Add optional parameters from event
+    if event.get('start_time'):
+        cmd.extend(["--start-time", event['start_time']])
+        print(f"Using custom start_time: {event['start_time']}")
+    
+    if event.get('end_time'):
+        cmd.extend(["--end-time", event['end_time']])
+        print(f"Using custom end_time: {event['end_time']}")
+    
+    if event.get('full_analysis', False):
+        cmd.append("--full-analysis")
+        print("Using full-analysis mode")
     
     print(f"Running command: {' '.join(cmd)}")
     
@@ -199,11 +229,14 @@ def publish_metrics_to_cloudwatch(result_dir, cloudwatch, region, namespace,
         summary = stats_data.get('summary', {})
         last_update = stats_data.get('last_update', datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))
         
-        # Parse last_update timestamp
+        # Use timestamp from analysis (last_update) to maintain temporal consistency
+        # The metric values represent the state at the time of analysis, not publication time
         try:
             timestamp = datetime.strptime(last_update, '%Y-%m-%d %H:%M:%S')
         except:
             timestamp = datetime.utcnow()
+        
+        print(f"Publishing metrics with analysis timestamp: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
         
         # Prepare metrics
         metrics = [
