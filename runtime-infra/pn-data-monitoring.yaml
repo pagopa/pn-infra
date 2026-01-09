@@ -35,10 +35,6 @@ Parameters:
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
     Default: 'cron(30 6 * * ? *)'
 
-  AthenaResultsBucketName:
-    Type: String
-    Description: Name of the Athena results bucket
-
   #Dynamodb export parameters:
 
   DynamoDbExportTableNames:
@@ -1127,7 +1123,7 @@ Resources:
                   
                   print("Repository extracted successfully")
               except Exception as e:
-                  print(f"Error downloading/extracting repository: {e}")
+                  print(f"ERROR: Failed to download/extract repository: {e}")
                   raise
               
               # Change to script directory
@@ -1135,7 +1131,7 @@ Resources:
               script_path = os.path.join(script_dir, "prepare_blocked_analisys.py")
               
               if not os.path.exists(script_path):
-                  print(f"Script not found at {script_path}")
+                  print(f"ERROR: Script not found at {script_path}")
                   raise FileNotFoundError(f"Script not found at {script_path}")
               
               print(f"Found script at {script_path}")
@@ -1198,7 +1194,7 @@ Resources:
                       'body': 'PrepareBlockedAnalysis completed successfully'
                   }
               except subprocess.CalledProcessError as e:
-                  print(f"Script execution failed with return code {e.returncode}")
+                  print(f"ERROR: Script execution failed with return code {e.returncode}")
                   print(f"stdout: {e.stdout}")
                   print(f"stderr: {e.stderr}")
                   
@@ -1225,12 +1221,15 @@ Resources:
                               
                               print(f"Uploaded {len(uploaded_files)} files after timeout: {uploaded_files}")
                           except Exception as upload_error:
-                              print(f"Error uploading files after timeout: {upload_error}")
+                              print(f"ERROR: Failed to upload files after timeout: {upload_error}")
                       
                       return {
                           'statusCode': 200,
                           'body': 'PrepareBlockedAnalysis reached timeout but progress was saved'
                       }
+                  
+                  # For other errors, log and re-raise
+                  print(f"ERROR: Script execution failed, re-raising exception")
                   raise
 
       Environment:
@@ -1240,7 +1239,7 @@ Resources:
           AthenaTable: pn_timelines_json_view
           AthenaWorkgroup: primary
           S3ResultBucket: !Sub s3://${DataMonitoringBucket}/prepare-blocked-analysis/
-          AthenaResultsBucket: !Ref AthenaResultsBucketName
+          AthenaResultsBucket: !Sub pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
           RepoZipUrl: !Ref LambdaPrepareBlockedAnalysisRepoZipUrl
       Role: !GetAtt LambdaPrepareBlockedAnalysisRole.Arn
 
@@ -1267,15 +1266,27 @@ Resources:
               - Effect: Allow
                 Action:
                   - s3:GetObject
-                  - s3:PutObject
                   - s3:ListBucket
                   - s3:GetBucketLocation
                   - s3:GetBucketVersioning
                 Resource:
                   - !Sub arn:aws:s3:::${DataMonitoringBucket}
                   - !Sub arn:aws:s3:::${DataMonitoringBucket}/*
-                  - !Sub arn:aws:s3:::${AthenaResultsBucketName}
-                  - !Sub arn:aws:s3:::${AthenaResultsBucketName}/*
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource:
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/prepare-blocked-analysis/*
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                  - s3:GetBucketVersioning
+                Resource:
+                  - !Sub arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
+                  - !Sub arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001/*
               # S3 read-only access for logs bucket (Athena data source)
               - Effect: Allow
                 Action:
