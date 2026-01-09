@@ -140,31 +140,39 @@ def lambda_handler(event, context):
             print("Script stderr:")
             print(result.stderr)
         
-        # Copy result files to S3
-        result_dir = os.path.join(script_dir, "result")
-        if os.path.exists(result_dir):
-            print(f"Copying result files from {result_dir} to S3...")
-            s3_client = boto3.client('s3', region_name=region)
-            bucket_name = s3_result_bucket.replace('s3://', '').split('/')[0]
-            s3_prefix = '/'.join(s3_result_bucket.replace('s3://', '').split('/')[1:])
-            
-            uploaded_files = []
-            for filename in os.listdir(result_dir):
-                file_path = os.path.join(result_dir, filename)
-                if os.path.isfile(file_path):
-                    s3_key = f"{s3_prefix}/{filename}".lstrip('/')
-                    print(f"Uploading {filename} to s3://{bucket_name}/{s3_key}")
-                    s3_client.upload_file(file_path, bucket_name, s3_key)
-                    uploaded_files.append(filename)
-            
-            print(f"Successfully uploaded {len(uploaded_files)} files to S3: {uploaded_files}")
-            
-            # Read and send metrics to CloudWatch
+        # Script saves files directly to S3, download them to read metrics
+        print("Downloading result files from S3 for metrics publishing...")
+        s3_client = boto3.client('s3', region_name=region)
+        bucket_name = s3_result_bucket.replace('s3://', '').split('/')[0]
+        s3_prefix = '/'.join(s3_result_bucket.replace('s3://', '').split('/')[1:])
+        
+        # Create local result directory
+        result_dir = "/tmp/prepare_blocked_results"
+        os.makedirs(result_dir, exist_ok=True)
+        
+        # Download statistics.json and analysis.json from S3
+        required_files = ['statistics.json', 'analysis.json']
+        downloaded_files = []
+        
+        for filename in required_files:
+            s3_key = f"{s3_prefix}/{filename}".lstrip('/')
+            local_path = os.path.join(result_dir, filename)
+            try:
+                print(f"Downloading s3://{bucket_name}/{s3_key} to {local_path}")
+                s3_client.download_file(bucket_name, s3_key, local_path)
+                downloaded_files.append(filename)
+                print(f"Successfully downloaded {filename}")
+            except Exception as e:
+                print(f"ERROR: Failed to download {filename} from S3: {e}")
+        
+        # Read and send metrics to CloudWatch if we have the required files
+        if 'statistics.json' in downloaded_files:
+            print(f"Publishing metrics from downloaded files...")
             publish_metrics_to_cloudwatch(result_dir, cloudwatch, region, cloudwatch_namespace,
                                          metric_name_total_open_case, metric_name_resolved_case, 
                                          metric_name_new_case, metric_name_affected)
         else:
-            print(f"Result directory not found at {result_dir}")
+            print("ERROR: statistics.json not found on S3, cannot publish CloudWatch metrics")
         
         return {
             'statusCode': 200,
@@ -179,26 +187,39 @@ def lambda_handler(event, context):
         if e.returncode == 2:
             print("Script reached timeout but saved progress")
             
-            # Try to upload any result files even after timeout
-            result_dir = os.path.join(script_dir, "result")
-            if os.path.exists(result_dir):
-                print(f"Attempting to copy result files after timeout...")
-                try:
-                    s3_client = boto3.client('s3', region_name=region)
-                    bucket_name = s3_result_bucket.replace('s3://', '').split('/')[0]
-                    s3_prefix = '/'.join(s3_result_bucket.replace('s3://', '').split('/')[1:])
-                    
-                    uploaded_files = []
-                    for filename in os.listdir(result_dir):
-                        file_path = os.path.join(result_dir, filename)
-                        if os.path.isfile(file_path):
-                            s3_key = f"{s3_prefix}/{filename}".lstrip('/')
-                            s3_client.upload_file(file_path, bucket_name, s3_key)
-                            uploaded_files.append(filename)
-                    
-                    print(f"Uploaded {len(uploaded_files)} files after timeout: {uploaded_files}")
-                except Exception as upload_error:
-                    print(f"ERROR: Failed to upload files after timeout: {upload_error}")
+            # Try to download and publish metrics even after timeout
+            try:
+                print("Attempting to download results from S3 after timeout...")
+                s3_client = boto3.client('s3', region_name=region)
+                bucket_name = s3_result_bucket.replace('s3://', '').split('/')[0]
+                s3_prefix = '/'.join(s3_result_bucket.replace('s3://', '').split('/')[1:])
+                
+                result_dir = "/tmp/prepare_blocked_results_timeout"
+                os.makedirs(result_dir, exist_ok=True)
+                
+                # Try to download statistics.json and analysis.json
+                required_files = ['statistics.json', 'analysis.json']
+                downloaded_files = []
+                
+                for filename in required_files:
+                    s3_key = f"{s3_prefix}/{filename}".lstrip('/')
+                    local_path = os.path.join(result_dir, filename)
+                    try:
+                        s3_client.download_file(bucket_name, s3_key, local_path)
+                        downloaded_files.append(filename)
+                        print(f"Downloaded {filename} after timeout")
+                    except Exception as download_error:
+                        print(f"ERROR: Could not download {filename} from S3 after timeout: {download_error}")
+                
+                # Publish metrics if we have statistics.json
+                if 'statistics.json' in downloaded_files:
+                    publish_metrics_to_cloudwatch(result_dir, cloudwatch, region, cloudwatch_namespace,
+                                                 metric_name_total_open_case, metric_name_resolved_case, 
+                                                 metric_name_new_case, metric_name_affected)
+                else:
+                    print("ERROR: statistics.json not available after timeout, cannot publish metrics")
+            except Exception as metrics_error:
+                print(f"ERROR: Failed to download and publish metrics after timeout: {metrics_error}")
             
             return {
                 'statusCode': 200,
