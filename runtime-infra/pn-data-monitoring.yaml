@@ -1278,7 +1278,7 @@ Resources:
                   }
                 }
               },
-              "width": 24,
+              "width": 18,
               "height": 6,
               "x": 0,
               "y": 0
@@ -1287,21 +1287,28 @@ Resources:
               "type": "metric",
               "properties": {
                 "metrics": [
-                  [ "${CloudWatchNamespace}", "${MetricNameAffectedPrepare}", { "stat": "Average", "label": "Affected PREPARE" } ]
+                  [ "${CloudWatchNamespace}", "${MetricNameAffectedPrepare}", { "stat": "Average" } ]
                 ],
-                "view": "timeSeries",
-                "stacked": false,
+                "view": "singleValue",
                 "region": "${AWS::Region}",
-                "title": "Affected PREPARE Analysis",
-                "period": 300,
-                "yAxis": {
-                  "left": {
-                    "min": 0
-                  }
-                }
+                "title": "Affected PREPARE Cases",
+                "period": 300
+              },
+              "width": 6,
+              "height": 6,
+              "x": 18,
+              "y": 0
+            },
+            {
+              "type": "log",
+              "properties": {
+                "query": "SOURCE '/aws/lambda/pn-prepare-blocked-analysis-lambda-${EnvironmentType}'\n| fields timestamp, iun, timelineElementId, hasResult, isInPaperRequestError\n| filter type = \"AFFECTED_PREPARE_CASE\"\n| sort timestamp desc\n| limit 100",
+                "region": "${AWS::Region}",
+                "title": "Affected PREPARE Cases (Last 100)",
+                "stacked": false
               },
               "width": 24,
-              "height": 6,
+              "height": 8,
               "x": 0,
               "y": 6
             }

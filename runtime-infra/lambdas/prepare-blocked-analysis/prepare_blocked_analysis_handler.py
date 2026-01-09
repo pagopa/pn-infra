@@ -240,6 +240,18 @@ def publish_metrics_to_cloudwatch(result_dir, cloudwatch, region, namespace,
                 'Unit': 'Count',
                 'Timestamp': timestamp
             })
+            
+            # Log each affected case for CloudWatch Logs Insights table visualization
+            for case in analysis_data.get('analysis', []):
+                log_entry = {
+                    'type': 'AFFECTED_PREPARE_CASE',
+                    'timestamp': case.get('timestamp', ''),
+                    'iun': case.get('iun', ''),
+                    'timelineElementId': case.get('timelineElementId', ''),
+                    'hasResult': case.get('hasResult', False),
+                    'isInPaperRequestError': case.get('isInPaperRequestError', False)
+                }
+                print(json.dumps(log_entry))
         else:
             print("WARNING: analysis.json not found")
         
