@@ -110,8 +110,20 @@ Parameters:
   
   LambdaPrepareBlockedAnalysisCronExpression:
     Type: String
-    Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
-    Default: 'cron(30 6 * * ? *)'
+    Description: Cron expression for the 
+  
+  LambdaPrepareBlockedAnalysisEnableCronExpression:
+    Type: String
+    Description: Cron expression for the scheduled rule enabled/disabled
+    Default: 'DISABLED'
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    
+  LambdaPrepareBlockedAnalysisMemorySize:
+    Type: Number
+    Description: Memory size for the Lambda Prepare Blocked Analysis function
+    Default: 512
 
   LambdaPrepareBlockedAnalysisRepoZipUrl:
     Type: String
@@ -1055,7 +1067,7 @@ Resources:
     Properties:
       Runtime: python3.14
       Timeout: 900
-      MemorySize: 512
+      MemorySize: !Ref LambdaPrepareBlockedAnalysisMemorySize
       Handler: index.lambda_handler
       FunctionName: !Sub pn-prepare-blocked-analysis-lambda-${EnvironmentType}
       Code:
@@ -1339,7 +1351,7 @@ Resources:
     Properties:
       Description: "Scheduled rule to trigger PrepareBlockedAnalysis Lambda UTC"
       ScheduleExpression: !Ref LambdaPrepareBlockedAnalysisCronExpression
-      State: ENABLED
+      State: !Ref LambdaPrepareBlockedAnalysisEnableCronExpression
       Targets:
         - Arn: !GetAtt LambdaPrepareBlockedAnalysis.Arn
           Id: LambdaPrepareBlockedAnalysisTarget
