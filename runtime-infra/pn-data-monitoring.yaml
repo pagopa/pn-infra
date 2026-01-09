@@ -1305,6 +1305,13 @@ Resources:
                   - dynamodb:Scan
                 Resource:
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperRequestError
+              # KMS permissions for logs bucket encryption
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                Resource:
+                  - !Sub "${LogsBucketKmsKeyArn}"
 
   LambdaPrepareBlockedAnalysisLogGroup:
     Condition: IsCoreAccount
