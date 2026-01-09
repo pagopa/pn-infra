@@ -1299,7 +1299,7 @@ Resources:
             {
               "type": "log",
               "properties": {
-                "query": "SOURCE '/aws/lambda/pn-prepare-blocked-analysis-lambda-${EnvironmentType}'\n| fields timestamp, iun, timelineElementId, hasResult, isInPaperRequestError\n| filter type = \"AFFECTED_PREPARE_CASE\"\n| dedup timelineElementId\n| sort timestamp desc\n| limit 100",
+                "query": "SOURCE '/aws/lambda/pn-prepare-blocked-analysis-lambda-${EnvironmentType}'\n| fields timestamp, iun, timelineElementId, hasResult, isInPaperRequestError\n| filter type = \"AFFECTED_PREPARE_CASE\"\n| sort timestamp desc\n| dedup timelineElementId\n| limit 100",
                 "region": "${AWS::Region}",
                 "title": "Affected PREPARE Cases (Last 100)",
                 "stacked": false
