@@ -126,6 +126,31 @@ Parameters:
     Description: URL to download pn-troubleshooting repository ZIP (branch or tag)
     Default: ''
 
+  CloudWatchNamespace:
+    Type: String
+    Description: CloudWatch namespace for PrepareBlocked metrics
+    Default: 'PrepareBlockedAnalysis'
+
+  MetricNameTotalOpenCases:
+    Type: String
+    Description: Metric name for total open cases
+    Default: 'PrepareBlockedTotalOpenCases'
+
+  MetricNameResolvedInLastRun:
+    Type: String
+    Description: Metric name for resolved cases in last run
+    Default: 'PrepareBlockedResolvedInLastRun'
+
+  MetricNameNewInLastRun:
+    Type: String
+    Description: Metric name for new cases in last run
+    Default: 'PrepareBlockedNewInLastRun'
+
+  MetricNameAffectedPrepare:
+    Type: String
+    Description: Metric name for affected PREPARE count
+    Default: 'AffectedPrepareBlockedAnalysis'
+
   TemplateBucketBaseUrl:
     Type: String
     Description: URL to load infrastructure model fragments from
@@ -1086,6 +1111,11 @@ Resources:
           S3ResultBucket: !Sub s3://${DataMonitoringBucket}/prepare-blocked-analysis/
           AthenaResultsBucket: !Sub pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
           RepoZipUrl: !Ref LambdaPrepareBlockedAnalysisRepoZipUrl
+          CloudWatchNamespace: !Ref CloudWatchNamespace
+          MetricNameTotalOpenCases: !Ref MetricNameTotalOpenCases
+          MetricNameResolvedInLastRun: !Ref MetricNameResolvedInLastRun
+          MetricNameNewInLastRun: !Ref MetricNameNewInLastRun
+          MetricNameAffectedPrepare: !Ref MetricNameAffectedPrepare
       Role: !GetAtt LambdaPrepareBlockedAnalysisRole.Arn
 
   LambdaPrepareBlockedAnalysisRole:
@@ -1146,6 +1176,11 @@ Resources:
                 Action:
                   - s3:ListAllMyBuckets
                   - s3:GetBucketLocation
+                Resource: "*"
+              # CloudWatch metrics permissions
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
                 Resource: "*"
               # Athena permissions
               - Effect: Allow
@@ -1221,6 +1256,64 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt LambdaPrepareBlockedAnalysisScheduleRule.Arn
       SourceAccount: !Ref AWS::AccountId
+
+  # CloudWatch Dashboard for PREPARE-BLOCCATE
+  PrepareBloccateDashboard:
+    Condition: IsCoreAccount
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub PREPARE-BLOCKED-${EnvironmentType}
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  [ "${CloudWatchNamespace}", "${MetricNameTotalOpenCases}", { "stat": "Average", "label": "Total Open Cases" } ],
+                  [ ".", "${MetricNameResolvedInLastRun}", { "stat": "Average", "label": "Resolved in Last Run" } ],
+                  [ ".", "${MetricNameNewInLastRun}", { "stat": "Average", "label": "New in Last Run" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "Statistics",
+                "period": 300,
+                "yAxis": {
+                  "left": {
+                    "min": 0
+                  }
+                }
+              },
+              "width": 24,
+              "height": 6,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  [ "${CloudWatchNamespace}", "${MetricNameAffectedPrepare}", { "stat": "Average", "label": "Affected PREPARE" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "Affected PREPARE Analysis",
+                "period": 300,
+                "yAxis": {
+                  "left": {
+                    "min": 0
+                  }
+                }
+              },
+              "width": 24,
+              "height": 6,
+              "x": 0,
+              "y": 6
+            }
+          ]
+        }
 
 Outputs:
   DataMonitoringBucketName: 

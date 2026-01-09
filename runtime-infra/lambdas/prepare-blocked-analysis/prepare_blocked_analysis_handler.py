@@ -5,7 +5,9 @@ import sys
 import shutil
 import urllib.request
 import zipfile
+import json
 from pathlib import Path
+from datetime import datetime
 
 def lambda_handler(event, context):
     print("Starting PrepareBlockedAnalysis Lambda")
@@ -18,6 +20,16 @@ def lambda_handler(event, context):
     s3_result_bucket = os.environ['S3ResultBucket']
     athena_results_bucket = os.environ['AthenaResultsBucket']
     repo_zip_url = os.environ['RepoZipUrl']
+    cloudwatch_namespace = os.environ['CloudWatchNamespace']
+    
+    # CloudWatch metric names
+    metric_name_total_open_case = os.environ['MetricNameTotalOpenCases']
+    metric_name_resolved_case = os.environ['MetricNameResolvedInLastRun']
+    metric_name_new_case = os.environ['MetricNameNewInLastRun']
+    metric_name_affected = os.environ['MetricNameAffectedPrepare']
+    
+    # Initialize CloudWatch client
+    cloudwatch = boto3.client('cloudwatch', region_name=region)
     
     # Download pn-troubleshooting repository as ZIP
     zip_path = "/tmp/pn-troubleshooting.zip"
@@ -116,6 +128,11 @@ def lambda_handler(event, context):
                     uploaded_files.append(filename)
             
             print(f"Successfully uploaded {len(uploaded_files)} files to S3: {uploaded_files}")
+            
+            # Read and send metrics to CloudWatch
+            publish_metrics_to_cloudwatch(result_dir, cloudwatch, region, cloudwatch_namespace,
+                                         metric_name_total_open_case, metric_name_resolved_case, 
+                                         metric_name_new_case, metric_name_affected)
         else:
             print(f"Result directory not found at {result_dir}")
         
@@ -161,3 +178,84 @@ def lambda_handler(event, context):
         # For other errors, log and re-raise
         print(f"ERROR: Script execution failed, re-raising exception")
         raise
+
+
+def publish_metrics_to_cloudwatch(result_dir, cloudwatch, region, namespace,
+                                  metric_name_total_open_case, metric_name_resolved_case,
+                                  metric_name_new_case, metric_name_affected):
+    """
+    Reads statistics.json and analysis.json and publishes metrics to CloudWatch
+    """
+    try:
+        # Read statistics.json
+        stats_file = os.path.join(result_dir, 'statistics.json')
+        if not os.path.exists(stats_file):
+            print("ERROR: statistics.json not found, skipping metrics")
+            return
+        
+        with open(stats_file, 'r', encoding='utf-8') as f:
+            stats_data = json.load(f)
+        
+        summary = stats_data.get('summary', {})
+        last_update = stats_data.get('last_update', datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))
+        
+        # Parse last_update timestamp
+        try:
+            timestamp = datetime.strptime(last_update, '%Y-%m-%d %H:%M:%S')
+        except:
+            timestamp = datetime.utcnow()
+        
+        # Prepare metrics
+        metrics = [
+            {
+                'MetricName': metric_name_total_open_case,
+                'Value': float(summary.get('total_open_cases', 0)),
+                'Unit': 'Count',
+                'Timestamp': timestamp
+            },
+            {
+                'MetricName': metric_name_resolved_case,
+                'Value': float(summary.get('resolved_in_last_run', 0)),
+                'Unit': 'Count',
+                'Timestamp': timestamp
+            },
+            {
+                'MetricName': metric_name_new_case,
+                'Value': float(summary.get('new_in_last_run', 0)),
+                'Unit': 'Count',
+                'Timestamp': timestamp
+            }
+        ]
+        
+        # Read analysis.json for affected prepare count
+        analysis_file = os.path.join(result_dir, 'analysis.json')
+        if os.path.exists(analysis_file):
+            with open(analysis_file, 'r', encoding='utf-8') as f:
+                analysis_data = json.load(f)
+            
+            affected_count = len(analysis_data.get('analysis', []))
+            metrics.append({
+                'MetricName': metric_name_affected,
+                'Value': float(affected_count),
+                'Unit': 'Count',
+                'Timestamp': timestamp
+            })
+        else:
+            print("WARNING: analysis.json not found")
+        
+        # Publish metrics to CloudWatch (namespace passed as parameter)
+        
+        for metric in metrics:
+            try:
+                cloudwatch.put_metric_data(
+                    Namespace=namespace,
+                    MetricData=[metric]
+                )
+                print(f"Published metric {metric['MetricName']}: {metric['Value']}")
+            except Exception as e:
+                print(f"ERROR: Failed to publish metric {metric['MetricName']}: {e}")
+        
+        print(f"Successfully published {len(metrics)} metrics to CloudWatch namespace '{namespace}'")
+        
+    except Exception as e:
+        print(f"ERROR: Failed to publish metrics to CloudWatch: {e}")
