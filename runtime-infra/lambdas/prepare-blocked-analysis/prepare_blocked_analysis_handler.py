@@ -89,7 +89,7 @@ def lambda_handler(event, context):
         "--workgroup", workgroup,
         "--output-location", f"s3://{athena_results_bucket}/",
         "--s3-result-bucket", s3_result_bucket,
-        "--timeout", "840"  # 60 secondi meno del timeout Lambda per salvare i progressi
+        "--timeout", "840"  # 60 seconds less than Lambda max timeout
     ]
     
     print(f"Running command: {' '.join(cmd)}")

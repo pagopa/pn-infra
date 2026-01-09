@@ -1089,7 +1089,7 @@ Resources:
       LogGroupName: !Sub "/aws/lambda/${LambdaPnSupportExport}"
       RetentionInDays: 3
 
-  # Lambda for Blocked Analysis
+  # Lambda for PrepareBlockedAnalysis
   LambdaPrepareBlockedAnalysis:
     Condition: IsCoreAccount
     Type: AWS::Lambda::Function
@@ -1162,7 +1162,6 @@ Resources:
                 Resource:
                   - !Sub arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
                   - !Sub arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001/*
-              # S3 read-only access for logs bucket (Athena data source)
               - Effect: Allow
                 Action:
                   - s3:GetObject
@@ -1171,18 +1170,15 @@ Resources:
                 Resource:
                   - !Sub arn:aws:s3:::${LogsBucketName}
                   - !Sub arn:aws:s3:::${LogsBucketName}/*
-              # S3 additional permissions for Athena bucket verification
               - Effect: Allow
                 Action:
                   - s3:ListAllMyBuckets
                   - s3:GetBucketLocation
                 Resource: "*"
-              # CloudWatch metrics permissions
               - Effect: Allow
                 Action:
                   - cloudwatch:PutMetricData
                 Resource: "*"
-              # Athena permissions
               - Effect: Allow
                 Action:
                   - athena:StartQueryExecution
@@ -1191,7 +1187,6 @@ Resources:
                   - athena:GetWorkGroup
                 Resource:
                   - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/*
-              # Glue permissions for Athena
               - Effect: Allow
                 Action:
                   - glue:GetDatabase
@@ -1201,14 +1196,12 @@ Resources:
                   - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
                   - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/*
                   - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/*/*
-              # DynamoDB access for pn-PaperRequestError
               - Effect: Allow
                 Action:
                   - dynamodb:Query
                   - dynamodb:Scan
                 Resource:
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperRequestError
-              # KMS permissions for logs bucket encryption
               - Effect: Allow
                 Action:
                   - kms:Decrypt
@@ -1257,7 +1250,7 @@ Resources:
       SourceArn: !GetAtt LambdaPrepareBlockedAnalysisScheduleRule.Arn
       SourceAccount: !Ref AWS::AccountId
 
-  # CloudWatch Dashboard for PREPARE-BLOCCATE
+  # CloudWatch Dashboard for PrepareBlockedAnalysis
   PrepareBloccateDashboard:
     Condition: IsCoreAccount
     Type: AWS::CloudWatch::Dashboard
