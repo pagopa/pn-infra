@@ -113,6 +113,11 @@ Parameters:
     Description: Cron expression for the scheduled rule, e.g. cron(0 9 * * ? *)
     Default: 'cron(30 6 * * ? *)'
 
+  LambdaPrepareBlockedAnalysisRepoZipUrl:
+    Type: String
+    Description: URL to download pn-troubleshooting repository ZIP (branch or tag)
+    Default: ''
+
   TemplateBucketBaseUrl:
     Type: String
     Description: URL to load infrastructure model fragments from
@@ -1074,9 +1079,9 @@ Resources:
               workgroup = os.environ.get('AthenaWorkgroup', 'primary')
               s3_result_bucket = os.environ['S3ResultBucket']
               athena_results_bucket = os.environ['AthenaResultsBucket']
+              repo_zip_url = os.environ['RepoZipUrl']
               
               # Download pn-troubleshooting repository as ZIP
-              repo_zip_url = "https://github.com/pagopa/pn-troubleshooting/archive/refs/heads/main.zip"
               zip_path = "/tmp/pn-troubleshooting.zip"
               repo_path = "/tmp/pn-troubleshooting"
               
@@ -1096,10 +1101,17 @@ Resources:
                   with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                       zip_ref.extractall("/tmp")
                   
-                  # Rename extracted folder to expected name
-                  extracted_folder = "/tmp/pn-troubleshooting-main"
-                  if os.path.exists(extracted_folder):
+                  # Find extracted folder (works with any branch name)
+                  import glob
+                  extracted_folders = glob.glob("/tmp/pn-troubleshooting-*")
+                  if extracted_folders:
+                      extracted_folder = extracted_folders[0]
+                      print(f"Found extracted folder: {extracted_folder}")
+                      if os.path.exists(repo_path):
+                          shutil.rmtree(repo_path)
                       os.rename(extracted_folder, repo_path)
+                  else:
+                      raise FileNotFoundError("Extracted folder not found")
                   
                   print("Repository extracted successfully")
               except Exception as e:
@@ -1217,6 +1229,7 @@ Resources:
           AthenaWorkgroup: primary
           S3ResultBucket: !Sub s3://${DataMonitoringBucket}/prepare-blocked-analysis/
           AthenaResultsBucket: !Ref AthenaResultsBucketName
+          RepoZipUrl: !Ref LambdaPrepareBlockedAnalysisRepoZipUrl
       Role: !GetAtt LambdaPrepareBlockedAnalysisRole.Arn
 
   LambdaPrepareBlockedAnalysisRole:
@@ -1244,11 +1257,19 @@ Resources:
                   - s3:GetObject
                   - s3:PutObject
                   - s3:ListBucket
+                  - s3:GetBucketLocation
+                  - s3:GetBucketVersioning
                 Resource:
                   - !Sub arn:aws:s3:::${DataMonitoringBucket}
                   - !Sub arn:aws:s3:::${DataMonitoringBucket}/*
                   - !Sub arn:aws:s3:::${AthenaResultsBucketName}
                   - !Sub arn:aws:s3:::${AthenaResultsBucketName}/*
+              # S3 additional permissions for Athena bucket verification
+              - Effect: Allow
+                Action:
+                  - s3:ListAllMyBuckets
+                  - s3:GetBucketLocation
+                Resource: "*"
               # Athena permissions
               - Effect: Allow
                 Action:
