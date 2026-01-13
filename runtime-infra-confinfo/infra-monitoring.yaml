@@ -179,6 +179,8 @@ Resources:
       TreatMissingData: notBreaching        
       AlarmActions:
         - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: 1            
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 60
@@ -238,6 +240,8 @@ Resources:
       TreatMissingData: notBreaching        
       AlarmActions:
         - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
       Dimensions:
         - Value: !Ref LogsKinesisStreamName
           Name: StreamName        
@@ -257,6 +261,8 @@ Resources:
       AlarmDescription: "CloudWatch alarm for when Kinesis Logs GetRecords.IteratorAgeMilliseconds is too high."
       TreatMissingData: notBreaching        
       AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
         - !Ref AlarmSNSTopicArn
       Dimensions:
         - Value: !Ref LogsKinesisStreamName
@@ -279,6 +285,8 @@ Resources:
       TreatMissingData: notBreaching        
       AlarmActions:
         - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
       Dimensions:
         - Value: !Ref CdcKinesisStreamName
           Name: StreamName
@@ -298,6 +306,8 @@ Resources:
       AlarmDescription: "CloudWatch alarm for when Kinesis Cdc GetRecords.IteratorAgeMilliseconds is too high."
       TreatMissingData: notBreaching        
       AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
         - !Ref AlarmSNSTopicArn
       Dimensions:
         - Value: !Ref CdcKinesisStreamName
@@ -319,6 +329,8 @@ Resources:
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
       Metrics:
         - Id: q1
           Expression: "SELECT MAX(ClockErrorBound) FROM SCHEMA(\"ECS/ContainerInsights\", ClusterName,Family,TaskID) GROUP BY ClusterName"
@@ -339,6 +351,8 @@ Resources:
       AlarmDescription: "CloudWatch Alarm for Synchronization value different by Synchronized"
       TreatMissingData: notBreaching
       AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
         - !Ref AlarmSNSTopicArn
       Metrics:
         - Id: q1
