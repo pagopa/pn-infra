@@ -281,6 +281,8 @@ Resources:
       TreatMissingData: notBreaching        
       AlarmActions:
         - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: 1            
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 60
@@ -494,6 +496,8 @@ Resources:
       TreatMissingData: notBreaching        
       AlarmActions:
         - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
       Dimensions:
         - Value: !Ref LogsKinesisSourceStreamName
           Name: StreamName        
@@ -513,6 +517,8 @@ Resources:
       AlarmDescription: "CloudWatch alarm for when Kinesis Logs GetRecords.IteratorAgeMilliseconds is too high."
       TreatMissingData: notBreaching        
       AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
         - !Ref AlarmSNSTopicArn
       Dimensions:
         - Value: !Ref LogsKinesisSourceStreamName
@@ -535,6 +541,8 @@ Resources:
       TreatMissingData: notBreaching        
       AlarmActions:
         - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
       Dimensions:
         - Value: !Ref CdcKinesisSourceStreamName
           Name: StreamName
@@ -555,6 +563,8 @@ Resources:
       TreatMissingData: notBreaching        
       AlarmActions:
         - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
       Dimensions:
         - Value: !Ref CdcKinesisSourceStreamName
           Name: StreamName
@@ -574,6 +584,8 @@ Resources:
       AlarmDescription: "CloudWatch Alarm for Clock Error Bound limit over threshold"
       TreatMissingData: notBreaching      
       AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
         - !Ref AlarmSNSTopicArn 
       Metrics:
         - Id: q1
@@ -595,6 +607,8 @@ Resources:
       AlarmDescription: "CloudWatch Alarm for Synchronization value different by Synchronized"
       TreatMissingData: notBreaching   
       AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
         - !Ref AlarmSNSTopicArn    
       Metrics:
         - Id: q1
@@ -860,6 +874,8 @@ Resources:
       AlarmDescription: "CloudWatch alarm for SSL Expiration."
       TreatMissingData: notBreaching        
       AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
         - !Ref AlarmSNSTopicArn
       Metrics:
         - Id: q1
