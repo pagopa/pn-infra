@@ -134,8 +134,13 @@ Resources:
             Ref: DeliveryStreamLogGroup
           LogStreamName:
             Ref: DeliveryStreamLogGroupS3Destination
-        Prefix: 
-          Fn::If: 
+        FileExtension:
+          Fn::If:
+            - IsCdcStream
+            - !Ref AWS::NoValue
+            - '.gz'
+        Prefix:
+          Fn::If:
             - IsCdcStream
             - !Sub '${StreamNamePrefix}/TABLE_NAME_!{partitionKeyFromQuery:TABLE_NAME}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
             - !Sub '${StreamNamePrefix}/'
