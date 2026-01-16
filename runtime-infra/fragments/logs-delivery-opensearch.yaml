@@ -80,10 +80,10 @@ Parameters:
     Type: Number
     Default: 14
 
-  ReservedConcurrentLambdaExecution:
+  LogIngestionReservedConcurrentExecution:
     Type: Number
     Default: 25
-    
+
   OpensearchIngestionEnabled: 
     Description: Enable Ingestion To Opensearch
     Default: true
@@ -160,7 +160,7 @@ Resources:
       Handler: index.handler
       MemorySize: !Ref OpenSearchLambdaMemory
       Timeout: 900 # 15 minutes
-      ReservedConcurrentExecutions : !Ref ReservedConcurrentLambdaExecution
+      ReservedConcurrentExecutions: !Ref LogIngestionReservedConcurrentExecution
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"      
       Environment:
