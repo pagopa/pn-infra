@@ -88,6 +88,7 @@ Parameters:
 Conditions:
   HasDedicatedMaster: !Not [ !Equals [ !Ref MasterNodeType, "" ] ]
   HasZoneAwareness: !Equals [ !Ref ZoneAwareness, true ]
+  HasWarmEnabled: !Equals [ !Ref WarmEnabled, true ]
 
 Resources:
   SecurityGroup:
@@ -164,9 +165,15 @@ Resources:
               ZoneAwarenessEnabled: !Ref ZoneAwareness
               ZoneAwarenessConfig:
                 AvailabilityZoneCount: 3
-              WarmCount: !Ref WarmCount
               WarmEnabled: !Ref WarmEnabled
-              WarmType: !Ref WarmType
+              WarmCount: !If
+                - HasWarmEnabled
+                - !Ref WarmCount
+                - !Ref AWS::NoValue
+              WarmType: !If
+                - HasWarmEnabled
+                - !Ref WarmType
+                - !Ref AWS::NoValue
             - 
               InstanceCount: !Ref InstanceReplicas
               InstanceType: !Ref InstanceType
@@ -174,9 +181,15 @@ Resources:
               DedicatedMasterEnabled: true
               DedicatedMasterType: !Ref MasterNodeType
               ZoneAwarenessEnabled: !Ref ZoneAwareness
-              WarmCount: !Ref WarmCount
               WarmEnabled: !Ref WarmEnabled
-              WarmType: !Ref WarmType
+              WarmCount: !If
+                - HasWarmEnabled
+                - !Ref WarmCount
+                - !Ref AWS::NoValue
+              WarmType: !If
+                - HasWarmEnabled
+                - !Ref WarmType
+                - !Ref AWS::NoValue
         - !If
             - HasZoneAwareness
             - 
