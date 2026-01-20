@@ -120,6 +120,8 @@ Resources:
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
       Dimensions:
         - Value: !Ref KinesisStream
           Name: StreamName
@@ -140,6 +142,8 @@ Resources:
       AlarmDescription: "CloudWatch alarm for when Kinesis GetRecords.IteratorAgeMilliseconds is too high."
       TreatMissingData: notBreaching
       AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
         - !Ref AlarmSNSTopicArn
       Dimensions:
         - Value: !Ref KinesisStream
