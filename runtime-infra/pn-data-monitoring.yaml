@@ -103,10 +103,67 @@ Parameters:
     Type: Number
     Description: SQS queue visibility timeout Lambda export function for pn-support
     Default: 360
+  
+  LambdaPrepareBlockedAnalysisCronExpression:
+    Type: String
+    Description: Cron expression for the lambda prepare blocked analysis function
+    Default: ''
+  
+  LambdaPrepareBlockedAnalysisEnableCronExpression:
+    Type: String
+    Description: Cron expression for the scheduled rule enabled/disabled
+    Default: 'DISABLED'
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    
+  LambdaPrepareBlockedAnalysisMemorySize:
+    Type: Number
+    Description: Memory size for the Lambda Prepare Blocked Analysis function
+    Default: 512
+
+  LambdaPrepareBlockedAnalysisPnTroubleshootingBranch:
+    Type: String
+    Description: pn-troubleshooting repository branch or tag name (e.g. main, develop)
+    Default: 'main'
+
+  CloudWatchNamespace:
+    Type: String
+    Description: CloudWatch namespace for PrepareBlocked metrics
+    Default: 'PrepareBlockedAnalysis'
+
+  MetricNameTotalOpenCases:
+    Type: String
+    Description: Metric name for total open cases
+    Default: 'PrepareBlockedTotalOpenCases'
+
+  MetricNameResolvedInLastRun:
+    Type: String
+    Description: Metric name for resolved cases in last run
+    Default: 'PrepareBlockedResolvedInLastRun'
+
+  MetricNameNewInLastRun:
+    Type: String
+    Description: Metric name for new cases in last run
+    Default: 'PrepareBlockedNewInLastRun'
+
+  MetricNameAffectedPrepare:
+    Type: String
+    Description: Metric name for affected PREPARE count
+    Default: 'AffectedPrepareBlockedAnalysis'
 
   TemplateBucketBaseUrl:
     Type: String
     Description: URL to load infrastructure model fragments from
+
+  LambdasBucketName:
+    Type: String
+    Description: S3 bucket name containing Lambda deployment packages
+
+  LambdasBasePath:
+    Type: String
+    Description: S3 key prefix for Lambda deployment packages
+    Default: ''
 
   AlarmSNSTopicArn:
     Type: String
@@ -1033,7 +1090,230 @@ Resources:
     Properties:
       LogGroupName: !Sub "/aws/lambda/${LambdaPnSupportExport}"
       RetentionInDays: 3
-     
+
+  # Lambda for PrepareBlockedAnalysis
+  LambdaPrepareBlockedAnalysis:
+    Condition: IsCoreAccount
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.14
+      Timeout: 900
+      MemorySize: !Ref LambdaPrepareBlockedAnalysisMemorySize
+      Handler: prepare_blocked_analysis_handler.lambda_handler
+      FunctionName: !Sub pn-prepare-blocked-analysis-lambda-${EnvironmentType}
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/prepare-blocked-analysis.zip
+      Environment:
+        Variables:
+          Region: !Ref AWS::Region
+          AthenaDatabase: cdc_analytics_database
+          AthenaTable: pn_timelines_json_view
+          AthenaWorkgroup: primary
+          S3ResultBucket: !Sub s3://${DataMonitoringBucket}/prepare-blocked-analysis/
+          AthenaResultsBucket: !Sub pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
+          RepoZipUrl: !Sub 'https://github.com/pagopa/pn-troubleshooting/archive/refs/heads/${LambdaPrepareBlockedAnalysisPnTroubleshootingBranch}.zip'
+          CloudWatchNamespace: !Ref CloudWatchNamespace
+          MetricNameTotalOpenCases: !Ref MetricNameTotalOpenCases
+          MetricNameResolvedInLastRun: !Ref MetricNameResolvedInLastRun
+          MetricNameNewInLastRun: !Ref MetricNameNewInLastRun
+          MetricNameAffectedPrepare: !Ref MetricNameAffectedPrepare
+      Role: !GetAtt LambdaPrepareBlockedAnalysisRole.Arn
+
+  LambdaPrepareBlockedAnalysisRole:
+    Condition: IsCoreAccount
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub pn-prepare-blocked-analysis-lambda-role-${EnvironmentType}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: LambdaPrepareBlockedAnalysisPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # S3 write access for results
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                  - s3:GetBucketVersioning
+                Resource:
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/*
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource:
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/prepare-blocked-analysis/*
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                  - s3:GetBucketVersioning
+                Resource:
+                  - !Sub arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
+                  - !Sub arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001/*
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Resource:
+                  - !Sub arn:aws:s3:::${LogsBucketName}
+                  - !Sub arn:aws:s3:::${LogsBucketName}/*
+              - Effect: Allow
+                Action:
+                  - s3:ListAllMyBuckets
+                  - s3:GetBucketLocation
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - athena:StartQueryExecution
+                  - athena:GetQueryExecution
+                  - athena:GetQueryResults
+                  - athena:GetWorkGroup
+                Resource:
+                  - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/*
+              - Effect: Allow
+                Action:
+                  - glue:GetDatabase
+                  - glue:GetTable
+                  - glue:GetPartitions
+                Resource:
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/*
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/*/*
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperRequestError
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                Resource:
+                  - !Sub "${LogsBucketKmsKeyArn}"
+
+  LambdaPrepareBlockedAnalysisLogGroup:
+    Condition: IsCoreAccount
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${LambdaPrepareBlockedAnalysis}"
+      RetentionInDays: 7
+
+  LambdaPrepareBlockedAnalysisAlarms:
+    Condition: IsCoreAccount
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref LambdaPrepareBlockedAnalysis
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        FilterPattern: "ERROR"
+
+  # EventBridge rule to trigger PrepareBlockedAnalysis Lambda
+  LambdaPrepareBlockedAnalysisScheduleRule:
+    Condition: IsCoreAccount
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Scheduled rule to trigger PrepareBlockedAnalysis Lambda UTC"
+      ScheduleExpression: !Ref LambdaPrepareBlockedAnalysisCronExpression
+      State: !Ref LambdaPrepareBlockedAnalysisEnableCronExpression
+      Targets:
+        - Arn: !GetAtt LambdaPrepareBlockedAnalysis.Arn
+          Id: LambdaPrepareBlockedAnalysisTarget
+
+  LambdaPrepareBlockedAnalysisPermission:
+    Condition: IsCoreAccount
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaPrepareBlockedAnalysis
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt LambdaPrepareBlockedAnalysisScheduleRule.Arn
+      SourceAccount: !Ref AWS::AccountId
+
+  # CloudWatch Dashboard for PrepareBlockedAnalysis
+  PrepareBloccateDashboard:
+    Condition: IsCoreAccount
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub PREPARE-BLOCKED-${EnvironmentType}
+      DashboardBody: !Sub |
+        {
+          "start": "-PT24H",
+          "widgets": [
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  [ "${CloudWatchNamespace}", "${MetricNameTotalOpenCases}", { "label": "Total Open Cases" } ],
+                  [ ".", "${MetricNameResolvedInLastRun}", { "label": "Resolved in Last Run" } ],
+                  [ ".", "${MetricNameNewInLastRun}", { "label": "New in Last Run" } ]
+                ],
+                "view": "singleValue",
+                "region": "${AWS::Region}",
+                "title": "Statistics",
+                "period": 300,
+                "stat": "Maximum"
+              },
+              "width": 18,
+              "height": 6,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  [ "${CloudWatchNamespace}", "${MetricNameAffectedPrepare}" ]
+                ],
+                "view": "singleValue",
+                "region": "${AWS::Region}",
+                "title": "Affected PREPARE Cases",
+                "period": 300,
+                "stat": "Maximum"
+              },
+              "width": 6,
+              "height": 6,
+              "x": 18,
+              "y": 0
+            },
+            {
+              "type": "log",
+              "properties": {
+                "query": "SOURCE '/aws/lambda/pn-prepare-blocked-analysis-lambda-${EnvironmentType}'\n| fields timestamp, iun, timelineElementId, hasResult, isInPaperRequestError\n| filter type = \"AFFECTED_PREPARE_CASE\"\n| sort timestamp desc\n| dedup timelineElementId\n| limit 100",
+                "region": "${AWS::Region}",
+                "title": "Affected PREPARE Cases (Last 100)",
+                "stacked": false
+              },
+              "width": 24,
+              "height": 8,
+              "x": 0,
+              "y": 6
+            }
+          ]
+        }
+
 Outputs:
   DataMonitoringBucketName: 
     Value: !Ref DataMonitoringBucket
