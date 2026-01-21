@@ -1,0 +1,225 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Unique stack for data analytics resources
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: pn
+    Description: Base name for pn project
+  AthenaResultBucketSuffix:
+    Type: String
+    Description: Suffix for the athena result bucket name
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: The S3 bucket from which to fetch the templates used by this stack
+  ConfinfoDynamoDbExportBucketName:
+    Type: String
+    Description: Name of the Confinfo data-monitoring bucket
+  SafeStorageAccountId:
+    Type: String
+    Description: "Confinfo AWS Account id"
+  ConfinfoLogsBucketSuffix:
+    Type: String
+    Description: Suffix for the logs bucket name
+    Default: "001"
+
+Resources:
+  ConfinfoExportDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: confinfo_analytics_database
+        Description: Database for Confinfo DynamoDB export tables
+
+  SsDocumentiGlueTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref ConfinfoExportDatabase
+      TableInput:
+        Name: pn_ss_documenti
+        TableType: EXTERNAL_TABLE
+        PartitionKeys:
+          - Name: export_date
+            Type: string
+        Parameters:
+          EXTERNAL: 'true'
+          projection.enabled: 'true'
+          projection.export_date.type: date
+          projection.export_date.format: yyyyMMdd
+          projection.export_date.range: '20240101,NOW'
+          projection.export_date.interval: '1'
+          projection.export_date.interval.unit: DAYS
+          storage.location.template: !Sub 's3://${ConfinfoDynamoDbExportBucketName}/pn-SsDocumenti/incremental2024/${export_date}/'
+        StorageDescriptor:
+          Columns:
+            - Name: metadata
+              Type: struct<WriteTimestampMicros:struct<N:string>>
+            - Name: keys
+              Type: struct<documentKey:struct<S:string>>
+            - Name: newimage
+              Type: >-
+                struct<
+                  checkSum:struct<S:string>,
+                  clientShortCode:struct<S:string>,
+                  contentLenght:struct<N:string>,
+                  contentType:struct<S:string>,
+                  documentKey:struct<S:string>,
+                  documentLogicalState:struct<S:string>,
+                  documentState:struct<S:string>,
+                  lastStatusChangeTimestamp:struct<S:string>,
+                  retentionUntil:struct<S:string>,
+                  version:struct<N:string>
+                >
+        Location: !Sub 's3://${ConfinfoDynamoDbExportBucketName}/pn-SsDocumenti/incremental2024/'
+        InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Compressed: true
+          SerdeInfo:
+            SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
+            Parameters:
+              paths: 'Metadata,Keys,NewImage'
+              case.insensitive: 'true'
+          StoredAsSubDirectories: true
+
+  EcRichiesteMetadatiGlueTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref ConfinfoExportDatabase
+      TableInput:
+        Name: pn_ec_richieste_metadati
+        TableType: EXTERNAL_TABLE
+        PartitionKeys:
+          - Name: export_date
+            Type: string
+        Parameters:
+          EXTERNAL: 'true'
+          projection.enabled: 'true'
+          projection.export_date.type: date
+          projection.export_date.format: yyyyMMdd
+          projection.export_date.range: '20240101,NOW'
+          projection.export_date.interval: '1'
+          projection.export_date.interval.unit: DAYS
+          storage.location.template: !Sub 's3://${ConfinfoDynamoDbExportBucketName}/pn-EcRichiesteMetadati/incremental2024/${export_date}/'
+        StorageDescriptor:
+          Columns:
+            - Name: metadata
+              Type: struct<WriteTimestampMicros:struct<N:string>>
+            - Name: keys
+              Type: struct<requestId:struct<S:string>>
+            - Name: newimage
+              Type: >-
+                struct<
+                  XPagopaExtchCxId:struct<S:string>,
+                  clientRequestTimeStamp:struct<S:string>,
+                  statusRequest:struct<S:string>,
+                  requestTimestamp:struct<S:string>,
+                  lastUpdateTimestamp:struct<S:string>,
+                  requestId:struct<S:string>,
+                  requestHash:struct<S:string>,
+                  version:struct<N:string>,
+                  paperRequestMetadata:struct<M:struct<
+                    printType:struct<S:string>,
+                    productType:struct<S:string>,
+                    requestPaId:struct<S:string>
+                  >>
+                >
+          Location: !Sub 's3://${ConfinfoDynamoDbExportBucketName}/pn-EcRichiesteMetadati/incremental2024/'
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Compressed: true
+          SerdeInfo:
+            SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
+            Parameters:
+              paths: 'Metadata,Keys,NewImage'
+              case.insensitive: 'true'
+          StoredAsSubDirectories: true
+
+  SsTagsGlueTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref ConfinfoExportDatabase
+      TableInput:
+        Name: pn_ss_tags
+        TableType: EXTERNAL_TABLE
+        PartitionKeys:
+          - Name: p_year
+            Type: string
+          - Name: p_month
+            Type: string
+          - Name: p_day
+            Type: string
+          - Name: p_hour
+            Type: string
+        Parameters:
+          EXTERNAL: 'true'
+          projection.enabled: 'true'
+          projection.p_year.type: integer
+          projection.p_year.range: 2024,2099
+          projection.p_month.type: integer
+          projection.p_month.range: 1,12
+          projection.p_month.digits: '2'
+          projection.p_day.type: integer
+          projection.p_day.range: 1,31
+          projection.p_day.digits: '2'
+          projection.p_hour.type: integer
+          projection.p_hour.range: 0,23
+          projection.p_hour.digits: '2'
+          storage.location.template: !Sub 's3://pn-logs-bucket-${AWS::Region}-${SafeStorageAccountId}-${ConfinfoLogsBucketSuffix}/cdcTos3/TABLE_NAME_pn-SsTags/${p_year}/${p_month}/${p_day}/${p_hour}/'
+        StorageDescriptor:
+          Columns:
+            - Name: awsRegion
+              Type: string
+            - Name: eventID
+              Type: string
+            - Name: eventName
+              Type: string
+            - Name: userIdentity
+              Type: string
+            - Name: recordFormat
+              Type: string
+            - Name: tableName
+              Type: string
+            - Name: dynamodb
+              Type: >-
+                struct<
+                  ApproximateCreationDateTime:bigint,
+                  SizeBytes:bigint,
+                  Keys:struct<tagKeyValue:struct<S:string>>,
+                  NewImage:struct<
+                    version:struct<N:string>,
+                    fileKeys:struct<L:array<struct<S:string>>>,
+                    tagKeyValue:struct<S:string>
+                  >
+                >
+            - Name: eventSource
+              Type: string
+          Location: !Sub 's3://pn-logs-bucket-${AWS::Region}-${SafeStorageAccountId}-${ConfinfoLogsBucketSuffix}/cdcTos3/TABLE_NAME_pn-SsTags/'
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Compressed: false
+          SerdeInfo:
+            SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
+          StoredAsSubDirectories: false
+
+Outputs:
+  ConfinfoExportDatabaseName:
+    Description: Name of the Glue database
+    Value: !Ref ConfinfoExportDatabase
+    Export:
+      Name: !Sub ${AWS::StackName}-ConfinfoExportDatabaseName
+
+  SsDocumentiGlueTableName:
+    Description: Name of the pn-SsDocumenti Glue Table
+    Value: !Ref SsDocumentiGlueTable
+
+  EcRichiesteMetadatiGlueTableName:
+    Description: Name of the pn-EcRichiesteMetadati Glue Table
+    Value: !Ref EcRichiesteMetadatiGlueTable
+
+  SsTagsGlueTableName:
+    Description: Name of the pn-SsTags Glue Table
+    Value: !Ref SsTagsGlueTable

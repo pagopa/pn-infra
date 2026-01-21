@@ -170,6 +170,16 @@ Parameters:
     Type: String
     Default: ''
 
+  SafeStorageAccountId:
+    Type: String
+    Description: "Confinfo AWS Account id"
+    Default: ''
+
+  ConfinfoLogsBucketSuffix:
+    Type: String
+    Description: Suffix for the logs bucket name
+    Default: "001"
+
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
@@ -226,6 +236,7 @@ Resources:
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-ec2-service-role"
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:instance-profile/pn-data-monitoring-ec2-instance-profile"
                   - !Sub "arn:${AWS::Partition}:sts::${PnCoreAwsAccountId}:assumed-role/pn-data-monitoring-ec2-service-role/*"
+                  - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-confinfo-export-access-role"
           - Effect: Allow
             Action:
               - "s3:PutObject"
@@ -1250,6 +1261,57 @@ Resources:
       SourceArn: !GetAtt LambdaPrepareBlockedAnalysisScheduleRule.Arn
       SourceAccount: !Ref AWS::AccountId
 
+  ConfinfoExportAccessRole:
+    Type: AWS::IAM::Role
+    Condition: IsCoreAccount
+    Properties:
+      RoleName: pn-confinfo-export-access-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - glue.amazonaws.com
+                - athena.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ConfinfoS3ReadAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: DataMonitoringBucketAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}
+                  - !Sub arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}/pn-SsDocumenti/*
+                  - !Sub arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}/pn-EcRichiesteMetadati/*
+              - Sid: LogsBucketAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${SafeStorageAccountId}-${ConfinfoLogsBucketSuffix}/cdcTos3/TABLE_NAME_pn-SsTags/*
+              - Sid: LogsBucketList
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${SafeStorageAccountId}-${ConfinfoLogsBucketSuffix}
+                Condition:
+                  StringLike:
+                    s3:prefix: "cdcTos3/TABLE_NAME_pn-SsTags/*"
+              - Sid: KmsDecrypt
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                Resource:
+                  - !Sub arn:aws:kms:${AWS::Region}:${SafeStorageAccountId}:key/*
+
   # CloudWatch Dashboard for PrepareBlockedAnalysis
   PrepareBloccateDashboard:
     Condition: IsCoreAccount
@@ -1313,6 +1375,10 @@ Resources:
         }
 
 Outputs:
-  DataMonitoringBucketName: 
+  DataMonitoringBucketName:
     Value: !Ref DataMonitoringBucket
     Description: Name of the bucket created for the data monitoring
+
+  ConfinfoExportAccessRoleArn:
+    Description: ARN of the role for cross-account Confinfo access
+    Value: !GetAtt ConfinfoExportAccessRole.Arn
