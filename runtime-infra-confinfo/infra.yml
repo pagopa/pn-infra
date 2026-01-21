@@ -22,6 +22,16 @@ Parameters:
     Type: String
     Description: Cidr of the VPC where to install PN-CONFIDENTIAL-INFO
 
+  VpcCidrAllowEfs:
+    Type: String
+    Description: CIDR range allowed to mount EFS
+    Default: 10.0.0.0/8
+
+  WebappSecurityGroupId: 
+    Type: String
+    Default: '-'
+    Description: ALB security group ID
+
   VpcSubnets:
     Type: String
     Description: subnets where to install PN-CONFIDENTIAL-INFO
@@ -319,7 +329,8 @@ Conditions:
   IsAlbArnDnsEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDns, '-' ]
   IsAlbArnDnsZoneIdEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDnsZoneId, '-' ]
   IsAlbListenerArnEmpty: !Equals [ !Ref ApplicationLoadBalancerListenerArn, '-' ]
-  RequiresAlbCreation: !Or [ !Condition IsAlbArnEmpty, !Condition IsAlbArnDnsEmpty, !Condition IsAlbArnDnsZoneIdEmpty, !Condition IsAlbListenerArnEmpty ]
+  IsWebappSecurityGroupIdEmpty: !Equals [!Ref WebappSecurityGroupId, "-"]
+  RequiresAlbCreation: !Or [ !Condition IsAlbArnEmpty, !Condition IsAlbArnDnsEmpty, !Condition IsAlbArnDnsZoneIdEmpty, !Condition IsAlbListenerArnEmpty, !Condition IsWebappSecurityGroupIdEmpty, ]
 
   RequiresVpcEndpoints: !Equals [ !Ref VpcEndpointsRequired, true ]
 
@@ -589,7 +600,7 @@ Resources:
       GroupDescription: EFS Security Group
       SecurityGroupIngress:
         # All Subnet can mount EFS:
-        - CidrIp: 0.0.0.0/0
+        - CidrIp: !Ref VpcCidrAllowEfs
           IpProtocol: tcp
           FromPort: 2049
           ToPort: 2049
@@ -1199,6 +1210,9 @@ Outputs:
     Value: !If [ RequiresAlbCreation, !Sub '${ApplicationLoadBalancer.DNSName}', !Ref ApplicationLoadBalancerAwsDns ]
     Description: Application Load Balancer Domain to use for http URL
   
+  AlbSecurityGroup:
+    Value: !If [ RequiresAlbCreation, !Ref WebappSecurityGroup, !Ref WebappSecurityGroupId ]
+
   # ECS Cluster
   ECSClusterName:
     Value: !GetAtt ECSCluster.Outputs.ClusterName
