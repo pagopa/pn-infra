@@ -24,6 +24,56 @@ Parameters:
     Default: "001"
 
 Resources:
+  ConfinfoExportAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-confinfo-export-access-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - glue.amazonaws.com
+                - athena.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ConfinfoS3ReadAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: DataMonitoringBucketAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}
+                  - !Sub arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}/pn-SsDocumenti/*
+                  - !Sub arn:aws:s3:::${ConfinfoDynamoDbExportBucketName}/pn-EcRichiesteMetadati/*
+              - Sid: LogsBucketAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${SafeStorageAccountId}-${ConfinfoLogsBucketSuffix}/cdcTos3/TABLE_NAME_pn-SsTags/*
+              - Sid: LogsBucketList
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${SafeStorageAccountId}-${ConfinfoLogsBucketSuffix}
+                Condition:
+                  StringLike:
+                    s3:prefix: "cdcTos3/TABLE_NAME_pn-SsTags/*"
+              - Sid: KmsDecrypt
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                Resource:
+                  - !Sub arn:aws:kms:${AWS::Region}:${SafeStorageAccountId}:key/*
+
   ConfinfoExportDatabase:
     Type: AWS::Glue::Database
     Properties:
@@ -206,6 +256,12 @@ Resources:
           StoredAsSubDirectories: false
 
 Outputs:
+  ConfinfoExportAccessRoleArn:
+    Description: ARN of the role for cross-account Confinfo access
+    Value: !GetAtt ConfinfoExportAccessRole.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-ConfinfoExportAccessRoleArn
+
   ConfinfoExportDatabaseName:
     Description: Name of the Glue database
     Value: !Ref ConfinfoExportDatabase

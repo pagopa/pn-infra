@@ -403,8 +403,8 @@ Resources:
                   "Action": "s3:GetObject",
                   "Resource": "arn:${AWS::Partition}:s3:::${LogsBucketName}/cdcTos3/TABLE_NAME_pn-SsTags/*",
                   "Condition": {
-                    "ArnLike": {
-                      "aws:PrincipalArn": "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-confinfo-export-access-role"
+                    "StringEquals": {
+                      "aws:CalledVia": "athena.amazonaws.com"
                     }
                   }
                 },
@@ -420,8 +420,8 @@ Resources:
                     "StringLike": {
                       "s3:prefix": "cdcTos3/TABLE_NAME_pn-SsTags/*"
                     },
-                    "ArnLike": {
-                      "aws:PrincipalArn": "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-confinfo-export-access-role"
+                    "StringEquals": {
+                      "aws:CalledVia": "athena.amazonaws.com"
                     }
                   }
                 }
