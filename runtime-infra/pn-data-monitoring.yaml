@@ -243,12 +243,11 @@ Resources:
                 - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
             Condition:
               ArnLike:
-                aws:PrincipalArn: 
+                aws:PrincipalArn:
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-ec2-service-role"
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:instance-profile/pn-data-monitoring-ec2-instance-profile"
                   - !Sub "arn:${AWS::Partition}:sts::${PnCoreAwsAccountId}:assumed-role/pn-data-monitoring-ec2-service-role/*"
-                  - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-confinfo-export-access-role"
           - Sid: AllowAthenaAccess
             Effect: Allow
             Principal:
