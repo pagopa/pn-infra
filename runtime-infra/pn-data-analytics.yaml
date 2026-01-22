@@ -60,19 +60,7 @@ Resources:
             - Name: keys
               Type: struct<documentKey:struct<S:string>>
             - Name: newimage
-              Type: >-
-                struct<
-                  checkSum:struct<S:string>,
-                  clientShortCode:struct<S:string>,
-                  contentLenght:struct<N:string>,
-                  contentType:struct<S:string>,
-                  documentKey:struct<S:string>,
-                  documentLogicalState:struct<S:string>,
-                  documentState:struct<S:string>,
-                  lastStatusChangeTimestamp:struct<S:string>,
-                  retentionUntil:struct<S:string>,
-                  version:struct<N:string>
-                >
+              Type: 'struct<checkSum:struct<S:string>,clientShortCode:struct<S:string>,contentLenght:struct<N:string>,contentType:struct<S:string>,documentKey:struct<S:string>,documentLogicalState:struct<S:string>,documentState:struct<S:string>,lastStatusChangeTimestamp:struct<S:string>,retentionUntil:struct<S:string>,version:struct<N:string>>'
           Location: !Sub 's3://${ConfinfoDynamoDbExportBucketName}/pn-SsDocumenti/incremental2024/'
           InputFormat: org.apache.hadoop.mapred.TextInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
@@ -111,22 +99,7 @@ Resources:
             - Name: keys
               Type: struct<requestId:struct<S:string>>
             - Name: newimage
-              Type: >-
-                struct<
-                  XPagopaExtchCxId:struct<S:string>,
-                  clientRequestTimeStamp:struct<S:string>,
-                  statusRequest:struct<S:string>,
-                  requestTimestamp:struct<S:string>,
-                  lastUpdateTimestamp:struct<S:string>,
-                  requestId:struct<S:string>,
-                  requestHash:struct<S:string>,
-                  version:struct<N:string>,
-                  paperRequestMetadata:struct<M:struct<
-                    printType:struct<S:string>,
-                    productType:struct<S:string>,
-                    requestPaId:struct<S:string>
-                  >>
-                >
+              Type: 'struct<XPagopaExtchCxId:struct<S:string>,clientRequestTimeStamp:struct<S:string>,statusRequest:struct<S:string>,requestTimestamp:struct<S:string>,lastUpdateTimestamp:struct<S:string>,requestId:struct<S:string>,requestHash:struct<S:string>,version:struct<N:string>,paperRequestMetadata:struct<M:struct<printType:struct<S:string>,productType:struct<S:string>,requestPaId:struct<S:string>>>>'
           Location: !Sub 's3://${ConfinfoDynamoDbExportBucketName}/pn-EcRichiesteMetadati/incremental2024/'
           InputFormat: org.apache.hadoop.mapred.TextInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
@@ -185,17 +158,7 @@ Resources:
             - Name: tableName
               Type: string
             - Name: dynamodb
-              Type: >-
-                struct<
-                  ApproximateCreationDateTime:bigint,
-                  SizeBytes:bigint,
-                  Keys:struct<tagKeyValue:struct<S:string>>,
-                  NewImage:struct<
-                    version:struct<N:string>,
-                    fileKeys:struct<L:array<struct<S:string>>>,
-                    tagKeyValue:struct<S:string>
-                  >
-                >
+              Type: 'struct<ApproximateCreationDateTime:bigint,SizeBytes:bigint,Keys:struct<tagKeyValue:struct<S:string>>,NewImage:struct<version:struct<N:string>,fileKeys:struct<L:array<struct<S:string>>>,tagKeyValue:struct<S:string>>>'
             - Name: eventSource
               Type: string
           Location: !Sub 's3://pn-logs-bucket-${AWS::Region}-${SafeStorageAccountId}-${ConfinfoLogsBucketSuffix}/cdcTos3/TABLE_NAME_pn-SsTags/'
