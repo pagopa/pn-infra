@@ -49,7 +49,7 @@ Resources:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
       CidrBlock: !Join ['', ["10.", !Ref "VpcNumber", ".1.0/24" ]]
-      MapPublicIpOnLaunch: true
+      MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
           Value: !Sub ${VpcName} Subnet 1(AZ1)
@@ -81,7 +81,7 @@ Resources:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
       CidrBlock: !Join [ '', [ "10.", !Ref "VpcNumber", ".2.0/24" ] ]
-      MapPublicIpOnLaunch: true
+      MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
           Value: !Sub ${VpcName} Subnet 2 (AZ2)
@@ -114,7 +114,7 @@ Resources:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [ 2, !GetAZs '' ]
       CidrBlock: !Join [ '', [ "10.", !Ref "VpcNumber", ".3.0/24" ] ]
-      MapPublicIpOnLaunch: true
+      MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
           Value: !Sub ${VpcName} Subnet 3 (AZ3)
