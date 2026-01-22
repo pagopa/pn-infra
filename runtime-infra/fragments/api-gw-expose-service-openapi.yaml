@@ -25,6 +25,7 @@ Parameters:
       - B2B
       - WEB
       - IO
+      - IO_EXP
       - BACKOFFICE
       - PNPG
       - CN_BE
@@ -248,6 +249,7 @@ Conditions:
   IsRADD: !Equals [ !Ref IntendedUsage, 'RADD' ]
   IsCNBE: !Equals [ !Ref IntendedUsage, 'CN_BE' ]
   IsB2BPG: !Equals [ !Ref IntendedUsage, 'B2BPG' ]
+  IsIOEXP: !Equals [ !Ref IntendedUsage, 'IO_EXP' ]
   IsRADDorB2B: !Or [ !Condition IsRADD, !Condition IsB2B ]
   IsRADDorB2BPG: !Or [ !Condition IsRADD, !Condition IsB2BPG ]
   SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
@@ -388,6 +390,19 @@ Resources:
     DependsOn: PublicRestApiOpenapi
     Properties:
       FunctionName: !Sub '${ProjectName}-ioAuthorizerLambda'
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
+      SourceAccount: !Ref AWS::AccountId
+
+
+  # IO Experimental Authorizer
+  IoExpLambdaPermission:
+    Condition: IsIOEXP
+    Type: AWS::Lambda::Permission
+    DependsOn: PublicRestApiOpenapi
+    Properties:
+      FunctionName: !Sub '${ProjectName}-lollipopAuthorizerLambda'
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PublicRestApiOpenapi}/authorizers/*"
