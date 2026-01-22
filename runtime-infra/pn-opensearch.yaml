@@ -67,9 +67,28 @@ Parameters:
       - true
       - false
 
+  WarmCount:
+    Type: Number
+    Default: 3
+    Description: Number of warm nodes
+
+  WarmEnabled:
+    Type: String
+    Default: false
+    Description: Warm nodes enabled
+    AllowedValues:
+      - true
+      - false
+
+  WarmType:
+    Type: String
+    Description: "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-instance-types.html Warm Node Instance Type"
+    Default: "ultrawarm1.medium.search"
+
 Conditions:
   HasDedicatedMaster: !Not [ !Equals [ !Ref MasterNodeType, "" ] ]
   HasZoneAwareness: !Equals [ !Ref ZoneAwareness, true ]
+  HasWarmEnabled: !Equals [ !Ref WarmEnabled, true ]
 
 Resources:
   SecurityGroup:
@@ -143,30 +162,48 @@ Resources:
               DedicatedMasterCount: !Ref MasterNodeInstancesNumber
               DedicatedMasterEnabled: true
               DedicatedMasterType: !Ref MasterNodeType
-              ZoneAwarenessEnabled: true
+              ZoneAwarenessEnabled: !Ref ZoneAwareness
               ZoneAwarenessConfig:
                 AvailabilityZoneCount: 3
+              WarmEnabled: !Ref WarmEnabled
+              WarmCount: !If
+                - HasWarmEnabled
+                - !Ref WarmCount
+                - !Ref AWS::NoValue
+              WarmType: !If
+                - HasWarmEnabled
+                - !Ref WarmType
+                - !Ref AWS::NoValue
             - 
               InstanceCount: !Ref InstanceReplicas
               InstanceType: !Ref InstanceType
               DedicatedMasterCount: !Ref MasterNodeInstancesNumber
               DedicatedMasterEnabled: true
               DedicatedMasterType: !Ref MasterNodeType
-              ZoneAwarenessEnabled: false
+              ZoneAwarenessEnabled: !Ref ZoneAwareness
+              WarmEnabled: !Ref WarmEnabled
+              WarmCount: !If
+                - HasWarmEnabled
+                - !Ref WarmCount
+                - !Ref AWS::NoValue
+              WarmType: !If
+                - HasWarmEnabled
+                - !Ref WarmType
+                - !Ref AWS::NoValue
         - !If
             - HasZoneAwareness
             - 
               InstanceCount: !Ref InstanceReplicas
               InstanceType: !Ref InstanceType
               DedicatedMasterEnabled: false
-              ZoneAwarenessEnabled: true
+              ZoneAwarenessEnabled: !Ref ZoneAwareness
               ZoneAwarenessConfig:
                 AvailabilityZoneCount: 3
             -
               InstanceCount: !Ref InstanceReplicas
               InstanceType: !Ref InstanceType
               DedicatedMasterEnabled: false
-              ZoneAwarenessEnabled: false
+              ZoneAwarenessEnabled: !Ref ZoneAwareness
       EBSOptions:
         EBSEnabled: true
         Iops: !Ref EbsIops
