@@ -149,6 +149,7 @@ Resources:
 
   GlueCrawler:
     Type: AWS::Glue::Crawler
+    Condition: IsGlueCrawlerScheduled
     DependsOn: GlueTable
     Properties:
       DatabaseName: !Ref GlueDatabaseName
@@ -334,7 +335,10 @@ Outputs:
     Value: !Ref GlueTableName
   GlueCrawlerName:
     Description: Name of the created Glue Crawler
-    Value: !Ref GlueCrawler
+    Value: !If
+      - IsGlueCrawlerScheduled
+      - !Ref GlueCrawler
+      - "-"
   GlueViewName:
     Description: Name of the created Glue View
     Value: 
