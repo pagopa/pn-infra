@@ -5,12 +5,12 @@ const { unmarshall } = require("@aws-sdk/util-dynamodb");
 const { trasformPrepareToSendAnalogTimelineKey, retrieveIunFromRequestId, prepareMessageToSns, retrieveInfoFromDetails} = require("./lib/utils");
 
 
-const timelineDbTableName = process.env.DYNAMODB_TIMELINE_TABLE_NAME;
-const paperRequestDeliveryDbTableName = process.env.DYNAMODB_PAPERREQUESTDELIVERY_TABLE_NAME;
-const paperChannelDeliveryDriverDbTableName = process.env.DYNAMODB_PAPERCHANNELDELIVERYDRIVER_TABLE_NAME;
-const s3BucketName = process.env.BUCKET_NAME;
-const snsTopicArn = process.env.SNS_TOPIC_ARN;
-const headerCsv = "RequestId, CAP, ExpectedRecipientID, ActualRecipientID, Courier, Code, ProductType\n";
+const TIMELINE_DB_TABLE_NAME = 'pn-Timelines';
+const PAPER_REQUEST_DELIVERY_DB_TABLE_NAME = 'pn-PaperRequestDelivery';
+const PAPER_CHANNEL_DELIVERY_DRIVER_DB_TABLE_NAME = 'pn-PaperChannelDeliveryDriver';
+const S3_BUCKET_NAME = process.env.MONITORING_BUCKET_NAME;
+const SNS_TOPIC_ARN = process.env.SNS_TOPIC_ARN;
+const HEADER_CSV = "RequestId, CAP, ExpectedRecipientID, ActualRecipientID, Courier, Code, ProductType\n";
 
 async function retrieveElementFromDynamoDB(tableName, keyName, keyValue, sKeyName, sKeyValue) {
   
@@ -24,9 +24,9 @@ async function retrieveElementFromDynamoDB(tableName, keyName, keyValue, sKeyNam
 }
 
 async function exportDataToS3(data, key) {
-  console.log(`Uploading CSV report to S3 bucket: ${s3BucketName}, key: ${key}`);
+  console.log(`Uploading CSV report to S3 bucket: ${S3_BUCKET_NAME}, key: ${key}`);
   try {
-    await uploadFileToS3(s3BucketName, key, data);
+    await uploadFileToS3(S3_BUCKET_NAME, key, data);
     console.log(`Data successfully uploaded to S3 at ${key}`);
   } catch (error) {
     console.error(`Failed to upload data to S3 at ${key}:`, error);
@@ -42,15 +42,15 @@ async function processRecord(record) {
 
   console.log(`Extracted requestId: ${analogMailInfo.requestId}, courier: ${analogMailInfo.courier}, registeredLetterCode: ${analogMailInfo.registeredLetterCode}`);
 
-  const paperRequestData = await retrieveElementFromDynamoDB(paperRequestDeliveryDbTableName, "requestId", analogMailInfo.requestId);
+  const paperRequestData = await retrieveElementFromDynamoDB(PAPER_REQUEST_DELIVERY_DB_TABLE_NAME, "requestId", analogMailInfo.requestId);
   const productType = paperRequestData.productType;
   const driverCode = paperRequestData.driverCode;
-  console.log(`Retrieved productType: ${productType}, driverCode: ${driverCode} from ${paperRequestDeliveryDbTableName}`);
+  console.log(`Retrieved productType: ${productType}, driverCode: ${driverCode} from ${PAPER_REQUEST_DELIVERY_DB_TABLE_NAME}`);
 
-  const driverData = await retrieveElementFromDynamoDB(paperChannelDeliveryDriverDbTableName, "deliveryDriverId", driverCode);
+  const driverData = await retrieveElementFromDynamoDB(PAPER_CHANNEL_DELIVERY_DRIVER_DB_TABLE_NAME, "deliveryDriverId", driverCode);
   const expectedRecipientId = driverData.unifiedDeliveryDriver;
 
-  const timelineElement = await retrieveElementFromDynamoDB(timelineDbTableName, "iun", retrieveIunFromRequestId(analogMailInfo.requestId), "timelineElementId", trasformPrepareToSendAnalogTimelineKey(analogMailInfo.requestId));
+  const timelineElement = await retrieveElementFromDynamoDB(TIMELINE_DB_TABLE_NAME, "iun", retrieveIunFromRequestId(analogMailInfo.requestId), "timelineElementId", trasformPrepareToSendAnalogTimelineKey(analogMailInfo.requestId));
   const recipientZip = timelineElement.details.physicalAddress.zip;
   if(expectedRecipientId !== analogMailInfo.courier) {
     console.warn(`RequestId ${analogMailInfo.requestId} mismatch between expected recipient ID: ${expectedRecipientId} and retrieved zip: ${recipientZip}`);
@@ -64,7 +64,7 @@ async function processRecord(record) {
 
 const handler = async (event) => {
   console.info("New event received ", event);
-  let csvContent = headerCsv;
+  let csvContent = HEADER_CSV;
   const batchItemFailures = [];
   let foundMismatches = false;
   // Processa tutti i record, collezionando i fallimenti
@@ -92,7 +92,7 @@ const handler = async (event) => {
       for(const element of csvContent.split("\n").slice(1,-1)) {
         console.log("Publishing SNS message for element: ", element);
         const message = prepareMessageToSns(element)
-        await publishMessageToSns(snsTopicArn, "Mismatch detection", message);
+        await publishMessageToSns(SNS_TOPIC_ARN, "Mismatch detection", message);
       }
     } catch (error) {
       console.error("Error uploading CSV report to S3", error);

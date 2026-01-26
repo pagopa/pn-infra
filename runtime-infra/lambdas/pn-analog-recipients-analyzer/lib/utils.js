@@ -18,8 +18,7 @@ function prepareMessageToSns(csvLine) {
     Registered Letter Code: ${registeredLetterCode}
     Product Type: ${productType}
     Expected Recipient ID: ${expectedRecipientId}
-    Actual Recipient ZIP: ${recipientZip}
-    Please investigate this discrepancy.`;
+    Actual Recipient ZIP: ${recipientZip}`;
 }
 
 function retrieveInfoFromDetails(event){

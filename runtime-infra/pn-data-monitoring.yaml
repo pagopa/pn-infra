@@ -190,6 +190,15 @@ Parameters:
       - 'ENABLED'
       - 'DISABLED'
   
+  DeliveryMonitoringSnsTopicName:
+    Type: String
+    Description: SNS Topic name for Delivery Monitoring notifications
+    Default: ''
+
+  DeliveryMonitoringSlackEmail:
+    Type: String
+    Description: Slack Email channel for Delivery Monitoring notifications
+    Default: ''
 
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
@@ -1038,6 +1047,20 @@ Resources:
       Endpoint: !Ref DataAnalysisSlackEmail
       TopicArn: !Ref DataAnalysisTopic
 
+  DeliveryMonitoringTopic:
+    Condition: IsCoreAccount
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Ref DeliveryMonitoringSnsTopicName
+
+  DeliveryMonitoringTopicSubscription:
+    Condition: IsCoreAccount
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Ref DeliveryMonitoringSlackEmail
+      TopicArn: !Ref DeliveryMonitoringTopic
+
   LambdaSNSTopicPolicy:
     Condition: IsCoreAccount
     Type: AWS::SNS::TopicPolicy
@@ -1433,7 +1456,80 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt ScheduleQuickSightDataImport.Arn
       SourceAccount: !Ref AWS::AccountId
-     
+  
+  PnAnalogRecipientsAnalyzerLambda:
+    Type: AWS::Lambda::Function
+    Condition: IsCoreAccount
+    Properties:
+      Runtime: nodejs22.x
+      Timeout: 60
+      MemorySize: 128
+      Handler: index.handler
+      FunctionName: pn-analog-recipients-analyzer-lambda
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/pn-analog-recipients-analyzer.zip
+      Environment:
+        Variables:
+          MONITORING_BUCKET_NAME: !Ref DataMonitoringBucket
+          SNS_TOPIC_ARN: !Ref DeliveryMonitoringTopic
+      Role:
+        Fn::GetAtt:
+          - PnAnalogRecipientsAnalyzerLambdaRole
+          - Arn 
+
+  PnAnalogRecipientsAnalyzerLambdaRole:
+    Type: AWS::IAM::Role
+    Condition: IsCoreAccount
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: PnAnalogRecipientsAnalyzerLambdaPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource:
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/PnAnalogRecipientsAnalyzer/*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream  
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/pn-analog-recipients-analyzer-lambda:*
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref DeliveryMonitoringTopic 
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                Resource: 
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-Timelines
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperRequestDelivery
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperChannelDeliveryDriver
+
+
+  PnAnalogRecipientsAnalyzerLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Ref PnAnalogRecipientsAnalyzerLambda
+        LogGroupRetention: 14
+        LogGroupPrefix: /aws/lambda
+
 Outputs:
   DataMonitoringBucketName: 
     Value: !Ref DataMonitoringBucket
