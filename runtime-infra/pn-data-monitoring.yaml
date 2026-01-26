@@ -259,7 +259,7 @@ Resources:
               - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
               - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
             Condition:
-              StringEquals:
+              ForAnyValue:StringEquals:
                 "aws:CalledVia": "athena.amazonaws.com"
           - Effect: Allow
             Action:

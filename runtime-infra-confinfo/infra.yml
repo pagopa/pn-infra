@@ -409,7 +409,7 @@ Resources:
                   "Action": "s3:GetObject",
                   "Resource": "arn:${AWS::Partition}:s3:::${LogsBucketName}/cdcTos3/TABLE_NAME_pn-SsTags/*",
                   "Condition": {
-                    "StringEquals": {
+                    "ForAnyValue:StringEquals": {
                       "aws:CalledVia": "athena.amazonaws.com"
                     }
                   }
@@ -426,7 +426,7 @@ Resources:
                     "StringLike": {
                       "s3:prefix": "cdcTos3/TABLE_NAME_pn-SsTags/*"
                     },
-                    "StringEquals": {
+                    "ForAnyValue:StringEquals": {
                       "aws:CalledVia": "athena.amazonaws.com"
                     }
                   }

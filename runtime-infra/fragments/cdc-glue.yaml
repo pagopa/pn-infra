@@ -15,6 +15,10 @@ Parameters:
   LogsBucketName:
     Type: String
     Description: Logs bucket name
+  ConfinfoLogsBucketName:
+    Type: String
+    Default: ''
+    Description: Optional Confinfo logs bucket name for cross-account CDC access (if empty, uses LogsBucketName)
   GlueTableName:
     Type: String
     AllowedPattern: '^[a-z0-9_]+$'
@@ -48,7 +52,8 @@ Parameters:
     Description: Cron expression for the Glue Crawler schedule.
   GlueServiceRoleArn:
     Type: String
-    Description: Service role for the Glue Crawler.
+    Default: ''
+    Description: Service role for the Glue Crawler (not required if GlueCrawlerSchedule is empty).
 
 Conditions:
   IsGlueCrawlerScheduled: !Not
@@ -56,9 +61,13 @@ Conditions:
       - !Ref GlueCrawlerSchedule
       - ''
   HasCdcView: !Equals [ "true", !Ref GenerateCdcView ]
-  HasNewImagePart2: !Not 
-    - !Equals 
+  HasNewImagePart2: !Not
+    - !Equals
       - !Ref DynamoDBNewImageStructurePart2
+      - ''
+  UseConfinfoLogsBucket: !Not
+    - !Equals
+      - !Ref ConfinfoLogsBucketName
       - ''
 
 Resources:
@@ -96,13 +105,10 @@ Resources:
           projection.p_hour.type: integer
           projection.p_hour.range: 0,23
           projection.p_hour.digits: '2'
-          storage.location.template: !Join
-            - ''
-            - - 's3://'
-              - !Ref LogsBucketName
-              - '/cdcTos3/TABLE_NAME_'
-              - !Ref DynamoTableName
-              - '/${p_year}/${p_month}/${p_day}/${p_hour}/'
+          storage.location.template: !If
+            - UseConfinfoLogsBucket
+            - !Sub 's3://${ConfinfoLogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}/${!p_year}/${!p_month}/${!p_day}/${!p_hour}/'
+            - !Sub 's3://${LogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}/${!p_year}/${!p_month}/${!p_day}/${!p_hour}/'
         StorageDescriptor:
           Columns:
             - Name: awsRegion
@@ -130,7 +136,10 @@ Resources:
                         - HasNewImagePart2
                         - !Sub "struct<ApproximateCreationDateTime:bigint,SizeBytes:bigint,Keys:${DynamoDBKeysStructure},NewImage:${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}>"
                         - !Sub "struct<ApproximateCreationDateTime:bigint,SizeBytes:bigint,Keys:${DynamoDBKeysStructure},NewImage:${DynamoDBNewImageStructure}>"
-          Location: !Sub s3://${LogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}/
+          Location: !If
+            - UseConfinfoLogsBucket
+            - !Sub s3://${ConfinfoLogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}/
+            - !Sub s3://${LogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}/
           InputFormat: org.apache.hadoop.mapred.TextInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
           Compressed: false
@@ -158,15 +167,16 @@ Resources:
         - IsGlueCrawlerScheduled
         - ScheduleExpression: !Ref GlueCrawlerSchedule
         - !Ref AWS::NoValue
-      Tags: 
+      Tags:
         !If
           - HasCdcView
-          - 
-            PnHasView: "true"
-            PnView: !Sub '${GlueTableName}_json_view'
-            PnViewCache: !Sub '${GlueTableName}_parsed_cache'
-          - 
-            PnHasView: "false"
+          - !If
+            - UseConfinfoLogsBucket
+            - PnHasView: "false"
+            - PnHasView: "true"
+              PnView: !Sub '${GlueTableName}_json_view'
+              PnViewCache: !Sub '${GlueTableName}_parsed_cache'
+          - PnHasView: "false"
   
   CdcGlueView:
     Condition: HasCdcView
