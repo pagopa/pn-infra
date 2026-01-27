@@ -1456,7 +1456,18 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt ScheduleQuickSightDataImport.Arn
       SourceAccount: !Ref AWS::AccountId
-  
+
+  AnalogRecipientEventsQueue:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml
+      Parameters:
+        QueueName: pn-analog-recipient-events-queue
+        VisibilityTimeout: 900 # max time for Lambda to process the message
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref DeliveryMonitoringSnsTopicName
+
   PnAnalogRecipientsAnalyzerLambda:
     Type: AWS::Lambda::Function
     Condition: IsCoreAccount
@@ -1473,6 +1484,7 @@ Resources:
         Variables:
           MONITORING_BUCKET_NAME: !Ref DataMonitoringBucket
           SNS_TOPIC_ARN: !Ref DeliveryMonitoringTopic
+          ANALOG_RECIPIENT_QUEUE_URL: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueURL
       Role:
         Fn::GetAtt:
           - PnAnalogRecipientsAnalyzerLambdaRole
@@ -1515,6 +1527,13 @@ Resources:
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-Timelines
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperRequestDelivery
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperChannelDeliveryDriver
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: 
+                  - !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
 
 
   PnAnalogRecipientsAnalyzerLambdaLogGroup:
@@ -1528,6 +1547,15 @@ Resources:
         LogGroupName: !Ref PnAnalogRecipientsAnalyzerLambda
         LogGroupRetention: 14
         LogGroupPrefix: /aws/lambda
+
+  PnAnalogRecipientsAnalyzerLambdaEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Condition: IsCoreAccount
+    Properties:
+      BatchSize: 10
+      Enabled: true
+      EventSourceArn: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+      FunctionName: !Ref PnAnalogRecipientsAnalyzerLambda
 
 Outputs:
   DataMonitoringBucketName: 
