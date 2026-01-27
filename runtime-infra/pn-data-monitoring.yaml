@@ -1466,7 +1466,7 @@ Resources:
         QueueName: pn-analog-recipient-events-queue
         VisibilityTimeout: 900 # max time for Lambda to process the message
         DelaySeconds: 1
-        AlarmSNSTopicName: !Ref DeliveryMonitoringSnsTopicName
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   PnAnalogRecipientsAnalyzerLambda:
     Type: AWS::Lambda::Function
@@ -1484,7 +1484,6 @@ Resources:
         Variables:
           MONITORING_BUCKET_NAME: !Ref DataMonitoringBucket
           SNS_TOPIC_ARN: !Ref DeliveryMonitoringTopic
-          ANALOG_RECIPIENT_QUEUE_URL: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueURL
       Role:
         Fn::GetAtt:
           - PnAnalogRecipientsAnalyzerLambdaRole
