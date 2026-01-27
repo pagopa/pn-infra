@@ -1,16 +1,7 @@
 
 const { DynamoDBClient, QueryCommand  } = require("@aws-sdk/client-dynamodb");
-const { fromIni } = require("@aws-sdk/credential-providers");
-//const dynamoDBClient = new DynamoDBClient();
 
-const dynamoDBClient = new DynamoDBClient({
-    region: "eu-south-1",
-    credentials: fromIni({
-      profile: "sso_pn-core-prod",
-    })
-  });
-
-
+const dynamoDBClient = new DynamoDBClient();
 
 async function queryRequest(tableName, key, value, sKey = undefined, sValue = undefined) {
     const input = { // QueryInput

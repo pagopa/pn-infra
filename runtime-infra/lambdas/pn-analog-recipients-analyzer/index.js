@@ -3,6 +3,7 @@ const { uploadFileToS3 } = require("./lib/s3");
 const { publishMessageToSns } = require("./lib/sns");
 const { unmarshall } = require("@aws-sdk/util-dynamodb");
 const { trasformPrepareToSendAnalogTimelineKey, retrieveIunFromRequestId, prepareMessageToSns, retrieveInfoFromDetails} = require("./lib/utils");
+const { randomUUID } = require('crypto');
 
 
 const TIMELINE_DB_TABLE_NAME = 'pn-Timelines';
@@ -84,8 +85,8 @@ const handler = async (event) => {
   }
   // Se ci sono righe di dati, carica il file CSV su S3)
   if (foundMismatches) {
-    //key name con path yyyyy/mm/dd/hh/mm/<timestamp>_mismatches.csv
-    const s3Key = `analog-zip-mismatches/${new Date().toISOString().slice(0,16).replace(/[-:T]/g, "/")}/${Date.now()}_mismatches.csv`;
+    //key name con path yyyyy/mm/dd/hh/mm/<random-uuid>_mismatches.csv
+    const s3Key = `analog-zip-mismatches/${new Date().toISOString().slice(0,13).replace(/[-:T]/g, "/")}/${randomUUID()}_mismatches.csv`;
 
     try { 
       await exportDataToS3(csvContent, s3Key);

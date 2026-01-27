@@ -1,13 +1,7 @@
 const { SNSClient, PublishCommand } = require("@aws-sdk/client-sns");
-const { fromIni } = require("@aws-sdk/credential-providers");
-//const snsClient = new SNSClient({ region: process.env.AWS_REGION });
 
-const snsClient = new SNSClient({
-    region: "eu-south-1",
-    credentials: fromIni({
-      profile: "sso_pn-core-dev",
-    })
-  });
+const snsClient = new SNSClient();
+
 async function publishMessageToSns(snsTopicArn, subject, message) {
   const params = {
     Subject: subject,
