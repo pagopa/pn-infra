@@ -401,27 +401,19 @@ Resources:
                   }
                 },
                 {
-                  "Sid": "pnCoreAthenaGetCdcSsTags",
+                  "Sid": "pnCoreAthenaCdcSsTags",
                   "Effect": "Allow",
                   "Principal": {
                     "AWS": "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
                   },
-                  "Action": "s3:GetObject",
-                  "Resource": "arn:${AWS::Partition}:s3:::${LogsBucketName}/cdcTos3/TABLE_NAME_pn-SsTags/*",
-                  "Condition": {
-                    "ForAnyValue:StringEquals": {
-                      "aws:CalledVia": "athena.amazonaws.com"
-                    }
-                  }
-                },
-                {
-                  "Sid": "pnCoreAthenaListCdcSsTags",
-                  "Effect": "Allow",
-                  "Principal": {
-                    "AWS": "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
-                  },
-                  "Action": "s3:ListBucket",
-                  "Resource": "arn:${AWS::Partition}:s3:::${LogsBucketName}",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:ListBucket"
+                  ],
+                  "Resource": [
+                    "arn:${AWS::Partition}:s3:::${LogsBucketName}",
+                    "arn:${AWS::Partition}:s3:::${LogsBucketName}/cdcTos3/TABLE_NAME_pn-SsTags/*"
+                  ],
                   "Condition": {
                     "StringLike": {
                       "s3:prefix": "cdcTos3/TABLE_NAME_pn-SsTags/*"

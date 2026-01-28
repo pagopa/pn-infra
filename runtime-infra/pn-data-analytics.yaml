@@ -42,17 +42,24 @@ Resources:
         Name: pn_ss_documenti
         TableType: EXTERNAL_TABLE
         PartitionKeys:
-          - Name: export_date
+          - Name: p_year
+            Type: string
+          - Name: p_month
+            Type: string
+          - Name: p_day
             Type: string
         Parameters:
           EXTERNAL: 'true'
           projection.enabled: 'true'
-          projection.export_date.type: date
-          projection.export_date.format: yyyyMMdd
-          projection.export_date.range: '20240101,NOW'
-          projection.export_date.interval: '1'
-          projection.export_date.interval.unit: DAYS
-          storage.location.template: !Sub 's3://${ConfinfoDynamoDbExportBucketName}/pn-SsDocumenti/incremental2024/${!export_date}/AWSDynamoDB/data/'
+          projection.p_year.type: integer
+          projection.p_year.range: 2024,2099
+          projection.p_month.type: integer
+          projection.p_month.range: 1,12
+          projection.p_month.digits: '2'
+          projection.p_day.type: integer
+          projection.p_day.range: 1,31
+          projection.p_day.digits: '2'
+          storage.location.template: !Sub 's3://${ConfinfoDynamoDbExportBucketName}/pn-SsDocumenti/incremental2024/${!p_year}${!p_month}${!p_day}/AWSDynamoDB/data/'
           compressionType: gzip
           classification: json
         StorageDescriptor:
@@ -82,17 +89,24 @@ Resources:
         Name: pn_ec_richieste_metadati
         TableType: EXTERNAL_TABLE
         PartitionKeys:
-          - Name: export_date
+          - Name: p_year
+            Type: string
+          - Name: p_month
+            Type: string
+          - Name: p_day
             Type: string
         Parameters:
           EXTERNAL: 'true'
           projection.enabled: 'true'
-          projection.export_date.type: date
-          projection.export_date.format: yyyyMMdd
-          projection.export_date.range: '20240101,NOW'
-          projection.export_date.interval: '1'
-          projection.export_date.interval.unit: DAYS
-          storage.location.template: !Sub 's3://${ConfinfoDynamoDbExportBucketName}/pn-EcRichiesteMetadati/incremental2024/${!export_date}/AWSDynamoDB/data/'
+          projection.p_year.type: integer
+          projection.p_year.range: 2024,2099
+          projection.p_month.type: integer
+          projection.p_month.range: 1,12
+          projection.p_month.digits: '2'
+          projection.p_day.type: integer
+          projection.p_day.range: 1,31
+          projection.p_day.digits: '2'
+          storage.location.template: !Sub 's3://${ConfinfoDynamoDbExportBucketName}/pn-EcRichiesteMetadati/incremental2024/${!p_year}${!p_month}${!p_day}/AWSDynamoDB/data/'
           compressionType: gzip
           classification: json
         StorageDescriptor:
@@ -175,6 +189,12 @@ Resources:
               Type: int
             - Name: write_timestamp_micros
               Type: bigint
+            - Name: p_year
+              Type: string
+            - Name: p_month
+              Type: string
+            - Name: p_day
+              Type: string
             - Name: export_date
               Type: string
           Location: ""
@@ -186,7 +206,7 @@ Resources:
               Fn::Sub:
                 - |
                   {
-                    "originalSql": "SELECT newimage.documentkey.s as document_key, newimage.documenttype.m.tipodocumento.s as document_type, newimage.documentstate.s as document_state, newimage.documentlogicalstate.s as document_logical_state, newimage.clientshortcode.s as client_short_code, newimage.contenttype.s as content_type, CAST(newimage.contentlenght.n AS bigint) as content_length, newimage.laststatuschangetimestamp.s as last_status_change_timestamp, newimage.retentionuntil.s as retention_until, newimage.checksum.s as checksum, CAST(newimage.version.n AS int) as version, CAST(metadata.writetimestampmicros.n AS bigint) as write_timestamp_micros, export_date FROM ${DatabaseName}.${TableName}",
+                    "originalSql": "SELECT newimage.documentkey.s as document_key, newimage.documenttype.m.tipodocumento.s as document_type, newimage.documentstate.s as document_state, newimage.documentlogicalstate.s as document_logical_state, newimage.clientshortcode.s as client_short_code, newimage.contenttype.s as content_type, CAST(newimage.contentlenght.n AS bigint) as content_length, newimage.laststatuschangetimestamp.s as last_status_change_timestamp, newimage.retentionuntil.s as retention_until, newimage.checksum.s as checksum, CAST(newimage.version.n AS int) as version, CAST(metadata.writetimestampmicros.n AS bigint) as write_timestamp_micros, p_year, p_month, p_day, concat(p_year, p_month, p_day) as export_date FROM ${DatabaseName}.${TableName}",
                     "catalog": "awsdatacatalog",
                     "schema": "${DatabaseName}",
                     "columns": [
@@ -202,6 +222,9 @@ Resources:
                       {"name": "checksum", "type": "varchar"},
                       {"name": "version", "type": "integer"},
                       {"name": "write_timestamp_micros", "type": "bigint"},
+                      {"name": "p_year", "type": "varchar"},
+                      {"name": "p_month", "type": "varchar"},
+                      {"name": "p_day", "type": "varchar"},
                       {"name": "export_date", "type": "varchar"}
                     ]
                   }
@@ -246,6 +269,12 @@ Resources:
               Type: int
             - Name: write_timestamp_micros
               Type: bigint
+            - Name: p_year
+              Type: string
+            - Name: p_month
+              Type: string
+            - Name: p_day
+              Type: string
             - Name: export_date
               Type: string
           Location: ""
@@ -257,7 +286,7 @@ Resources:
               Fn::Sub:
                 - |
                   {
-                    "originalSql": "SELECT newimage.requestid.s as request_id, newimage.xpagopaextchcxid.s as cx_id, newimage.statusrequest.s as status_request, newimage.requesttimestamp.s as request_timestamp, newimage.lastupdatetimestamp.s as last_update_timestamp, newimage.clientrequesttimestamp.s as client_request_timestamp, newimage.requesthash.s as request_hash, newimage.paperrequestmetadata.m.printtype.s as paper_print_type, newimage.paperrequestmetadata.m.producttype.s as paper_product_type, newimage.paperrequestmetadata.m.requestpaid.s as paper_request_paid, CAST(newimage.version.n AS int) as version, CAST(metadata.writetimestampmicros.n AS bigint) as write_timestamp_micros, export_date FROM ${DatabaseName}.${TableName}",
+                    "originalSql": "SELECT newimage.requestid.s as request_id, newimage.xpagopaextchcxid.s as cx_id, newimage.statusrequest.s as status_request, newimage.requesttimestamp.s as request_timestamp, newimage.lastupdatetimestamp.s as last_update_timestamp, newimage.clientrequesttimestamp.s as client_request_timestamp, newimage.requesthash.s as request_hash, newimage.paperrequestmetadata.m.printtype.s as paper_print_type, newimage.paperrequestmetadata.m.producttype.s as paper_product_type, newimage.paperrequestmetadata.m.requestpaid.s as paper_request_paid, CAST(newimage.version.n AS int) as version, CAST(metadata.writetimestampmicros.n AS bigint) as write_timestamp_micros, p_year, p_month, p_day, concat(p_year, p_month, p_day) as export_date FROM ${DatabaseName}.${TableName}",
                     "catalog": "awsdatacatalog",
                     "schema": "${DatabaseName}",
                     "columns": [
@@ -273,6 +302,9 @@ Resources:
                       {"name": "paper_request_paid", "type": "varchar"},
                       {"name": "version", "type": "integer"},
                       {"name": "write_timestamp_micros", "type": "bigint"},
+                      {"name": "p_year", "type": "varchar"},
+                      {"name": "p_month", "type": "varchar"},
+                      {"name": "p_day", "type": "varchar"},
                       {"name": "export_date", "type": "varchar"}
                     ]
                   }
