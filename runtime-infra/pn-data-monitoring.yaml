@@ -200,6 +200,10 @@ Parameters:
     Description: Slack Email channel for Delivery Monitoring notifications
     Default: ''
 
+  AnalogRecipientEventsQueueARN:
+    Type: String
+    Description: pn-analog-recipient-events-queue ARN
+
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
@@ -1457,17 +1461,6 @@ Resources:
       SourceArn: !GetAtt ScheduleQuickSightDataImport.Arn
       SourceAccount: !Ref AWS::AccountId
 
-  AnalogRecipientEventsQueue:
-    Type: AWS::CloudFormation::Stack
-    Condition: IsCoreAccount
-    Properties:
-      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml
-      Parameters:
-        QueueName: pn-analog-recipient-events-queue
-        VisibilityTimeout: 900 # max time for Lambda to process the message
-        DelaySeconds: 1
-        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-
   PnAnalogRecipientsAnalyzerLambda:
     Type: AWS::Lambda::Function
     Condition: IsCoreAccount
@@ -1532,7 +1525,7 @@ Resources:
                   - sqs:DeleteMessage
                   - sqs:GetQueueAttributes
                 Resource: 
-                  - !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+                  - !Ref AnalogRecipientEventsQueueARN
 
 
   PnAnalogRecipientsAnalyzerLambdaLogGroup:
@@ -1553,7 +1546,7 @@ Resources:
     Properties:
       BatchSize: 10
       Enabled: true
-      EventSourceArn: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+      EventSourceArn: !Ref AnalogRecipientEventsQueueARN
       FunctionName: !Ref PnAnalogRecipientsAnalyzerLambda
 
 Outputs:
