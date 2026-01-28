@@ -248,15 +248,24 @@ Resources:
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-ec2-service-role"
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:instance-profile/pn-data-monitoring-ec2-instance-profile"
                   - !Sub "arn:${AWS::Partition}:sts::${PnCoreAwsAccountId}:assumed-role/pn-data-monitoring-ec2-service-role/*"
-          - Sid: AllowAthenaAccess
+          - Sid: AllowAthenaList
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
+            Action:
+              - "s3:List*"
+            Resource:
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
+            Condition:
+              ForAnyValue:StringEquals:
+                "aws:CalledVia": "athena.amazonaws.com"
+          - Sid: AllowAthenaGet
             Effect: Allow
             Principal:
               AWS: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
             Action:
               - "s3:Get*"
-              - "s3:List*"
             Resource:
-              - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
               - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
             Condition:
               ForAnyValue:StringEquals:
