@@ -250,20 +250,6 @@ Parameters:
   AddressManagerToRaddAltQueueURL:
     Type: String
 
-  # External Channels to Analog Recipient Events
-  AnalogRecipientEventsQueueARN:
-    Type: String
-    Description: pn-analog-recipient-events-queue ARN
-
-  AnalogRecipientEventsQueueURL:
-    Type: String
-    Description: pn-analog-recipient-events-queue URL
-
-  AnalogRecipientExtChUser:
-    Type: String
-    Default: "pn-cons-000"
-    Description: "external channel user dedicated to Analog Recipient Events"
-
 Conditions:
   HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
   HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ]]
@@ -354,7 +340,6 @@ Resources:
                   - !Ref "F24ToPaperChannelQueueARN"
                   - !Ref "F24ToDeliveryPushQueueARN"
                   - !Ref DeliveryPushValidationInputsQueueARN
-                  - !Ref AnalogRecipientEventsQueueARN
       Tags:
         - Key: Microservice
           Value: pn-infra-core
@@ -436,7 +421,6 @@ Resources:
         - !Ref "F24ToDeliveryPushQueueURL"
         - !Ref "SafeStorageToF24QueueURL"
         - !Ref "DeliveryPushValidationInputsQueueURL"
-        - !Ref "AnalogRecipientEventsQueueURL"
       PolicyDocument:
         Statement:
           - Sid: "SendEventsToDLQ"
@@ -466,7 +450,6 @@ Resources:
               - !Ref "F24ToDeliveryPushQueueARN"
               - !Ref "SafeStorageToF24QueueARN"
               - !Ref "DeliveryPushValidationInputsQueueARN"
-              - !Ref "AnalogRecipientEventsQueueARN"
 
   # Log all events
   # pn-infra-logs
@@ -818,39 +801,6 @@ Resources:
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-ExtCh2DeliveryPush'
           Arn: !Ref ExternalChannelsOutputsQueueARN
-          InputPath: $.detail
-          DeadLetterConfig: 
-            Arn: !GetAtt EventBusDeadLetterQueue.Arn
-
-  # Send Analog Recipient Events to pn-analog-recipient-events-queue
-  PnCoreEventBusToAnalogRecipientEventsQueue:
-    Type: AWS::Events::Rule
-    Properties: 
-      Description: Route Analog Recipient Events (CON080) to pn-analog-recipient-events-queue
-      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
-      EventBusName: !Ref PnCoreEventBus
-      EventPattern:
-        detail-type: [ "ExternalChannelOutcomeEvent" ]
-        detail:
-          clientId: [ !Ref AnalogRecipientExtChUser ]
-          analogMail:
-            statusCode: [ "CON080" ]
-      Targets: 
-        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
-          Id: !Sub ${ProjectName}-Logger-AnalogRecipientEvents
-          InputTransformer:
-            InputPathsMap:
-              "timestamp": "$.time"
-            InputTemplate: |
-              {
-                  "timestamp": <timestamp>,
-                  "ruleArn": <aws.events.rule-arn>,
-                  "ruleName": <aws.events.rule-name>,
-                  "ingestionTime": <aws.events.event.ingestion-time>,
-                  "originalEvent": <aws.events.event.json>
-              }       
-        - Id: !Sub '${ProjectName}-CoreEventBus-AnalogRecipientEvents'
-          Arn: !Ref AnalogRecipientEventsQueueARN
           InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
