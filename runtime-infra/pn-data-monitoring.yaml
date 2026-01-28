@@ -243,11 +243,33 @@ Resources:
                 - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
             Condition:
               ArnLike:
-                aws:PrincipalArn: 
+                aws:PrincipalArn:
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-ec2-service-role"
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:instance-profile/pn-data-monitoring-ec2-instance-profile"
                   - !Sub "arn:${AWS::Partition}:sts::${PnCoreAwsAccountId}:assumed-role/pn-data-monitoring-ec2-service-role/*"
+          - Sid: AllowAthenaList
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
+            Action:
+              - "s3:List*"
+            Resource:
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
+            Condition:
+              ForAnyValue:StringEquals:
+                "aws:CalledVia": "athena.amazonaws.com"
+          - Sid: AllowAthenaGet
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
+            Action:
+              - "s3:Get*"
+            Resource:
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
+            Condition:
+              ForAnyValue:StringEquals:
+                "aws:CalledVia": "athena.amazonaws.com"
           - Effect: Allow
             Action:
               - "s3:PutObject"
@@ -1435,6 +1457,6 @@ Resources:
       SourceAccount: !Ref AWS::AccountId
      
 Outputs:
-  DataMonitoringBucketName: 
+  DataMonitoringBucketName:
     Value: !Ref DataMonitoringBucket
     Description: Name of the bucket created for the data monitoring
