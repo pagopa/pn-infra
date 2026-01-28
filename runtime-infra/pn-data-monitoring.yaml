@@ -998,6 +998,8 @@ Resources:
   LambdaPnSupportExportAlarms:
     Condition: IsCoreAccount
     Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
       Parameters:
@@ -1284,6 +1286,8 @@ Resources:
   LambdaPrepareBlockedAnalysisAlarms:
     Condition: IsCoreAccount
     Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
       Parameters:
@@ -1400,6 +1404,8 @@ Resources:
     DependsOn: QuickSightDataImportLambdaLogGroup
     Condition: IsCoreAccount
     Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
       Parameters:
@@ -1479,6 +1485,8 @@ Resources:
   AnalogRecipientEventsQueue:
     Type: AWS::CloudFormation::Stack
     Condition: IsCoreAccount
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
