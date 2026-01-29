@@ -789,7 +789,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Condition: HasDynamoDbExportTableNames
     DeletionPolicy: Delete
-    UpdateReplacePolicy : Delete
+    UpdateReplacePolicy: Delete
     Properties:
       LogGroupName: !Sub "/aws/lambda/${DynamoDbExportFunction}"
       RetentionInDays: 3
@@ -1021,8 +1021,6 @@ Resources:
   LambdaPnSupportExportAlarms:
     Condition: IsCoreAccount
     Type: AWS::CloudFormation::Stack
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
       Parameters:
@@ -1172,7 +1170,7 @@ Resources:
     Condition: IsCoreAccount
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
-    UpdateReplacePolicy : Delete
+    UpdateReplacePolicy: Delete
     Properties:
       LogGroupName: !Sub "/aws/lambda/${LambdaPnSupportExport}"
       RetentionInDays: 3
@@ -1309,8 +1307,6 @@ Resources:
   LambdaPrepareBlockedAnalysisAlarms:
     Condition: IsCoreAccount
     Type: AWS::CloudFormation::Stack
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
       Parameters:
@@ -1427,8 +1423,6 @@ Resources:
     DependsOn: QuickSightDataImportLambdaLogGroup
     Condition: IsCoreAccount
     Type: AWS::CloudFormation::Stack
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
       Parameters:
@@ -1475,8 +1469,8 @@ Resources:
   QuickSightDataImportLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
     Condition: IsCoreAccount
-    UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
       Parameters:
@@ -1508,8 +1502,8 @@ Resources:
   AnalogRecipientEventsQueue:
     Type: AWS::CloudFormation::Stack
     Condition: IsCoreAccount
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
@@ -1623,8 +1617,8 @@ Resources:
   PnAnalogRecipientsAnalyzerLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
     Condition: IsCoreAccount
-    UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
       Parameters:
