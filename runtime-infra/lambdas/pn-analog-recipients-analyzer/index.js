@@ -42,7 +42,10 @@ async function processRecord(record) {
   const analogMailInfo = retrieveInfoFromDetails(recordBody.analogMail);
 
   console.log(`Extracted requestId: ${analogMailInfo.requestId}, courier: ${analogMailInfo.courier}, registeredLetterCode: ${analogMailInfo.registeredLetterCode}`);
-
+  if (!analogMailInfo.courier) {
+    console.log(`Missing courier in record ${record.messageId}, skipping.`);
+    return;
+  }
   const paperRequestData = await retrieveElementFromDynamoDB(PAPER_REQUEST_DELIVERY_DB_TABLE_NAME, "requestId", analogMailInfo.requestId);
   const productType = paperRequestData.productType;
   const driverCode = paperRequestData.driverCode;
