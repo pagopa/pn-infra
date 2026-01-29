@@ -156,6 +156,24 @@ Parameters:
     Type: String
     Description: URL to load infrastructure model fragments from
 
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  EventBusToAnalogRecipientEventsQueueName:
+    Type: String
+    Description: Core Event Bus Name
+
+  AlarmSNSTopicName:
+    Type: String
+    Description: Alarm SNS Topic Name
+
+  AnalogRecipientExtChUser:
+    Type: String
+    Default: "pn-cons-000"
+    Description: "external channel user dedicated to Analog Recipient Events"
+
   LambdasBucketName:
     Type: String
     Description: S3 bucket name containing Lambda deployment packages
@@ -252,11 +270,33 @@ Resources:
                 - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
             Condition:
               ArnLike:
-                aws:PrincipalArn: 
+                aws:PrincipalArn:
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-codebuild-role"
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-data-monitoring-ec2-service-role"
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:instance-profile/pn-data-monitoring-ec2-instance-profile"
                   - !Sub "arn:${AWS::Partition}:sts::${PnCoreAwsAccountId}:assumed-role/pn-data-monitoring-ec2-service-role/*"
+          - Sid: AllowAthenaList
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
+            Action:
+              - "s3:List*"
+            Resource:
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
+            Condition:
+              ForAnyValue:StringEquals:
+                "aws:CalledVia": "athena.amazonaws.com"
+          - Sid: AllowAthenaGet
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
+            Action:
+              - "s3:Get*"
+            Resource:
+              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
+            Condition:
+              ForAnyValue:StringEquals:
+                "aws:CalledVia": "athena.amazonaws.com"
           - Effect: Allow
             Action:
               - "s3:PutObject"
@@ -980,6 +1020,8 @@ Resources:
   LambdaPnSupportExportAlarms:
     Condition: IsCoreAccount
     Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
       Parameters:
@@ -1266,6 +1308,8 @@ Resources:
   LambdaPrepareBlockedAnalysisAlarms:
     Condition: IsCoreAccount
     Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
       Parameters:
@@ -1382,6 +1426,8 @@ Resources:
     DependsOn: QuickSightDataImportLambdaLogGroup
     Condition: IsCoreAccount
     Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
       Parameters:
@@ -1456,7 +1502,56 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt ScheduleQuickSightDataImport.Arn
       SourceAccount: !Ref AWS::AccountId
-  
+
+  ### Analog Recipient Events Queue (Monitoring) ###
+  AnalogRecipientEventsQueue:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-analog-recipient-events'
+        VisibilityTimeout: 900 # max time for Lambda to process the message
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  AnalogRecipientEventsQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Condition: IsCoreAccount
+    Properties:
+      Queues:
+        - !GetAtt AnalogRecipientEventsQueue.Outputs.QueueURL
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt PnCoreEventBusToAnalogRecipientEventsQueue.Arn
+
+  PnCoreEventBusToAnalogRecipientEventsQueue:
+    Type: AWS::Events::Rule
+    Condition: IsCoreAccount
+    Properties: 
+      Description: Route Analog Recipient Events (CON080) to pn-analog-recipient-events-queue
+      EventBusName: !Ref EventBusToAnalogRecipientEventsQueueName
+      EventPattern:
+        detail-type: [ "ExternalChannelOutcomeEvent" ]
+        detail:
+          clientId: [ !Ref AnalogRecipientExtChUser ]
+          analogMail:
+            statusCode: [ "CON080" ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-CoreEventBus-AnalogRecipientEvents'
+          Arn: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+          InputPath: $.detail
+
   PnAnalogRecipientsAnalyzerLambda:
     Type: AWS::Lambda::Function
     Condition: IsCoreAccount
@@ -1515,6 +1610,13 @@ Resources:
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-Timelines
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperRequestDelivery
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperChannelDeliveryDriver
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: 
+                  - !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
 
 
   PnAnalogRecipientsAnalyzerLambdaLogGroup:
@@ -1529,7 +1631,16 @@ Resources:
         LogGroupRetention: 14
         LogGroupPrefix: /aws/lambda
 
+  PnAnalogRecipientsAnalyzerLambdaEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Condition: IsCoreAccount
+    Properties:
+      BatchSize: 10
+      Enabled: true
+      EventSourceArn: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+      FunctionName: !Ref PnAnalogRecipientsAnalyzerLambda
+
 Outputs:
-  DataMonitoringBucketName: 
+  DataMonitoringBucketName:
     Value: !Ref DataMonitoringBucket
     Description: Name of the bucket created for the data monitoring

@@ -1,0 +1,343 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Unique stack for data analytics resources
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: pn
+    Description: Base name for pn project
+  AthenaResultBucketSuffix:
+    Type: String
+    Description: Suffix for the athena result bucket name
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: The S3 bucket from which to fetch the templates used by this stack
+  ConfinfoDynamoDbExportBucketName:
+    Type: String
+    Description: Name of the Confinfo data-monitoring bucket
+  SafeStorageAccountId:
+    Type: String
+    Description: "Confinfo AWS Account id"
+  ConfinfoLogsBucketSuffix:
+    Type: String
+    Description: Suffix for the logs bucket name
+    Default: "001"
+
+Resources:
+
+  ConfinfoExportDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: confinfo_analytics_database
+        Description: Database for Confinfo DynamoDB export tables
+
+  SsDocumentiGlueTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref ConfinfoExportDatabase
+      TableInput:
+        Name: pn_ss_documenti
+        TableType: EXTERNAL_TABLE
+        PartitionKeys:
+          - Name: p_year
+            Type: string
+          - Name: p_month
+            Type: string
+          - Name: p_day
+            Type: string
+        Parameters:
+          EXTERNAL: 'true'
+          projection.enabled: 'true'
+          projection.p_year.type: integer
+          projection.p_year.range: 2024,2099
+          projection.p_month.type: integer
+          projection.p_month.range: 1,12
+          projection.p_month.digits: '2'
+          projection.p_day.type: integer
+          projection.p_day.range: 1,31
+          projection.p_day.digits: '2'
+          storage.location.template: !Sub 's3://${ConfinfoDynamoDbExportBucketName}/pn-SsDocumenti/incremental2024/${!p_year}${!p_month}${!p_day}/AWSDynamoDB/data/'
+          compressionType: gzip
+          classification: json
+        StorageDescriptor:
+          Columns:
+            - Name: metadata
+              Type: 'struct<writetimestampmicros:struct<n:string>>'
+            - Name: keys
+              Type: 'struct<documentkey:struct<s:string>>'
+            - Name: newimage
+              Type: 'struct<checksum:struct<s:string>,clientshortcode:struct<s:string>,contentlenght:struct<n:string>,contenttype:struct<s:string>,documentkey:struct<s:string>,documentlogicalstate:struct<s:string>,documentstate:struct<s:string>,documenttype:struct<m:struct<checksum:struct<s:string>,informationclassification:struct<s:string>,initialstatus:struct<null:boolean>,statuses:struct<m:struct<attached:struct<m:struct<allowedstatustransitions:struct<l:array<struct<s:string>>>,storage:struct<s:string>,technicalstate:struct<s:string>>>,preloaded:struct<m:struct<allowedstatustransitions:struct<l:array<struct<s:string>>>,storage:struct<s:string>,technicalstate:struct<s:string>>>>>,timestamped:struct<s:string>,tipodocumento:struct<s:string>,transformations:struct<l:array<string>>>>,laststatuschangetimestamp:struct<s:string>,retentionuntil:struct<s:string>,version:struct<n:string>>'
+          Location: !Sub 's3://${ConfinfoDynamoDbExportBucketName}/pn-SsDocumenti/incremental2024/'
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Compressed: true
+          SerdeInfo:
+            SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
+            Parameters:
+              case.insensitive: 'true'
+          StoredAsSubDirectories: true
+
+  EcRichiesteMetadatiGlueTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref ConfinfoExportDatabase
+      TableInput:
+        Name: pn_ec_richieste_metadati
+        TableType: EXTERNAL_TABLE
+        PartitionKeys:
+          - Name: p_year
+            Type: string
+          - Name: p_month
+            Type: string
+          - Name: p_day
+            Type: string
+        Parameters:
+          EXTERNAL: 'true'
+          projection.enabled: 'true'
+          projection.p_year.type: integer
+          projection.p_year.range: 2024,2099
+          projection.p_month.type: integer
+          projection.p_month.range: 1,12
+          projection.p_month.digits: '2'
+          projection.p_day.type: integer
+          projection.p_day.range: 1,31
+          projection.p_day.digits: '2'
+          storage.location.template: !Sub 's3://${ConfinfoDynamoDbExportBucketName}/pn-EcRichiesteMetadati/incremental2024/${!p_year}${!p_month}${!p_day}/AWSDynamoDB/data/'
+          compressionType: gzip
+          classification: json
+        StorageDescriptor:
+          Columns:
+            - Name: metadata
+              Type: 'struct<writetimestampmicros:struct<n:string>>'
+            - Name: keys
+              Type: 'struct<requestid:struct<s:string>>'
+            - Name: newimage
+              Type: 'struct<xpagopaextchcxid:struct<s:string>,clientrequesttimestamp:struct<s:string>,eventslist:struct<l:array<struct<m:struct<digprogrstatus:struct<null:boolean>,inserttimestamp:struct<s:string>,paperprogrstatus:struct<m:struct<attachments:struct<l:array<struct<m:struct<date:struct<s:string>,documenttype:struct<s:string>,id:struct<s:string>,sha256:struct<s:string>,uri:struct<s:string>>>>>,clientrequesttimestamp:struct<s:string,null:boolean>,courier:struct<s:string,null:boolean>,deliveryfailurecause:struct<null:boolean>,discoveredaddress:struct<null:boolean>,iun:struct<s:string,null:boolean>,producttype:struct<s:string,null:boolean>,registeredlettercode:struct<s:string,null:boolean>,status:struct<s:string>,statuscode:struct<s:string,null:boolean>,statusdatetime:struct<s:string>,statusdescription:struct<s:string,null:boolean>>>>>>>,lastupdatetimestamp:struct<s:string>,paperrequestmetadata:struct<m:struct<duplicatecheckpassthrough:struct<null:boolean>,isopenreworkrequest:struct<null:boolean>,iun:struct<null:boolean>,printtype:struct<s:string>,producttype:struct<s:string>,requestpaid:struct<s:string>,vas:struct<null:boolean>>>,requesthash:struct<s:string>,requestid:struct<s:string>,requesttimestamp:struct<s:string>,statusrequest:struct<s:string>,version:struct<n:string>>'
+          Location: !Sub 's3://${ConfinfoDynamoDbExportBucketName}/pn-EcRichiesteMetadati/incremental2024/'
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Compressed: true
+          SerdeInfo:
+            SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
+            Parameters:
+              case.insensitive: 'true'
+          StoredAsSubDirectories: true
+
+  SsTagsDataQualityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/cdc-glue.yaml
+      Parameters:
+        DynamoTableName: pn-SsTags
+        GlueTableName: pn_ss_tags
+        GlueDatabaseName: !Ref ConfinfoExportDatabase
+        LogsBucketName: ''
+        ConfinfoLogsBucketName: !Sub 'pn-logs-bucket-${AWS::Region}-${SafeStorageAccountId}-${ConfinfoLogsBucketSuffix}'
+        GlueServiceRoleArn: ''
+        ProjectName: !Ref ProjectName
+        BucketSuffix: !Ref AthenaResultBucketSuffix
+        GenerateCdcView: 'true'
+        GlueCrawlerSchedule: ''
+        DynamoDBKeysStructure: |
+          struct<tagKeyValue:struct<S:string>>
+        DynamoDBNewImageStructure: |
+          struct<
+            version:struct<N:string>,
+            fileKeys:struct<L:array<struct<S:string>>>,
+            tagKeyValue:struct<S:string>
+          >
+
+  SsDocumentiViewTable:
+    Type: AWS::Glue::Table
+    DependsOn: SsDocumentiGlueTable
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref ConfinfoExportDatabase
+      TableInput:
+        Name: pn_ss_documenti_view
+        TableType: VIRTUAL_VIEW
+        Parameters:
+          presto_view: 'true'
+          comment: 'Flattened view for pn_ss_documenti'
+        StorageDescriptor:
+          Columns:
+            - Name: document_key
+              Type: string
+            - Name: document_type
+              Type: string
+            - Name: document_state
+              Type: string
+            - Name: document_logical_state
+              Type: string
+            - Name: client_short_code
+              Type: string
+            - Name: content_type
+              Type: string
+            - Name: content_length
+              Type: bigint
+            - Name: last_status_change_timestamp
+              Type: string
+            - Name: retention_until
+              Type: string
+            - Name: checksum
+              Type: string
+            - Name: version
+              Type: int
+            - Name: write_timestamp_micros
+              Type: bigint
+            - Name: p_year
+              Type: string
+            - Name: p_month
+              Type: string
+            - Name: p_day
+              Type: string
+            - Name: export_date
+              Type: string
+          Location: ""
+          SerdeInfo: {}
+        ViewExpandedText: "/* Presto View */"
+        ViewOriginalText: !Sub
+          - '/* Presto View: ${View} */'
+          - View: !Base64
+              Fn::Sub:
+                - |
+                  {
+                    "originalSql": "SELECT newimage.documentkey.s as document_key, newimage.documenttype.m.tipodocumento.s as document_type, newimage.documentstate.s as document_state, newimage.documentlogicalstate.s as document_logical_state, newimage.clientshortcode.s as client_short_code, newimage.contenttype.s as content_type, CAST(newimage.contentlenght.n AS bigint) as content_length, newimage.laststatuschangetimestamp.s as last_status_change_timestamp, newimage.retentionuntil.s as retention_until, newimage.checksum.s as checksum, CAST(newimage.version.n AS int) as version, CAST(metadata.writetimestampmicros.n AS bigint) as write_timestamp_micros, p_year, p_month, p_day, concat(p_year, p_month, p_day) as export_date FROM ${DatabaseName}.${TableName}",
+                    "catalog": "awsdatacatalog",
+                    "schema": "${DatabaseName}",
+                    "columns": [
+                      {"name": "document_key", "type": "varchar"},
+                      {"name": "document_type", "type": "varchar"},
+                      {"name": "document_state", "type": "varchar"},
+                      {"name": "document_logical_state", "type": "varchar"},
+                      {"name": "client_short_code", "type": "varchar"},
+                      {"name": "content_type", "type": "varchar"},
+                      {"name": "content_length", "type": "bigint"},
+                      {"name": "last_status_change_timestamp", "type": "varchar"},
+                      {"name": "retention_until", "type": "varchar"},
+                      {"name": "checksum", "type": "varchar"},
+                      {"name": "version", "type": "integer"},
+                      {"name": "write_timestamp_micros", "type": "bigint"},
+                      {"name": "p_year", "type": "varchar"},
+                      {"name": "p_month", "type": "varchar"},
+                      {"name": "p_day", "type": "varchar"},
+                      {"name": "export_date", "type": "varchar"}
+                    ]
+                  }
+                - DatabaseName: !Ref ConfinfoExportDatabase
+                  TableName: !Ref SsDocumentiGlueTable
+
+  EcRichiesteMetadatiViewTable:
+    Type: AWS::Glue::Table
+    DependsOn: EcRichiesteMetadatiGlueTable
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref ConfinfoExportDatabase
+      TableInput:
+        Name: pn_ec_richieste_metadati_view
+        TableType: VIRTUAL_VIEW
+        Parameters:
+          presto_view: 'true'
+          comment: 'Flattened view for pn_ec_richieste_metadati'
+        StorageDescriptor:
+          Columns:
+            - Name: request_id
+              Type: string
+            - Name: cx_id
+              Type: string
+            - Name: status_request
+              Type: string
+            - Name: request_timestamp
+              Type: string
+            - Name: last_update_timestamp
+              Type: string
+            - Name: client_request_timestamp
+              Type: string
+            - Name: request_hash
+              Type: string
+            - Name: paper_print_type
+              Type: string
+            - Name: paper_product_type
+              Type: string
+            - Name: paper_request_paid
+              Type: string
+            - Name: version
+              Type: int
+            - Name: write_timestamp_micros
+              Type: bigint
+            - Name: p_year
+              Type: string
+            - Name: p_month
+              Type: string
+            - Name: p_day
+              Type: string
+            - Name: export_date
+              Type: string
+          Location: ""
+          SerdeInfo: {}
+        ViewExpandedText: "/* Presto View */"
+        ViewOriginalText: !Sub
+          - '/* Presto View: ${View} */'
+          - View: !Base64
+              Fn::Sub:
+                - |
+                  {
+                    "originalSql": "SELECT newimage.requestid.s as request_id, newimage.xpagopaextchcxid.s as cx_id, newimage.statusrequest.s as status_request, newimage.requesttimestamp.s as request_timestamp, newimage.lastupdatetimestamp.s as last_update_timestamp, newimage.clientrequesttimestamp.s as client_request_timestamp, newimage.requesthash.s as request_hash, newimage.paperrequestmetadata.m.printtype.s as paper_print_type, newimage.paperrequestmetadata.m.producttype.s as paper_product_type, newimage.paperrequestmetadata.m.requestpaid.s as paper_request_paid, CAST(newimage.version.n AS int) as version, CAST(metadata.writetimestampmicros.n AS bigint) as write_timestamp_micros, p_year, p_month, p_day, concat(p_year, p_month, p_day) as export_date FROM ${DatabaseName}.${TableName}",
+                    "catalog": "awsdatacatalog",
+                    "schema": "${DatabaseName}",
+                    "columns": [
+                      {"name": "request_id", "type": "varchar"},
+                      {"name": "cx_id", "type": "varchar"},
+                      {"name": "status_request", "type": "varchar"},
+                      {"name": "request_timestamp", "type": "varchar"},
+                      {"name": "last_update_timestamp", "type": "varchar"},
+                      {"name": "client_request_timestamp", "type": "varchar"},
+                      {"name": "request_hash", "type": "varchar"},
+                      {"name": "paper_print_type", "type": "varchar"},
+                      {"name": "paper_product_type", "type": "varchar"},
+                      {"name": "paper_request_paid", "type": "varchar"},
+                      {"name": "version", "type": "integer"},
+                      {"name": "write_timestamp_micros", "type": "bigint"},
+                      {"name": "p_year", "type": "varchar"},
+                      {"name": "p_month", "type": "varchar"},
+                      {"name": "p_day", "type": "varchar"},
+                      {"name": "export_date", "type": "varchar"}
+                    ]
+                  }
+                - DatabaseName: !Ref ConfinfoExportDatabase
+                  TableName: !Ref EcRichiesteMetadatiGlueTable
+
+Outputs:
+  ConfinfoExportDatabaseName:
+    Description: Name of the Glue database
+    Value: !Ref ConfinfoExportDatabase
+    Export:
+      Name: !Sub ${AWS::StackName}-ConfinfoExportDatabaseName
+
+  SsDocumentiGlueTableName:
+    Description: Name of the pn-SsDocumenti Glue Table
+    Value: !Ref SsDocumentiGlueTable
+
+  EcRichiesteMetadatiGlueTableName:
+    Description: Name of the pn-EcRichiesteMetadati Glue Table
+    Value: !Ref EcRichiesteMetadatiGlueTable
+
+  SsTagsGlueTableName:
+    Description: Name of the pn-SsTags Glue Table (from nested stack)
+    Value: !GetAtt SsTagsDataQualityStack.Outputs.GlueTableName
+
+  SsTagsViewTableName:
+    Description: Name of the pn-SsTags unified view (from nested stack)
+    Value: !GetAtt SsTagsDataQualityStack.Outputs.GlueViewName
+
+  SsDocumentiViewTableName:
+    Description: Name of the pn-SsDocumenti flattened view
+    Value: !Ref SsDocumentiViewTable
+
+  EcRichiesteMetadatiViewTableName:
+    Description: Name of the pn-EcRichiesteMetadati flattened view
+    Value: !Ref EcRichiesteMetadatiViewTable
