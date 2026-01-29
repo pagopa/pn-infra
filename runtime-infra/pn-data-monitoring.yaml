@@ -127,6 +127,14 @@ Parameters:
     Default: "pn-cons-000"
     Description: "external channel user dedicated to Analog Recipient Events"
 
+  AnalogRecipientsAnalyzerMappingEnabled:
+      Type: String
+      Description: Enable or Disable the Event Source Mapping for the PnAnalogRecipientsAnalyzer Lambda Function
+      Default: "false"
+      AllowedValues:
+        - "true"
+        - "false"
+
   AlarmSNSTopicArn:
     Type: String
 
@@ -1339,7 +1347,7 @@ Resources:
     Condition: IsCoreAccount
     Properties:
       BatchSize: 10
-      Enabled: true
+      Enabled: !Ref AnalogRecipientsAnalyzerMappingEnabled
       EventSourceArn: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
       FunctionName: !Ref PnAnalogRecipientsAnalyzerLambda
 
