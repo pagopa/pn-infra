@@ -742,6 +742,10 @@ Resources:
               - logs:CreateLogStream
               - logs:PutLogEvents
             Resource: '*'
+          - Effect: Allow
+            Action:
+              - kms:Decrypt
+            Resource: !GetAtt SesSnsKmsKey.Arn
             
   SesLambdaFunctionLogGroup:
     Type: AWS::Logs::LogGroup
@@ -1123,14 +1127,51 @@ Resources:
 
 
 
+  # KMS Key for SES SNS Topic encryption
+  SesSnsKmsKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: "KMS Key for SES SNS Topic encryption"
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "Allow administration of the key"
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "kms:*"
+            Resource: "*"
+          - Sid: "Allow SES to use the key"
+            Effect: Allow
+            Principal:
+              Service: "ses.amazonaws.com"
+            Action:
+              - "kms:GenerateDataKey*"
+              - "kms:Decrypt"
+            Resource: "*"
+          - Sid: "Allow SNS to use the key"
+            Effect: Allow
+            Principal:
+              Service: "sns.amazonaws.com"
+            Action:
+              - "kms:GenerateDataKey*"
+              - "kms:Decrypt"
+            Resource: "*"
+
+  SesSnsKmsKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/pn-ses-sns-key
+      TargetKeyId: !Ref SesSnsKmsKey
+
   # Define the SNS topic for SES log
   SesSnsTopic:
     Type: AWS::SNS::Topic
     Properties:
         TopicName: pn-sessns-topic
-        KmsMasterKeyId: alias/aws/sns
+        KmsMasterKeyId: !Ref SesSnsKmsKey
  
-    
   # Policy allow SES to publish event to SNS topic for SES log
   SesTopicPolicy:
     Type: AWS::SNS::TopicPolicy
