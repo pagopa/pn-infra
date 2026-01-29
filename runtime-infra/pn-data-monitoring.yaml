@@ -108,6 +108,33 @@ Parameters:
     Type: String
     Description: URL to load infrastructure model fragments from
 
+  ProjectName:
+    Type: String
+    Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
+      experimental environments without crash official development environment'
+
+  EventBusToAnalogRecipientEventsQueueName:
+    Default: ''
+    Type: String
+    Description: Core Event Bus Name
+
+  AlarmSNSTopicName:
+    Type: String
+    Description: Alarm SNS Topic Name
+
+  AnalogRecipientExtChUser:
+    Type: String
+    Default: "pn-cons-000"
+    Description: "external channel user dedicated to Analog Recipient Events"
+
+  AnalogRecipientsAnalyzerMappingEnabled:
+      Type: String
+      Description: Enable or Disable the Event Source Mapping for the PnAnalogRecipientsAnalyzer Lambda Function
+      Default: "false"
+      AllowedValues:
+        - "true"
+        - "false"
+
   AlarmSNSTopicArn:
     Type: String
 
@@ -143,6 +170,15 @@ Parameters:
       - 'ENABLED'
       - 'DISABLED'
   
+  DeliveryMonitoringSnsTopicName:
+    Type: String
+    Description: SNS Topic name for Delivery Monitoring notifications
+    Default: ''
+
+  DeliveryMonitoringSlackEmail:
+    Type: String
+    Description: Slack Email channel for Delivery Monitoring notifications
+    Default: ''
 
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
@@ -692,7 +728,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Condition: HasDynamoDbExportTableNames
     DeletionPolicy: Delete
-    UpdateReplacePolicy : Delete
+    UpdateReplacePolicy: Delete
     Properties:
       LogGroupName: !Sub "/aws/lambda/${DynamoDbExportFunction}"
       RetentionInDays: 3
@@ -991,6 +1027,21 @@ Resources:
       Endpoint: !Ref DataAnalysisSlackEmail
       TopicArn: !Ref DataAnalysisTopic
 
+  DeliveryMonitoringTopic:
+    Condition: IsCoreAccount
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Ref DeliveryMonitoringSnsTopicName
+
+  DeliveryMonitoringTopicSubscription:
+    Condition: IsCoreAccount
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Ref DeliveryMonitoringSlackEmail
+      TopicArn: !Ref DeliveryMonitoringTopic
+
+
   LambdaSNSTopicPolicy:
     Condition: IsCoreAccount
     Type: AWS::SNS::TopicPolicy
@@ -1059,7 +1110,7 @@ Resources:
     Condition: IsCoreAccount
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
-    UpdateReplacePolicy : Delete
+    UpdateReplacePolicy: Delete
     Properties:
       LogGroupName: !Sub "/aws/lambda/${LambdaPnSupportExport}"
       RetentionInDays: 3
@@ -1163,7 +1214,143 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt ScheduleQuickSightDataImport.Arn
       SourceAccount: !Ref AWS::AccountId
-     
+  
+  AnalogRecipientEventsQueue:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-analog-recipient-events'
+        VisibilityTimeout: 900 # max time for Lambda to process the message
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  AnalogRecipientEventsQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Condition: IsCoreAccount
+    Properties:
+      Queues:
+        - !GetAtt AnalogRecipientEventsQueue.Outputs.QueueURL
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt PnCoreEventBusToAnalogRecipientEventsQueue.Arn
+
+  PnCoreEventBusToAnalogRecipientEventsQueue:
+    Type: AWS::Events::Rule
+    Condition: IsCoreAccount
+    Properties: 
+      Description: Route Analog Recipient Events (CON080) to pn-analog-recipient-events-queue
+      EventBusName: !Ref EventBusToAnalogRecipientEventsQueueName
+      EventPattern:
+        detail-type: [ "ExternalChannelOutcomeEvent" ]
+        detail:
+          clientId: [ !Ref AnalogRecipientExtChUser ]
+          analogMail:
+            statusCode: [ "CON080" ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-CoreEventBus-AnalogRecipientEvents'
+          Arn: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+          InputPath: $.detail
+
+  PnAnalogRecipientsAnalyzerLambda:
+    Type: AWS::Lambda::Function
+    Condition: IsCoreAccount
+    Properties:
+      Runtime: nodejs22.x
+      Timeout: 60
+      MemorySize: 128
+      Handler: index.handler
+      FunctionName: pn-analog-recipients-analyzer-lambda
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/pn-analog-recipients-analyzer.zip
+      Environment:
+        Variables:
+          MONITORING_BUCKET_NAME: !Ref DataMonitoringBucket
+          SNS_TOPIC_ARN: !Ref DeliveryMonitoringTopic
+      Role:
+        Fn::GetAtt:
+          - PnAnalogRecipientsAnalyzerLambdaRole
+          - Arn 
+
+  PnAnalogRecipientsAnalyzerLambdaRole:
+    Type: AWS::IAM::Role
+    Condition: IsCoreAccount
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: PnAnalogRecipientsAnalyzerLambdaPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource:
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/analog-zip-mismatches/*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream  
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/pn-analog-recipients-analyzer-lambda:*
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref DeliveryMonitoringTopic 
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                Resource: 
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-Timelines
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperRequestDelivery
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperChannelDeliveryDriver
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: 
+                  - !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+
+
+  PnAnalogRecipientsAnalyzerLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Ref PnAnalogRecipientsAnalyzerLambda
+        LogGroupRetention: 14
+        LogGroupPrefix: /aws/lambda
+
+  PnAnalogRecipientsAnalyzerLambdaEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Condition: IsCoreAccount
+    Properties:
+      BatchSize: 10
+      Enabled: !Ref AnalogRecipientsAnalyzerMappingEnabled
+      EventSourceArn: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+      FunctionName: !Ref PnAnalogRecipientsAnalyzerLambda
+
 Outputs:
   DataMonitoringBucketName: 
     Value: !Ref DataMonitoringBucket
