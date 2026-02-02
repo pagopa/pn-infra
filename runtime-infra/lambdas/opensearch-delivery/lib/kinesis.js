@@ -48,6 +48,7 @@ function isLogGroupAllowed(logGroup, allowedLogGroupPatterns){
 function mustLog(rec){
   const allowedLogGroupPatterns = [
     'pn-tokenExchangeLambda',
+    'pn-tokenExchangeOidcLambda',
     'pn-safestorage-logger',
     'pn-diagnostic-logger',
     'pn-webLogoutLambda'
