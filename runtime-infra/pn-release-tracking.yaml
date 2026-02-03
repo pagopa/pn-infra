@@ -1,0 +1,407 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  Release Tracking - Athena Glue Table + QuickSight DataSource/DataSets
+
+Parameters:
+  CdArtifactBucketName:
+    Type: String
+    Description: CD artifact bucket containing release-events-raw JSON files
+  ReleaseTrackingDatabaseName:
+    Type: String
+    Default: release_tracking_database
+    Description: Glue database name for release tracking queries
+  AthenaWorkGroupName:
+    Type: String
+    Default: release_tracking_workgroup
+    Description: Athena workgroup for release tracking queries
+  ReleaseTrackingResultsBucketSuffix:
+    Type: String
+    Default: '001'
+    Description: Suffix for the Athena results bucket name
+  ReleaseEventsTableName:
+    Type: String
+    Default: pn_release_events
+    Description: Glue table name for release events
+  ReleaseTrackingDataSourceId:
+    Type: String
+    Default: ReleaseTrackingAthenaDataSource
+    Description: QuickSight DataSource ID
+  ReleaseTrackingDataSourceName:
+    Type: String
+    Default: ReleaseTrackingAthenaDataSource
+    Description: QuickSight DataSource name
+  ReleaseEventsDataSetId:
+    Type: String
+    Default: ReleaseEventsDataSet
+    Description: QuickSight DataSet ID for raw release events
+  ReleaseEventsDataSetName:
+    Type: String
+    Default: SENDReleaseEvents
+    Description: QuickSight DataSet name for raw release events
+  ReleaseSummaryDataSetId:
+    Type: String
+    Default: ReleaseSummaryDataSet
+    Description: QuickSight DataSet ID for release summary
+  ReleaseSummaryDataSetName:
+    Type: String
+    Default: SENDReleaseSummary
+    Description: QuickSight DataSet name for release summary
+  ReleaseEventsRangeDays:
+    Type: Number
+    Default: 365
+    Description: Lookback window in days for QuickSight datasets (override via env cfg)
+
+Resources:
+  ReleaseTrackingResultsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub pn-release-tracking-athena-results-${AWS::Region}-${AWS::AccountId}-${ReleaseTrackingResultsBucketSuffix}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  ReleaseTrackingResultsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ReleaseTrackingResultsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: athena.amazonaws.com
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+            Resource:
+              - !Sub arn:aws:s3:::${ReleaseTrackingResultsBucket}/*
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+          - Effect: Allow
+            Principal:
+              Service: athena.amazonaws.com
+            Action:
+              - s3:ListBucket
+            Resource:
+              - !Sub arn:aws:s3:::${ReleaseTrackingResultsBucket}
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+
+  ReleaseTrackingAthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Ref AthenaWorkGroupName
+      Description: Workgroup for release tracking queries
+      State: ENABLED
+      WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: false
+        ResultConfiguration:
+          OutputLocation: !Sub s3://${ReleaseTrackingResultsBucket}/
+
+  ReleaseTrackingGlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Ref ReleaseTrackingDatabaseName
+        Description: Database for release tracking events
+
+  ReleaseEventsGlueTable:
+    Type: AWS::Glue::Table
+    DependsOn: ReleaseTrackingGlueDatabase
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref ReleaseTrackingGlueDatabase
+      TableInput:
+        Name: !Ref ReleaseEventsTableName
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          EXTERNAL: 'true'
+          projection.enabled: 'true'
+          projection.p_year.type: integer
+          projection.p_year.range: 2024,2099
+          projection.p_month.type: integer
+          projection.p_month.range: 1,12
+          projection.p_month.digits: '2'
+          projection.p_day.type: integer
+          projection.p_day.range: 1,31
+          projection.p_day.digits: '2'
+          projection.p_hour.type: integer
+          projection.p_hour.range: 0,23
+          projection.p_hour.digits: '2'
+          storage.location.template: !Join
+            - ''
+            - - s3://
+              - !Ref CdArtifactBucketName
+              - /release-events-raw/${p_year}/${p_month}/${p_day}/${p_hour}/
+        StorageDescriptor:
+          Location: !Sub s3://${CdArtifactBucketName}/release-events-raw/
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          SerdeInfo:
+            SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
+          Columns:
+            - Name: event_id
+              Type: string
+            - Name: timestamp
+              Type: string
+            - Name: start_timestamp
+              Type: string
+            - Name: duration_seconds
+              Type: string
+            - Name: execution_user
+              Type: string
+            - Name: project
+              Type: string
+            - Name: component
+              Type: string
+            - Name: environment
+              Type: string
+            - Name: phase
+              Type: string
+            - Name: requested_version
+              Type: string
+            - Name: commit_id
+              Type: string
+            - Name: tag
+              Type: string
+            - Name: config_version
+              Type: string
+            - Name: infra_version
+              Type: string
+            - Name: cicd_version
+              Type: string
+            - Name: pipeline_name
+              Type: string
+            - Name: build_id
+              Type: string
+            - Name: build_url
+              Type: string
+            - Name: release_label
+              Type: string
+            - Name: error_message
+              Type: string
+        PartitionKeys:
+          - Name: p_year
+            Type: string
+          - Name: p_month
+            Type: string
+          - Name: p_day
+            Type: string
+          - Name: p_hour
+            Type: string
+
+  ReleaseTrackingAthenaDataSource:
+    Type: AWS::QuickSight::DataSource
+    DependsOn: ReleaseTrackingAthenaWorkGroup
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DataSourceId: !Ref ReleaseTrackingDataSourceId
+      Name: !Ref ReleaseTrackingDataSourceName
+      Type: ATHENA
+      DataSourceParameters:
+        AthenaParameters:
+          WorkGroup: !Ref AthenaWorkGroupName
+
+  ReleaseEventsDataSet:
+    Type: AWS::QuickSight::DataSet
+    DependsOn:
+      - ReleaseTrackingAthenaDataSource
+      - ReleaseEventsGlueTable
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DataSetId: !Ref ReleaseEventsDataSetId
+      Name: !Ref ReleaseEventsDataSetName
+      ImportMode: DIRECT_QUERY
+      PhysicalTableMap:
+        ReleaseEventsTable:
+          CustomSql:
+            DataSourceArn: !GetAtt ReleaseTrackingAthenaDataSource.Arn
+            SqlQuery: !Sub |
+              SELECT
+                event_id,
+                try(date_parse(timestamp, '%Y-%m-%dT%H:%i:%sZ')) AS event_timestamp,
+                try(date_parse(start_timestamp, '%Y-%m-%dT%H:%i:%sZ')) AS start_timestamp,
+                try_cast(duration_seconds AS integer) AS duration_seconds,
+                execution_user,
+                project,
+                component,
+                environment,
+                phase,
+                requested_version,
+                commit_id,
+                tag,
+                config_version,
+                infra_version,
+                cicd_version,
+                pipeline_name,
+                build_id,
+                build_url,
+                release_label,
+                error_message,
+                p_year,
+                p_month,
+                p_day
+              FROM "${ReleaseTrackingDatabaseName}"."${ReleaseEventsTableName}"
+              WHERE
+                CAST(p_year || LPAD(p_month, 2, '0') || LPAD(p_day, 2, '0') AS integer)
+                BETWEEN CAST(DATE_FORMAT(CURRENT_DATE - interval '${ReleaseEventsRangeDays}' day, '%Y%m%d') AS integer)
+                    AND CAST(DATE_FORMAT(CURRENT_DATE, '%Y%m%d') AS integer)
+              ORDER BY event_timestamp DESC
+            Name: ReleaseEventsQuery
+            Columns:
+              - Name: event_id
+                Type: STRING
+              - Name: event_timestamp
+                Type: DATETIME
+              - Name: start_timestamp
+                Type: DATETIME
+              - Name: duration_seconds
+                Type: INTEGER
+              - Name: execution_user
+                Type: STRING
+              - Name: project
+                Type: STRING
+              - Name: component
+                Type: STRING
+              - Name: environment
+                Type: STRING
+              - Name: phase
+                Type: STRING
+              - Name: requested_version
+                Type: STRING
+              - Name: commit_id
+                Type: STRING
+              - Name: tag
+                Type: STRING
+              - Name: config_version
+                Type: STRING
+              - Name: infra_version
+                Type: STRING
+              - Name: cicd_version
+                Type: STRING
+              - Name: pipeline_name
+                Type: STRING
+              - Name: build_id
+                Type: STRING
+              - Name: build_url
+                Type: STRING
+              - Name: release_label
+                Type: STRING
+              - Name: error_message
+                Type: STRING
+              - Name: p_year
+                Type: STRING
+              - Name: p_month
+                Type: STRING
+              - Name: p_day
+                Type: STRING
+      LogicalTableMap:
+        ReleaseEventsLogicalTable:
+          Alias: ReleaseEvents
+          Source:
+            PhysicalTableId: ReleaseEventsTable
+
+  ReleaseSummaryDataSet:
+    Type: AWS::QuickSight::DataSet
+    DependsOn:
+      - ReleaseTrackingAthenaDataSource
+      - ReleaseEventsGlueTable
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DataSetId: !Ref ReleaseSummaryDataSetId
+      Name: !Ref ReleaseSummaryDataSetName
+      ImportMode: DIRECT_QUERY
+      PhysicalTableMap:
+        ReleaseSummaryTable:
+          CustomSql:
+            DataSourceArn: !GetAtt ReleaseTrackingAthenaDataSource.Arn
+            SqlQuery: !Sub |
+              SELECT
+                component,
+                environment,
+                date(try(date_parse(timestamp, '%Y-%m-%dT%H:%i:%sZ'))) AS event_date,
+                COUNT(*) AS total_deploys,
+                SUM(CASE WHEN phase = 'SUCCESS' THEN 1 ELSE 0 END) AS successful_deploys,
+                SUM(CASE WHEN phase = 'FAILURE' THEN 1 ELSE 0 END) AS failed_deploys,
+                ROUND(
+                  CAST(SUM(CASE WHEN phase = 'FAILURE' THEN 1 ELSE 0 END) AS double)
+                  / NULLIF(COUNT(*), 0) * 100,
+                  2
+                ) AS failure_rate_pct,
+                AVG(try_cast(duration_seconds AS integer)) AS avg_duration_seconds,
+                MAX(try(date_parse(timestamp, '%Y-%m-%dT%H:%i:%sZ'))) AS last_deploy_timestamp,
+                max_by(commit_id, try(date_parse(timestamp, '%Y-%m-%dT%H:%i:%sZ'))) AS latest_commit,
+                max_by(release_label, try(date_parse(timestamp, '%Y-%m-%dT%H:%i:%sZ'))) AS latest_release_label
+              FROM "${ReleaseTrackingDatabaseName}"."${ReleaseEventsTableName}"
+              WHERE
+                CAST(p_year || LPAD(p_month, 2, '0') || LPAD(p_day, 2, '0') AS integer)
+                BETWEEN CAST(DATE_FORMAT(CURRENT_DATE - interval '${ReleaseEventsRangeDays}' day, '%Y%m%d') AS integer)
+                    AND CAST(DATE_FORMAT(CURRENT_DATE, '%Y%m%d') AS integer)
+              GROUP BY
+                component,
+                environment,
+                date(try(date_parse(timestamp, '%Y-%m-%dT%H:%i:%sZ')))
+              ORDER BY event_date DESC, component, environment
+            Name: ReleaseSummaryQuery
+            Columns:
+              - Name: component
+                Type: STRING
+              - Name: environment
+                Type: STRING
+              - Name: event_date
+                Type: DATETIME
+              - Name: total_deploys
+                Type: INTEGER
+              - Name: successful_deploys
+                Type: INTEGER
+              - Name: failed_deploys
+                Type: INTEGER
+              - Name: failure_rate_pct
+                Type: DECIMAL
+              - Name: avg_duration_seconds
+                Type: DECIMAL
+              - Name: last_deploy_timestamp
+                Type: DATETIME
+              - Name: latest_commit
+                Type: STRING
+              - Name: latest_release_label
+                Type: STRING
+      LogicalTableMap:
+        ReleaseSummaryLogicalTable:
+          Alias: ReleaseSummary
+          Source:
+            PhysicalTableId: ReleaseSummaryTable
+
+Outputs:
+  ReleaseTrackingResultsBucketName:
+    Description: S3 bucket for Athena query results
+    Value: !Ref ReleaseTrackingResultsBucket
+  ReleaseTrackingAthenaWorkGroupName:
+    Description: Athena workgroup name for release tracking
+    Value: !Ref ReleaseTrackingAthenaWorkGroup
+  ReleaseTrackingGlueDatabaseName:
+    Description: Glue Database name for release tracking
+    Value: !Ref ReleaseTrackingGlueDatabase
+  ReleaseEventsGlueTableName:
+    Description: Glue Table name for release events
+    Value: !Ref ReleaseEventsTableName
+  ReleaseTrackingDataSourceArn:
+    Description: QuickSight Athena DataSource ARN
+    Value: !GetAtt ReleaseTrackingAthenaDataSource.Arn
+  ReleaseEventsDataSetArn:
+    Description: QuickSight DataSet ARN for raw release events
+    Value: !GetAtt ReleaseEventsDataSet.Arn
+  ReleaseSummaryDataSetArn:
+    Description: QuickSight DataSet ARN for release summary
+    Value: !GetAtt ReleaseSummaryDataSet.Arn
