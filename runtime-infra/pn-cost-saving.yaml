@@ -69,7 +69,7 @@ Resources:
   StopEc2Function:
     Type: AWS::Lambda::Function
     Properties:
-      Runtime: python3.12
+      Runtime: python3.14
       Handler: ec2_saving.lambda_handler
       FunctionName: !Sub 'Lambda-Ec2-stop-${EnvironmentType}'
       Code:
@@ -144,7 +144,7 @@ Resources:
     Condition: IsStopEcsService
     Type: AWS::Lambda::Function
     Properties:
-      Runtime: python3.12
+      Runtime: python3.14
       Timeout: 30
       Handler: ecs_saving.lambda_handler
       FunctionName: !Sub 'Lambda-Ecs-CostSaving-${EnvironmentType}'
