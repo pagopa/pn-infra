@@ -46,6 +46,10 @@ Parameters:
     Type: String
     Description: Bucket for save Json with desire count of Ecs
 
+  LambdasBasePath:
+    Type: String
+    Description: S3 object key prefix for the lambda artifacts
+
   PnCoreAwsAccountId:
     Type: String
     Description: Core Account ID (leave blank in Core account)
@@ -66,41 +70,17 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.12
-      Handler: index.lambda_handler
+      Handler: ec2_saving.lambda_handler
       FunctionName: !Sub 'Lambda-Ec2-stop-${EnvironmentType}'
       Code:
-        ZipFile: |
-          import boto3
-          import os
-
-          ec2 = boto3.resource('ec2')
-
-          def lambda_handler(event, context):
-
-              tag_name = os.environ['StopEc2FunctionTagName']
-              tag_value = os.environ['StopEc2FunctionTagValue']
-
-              filter = [{
-                  'Name': 'tag:' + tag_name,
-                  'Values': [tag_value]
-              }]
-
-              for instance in ec2.instances.filter(Filters=filter):
-                  instance_id = instance.id
-                  instance_type = instance.instance_type
-                  instance_state = instance.state['Name']
-                  instance.stop()
-                  print(f"EC2 Instance that will be stopped: {instance_id} ({instance_type}) - State: {instance_state}")
-
-              return 'Successfully identified EC2 instances and stopping it'  # Informative return message
-
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub "${LambdasBasePath}/pn-cost-saving.zip"
       Environment:
         Variables:
           StopEc2FunctionTagName:
             Ref: StopEc2FunctionTagName
           StopEc2FunctionTagValue:
             Ref: StopEc2FunctionTagValue
-
       Role:
         Fn::GetAtt:
           - StopEc2FunctionRole
@@ -158,104 +138,25 @@ Resources:
       LogGroupName: !Sub "/aws/lambda/${StopEc2Function}"
       RetentionInDays: 3
 
-#LAMBDA STOP ECS
+#LAMBDA ECS COST SAVING
 
-  StopEcsFunction:
+  EcsCostSavingFunction:
     Condition: IsStopEcsService
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.12
-      Timeout: 20
-      Handler: index.lambda_handler
-      FunctionName:  !Sub 'Lambda-Ecs-Stop-${EnvironmentType}'
+      Timeout: 30
+      Handler: ecs_saving.lambda_handler
+      FunctionName: !Sub 'Lambda-Ecs-CostSaving-${EnvironmentType}'
       Code:
-        ZipFile: |
-          import boto3
-          import os
-          import json
-          
-          # Retrive Cluster info:
-          def lambda_handler(event, context):
-              ecs_cluster_names = os.environ.get('ECSClusterName', '').split(',')
-              
-              if not ecs_cluster_names or ecs_cluster_names == ['']:
-                  print("ERROR: Not Cluster Specified")
-                  return {
-                      'statusCode': 400,
-                      'body': 'ERROR: Not Cluster Specified'
-                  }
-              
-              ecs_client = boto3.client('ecs')
-              overall_success = True  
-              results = [] 
-              
-              # For All Ecs Cluster in the account stop the services:
-              for cluster_name in ecs_cluster_names:
-                  cluster_name = cluster_name.strip()  
-                  print(f"==> Stopping services for cluster: {cluster_name}")
-
-                  try:
-                      services_response = ecs_client.list_services(cluster=cluster_name, maxResults=50)
-                      service_arns = services_response['serviceArns']
-                  except Exception as e:
-                      print(f"ERROR: Problem to retrive list of services for cluster {cluster_name}. Details: {str(e)}")
-                      overall_success = False
-                      results.append({
-                          'cluster': cluster_name,
-                          'status': 'error',
-                          'message': f'ERROR: to retrive list of services: {str(e)}'
-                      })
-                      continue
-
-                  if not service_arns:
-                      print(f"Nessun services trovato nel cluster {cluster_name}.")
-                      results.append({
-                          'cluster': cluster_name,
-                          'status': 'success',
-                          'message': 'no services found in cluster.'
-                      })
-                      continue
-
-                  cluster_success = True  #
-                  for service_arn in service_arns:
-                      service_name = service_arn.split('/')[-1]
-                      try:
-                          ecs_client.update_service(cluster=cluster_name, service=service_name, desiredCount=0)
-                          print(f"SUCCESS: Services {service_name} in cluster {cluster_name} setting desiredCount=0.")
-                      except Exception as e:
-                          print(f"ERROR: Problem to set desire count to zero {service_name} on cluster {cluster_name}. Details: {str(e)}")
-                          cluster_success = False
-                          overall_success = False
-
-                  if cluster_success:
-                      print(f"==> All services in {cluster_name} stopping successful.")
-                      results.append({
-                          'cluster': cluster_name,
-                          'status': 'success',
-                          'message': 'All services successfully stopping.'
-                      })
-                  else:
-                      print(f"==> Error during stop services on cluster: {cluster_name}.")
-                      results.append({
-                          'cluster': cluster_name,
-                          'status': 'error',
-                          'message': 'ERROR: during stop services.'
-                      })
-
-              if overall_success:
-                  print("==> Operation completed with success.")
-              else:
-                  print("==> Operation completed with errors.")
-
-              return {
-                  'statusCode': 200 if overall_success else 500,
-                  'body': json.dumps(results)
-              }
-
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub "${LambdasBasePath}/pn-cost-saving.zip"
       Environment:
         Variables:
           EcsDesireCountBucket:
             Ref: LambdasBucketName
+          EnvironmentType:
+            Ref: EnvironmentType
           AwsAccountId: 
             Fn::Sub: "${AWS::AccountId}"
           ECSClusterName: 
@@ -267,7 +168,6 @@ Resources:
                     - Ref: ECSClusterName
                     - Ref: PdfRasterECSClusterName
               - Ref: ECSClusterName
-
       Role:
         Fn::GetAtt:
           - EcsOptimizedCostFunctionRole
@@ -293,9 +193,15 @@ Resources:
                 Action:
                   - s3:GetObject
                   - s3:ListBucket
+                  - s3:PutObject
                 Resource:
                   - !Sub "arn:aws:s3:::${LambdasBucketName}"
                   - !Sub "arn:aws:s3:::${LambdasBucketName}/*"
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:github-token-*"
               - Effect: Allow
                 Action:
                   - ecs:*
@@ -327,15 +233,16 @@ Resources:
         - !Ref StopEcsFunctionCronExpression
       State: ENABLED
       Targets:
-        - Arn: !GetAtt StopEcsFunction.Arn
+        - Arn: !GetAtt EcsCostSavingFunction.Arn
           Id: StopEcsFunction
+          Input: '{"action": "stop"}'
 
   StopEcsFunctionInvokePermission:
     Condition: IsStopEcsService
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref StopEcsFunction
+      FunctionName: !Ref EcsCostSavingFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt StopEcsFunctionSchedule.Arn
       SourceAccount: !Ref AWS::AccountId
@@ -346,120 +253,8 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy : Delete
     Properties:
-      LogGroupName: !Sub "/aws/lambda/${StopEcsFunction}"
+      LogGroupName: !Sub "/aws/lambda/${EcsCostSavingFunction}"
       RetentionInDays: 3
-
-
-#LAMBDA START ECS
-
-  StartEcsFunction:
-    Condition: IsStopEcsService
-    Type: AWS::Lambda::Function
-    Properties:
-      Runtime: python3.12
-      Timeout: 20
-      Handler: index.lambda_handler
-      FunctionName: !Sub 'Lambda-Ecs-Start-${EnvironmentType}'
-      Code:
-        ZipFile: |
-          import boto3
-          import json
-          import os
-          import re
-
-          def lambda_handler(event, context):
-              # Env Variable
-              ecs_cluster_names = os.environ['ECSClusterName'].split(",") 
-              s3bucket_name = os.environ['EcsDesireCountBucket']
-              account_id = os.environ['AwsAccountId']
-
-              # Setup AWS Client
-              s3_client = boto3.client('s3')
-              ecs_client = boto3.client('ecs')
-              
-              # For All Clusters retrive json in bucket
-              for ecs_cluster_name in ecs_cluster_names:
-                  object_key = f'desire_count_ecs_{ecs_cluster_name}_{account_id}.json'
-                  
-                  try:
-                      print(f"Retrive JSON file {object_key} from bucket: {s3bucket_name}...")
-                      response = s3_client.get_object(Bucket=s3bucket_name, Key=object_key)
-                      json_data = response['Body'].read().decode('utf-8')
-                      service_counts = json.loads(json_data)
-                      print(f"File JSON successfully retrieved for cluster {ecs_cluster_name}.")
-                  except Exception as e:
-                      print(f"ERROR:  retrieving JSON {object_key} from S3: {str(e)}")
-                      return {
-                          'statusCode': 500,
-                          'body': f"ERROR : retrieving JSON for cluster {ecs_cluster_name}: {str(e)}"
-                      }
-
-                  try:
-                      existing_services = ecs_client.list_services(cluster=ecs_cluster_name, maxResults=50,)['serviceArns']
-                      existing_service_names = [arn.split("/")[-1] for arn in existing_services]
-                      print(f"Actual ECS service in cluster: {ecs_cluster_name}: {existing_service_names}")
-                  except Exception as e:
-                      print(f"[Cluster: {ecs_cluster_name}] ERROR: retrieving existing services: {str(e)}")
-                      return {
-                          'statusCode': 500,
-                          'body': f"ERROR: retrieving services for cluster {ecs_cluster_name}: {str(e)}"
-                      }
-
-                  # Extract Pattern
-                  for service_pattern, desired_count in service_counts.items():
-                      base_service_name_match = re.search(r'^([\w-]+Microservice)', service_pattern)
-                      if not base_service_name_match:
-                          print(f"[Cluster: {ecs_cluster_name}] ERROR: No valid service name found in pattern '{service_pattern}'")
-                          continue
-                      base_service_name = base_service_name_match.group(1)
-                      
-                      # Search ECS service in actual service that match with bucket file 
-                      matched_service = next((s for s in existing_service_names if base_service_name in s), None)
-                      if not matched_service:
-                          print(f"[Cluster: {ecs_cluster_name}] ERROR: No matching service found for pattern '{base_service_name}'")
-                          continue
-                      
-                      # Update Ecs Service
-                      try:
-                          print(f"Update service {matched_service} on cluster {ecs_cluster_name} with desiredCount {desired_count}...")
-                          ecs_client.update_service(
-                              cluster=ecs_cluster_name,
-                              service=matched_service,
-                              desiredCount=desired_count
-                          )
-                          print(f"[Cluster: {ecs_cluster_name}] Desired count successfully updated for service '{matched_service}'.")
-                      except Exception as e:
-                          print(f"[Cluster: {ecs_cluster_name}] ERROR: updating service '{matched_service}': {str(e)}")
-                          return {
-                              'statusCode': 500,
-                              'body': f"ERROR: updating service '{matched_service}' on cluster {ecs_cluster_name}: {str(e)}"
-                          }
-              
-              return {
-                  'statusCode': 200,
-                  'body': f"Desired counts successfully updated for the cluster: {', '.join(ecs_cluster_names)}"
-              }
-       
-      Environment:
-        Variables:
-          EcsDesireCountBucket:
-            Ref: LambdasBucketName
-          AwsAccountId: 
-            Fn::Sub: "${AWS::AccountId}"
-          ECSClusterName: 
-            Fn::If:
-              - IsStopEcsServiceConfinfo
-              - !Join 
-                  - ","
-                  - 
-                    - Ref: ECSClusterName
-                    - Ref: PdfRasterECSClusterName
-              - Ref: ECSClusterName
-
-      Role:
-        Fn::GetAtt:
-          - EcsOptimizedCostFunctionRole
-          - Arn
 
   StartEcsFunctionSchedule:
     Condition: IsStopEcsService
@@ -468,20 +263,20 @@ Resources:
       ScheduleExpression:
         Fn::If:
         - IsHotfixAccount
-        #hotfix fake turn-on for only one hour on the first day of the current month:
         - cron(0 18 1 * ? *)
         - !Ref StartEcsFunctionCronExpression
       State: ENABLED
       Targets:
-        - Arn: !GetAtt StartEcsFunction.Arn
+        - Arn: !GetAtt EcsCostSavingFunction.Arn
           Id: StartEcsFunction
+          Input: '{"action": "start"}'
 
   StartEcsFunctionInvokePermission:
     Condition: IsStopEcsService
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref StartEcsFunction
+      FunctionName: !Ref EcsCostSavingFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt StartEcsFunctionSchedule.Arn
       SourceAccount: !Ref AWS::AccountId
@@ -492,5 +287,5 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy : Delete
     Properties:
-      LogGroupName: !Sub "/aws/lambda/${StartEcsFunction}"
+      LogGroupName: !Sub "/aws/lambda/${EcsCostSavingFunction}-Start"
       RetentionInDays: 3
