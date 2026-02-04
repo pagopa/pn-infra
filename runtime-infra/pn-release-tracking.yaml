@@ -96,6 +96,52 @@ Resources:
             Condition:
               StringEquals:
                 aws:SourceAccount: !Ref AWS::AccountId
+          - Sid: QuickSightAccess
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:ListBucket
+              - s3:GetBucketLocation
+            Resource:
+              - !Sub arn:aws:s3:::${ReleaseTrackingResultsBucket}
+              - !Sub arn:aws:s3:::${ReleaseTrackingResultsBucket}/*
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              StringLike:
+                aws:PrincipalArn: !Sub arn:aws:iam::${AWS::AccountId}:role/aws-quicksight-*
+
+  QuickSightServiceRolePolicy:
+    Type: AWS::IAM::RolePolicy
+    DependsOn: ReleaseTrackingResultsBucket
+    Properties:
+      RoleName: aws-quicksight-service-role-v0
+      PolicyName: ReleaseTrackingS3AccessPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ResultsBucketAccess
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:ListBucket
+              - s3:GetBucketLocation
+            Resource:
+              - !Sub arn:aws:s3:::${ReleaseTrackingResultsBucket}
+              - !Sub arn:aws:s3:::${ReleaseTrackingResultsBucket}/*
+          - Sid: DataSourceBucketReadAccess
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:ListBucket
+              - s3:GetBucketLocation
+            Resource:
+              - !Sub arn:aws:s3:::${CdArtifactBucketName}
+              - !Sub arn:aws:s3:::${CdArtifactBucketName}/release-events-raw/*
 
   ReleaseTrackingAthenaWorkGroup:
     Type: AWS::Athena::WorkGroup
@@ -150,6 +196,8 @@ Resources:
           OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
           SerdeInfo:
             SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
+            Parameters:
+              case.insensitive: 'true'
           Columns:
             - Name: event_id
               Type: string
