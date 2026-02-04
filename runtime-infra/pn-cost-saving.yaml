@@ -46,9 +46,9 @@ Parameters:
     Type: String
     Description: Bucket for save Json with desire count of Ecs
 
-  BucketBasePath:
+  LambdasBasePath:
     Type: String
-    Description: S3 object key prefix for the lambda artifacts (alternative for confinfo)
+    Description: S3 object key prefix for the lambda artifacts
     Default: ''
 
   PnCoreAwsAccountId:
@@ -75,10 +75,7 @@ Resources:
       FunctionName: !Sub 'Lambda-Ec2-stop-${EnvironmentType}'
       Code:
         S3Bucket: !Ref LambdasBucketName
-        S3Key: !If 
-          - IsConfinfoAccount
-          - !Sub "${BucketBasePath}/pn-cost-saving.zip"
-          - !Sub "${LambdasBasePath}/pn-cost-saving.zip"
+        S3Key: !Sub "${LambdasBasePath}/pn-cost-saving.zip"
       Environment:
         Variables:
           StopEc2FunctionTagName:
@@ -154,10 +151,7 @@ Resources:
       FunctionName: !Sub 'Lambda-Ecs-CostSaving-${EnvironmentType}'
       Code:
         S3Bucket: !Ref LambdasBucketName
-        S3Key: !If 
-          - IsConfinfoAccount
-          - !Sub "${BucketBasePath}/pn-cost-saving.zip"
-          - !Sub "${LambdasBasePath}/pn-cost-saving.zip"
+        S3Key: !Sub "${LambdasBasePath}/pn-cost-saving.zip"
       Environment:
         Variables:
           EcsDesireCountBucket:
