@@ -7,14 +7,14 @@ import urllib.request
 def get_github_token():
     secret_name = "github-token"
     region_name = os.environ.get('AWS_REGION', 'eu-south-1')
-    print(f"INFO: Retrieving secret '{secret_name}' from Secrets Manager in region {region_name}")
+    print(f"INFO: Retrieving authentication token from Secrets Manager in region {region_name}")
     client = boto3.client(service_name='secretsmanager', region_name=region_name)
     try:
         get_secret_value_response = client.get_secret_value(SecretId=secret_name)
-        print(f"SUCCESS: Secret '{secret_name}' retrieved")
+        print("SUCCESS: Token retrieved successfully")
         return get_secret_value_response['SecretString']
     except Exception as e:
-        print(f"ERROR retrieving github-token secret: {e}")
+        print("ERROR: Failed to retrieve authentication token")
         return None
 
 def get_config_from_github(token, env, service_dir):
