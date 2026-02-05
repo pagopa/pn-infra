@@ -1555,6 +1555,53 @@ Resources:
           Arn: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
           InputPath: $.detail
 
+  SafeStorageErrorEventsQueue:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-safe-storage-error-events-DLQ'
+        HasDLQ: 'false'
+        VisibilityTimeout: 900
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
+  SafeStorageErrorEventsQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Condition: IsCoreAccount
+    Properties:
+      Queues:
+        - !GetAtt SafeStorageErrorEventsQueue.Outputs.QueueURL
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt SafeStorageErrorEventsQueue.Outputs.QueueARN
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt SafeStorageErrorEventsRule.Arn
+
+  SafeStorageErrorEventsRule:
+    Type: AWS::Events::Rule
+    Condition: IsCoreAccount
+    Properties: 
+      Description: Route Safe Storage Error Events to DLQ
+      EventBusName: !Ref EventBusToAnalogRecipientEventsQueueName
+      EventPattern:
+        source: [ "GESTORE DISPONIBILITA" ]
+        detail-type: [ "SafeStorageTransformEvent" ]
+        detail:
+          documentStatus: [ "ERROR" ]
+      Targets: 
+        - Id: !Sub '${ProjectName}-SafeStorageErrorEvents'
+          Arn: !GetAtt SafeStorageErrorEventsQueue.Outputs.QueueARN
+
   PnAnalogRecipientsAnalyzerLambda:
     Type: AWS::Lambda::Function
     Condition: IsCoreAccount
