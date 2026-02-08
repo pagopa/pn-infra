@@ -1,12 +1,18 @@
 """S3 service layer for CSV export"""
 import os
 import boto3
+from botocore.config import Config
 import csv
 from io import StringIO
 from datetime import datetime, timezone
 from config import logger, OUTPUT_S3_BUCKET, CSV_S3_PREFIX
 
-s3 = boto3.client('s3', region_name=os.environ['AWS_REGION'])
+# Configure S3 client with regional endpoint
+s3_config = Config(
+    region_name=os.environ['AWS_REGION'],
+    s3={'addressing_style': 'virtual'}
+)
+s3 = boto3.client('s3', config=s3_config)
 
 
 def export_results_to_csv(query_id, results, execution_date, alert_name=None):
