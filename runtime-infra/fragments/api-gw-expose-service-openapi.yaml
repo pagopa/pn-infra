@@ -250,6 +250,7 @@ Conditions:
   IsCNBE: !Equals [ !Ref IntendedUsage, 'CN_BE' ]
   IsB2BPG: !Equals [ !Ref IntendedUsage, 'B2BPG' ]
   IsIOEXP: !Equals [ !Ref IntendedUsage, 'IO_EXP' ]
+  IsIOOrIOEXP: !Or [ !Condition IsIO, !Condition IsIOEXP ]
   IsRADDorB2B: !Or [ !Condition IsRADD, !Condition IsB2B ]
   IsRADDorB2BPG: !Or [ !Condition IsRADD, !Condition IsB2BPG ]
   SendLogToKinesis: !Not [ !Equals [ !Ref CloudwatchLogKinesisStreamArn, '' ] ]
@@ -398,7 +399,7 @@ Resources:
 
   # IO Experimental Authorizer
   IoExpLambdaPermission:
-    Condition: IsIOEXP
+    Condition: IsIOOrIOEXP
     Type: AWS::Lambda::Permission
     DependsOn: PublicRestApiOpenapi
     Properties:
