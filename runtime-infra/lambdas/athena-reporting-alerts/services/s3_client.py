@@ -1,11 +1,18 @@
 """S3 service layer for CSV export"""
+import os
 import boto3
+from botocore.config import Config
 import csv
 from io import StringIO
 from datetime import datetime, timezone
 from config import logger, OUTPUT_S3_BUCKET, CSV_S3_PREFIX
 
-s3 = boto3.client('s3')
+# Configure S3 client with regional endpoint
+s3_config = Config(
+    region_name=os.environ['AWS_REGION'],
+    s3={'addressing_style': 'virtual'}
+)
+s3 = boto3.client('s3', config=s3_config)
 
 
 def export_results_to_csv(query_id, results, execution_date, alert_name=None):
@@ -68,14 +75,14 @@ def export_results_to_csv(query_id, results, execution_date, alert_name=None):
         
         s3_path = f"s3://{OUTPUT_S3_BUCKET}/{s3_key}"
         
-        # Generate presigned URL (valid for 3 days)
+        # Generate presigned URL
         presigned_url = s3.generate_presigned_url(
             'get_object',
             Params={
                 'Bucket': OUTPUT_S3_BUCKET,
                 'Key': s3_key
             },
-            ExpiresIn=259200  # 3 days (72 hours)
+            ExpiresIn=86400 # 1 day (24 hours)
         )
         
         logger.info(f"CSV exported successfully to: {s3_path}")
