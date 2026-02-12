@@ -22,7 +22,7 @@ Download link (valid 3 days):
 
 def build_alert_message(query_id, alert_name, alert_count, threshold, operator, s3_path, presigned_url, execution_date, timestamp):
     """Build simple plain text message for alert mode"""
-    csv_section = f"\n\nS3 location: {s3_path}\n\nDownload link (valid 3 days):\n{presigned_url}" if s3_path != 'N/A' else ""
+    csv_section = f"\n\nS3 location: {s3_path}\n\nDownload link:\n{presigned_url}" if s3_path != 'N/A' else ""
     
     return f"""Athena alert triggered.
 
