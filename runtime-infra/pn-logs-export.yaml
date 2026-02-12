@@ -130,6 +130,10 @@ Parameters:
     Default: false
     Type: String
     AllowedValues: [true, false]
+  
+  LogIngestionReservedConcurrentExecution:
+    Type: Number
+    Default: 25
 
 Conditions:
   HasOpenSearchExport: !Not [ !Equals [ !Ref OpenSearchClusterEndpoint, "" ] ]
@@ -244,6 +248,7 @@ Resources:
         OpenSearchKinesisWindow: !Ref OpenSearchKinesisWindow
         OpenSearchParallelizationFactor: !Ref OpenSearchParallelizationFactor
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        LogIngestionReservedConcurrentExecution: !Ref LogIngestionReservedConcurrentExecution
         OpensearchIngestionEnabled: !If
           - ShouldActivateIngestion
           - true
