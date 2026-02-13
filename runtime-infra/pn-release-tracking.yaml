@@ -6,6 +6,9 @@ Parameters:
   CdArtifactBucketName:
     Type: String
     Description: CD artifact bucket containing release-events-raw JSON files
+  ConfinfoCdArtifactBucketName:
+    Type: String
+    Description: CONFINFO CD artifact bucket containing release-events-raw JSON files
   ReleaseTrackingDatabaseName:
     Type: String
     Default: release_tracking_database
@@ -21,7 +24,15 @@ Parameters:
   ReleaseEventsTableName:
     Type: String
     Default: pn_release_events
-    Description: Glue table name for release events
+    Description: Glue view name for unified release events (CORE + CONFINFO)
+  ReleaseEventsCoreTableName:
+    Type: String
+    Default: pn_release_events_core_raw
+    Description: Glue table name for CORE raw release events
+  ReleaseEventsConfinfoTableName:
+    Type: String
+    Default: pn_release_events_confinfo_raw
+    Description: Glue table name for CONFINFO raw release events
   ReleaseTrackingDataSourceId:
     Type: String
     Default: ReleaseTrackingAthenaDataSource
@@ -142,6 +153,8 @@ Resources:
             Resource:
               - !Sub arn:aws:s3:::${CdArtifactBucketName}
               - !Sub arn:aws:s3:::${CdArtifactBucketName}/release-events-raw/*
+              - !Sub arn:aws:s3:::${ConfinfoCdArtifactBucketName}
+              - !Sub arn:aws:s3:::${ConfinfoCdArtifactBucketName}/release-events-raw/*
 
   ReleaseTrackingAthenaWorkGroup:
     Type: AWS::Athena::WorkGroup
@@ -162,14 +175,14 @@ Resources:
         Name: !Ref ReleaseTrackingDatabaseName
         Description: Database for release tracking events
 
-  ReleaseEventsGlueTable:
+  ReleaseEventsCoreGlueTable:
     Type: AWS::Glue::Table
     DependsOn: ReleaseTrackingGlueDatabase
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Ref ReleaseTrackingGlueDatabase
       TableInput:
-        Name: !Ref ReleaseEventsTableName
+        Name: !Ref ReleaseEventsCoreTableName
         TableType: EXTERNAL_TABLE
         Parameters:
           EXTERNAL: 'true'
@@ -251,6 +264,208 @@ Resources:
           - Name: p_hour
             Type: string
 
+  ReleaseEventsConfinfoGlueTable:
+    Type: AWS::Glue::Table
+    DependsOn: ReleaseTrackingGlueDatabase
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref ReleaseTrackingGlueDatabase
+      TableInput:
+        Name: !Ref ReleaseEventsConfinfoTableName
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          EXTERNAL: 'true'
+          projection.enabled: 'true'
+          projection.p_year.type: integer
+          projection.p_year.range: 2024,2099
+          projection.p_month.type: integer
+          projection.p_month.range: 1,12
+          projection.p_month.digits: '2'
+          projection.p_day.type: integer
+          projection.p_day.range: 1,31
+          projection.p_day.digits: '2'
+          projection.p_hour.type: integer
+          projection.p_hour.range: 0,23
+          projection.p_hour.digits: '2'
+          storage.location.template: !Join
+            - ''
+            - - s3://
+              - !Ref ConfinfoCdArtifactBucketName
+              - /release-events-raw/${p_year}/${p_month}/${p_day}/${p_hour}/
+        StorageDescriptor:
+          Location: !Sub s3://${ConfinfoCdArtifactBucketName}/release-events-raw/
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          SerdeInfo:
+            SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
+            Parameters:
+              case.insensitive: 'true'
+          Columns:
+            - Name: event_id
+              Type: string
+            - Name: timestamp
+              Type: string
+            - Name: start_timestamp
+              Type: string
+            - Name: duration_seconds
+              Type: string
+            - Name: execution_user
+              Type: string
+            - Name: project
+              Type: string
+            - Name: component
+              Type: string
+            - Name: environment
+              Type: string
+            - Name: phase
+              Type: string
+            - Name: requested_version
+              Type: string
+            - Name: commit_id
+              Type: string
+            - Name: tag
+              Type: string
+            - Name: config_version
+              Type: string
+            - Name: infra_version
+              Type: string
+            - Name: cicd_version
+              Type: string
+            - Name: pipeline_name
+              Type: string
+            - Name: pipeline_execution_id
+              Type: string
+            - Name: build_id
+              Type: string
+            - Name: build_url
+              Type: string
+            - Name: release_label
+              Type: string
+            - Name: error_message
+              Type: string
+        PartitionKeys:
+          - Name: p_year
+            Type: string
+          - Name: p_month
+            Type: string
+          - Name: p_day
+            Type: string
+          - Name: p_hour
+            Type: string
+
+  ReleaseEventsUnionViewTable:
+    Type: AWS::Glue::Table
+    DependsOn:
+      - ReleaseEventsCoreGlueTable
+      - ReleaseEventsConfinfoGlueTable
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref ReleaseTrackingGlueDatabase
+      TableInput:
+        Name: !Ref ReleaseEventsTableName
+        TableType: VIRTUAL_VIEW
+        Parameters:
+          presto_view: 'true'
+          comment: 'Unified release events view (CORE + CONFINFO)'
+        StorageDescriptor:
+          Columns:
+            - Name: event_id
+              Type: string
+            - Name: timestamp
+              Type: string
+            - Name: start_timestamp
+              Type: string
+            - Name: duration_seconds
+              Type: string
+            - Name: execution_user
+              Type: string
+            - Name: project
+              Type: string
+            - Name: component
+              Type: string
+            - Name: environment
+              Type: string
+            - Name: phase
+              Type: string
+            - Name: requested_version
+              Type: string
+            - Name: commit_id
+              Type: string
+            - Name: tag
+              Type: string
+            - Name: config_version
+              Type: string
+            - Name: infra_version
+              Type: string
+            - Name: cicd_version
+              Type: string
+            - Name: pipeline_name
+              Type: string
+            - Name: pipeline_execution_id
+              Type: string
+            - Name: build_id
+              Type: string
+            - Name: build_url
+              Type: string
+            - Name: release_label
+              Type: string
+            - Name: error_message
+              Type: string
+            - Name: p_year
+              Type: string
+            - Name: p_month
+              Type: string
+            - Name: p_day
+              Type: string
+            - Name: p_hour
+              Type: string
+            - Name: source_system
+              Type: string
+          Location: ""
+          SerdeInfo: {}
+        ViewExpandedText: "/* Presto View */"
+        ViewOriginalText: !Sub
+          - '/* Presto View: ${View} */'
+          - View: !Base64
+              Fn::Sub:
+                - |
+                  {
+                    "originalSql": "SELECT event_id, timestamp, start_timestamp, duration_seconds, execution_user, project, component, environment, phase, requested_version, commit_id, tag, config_version, infra_version, cicd_version, pipeline_name, pipeline_execution_id, build_id, build_url, release_label, error_message, p_year, p_month, p_day, p_hour, 'CORE' as source_system FROM ${DatabaseName}.${CoreTableName} UNION ALL SELECT event_id, timestamp, start_timestamp, duration_seconds, execution_user, project, component, environment, phase, requested_version, commit_id, tag, config_version, infra_version, cicd_version, pipeline_name, pipeline_execution_id, build_id, build_url, release_label, error_message, p_year, p_month, p_day, p_hour, 'CONFINFO' as source_system FROM ${DatabaseName}.${ConfinfoTableName}",
+                    "catalog": "awsdatacatalog",
+                    "schema": "${DatabaseName}",
+                    "columns": [
+                      {"name": "event_id", "type": "varchar"},
+                      {"name": "timestamp", "type": "varchar"},
+                      {"name": "start_timestamp", "type": "varchar"},
+                      {"name": "duration_seconds", "type": "varchar"},
+                      {"name": "execution_user", "type": "varchar"},
+                      {"name": "project", "type": "varchar"},
+                      {"name": "component", "type": "varchar"},
+                      {"name": "environment", "type": "varchar"},
+                      {"name": "phase", "type": "varchar"},
+                      {"name": "requested_version", "type": "varchar"},
+                      {"name": "commit_id", "type": "varchar"},
+                      {"name": "tag", "type": "varchar"},
+                      {"name": "config_version", "type": "varchar"},
+                      {"name": "infra_version", "type": "varchar"},
+                      {"name": "cicd_version", "type": "varchar"},
+                      {"name": "pipeline_name", "type": "varchar"},
+                      {"name": "pipeline_execution_id", "type": "varchar"},
+                      {"name": "build_id", "type": "varchar"},
+                      {"name": "build_url", "type": "varchar"},
+                      {"name": "release_label", "type": "varchar"},
+                      {"name": "error_message", "type": "varchar"},
+                      {"name": "p_year", "type": "varchar"},
+                      {"name": "p_month", "type": "varchar"},
+                      {"name": "p_day", "type": "varchar"},
+                      {"name": "p_hour", "type": "varchar"},
+                      {"name": "source_system", "type": "varchar"}
+                    ]
+                  }
+                - DatabaseName: !Ref ReleaseTrackingDatabaseName
+                  CoreTableName: !Ref ReleaseEventsCoreTableName
+                  ConfinfoTableName: !Ref ReleaseEventsConfinfoTableName
+
   ReleaseTrackingAthenaDataSource:
     Type: AWS::QuickSight::DataSource
     DependsOn: ReleaseTrackingAthenaWorkGroup
@@ -267,7 +482,7 @@ Resources:
     Type: AWS::QuickSight::DataSet
     DependsOn:
       - ReleaseTrackingAthenaDataSource
-      - ReleaseEventsGlueTable
+      - ReleaseEventsUnionViewTable
     Properties:
       AwsAccountId: !Ref AWS::AccountId
       DataSetId: !Ref ReleaseEventsDataSetId
@@ -299,6 +514,7 @@ Resources:
                 build_url,
                 release_label,
                 error_message,
+                source_system,
                 p_year,
                 p_month,
                 p_day
@@ -350,6 +566,8 @@ Resources:
                 Type: STRING
               - Name: error_message
                 Type: STRING
+              - Name: source_system
+                Type: STRING
               - Name: p_year
                 Type: STRING
               - Name: p_month
@@ -366,7 +584,7 @@ Resources:
     Type: AWS::QuickSight::DataSet
     DependsOn:
       - ReleaseTrackingAthenaDataSource
-      - ReleaseEventsGlueTable
+      - ReleaseEventsUnionViewTable
     Properties:
       AwsAccountId: !Ref AWS::AccountId
       DataSetId: !Ref ReleaseSummaryDataSetId
@@ -378,6 +596,7 @@ Resources:
             DataSourceArn: !GetAtt ReleaseTrackingAthenaDataSource.Arn
             SqlQuery: !Sub |
               SELECT
+                source_system,
                 component,
                 environment,
                 date(try(date_parse(timestamp, '%Y-%m-%dT%H:%i:%sZ'))) AS event_date,
@@ -399,12 +618,15 @@ Resources:
                 BETWEEN CAST(DATE_FORMAT(CURRENT_DATE - interval '${ReleaseEventsRangeDays}' day, '%Y%m%d') AS integer)
                     AND CAST(DATE_FORMAT(CURRENT_DATE, '%Y%m%d') AS integer)
               GROUP BY
+                source_system,
                 component,
                 environment,
                 date(try(date_parse(timestamp, '%Y-%m-%dT%H:%i:%sZ')))
-              ORDER BY event_date DESC, component, environment
+              ORDER BY event_date DESC, source_system, component, environment
             Name: ReleaseSummaryQuery
             Columns:
+              - Name: source_system
+                Type: STRING
               - Name: component
                 Type: STRING
               - Name: environment
@@ -444,7 +666,7 @@ Outputs:
     Description: Glue Database name for release tracking
     Value: !Ref ReleaseTrackingGlueDatabase
   ReleaseEventsGlueTableName:
-    Description: Glue Table name for release events
+    Description: Glue View name for unified release events (CORE + CONFINFO)
     Value: !Ref ReleaseEventsTableName
   ReleaseTrackingDataSourceArn:
     Description: QuickSight Athena DataSource ARN
