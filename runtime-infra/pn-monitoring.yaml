@@ -281,6 +281,8 @@ Resources:
       TreatMissingData: notBreaching        
       AlarmActions:
         - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: 1            
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: 60
@@ -494,6 +496,8 @@ Resources:
       TreatMissingData: notBreaching        
       AlarmActions:
         - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
       Dimensions:
         - Value: !Ref LogsKinesisSourceStreamName
           Name: StreamName        
@@ -513,6 +517,8 @@ Resources:
       AlarmDescription: "CloudWatch alarm for when Kinesis Logs GetRecords.IteratorAgeMilliseconds is too high."
       TreatMissingData: notBreaching        
       AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
         - !Ref AlarmSNSTopicArn
       Dimensions:
         - Value: !Ref LogsKinesisSourceStreamName
@@ -535,6 +541,8 @@ Resources:
       TreatMissingData: notBreaching        
       AlarmActions:
         - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
       Dimensions:
         - Value: !Ref CdcKinesisSourceStreamName
           Name: StreamName
@@ -555,6 +563,8 @@ Resources:
       TreatMissingData: notBreaching        
       AlarmActions:
         - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
       Dimensions:
         - Value: !Ref CdcKinesisSourceStreamName
           Name: StreamName
@@ -574,6 +584,8 @@ Resources:
       AlarmDescription: "CloudWatch Alarm for Clock Error Bound limit over threshold"
       TreatMissingData: notBreaching      
       AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
         - !Ref AlarmSNSTopicArn 
       Metrics:
         - Id: q1
@@ -595,6 +607,8 @@ Resources:
       AlarmDescription: "CloudWatch Alarm for Synchronization value different by Synchronized"
       TreatMissingData: notBreaching   
       AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
         - !Ref AlarmSNSTopicArn    
       Metrics:
         - Id: q1
@@ -861,6 +875,8 @@ Resources:
       TreatMissingData: notBreaching        
       AlarmActions:
         - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
       Metrics:
         - Id: q1
           Expression: "SELECT MIN(SSLExpiration) FROM SCHEMA(\"RADD\", \"Iss\")"
@@ -957,7 +973,7 @@ Resources:
                 Action:
                   - cloudwatch:PutMetricAlarm
                   - cloudwatch:DeleteAlarms
-                Resource: "aarn:aws:cloudwatch:*:*:alarm:SyntheticMonitorFailure-*"
+                Resource: "arn:aws:cloudwatch:*:*:alarm:SyntheticMonitorFailure-*"
 
   SyntheticsMonitorCanaryPortals:
     Condition: HasDeploySyntheticMonitoring
@@ -1048,7 +1064,7 @@ Resources:
               return await loadBlueprint();
           };
       ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
-      RuntimeVersion: syn-nodejs-puppeteer-10.0
+      RuntimeVersion: syn-nodejs-puppeteer-13.0
       Schedule:
         Expression: rate(5 minutes)
         DurationInSeconds: 0
@@ -1141,7 +1157,7 @@ Resources:
               return await apiCheck();
           };
       ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
-      RuntimeVersion: syn-nodejs-puppeteer-10.0
+      RuntimeVersion: syn-nodejs-puppeteer-13.0
       Schedule:
         Expression: rate(5 minutes)
         DurationInSeconds: 0
@@ -1241,7 +1257,7 @@ Resources:
           };
 
       ExecutionRoleArn: !GetAtt SyntheticsMonitorRole.Arn
-      RuntimeVersion: syn-nodejs-puppeteer-10.0
+      RuntimeVersion: syn-nodejs-puppeteer-13.0
       Schedule:
         Expression: cron(0 9 * * ? *)
         DurationInSeconds: 0
