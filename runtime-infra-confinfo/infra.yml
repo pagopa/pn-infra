@@ -432,6 +432,38 @@ Resources:
                   }
                 }
             - ""
+
+  CdArtifactBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CdBucketName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCoreAthenaListReleaseEventsRaw
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
+            Action:
+              - "s3:ListBucket"
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::${CdBucketName}"
+            Condition:
+              StringLike:
+                "s3:prefix": "release-events-raw/*"
+              ForAnyValue:StringEquals:
+                "aws:CalledVia": "athena.amazonaws.com"
+          - Sid: AllowCoreAthenaGetReleaseEventsRaw
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
+            Action:
+              - "s3:GetObject"
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::${CdBucketName}/release-events-raw/*"
+            Condition:
+              ForAnyValue:StringEquals:
+                "aws:CalledVia": "athena.amazonaws.com"
   
   ###             Export dynamo CDC to Log saving bucket             ###
   ###########################################################################
