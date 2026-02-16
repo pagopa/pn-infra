@@ -161,6 +161,7 @@ Resources:
     Properties:
       Name: !Ref AthenaWorkGroupName
       Description: Workgroup for release tracking queries
+      RecursiveDeleteOption: true
       State: ENABLED
       WorkGroupConfiguration:
         EnforceWorkGroupConfiguration: false
@@ -169,6 +170,7 @@ Resources:
 
   ReleaseTrackingGlueDatabase:
     Type: AWS::Glue::Database
+    DependsOn: ReleaseTrackingAthenaWorkGroup
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseInput:
@@ -177,7 +179,9 @@ Resources:
 
   ReleaseEventsCoreGlueTable:
     Type: AWS::Glue::Table
-    DependsOn: ReleaseTrackingGlueDatabase
+    DependsOn:
+      - ReleaseTrackingGlueDatabase
+      - ReleaseTrackingAthenaWorkGroup
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Ref ReleaseTrackingGlueDatabase
@@ -266,7 +270,9 @@ Resources:
 
   ReleaseEventsConfinfoGlueTable:
     Type: AWS::Glue::Table
-    DependsOn: ReleaseTrackingGlueDatabase
+    DependsOn:
+      - ReleaseTrackingGlueDatabase
+      - ReleaseTrackingAthenaWorkGroup
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Ref ReleaseTrackingGlueDatabase
@@ -356,6 +362,7 @@ Resources:
   ReleaseEventsUnionViewTable:
     Type: AWS::Glue::Table
     DependsOn:
+      - ReleaseTrackingAthenaWorkGroup
       - ReleaseEventsCoreGlueTable
       - ReleaseEventsConfinfoGlueTable
     Properties:
