@@ -475,7 +475,10 @@ Resources:
 
   ReleaseTrackingAthenaDataSource:
     Type: AWS::QuickSight::DataSource
-    DependsOn: ReleaseTrackingAthenaWorkGroup
+    DependsOn:
+      - ReleaseTrackingAthenaWorkGroup
+      - QuickSightServiceRolePolicy
+      - ReleaseTrackingResultsBucketPolicy
     Properties:
       AwsAccountId: !Ref AWS::AccountId
       DataSourceId: !Ref ReleaseTrackingDataSourceId
