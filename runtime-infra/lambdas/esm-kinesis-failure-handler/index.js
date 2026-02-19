@@ -39,7 +39,5 @@ export const handler = async (event) => {
 
   console.log("EMF Metric Data:", JSON.stringify(metricData, null, 2));
 
-  // Here you would typically send the metricData to CloudWatch Logs, which will be automatically parsed by EMF
-  // For example, you can use console.log to output the metric data, and it will be picked up by CloudWatch Logs
   console.log(JSON.stringify(metricData));
 };
