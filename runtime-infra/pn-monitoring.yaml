@@ -1289,6 +1289,7 @@ Resources:
 
   # Lambda function
   ESMKinesisFailureHandlerFunction:
+    Condition: HasESMKinesisFailureNotificationsBucket
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub "${ProjectName}-esm-kinesis-failure-handler"
@@ -1305,6 +1306,7 @@ Resources:
       Timeout : 60
 
   ESMKinesisFailureHandlerFunctionRole:
+    Condition: HasESMKinesisFailureNotificationsBucket
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub "${ProjectName}-esm-kinesis-failure-handler-role"
