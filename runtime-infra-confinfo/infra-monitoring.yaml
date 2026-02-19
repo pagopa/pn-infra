@@ -489,6 +489,7 @@ Resources:
 
   # Lambda function
   ESMKinesisFailureHandlerFunction:
+    Condition: HasESMKinesisFailureNotificationsBucket
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub "${ProjectName}-esm-kinesis-failure-handler"
@@ -505,6 +506,7 @@ Resources:
       Timeout : 60
 
   ESMKinesisFailureHandlerFunctionRole:
+    Condition: HasESMKinesisFailureNotificationsBucket
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub "${ProjectName}-esm-kinesis-failure-handler-role"
@@ -514,7 +516,7 @@ Resources:
           - Action: sts:AssumeRole
             Effect: Allow
             Principal:
-              Service: events.amazonaws.com
+              Service: lambda.amazonaws.com
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
@@ -545,6 +547,15 @@ Resources:
         - Arn: !GetAtt ESMKinesisFailureHandlerFunction.Arn
           Id: "TargetForESMKinesisFailureNotificationsBucketRule"
 
+  ESMKinesisFailureNotificationsBucketRulePermission:
+    Condition: HasESMKinesisFailureNotificationsBucket
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt ESMKinesisFailureHandlerFunction.Arn
+      Principal: 'events.amazonaws.com'
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !GetAtt ESMKinesisFailureNotificationsBucketRule.Arn
 
 Outputs:
   OOMAlarmArn:
