@@ -319,6 +319,10 @@ Parameters:
       For info about capacity provider strategy see: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_CapacityProviderStrategyItem.html
     Default: '[{"capacityProvider":"FARGATE_SPOT","weight":9,"base":0},{"capacityProvider":"FARGATE","weight":1,"base":0}]'
 
+  ESMKinesisFailureNotificationsBucketName:
+    Type: String
+    Description: 'Bucket name for ESM Kinesis failure notifications'
+
 Conditions:
   IsAlbArnEmpty: !Equals [ !Ref ApplicationLoadBalancerArn, '-' ]
   IsAlbArnDnsEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDns, '-' ]
@@ -338,6 +342,8 @@ Conditions:
     - !Equals [!Ref EnvironmentType, "dev"]
     - !Equals [!Ref EnvironmentType, "test"]
     - !Equals [!Ref EnvironmentType, "hotfix"]
+
+  HasESMKinesisFailureNotificationsBucket: !Not [ !Equals [ !Ref ESMKinesisFailureNotificationsBucketName, '' ]]  
 
 Resources:
 
@@ -1434,4 +1440,7 @@ Outputs:
 
   ServiceEndpointToPdfRaster:
     Value: !Ref ServiceEndpointToPdfRaster
+
+  ESMKinesisFailureNotificationsBucketName:
+    Value: !Ref ESMKinesisFailureNotificationsBucketName
     

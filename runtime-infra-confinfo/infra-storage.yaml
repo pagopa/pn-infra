@@ -249,6 +249,27 @@ Resources:
                   aws:SourceArn: !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
             - !Ref AWS::NoValue
 
+  ESMKinesisFailureNotificationsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub '${ProjectName}-esm-kinesis-failure-notifications-${AWS::Region}-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
 
   NewSafeStorageCloudTrailFileQueue:
     Type: AWS::CloudFormation::Stack
@@ -481,6 +502,10 @@ Outputs:
         - MakeBucketCondition
         - !Ref LogsBucket
         - ''
+
+  ESMKinesisFailureNotificationsBucketName:
+    Value: !Ref ESMKinesisFailureNotificationsBucket
+    Description: 'Bucket name for ESM Kinesis failure notifications'
 
   CdcKinesisStreamName:
     Value: !Ref CdcKinesisStream
