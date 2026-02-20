@@ -77,8 +77,14 @@ Parameters:
     Type: String
     Description: 'Base URL for the bucket'
     
+  ESMKinesisFailureNotificationsBucketName:
+    Type: String
+    Description: 'Bucket name for ESM Kinesis failure notifications'
+    Default: ''
+
 Conditions:
-  SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
+  SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]  
+  HasESMKinesisFailureNotificationsBucket: !Not [ !Equals [ !Ref ESMKinesisFailureNotificationsBucketName, '' ]]
 
 Resources:
  ###                            Event adn Alarm                           ###
@@ -480,6 +486,76 @@ Resources:
       Parameters:
         FunctionName: !Ref DiagnosticLoggerLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  # Lambda function
+  ESMKinesisFailureHandlerFunction:
+    Condition: HasESMKinesisFailureNotificationsBucket
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-esm-kinesis-failure-handler"
+      Runtime: nodejs22.x
+      Handler: "index.handler"
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub "${BucketBasePath}/esm-kinesis-failure-handler.zip"
+      Role: !GetAtt ESMKinesisFailureHandlerFunctionRole.Arn
+      TracingConfig:
+        Mode: Active
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:339249233099:layer:LambdaInsightsExtension:13"
+      Timeout : 60
+
+  ESMKinesisFailureHandlerFunctionRole:
+    Condition: HasESMKinesisFailureNotificationsBucket
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-esm-kinesis-failure-handler-role"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: !Sub "${ProjectName}-esm-kinesis-failure-handler-policy"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:getEventSourceMapping
+                Resource: "*"
+
+  ESMKinesisFailureNotificationsBucketRule:
+    Condition: HasESMKinesisFailureNotificationsBucket
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Rule to capture object creation in ESM Kinesis bucket and handle it"
+      EventPattern:
+        source:
+          - "aws.s3"
+        detail-type:
+          - "Object Created"
+        detail:
+          bucket:
+            name:
+              - !Ref ESMKinesisFailureNotificationsBucketName
+      Targets:
+        - Arn: !GetAtt ESMKinesisFailureHandlerFunction.Arn
+          Id: "TargetForESMKinesisFailureNotificationsBucketRule"
+
+  ESMKinesisFailureNotificationsBucketRulePermission:
+    Condition: HasESMKinesisFailureNotificationsBucket
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt ESMKinesisFailureHandlerFunction.Arn
+      Principal: 'events.amazonaws.com'
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !GetAtt ESMKinesisFailureNotificationsBucketRule.Arn
 
 Outputs:
   OOMAlarmArn:

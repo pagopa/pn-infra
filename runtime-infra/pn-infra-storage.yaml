@@ -281,6 +281,28 @@ Resources:
             ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256           
 
+  ESMKinesisFailureNotificationsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub '${ProjectName}-esm-kinesis-failure-notifications-${AWS::Region}-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+
   ## KINESIS SOURCE STREAM FOR Change Data Capture
 
   ### AWS KMS / Server-side encryption for Kinesis Stream 
@@ -540,3 +562,7 @@ Outputs:
   
   DataLakeAccountId2:
     Value: !Ref DataLakeAccountId2
+
+  ESMKinesisFailureNotificationsBucketName:
+    Value: !Ref ESMKinesisFailureNotificationsBucket
+    Description: 'Bucket name for ESM Kinesis failure notifications'
