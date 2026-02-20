@@ -22,19 +22,20 @@ export const handler = async (event) => {
       "Timestamp": new Date().getTime(),
       "CloudWatchMetrics": [
         {
-          "Namespace": "ESM/KinesisFailures",
+          "Namespace": "ESM/Kinesis",
           "Dimensions": [["FunctionName"]],
           "Metrics": [
             {
-              "Name": "KinesisWriteFailures",
+              "Name": "ProcessingFailures",
               "Unit": "Count"
             }
           ]
         }
       ]
     },
-    "FunctionName": eventSourceMapping.FunctionArn.split(":").slice(-1)[0],
-    "KinesisWriteFailures": 1
+    "FunctionName": eventSourceMapping.FunctionArn.split(":").pop(),
+    "StreamName": eventSourceMapping.EventSourceArn.split(":").pop(),
+    "ProcessingFailures": 1
   };
 
   console.log("EMF Metric Data:", JSON.stringify(metricData, null, 2));
