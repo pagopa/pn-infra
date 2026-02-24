@@ -41,6 +41,14 @@ Parameters:
     Description: Firehose buffer size in MB
     Default: 64
 
+  ExistingFirehoseLogGroupName:
+    Type: String
+    Default: ''
+    Description: Existing CloudWatch LogGroup name for Firehose logs. If empty, the fragment creates one.
+
+Conditions:
+  CreateFirehoseLogGroup: !Equals [ !Ref ExistingFirehoseLogGroupName, '' ]
+
 Resources:
   DeliveryStreamErrorBucket:
     Type: AWS::S3::Bucket
@@ -116,13 +124,18 @@ Resources:
               - logs:PutLogEvents
               - logs:CreateLogStream
             Resource:
-              - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeliveryStreamLogGroup}:*'
+              - !If
+                - CreateFirehoseLogGroup
+                - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeliveryStreamLogGroup}:*'
+                - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ExistingFirehoseLogGroupName}:*'
 
   DeliveryStreamLogGroup:
+    Condition: CreateFirehoseLogGroup
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
+      LogGroupName: !Sub '/aws/kinesisfirehose/${ProjectName}-${DeliveryStreamNamePrefix}'
       RetentionInDays: 30
 
   DeliveryStreamLogStream:
@@ -130,15 +143,15 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      LogGroupName: !Ref DeliveryStreamLogGroup
+      LogGroupName: !If
+        - CreateFirehoseLogGroup
+        - !Ref DeliveryStreamLogGroup
+        - !Ref ExistingFirehoseLogGroupName
 
   PostelTracingIcebergDeliveryStream:
     Type: AWS::KinesisFirehose::DeliveryStream
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
     DependsOn:
       - DeliveryStreamRolePolicy
-      - DeliveryStreamLogGroup
       - DeliveryStreamLogStream
     Properties:
       DeliveryStreamName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-delivery-stream-v1'
@@ -151,7 +164,10 @@ Resources:
             - TableBucketName: !Ref TableBucketName
         CloudWatchLoggingOptions:
           Enabled: true
-          LogGroupName: !Ref DeliveryStreamLogGroup
+          LogGroupName: !If
+            - CreateFirehoseLogGroup
+            - !Ref DeliveryStreamLogGroup
+            - !Ref ExistingFirehoseLogGroupName
           LogStreamName: !Ref DeliveryStreamLogStream
         DestinationTableConfigurationList:
           - DestinationDatabaseName: !Ref DestinationNamespace
@@ -172,15 +188,21 @@ Resources:
           CompressionFormat: UNCOMPRESSED
           CloudWatchLoggingOptions:
             Enabled: true
-            LogGroupName: !Ref DeliveryStreamLogGroup
+            LogGroupName: !If
+              - CreateFirehoseLogGroup
+              - !Ref DeliveryStreamLogGroup
+              - !Ref ExistingFirehoseLogGroupName
             LogStreamName: !Ref DeliveryStreamLogStream
 
   DeliveryStreamErrorMetricFilter:
     Type: AWS::Logs::MetricFilter
     DependsOn:
-      - DeliveryStreamLogGroup
+      - DeliveryStreamLogStream
     Properties:
-      LogGroupName: !Ref DeliveryStreamLogGroup
+      LogGroupName: !If
+        - CreateFirehoseLogGroup
+        - !Ref DeliveryStreamLogGroup
+        - !Ref ExistingFirehoseLogGroupName
       FilterPattern: '?ERROR ?Error ?Exception ?AccessDenied'
       MetricTransformations:
         - MetricValue: '1'
@@ -224,3 +246,10 @@ Outputs:
   DeliveryStreamErrorAlarmArn:
     Description: ARN of Firehose error alarm
     Value: !GetAtt DeliveryStreamErrorAlarm.Arn
+
+  EffectiveFirehoseLogGroupName:
+    Description: Effective CloudWatch LogGroup name used by Firehose
+    Value: !If
+      - CreateFirehoseLogGroup
+      - !Ref DeliveryStreamLogGroup
+      - !Ref ExistingFirehoseLogGroupName
