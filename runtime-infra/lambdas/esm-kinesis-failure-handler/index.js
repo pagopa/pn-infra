@@ -1,11 +1,9 @@
 const { getEventSourceMapping } = require("./lib/lambda");
 
 const handler = async (event) => {
-
   console.log("Received event:", JSON.stringify(event, null, 2));
 
   try {
-    // Per eventi S3 via EventBridge
     const objectKey = event?.detail?.object?.key;
 
     if (!objectKey) {
@@ -13,65 +11,47 @@ const handler = async (event) => {
       return;
     }
 
-    console.log("Object key:", objectKey);
-
-    // Estrae UUID (36 caratteri standard)
-    const esmUuidMatch = objectKey.match(/\/([a-f0-9-]{36})\//);
+    const esmUuidMatch = objectKey.match(
+      /\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12})\//i
+    );
 
     if (!esmUuidMatch) {
       console.error("ESM-UUID not found in object key:", objectKey);
       return;
     }
+
     const esmUuid = esmUuidMatch[1];
-    console.log("Extracted ESM-UUID:", esmUuid);
 
     const eventSourceMapping = await getEventSourceMapping(esmUuid);
-    console.log("Retrieved Event Source Mapping:", eventSourceMapping);
 
-    // Create metrics using EMF format
+    const functionName = eventSourceMapping?.FunctionArn?.split(":").pop();
+    
+    const streamName = eventSourceMapping?.EventSourceArn?.split(":").pop().split("/").pop();
+
+
     const metricData = {
-      "_aws": {
-        "Timestamp": new Date().getTime(),
-        "CloudWatchMetrics": [
+      _aws: {
+        Timestamp: Date.now(),
+        CloudWatchMetrics: [
           {
-            "Namespace": "ESM/Kinesis",
-            "Dimensions": [["FunctionName"]],
-            "Metrics": [
-              {
-                "Name": "ProcessingFailures",
-                "Unit": "Count"
-              }
-            ]
-          }
-        ]
+            Namespace: "ESM/Kinesis",
+            Dimensions: [["FunctionName", "StreamName"]],
+            Metrics: [{ Name: "ProcessingFailures", Unit: "Count" }],
+          },
+        ],
       },
-      "FunctionName": eventSourceMapping.FunctionArn.split(":").pop(),
-      "StreamName": eventSourceMapping.EventSourceArn.split(":").pop(),
-      "ProcessingFailures": 1
+      FunctionName: functionName,
+      StreamName: streamName,
+      ProcessingFailures: 1,
     };
-
-    console.log("EMF Metric Data:", JSON.stringify(metricData, null, 2));
 
     console.log(JSON.stringify(metricData));
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        message: "Kinesis failure handled and metrics emitted successfully.",
-      }),
-    };
+    return { statusCode: 200 };
   } catch (error) {
     console.error("Error handling Kinesis failure:", error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        message: "Error handling Kinesis failure.",
-        error: error.message,
-      }),
-    };
+    return { statusCode: 500 };
   }
 };
 
-module.exports = {
-  handler
-}
+module.exports = { handler };
