@@ -1,8 +1,8 @@
 const { getEventSourceMapping } = require("./lib/lambda");
 
-export const handler = async (event) => {
-  console.log("Received event:", JSON.stringify(event, null, 2));
+const handler = async (event) => {
 
+  console.log("Received event:", JSON.stringify(event, null, 2));
   
   // Extract ESM-UUID from the object key
   const esmUuidMatch = objectKey.match(/\/([a-f0-9-]{36})\//);
@@ -41,4 +41,15 @@ export const handler = async (event) => {
   console.log("EMF Metric Data:", JSON.stringify(metricData, null, 2));
 
   console.log(JSON.stringify(metricData));
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({
+      message: "Kinesis failure handled and metrics emitted successfully.",
+    }),
+  };
 };
+
+module.exports = {
+  handler
+}
