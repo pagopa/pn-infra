@@ -61,6 +61,16 @@ Parameters:
     Type: Number
     Default: 365
     Description: Lookback window in days for QuickSight datasets (override via env cfg)
+  EnableQuickSightResources:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable/disable QuickSight resources creation
+
+Conditions:
+  CreateQuickSightResources: !Equals [!Ref EnableQuickSightResources, 'true']
 
 Resources:
   ReleaseTrackingResultsBucket:
@@ -127,6 +137,7 @@ Resources:
 
   QuickSightServiceRolePolicy:
     Type: AWS::IAM::RolePolicy
+    Condition: CreateQuickSightResources
     DependsOn: ReleaseTrackingResultsBucket
     Properties:
       RoleName: aws-quicksight-service-role-v0
@@ -475,6 +486,7 @@ Resources:
 
   ReleaseTrackingAthenaDataSource:
     Type: AWS::QuickSight::DataSource
+    Condition: CreateQuickSightResources
     DependsOn:
       - ReleaseTrackingAthenaWorkGroup
       - QuickSightServiceRolePolicy
@@ -490,6 +502,7 @@ Resources:
 
   ReleaseEventsDataSet:
     Type: AWS::QuickSight::DataSet
+    Condition: CreateQuickSightResources
     DependsOn:
       - ReleaseTrackingAthenaDataSource
       - ReleaseEventsUnionViewTable
@@ -592,6 +605,7 @@ Resources:
 
   ReleaseSummaryDataSet:
     Type: AWS::QuickSight::DataSet
+    Condition: CreateQuickSightResources
     DependsOn:
       - ReleaseTrackingAthenaDataSource
       - ReleaseEventsUnionViewTable
@@ -679,11 +693,14 @@ Outputs:
     Description: Glue View name for unified release events (CORE + CONFINFO)
     Value: !Ref ReleaseEventsTableName
   ReleaseTrackingDataSourceArn:
+    Condition: CreateQuickSightResources
     Description: QuickSight Athena DataSource ARN
     Value: !GetAtt ReleaseTrackingAthenaDataSource.Arn
   ReleaseEventsDataSetArn:
+    Condition: CreateQuickSightResources
     Description: QuickSight DataSet ARN for raw release events
     Value: !GetAtt ReleaseEventsDataSet.Arn
   ReleaseSummaryDataSetArn:
+    Condition: CreateQuickSightResources
     Description: QuickSight DataSet ARN for release summary
     Value: !GetAtt ReleaseSummaryDataSet.Arn
