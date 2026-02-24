@@ -1,0 +1,226 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create a DirectPut Firehose stream that writes to an existing S3 Tables Iceberg table
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Project name identifier
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: Alarm SNS topic ARN
+
+  TableBucketARN:
+    Type: String
+    Description: ARN of the destination S3 Tables table bucket
+
+  TableBucketName:
+    Type: String
+    Description: Name of the destination S3 Tables table bucket
+
+  DestinationNamespace:
+    Type: String
+    Description: Namespace (database) name inside S3 Tables catalog
+
+  DestinationTableName:
+    Type: String
+    Description: Destination Iceberg table name
+
+  DeliveryStreamNamePrefix:
+    Type: String
+    Description: Delivery stream prefix identifier
+    Default: 'postel-tracing'
+
+  BufferingIntervalSec:
+    Type: Number
+    Description: Firehose buffer interval in seconds
+    Default: 60
+
+  BufferingSizeMB:
+    Type: Number
+    Description: Firehose buffer size in MB
+    Default: 64
+
+Resources:
+  DeliveryStreamErrorBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-firehose-errors-${AWS::AccountId}-${AWS::Region}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  DeliveryStreamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: sts:AssumeRole
+
+  DeliveryStreamRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-iceberg-policy'
+      Roles:
+        - !Ref DeliveryStreamRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: IcebergWrite
+            Effect: Allow
+            Action:
+              - s3tables:*
+            Resource:
+              - !Ref TableBucketARN
+              - !Sub '${TableBucketARN}/*'
+          - Sid: GlueCatalogRead
+            Effect: Allow
+            Action:
+              - glue:GetDatabase
+              - glue:GetDatabases
+              - glue:GetTable
+              - glue:GetTableVersion
+              - glue:GetTableVersions
+              - glue:GetPartitions
+            Resource:
+              - '*'
+          - Sid: LakeFormationDataAccess
+            Effect: Allow
+            Action:
+              - lakeformation:GetDataAccess
+            Resource:
+              - '*'
+          - Sid: ErrorBucketWrite
+            Effect: Allow
+            Action:
+              - s3:AbortMultipartUpload
+              - s3:GetBucketLocation
+              - s3:GetObject
+              - s3:ListBucket
+              - s3:ListBucketMultipartUploads
+              - s3:PutObject
+            Resource:
+              - !GetAtt DeliveryStreamErrorBucket.Arn
+              - !Sub '${DeliveryStreamErrorBucket.Arn}/*'
+          - Sid: Logging
+            Effect: Allow
+            Action:
+              - logs:PutLogEvents
+              - logs:CreateLogStream
+            Resource:
+              - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeliveryStreamLogGroup}:*'
+
+  DeliveryStreamLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RetentionInDays: 30
+
+  DeliveryStreamLogStream:
+    Type: AWS::Logs::LogStream
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Ref DeliveryStreamLogGroup
+
+  PostelTracingIcebergDeliveryStream:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    DependsOn:
+      - DeliveryStreamRolePolicy
+      - DeliveryStreamLogGroup
+      - DeliveryStreamLogStream
+    Properties:
+      DeliveryStreamName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-delivery-stream-v1'
+      DeliveryStreamType: DirectPut
+      IcebergDestinationConfiguration:
+        AppendOnly: true
+        CatalogConfiguration:
+          CatalogArn: !Sub
+            - 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog/s3tablescatalog/${TableBucketName}'
+            - TableBucketName: !Ref TableBucketName
+        CloudWatchLoggingOptions:
+          Enabled: true
+          LogGroupName: !Ref DeliveryStreamLogGroup
+          LogStreamName: !Ref DeliveryStreamLogStream
+        DestinationTableConfigurationList:
+          - DestinationDatabaseName: !Ref DestinationNamespace
+            DestinationTableName: !Ref DestinationTableName
+            S3ErrorOutputPrefix: !Sub 'iceberg-errors/${DestinationNamespace}/${DestinationTableName}/!{firehose:error-output-type}/'
+        RetryOptions:
+          DurationInSeconds: 300
+        RoleARN: !GetAtt DeliveryStreamRole.Arn
+        s3BackupMode: FailedDataOnly
+        S3Configuration:
+          BucketARN: !GetAtt DeliveryStreamErrorBucket.Arn
+          RoleARN: !GetAtt DeliveryStreamRole.Arn
+          Prefix: !Sub 'iceberg-backup/${DestinationNamespace}/${DestinationTableName}/'
+          ErrorOutputPrefix: !Sub 'iceberg-backup/errors/!{firehose:error-output-type}/'
+          BufferingHints:
+            IntervalInSeconds: !Ref BufferingIntervalSec
+            SizeInMBs: !Ref BufferingSizeMB
+          CompressionFormat: UNCOMPRESSED
+          CloudWatchLoggingOptions:
+            Enabled: true
+            LogGroupName: !Ref DeliveryStreamLogGroup
+            LogStreamName: !Ref DeliveryStreamLogStream
+
+  DeliveryStreamErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    DependsOn:
+      - DeliveryStreamLogGroup
+    Properties:
+      LogGroupName: !Ref DeliveryStreamLogGroup
+      FilterPattern: '?ERROR ?Error ?Exception ?AccessDenied'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: Firehose
+          MetricName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-error-count'
+
+  DeliveryStreamErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn:
+      - DeliveryStreamErrorMetricFilter
+    Properties:
+      AlarmName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-delivery-stream-error-alarm'
+      AlarmDescription: Alarm for Firehose delivery stream errors
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      MetricName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-error-count'
+      Namespace: Firehose
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 60
+      Statistic: Sum
+      Threshold: 1
+
+Outputs:
+  DeliveryStreamName:
+    Description: Name of delivery stream
+    Value: !Ref PostelTracingIcebergDeliveryStream
+
+  DeliveryStreamArn:
+    Description: ARN of delivery stream
+    Value: !GetAtt PostelTracingIcebergDeliveryStream.Arn
+
+  DeliveryStreamErrorBucketName:
+    Description: Name of the Firehose backup/error bucket
+    Value: !Ref DeliveryStreamErrorBucket
+
+  DeliveryStreamErrorAlarmArn:
+    Description: ARN of Firehose error alarm
+    Value: !GetAtt DeliveryStreamErrorAlarm.Arn
