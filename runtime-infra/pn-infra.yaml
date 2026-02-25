@@ -253,11 +253,6 @@ Parameters:
     Description: Default security group of the VPC where to install PN-VPN
     Default: ''
 
-  VPNSubnetsIds:
-    Type: String
-    Description: Subnets where to install VPN 
-    Default: ''
-
   VPNServicesSubnetsIds:
     Type: String
     Description: Subnets where to install PN-VPN services
@@ -307,6 +302,10 @@ Parameters:
     Type: String
     Default: '-'
     Description: ALB security group ARN for PN-VPN
+
+  ESMKinesisFailureNotificationsBucketName:
+    Type: String
+    Description: 'Bucket name for ESM Kinesis failure notifications'
 
 Conditions:
   IsAlbArnEmpty: !Equals [!Ref ApplicationLoadBalancerArn, "-"]
@@ -660,8 +659,6 @@ Outputs:
     Value: !Ref VPNServicesSubnetsIds
   VPNServicesSubnetsCidrs:
     Value: !Ref VPNServicesSubnetsCidrs
-  VPNSubnetsIds:
-    Value: !Ref VPNSubnetsIds
   VPNApplicationLoadBalancerArn:
     Value: !Ref VPNApplicationLoadBalancerArn
   VPNApplicationLoadBalancerMetricsDimensionName:
@@ -676,3 +673,5 @@ Outputs:
     Value: !Ref VPNWebappSecurityGroupId
   VPNWebappSecurityGroupArn:
     Value: !Ref VPNWebappSecurityGroupArn
+  ESMKinesisFailureNotificationsBucketName:
+    Value: !Ref ESMKinesisFailureNotificationsBucketName
