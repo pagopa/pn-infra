@@ -1,4 +1,10 @@
+const { Metrics, MetricUnits } = require("@aws-lambda-powertools/metrics");
 const { getEventSourceMapping } = require("./lib/lambda");
+
+const metrics = new Metrics({
+  namespace: "ESM/Kinesis",
+  serviceName: "esm-failure-tracker",
+});
 
 const handler = async (event) => {
   try {
@@ -22,33 +28,30 @@ const handler = async (event) => {
 
     const eventSourceMapping = await getEventSourceMapping(esmUuid);
 
-    const functionName = eventSourceMapping?.FunctionArn?.split(":").pop();
-    
-    const streamName = eventSourceMapping?.EventSourceArn?.split(":").pop().split("/").pop();
+    const functionName =
+      eventSourceMapping?.FunctionArn?.split(":").pop();
 
+    const streamName =
+      eventSourceMapping?.EventSourceArn?.split(":")
+        .pop()
+        .split("/")
+        .pop();
 
-    const metricData = {
-      _aws: {
-        Timestamp: Date.now(),
-        CloudWatchMetrics: [
-          {
-            Namespace: "ESM/Kinesis",
-            Dimensions: [["FunctionName", "StreamName"]],
-            Metrics: [{ Name: "ProcessingFailures", Unit: "Count" }],
-          },
-        ],
-      },
-      FunctionName: functionName,
-      StreamName: streamName,
-      ProcessingFailures: 1,
-    };
+    // 👉 metriche
+    metrics.addDimension("FunctionName", functionName || "unknown");
+    metrics.addDimension("StreamName", streamName || "unknown");
 
-    console.log(metricData);
+    metrics.addMetric("ProcessingFailures", MetricUnits.Count, 1);
 
     return { statusCode: 200 };
   } catch (error) {
     console.error("Error handling Kinesis failure:", error);
+
+    metrics.addMetric("ProcessingFailures", MetricUnits.Count, 1);
+
     return { statusCode: 500 };
+  } finally {
+    metrics.publishStoredMetrics();
   }
 };
 
