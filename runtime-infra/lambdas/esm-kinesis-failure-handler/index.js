@@ -43,7 +43,7 @@ const handler = async (event) => {
       ProcessingFailures: 1,
     };
 
-    console.log(JSON.stringify(metricData));
+    console.log(metricData);
 
     return { statusCode: 200 };
   } catch (error) {
