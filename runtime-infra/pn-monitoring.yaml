@@ -1351,6 +1351,17 @@ Resources:
         - Arn: !GetAtt ESMKinesisFailureHandlerFunction.Arn
           Id: "TargetForESMKinesisFailureNotificationsBucketRule"
 
+
+  ESMKinesisFailureNotificationsBucketRulePermission:
+    Condition: HasESMKinesisFailureNotificationsBucket
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt ESMKinesisFailureHandlerFunction.Arn
+      Principal: 'events.amazonaws.com'
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !GetAtt ESMKinesisFailureNotificationsBucketRule.Arn
+      
 Outputs:
   OOMAlarmArn:
     Value: !GetAtt CloudWatchAlarmOOM.Arn
