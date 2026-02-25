@@ -54,9 +54,18 @@ Parameters:
       - true
       - false
 
+  EnableLakeFormationGrant:
+    Type: String
+    Description: Enable Lake Formation grant for Firehose role on destination table
+    Default: true
+    AllowedValues:
+      - true
+      - false
+
 Conditions:
   CreateFirehoseLogGroup: !Equals [ !Ref ExistingFirehoseLogGroupName, '' ]
   HasOncallCondition: !Equals [ !Ref HasOncall, 'true' ]
+  EnableLakeFormationGrantCondition: !Equals [ !Ref EnableLakeFormationGrant, 'true' ]
 
 Resources:
   DeliveryStreamErrorBucket:
@@ -157,11 +166,28 @@ Resources:
         - !Ref DeliveryStreamLogGroup
         - !Ref ExistingFirehoseLogGroupName
 
+  DeliveryStreamLakeFormationGrant:
+    Type: AWS::LakeFormation::Permissions
+    Condition: EnableLakeFormationGrantCondition
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !GetAtt DeliveryStreamRole.Arn
+      Resource:
+        TableResource:
+          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
+          DatabaseName: !Ref DestinationNamespace
+          Name: !Ref DestinationTableName
+      Permissions:
+        - SELECT
+        - DESCRIBE
+        - INSERT
+        - DELETE
+        - ALTER
+
   PostelTracingIcebergDeliveryStream:
     Type: AWS::KinesisFirehose::DeliveryStream
     DependsOn:
       - DeliveryStreamRolePolicy
-      - DeliveryStreamLogStream
     Properties:
       DeliveryStreamName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-delivery-stream-v1'
       DeliveryStreamType: DirectPut
@@ -190,7 +216,7 @@ Resources:
           BucketARN: !GetAtt DeliveryStreamErrorBucket.Arn
           RoleARN: !GetAtt DeliveryStreamRole.Arn
           Prefix: !Sub 'iceberg-backup/${DestinationNamespace}/${DestinationTableName}/'
-          ErrorOutputPrefix: !Sub 'iceberg-backup/errors/!{firehose:error-output-type}/'
+          ErrorOutputPrefix: 'iceberg-backup/errors/!{firehose:error-output-type}/'
           BufferingHints:
             IntervalInSeconds: !Ref BufferingIntervalSec
             SizeInMBs: !Ref BufferingSizeMB
