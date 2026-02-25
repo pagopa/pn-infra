@@ -20,6 +20,10 @@ Parameters:
     Type: String
     Description: ARN of the Kinesis Stream ingesting the microservice logs
 
+  KinesisStreamName:
+    Type: String
+    Description: Name of the Kinesis Stream ingesting the microservice logs
+
   KinesisStreamKMSKeyArn:
     Type: String
     Description: ARN of the KMS key used by Kinesis stream to encrypt data
@@ -139,6 +143,26 @@ Resources:
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
         # - 'arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy'
 
+    # Lambda function IAM policy
+  DeliveryLambdaOnFailurePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-DeliveryLambdaOnFailurePolicy
+      Roles:
+        - !Ref DeliveryLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetBucketLocation
+            Resource: !Sub arn:${AWS::Partition}:s3:::pn-esm-kinesis-failure-notifications-${AWS::Region}-${AWS::AccountId}
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource: !Sub arn:${AWS::Partition}:s3:::pn-esm-kinesis-failure-notifications-${AWS::Region}-${AWS::AccountId}/*
+
   DeliveryLambdaSecGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -178,6 +202,8 @@ Resources:
 
   DeliveryLambdaKinesisSource:
     Type: AWS::Lambda::EventSourceMapping
+    DependsOn:
+      - DeliveryLambdaOnFailurePolicy
     Condition: IsOpensearchIngestionEnabled
     Properties:
       BatchSize: !Ref OpenSearchKinesisBatchSize
@@ -189,6 +215,34 @@ Resources:
       MaximumBatchingWindowInSeconds: !Ref OpenSearchKinesisWindow # 5 minutes
       ParallelizationFactor: !Ref OpenSearchParallelizationFactor
       StartingPosition: LATEST
+      MaximumRecordAgeInSeconds: 604800  # 7 days
+      DestinationConfig:
+        OnFailure:
+          Destination: !Sub "arn:${AWS::Partition}:s3:::pn-esm-kinesis-failure-notifications-${AWS::Region}-${AWS::AccountId}"
+
+  DeliveryLambdaKinesisFailuresAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-DeliveryLambda-ESM-Alarm"
+      AlarmDescription: "CloudWatch alarm for when DeliveryLambda has Kinesis stream read failures, which can indicate problems with the function processing or with the stream itself."
+      TreatMissingData: notBreaching        
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      Dimensions:
+        - Value: !Ref DeliveryLambda
+          Name: FunctionName
+        - Value: !Ref KinesisStreamName
+          Name: StreamName
+      DatapointsToAlarm: 1           
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 6
+      Period: 600
+      Namespace: ESM/Kinesis   
+      MetricName: ProcessingFailures
+      Statistic: Maximum      
+      Threshold: 1
 
   DeliveryLambdaAlarms:
     Type: AWS::CloudFormation::Stack
