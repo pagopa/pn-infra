@@ -667,7 +667,7 @@ Resources:
     Type: AWS::Lambda::Function
     Condition: HasDynamoDbExportTableNames
     Properties:
-      Runtime: python3.12
+      Runtime: python3.14
       Handler: dynamodb_daily_export_handler.lambda_handler
       FunctionName: Lambda-DailyExport-DynamoDbTable
       Code:
@@ -808,7 +808,7 @@ Resources:
     Condition: IsCoreAccount
     Type: AWS::Lambda::Function
     Properties:
-      Runtime: python3.12
+      Runtime: python3.14
       Timeout: 600
       MemorySize: !Ref LambdaPnSupportExportMemorySize
       Handler: pn_support_export_handler.lambda_handler
