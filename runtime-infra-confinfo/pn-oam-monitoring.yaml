@@ -1,0 +1,259 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Unified CloudWatch Observability & Monitoring: OAM Sink/Link, S3 URL Access, and Unauthorized Access detection.'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: 'pn'
+
+  EnvironmentType:
+    Type: String
+    Description: 'Environment type (e.g., dev, uat, prod)'
+
+  PnCoreAwsAccountId:
+    Type: String
+    Description: Core Account ID (leave blank in Core account)
+    Default: ''
+
+  RemoteSinkIdentifier:
+    Type: String
+    Default: ''
+    Description: 'ARN of the remote OAM Sink (required if NOT in Core account)'
+
+  AllowedSourceAccountIds:
+    Type: List<String>
+    Default: ''
+    Description: 'Comma-separated list of Account IDs allowed to link to this Sink'
+
+  # --- MONITORING CONFIGURATION ---
+  S3BucketToMonitor:
+    Type: String
+    Description: 'Name of the production S3 bucket to monitor (e.g., pn-safestorage-xxx)'
+
+  DynamoDBTableToMonitor:
+    Type: String
+    Default: ''
+    Description: 'Name of the production DynamoDB table to monitor (optional)'
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: 'ARN of the SNS topic for security alarms'
+
+  LambdasBucketName:
+    Type: String
+    Description: 'S3 Bucket containing Lambda code artifacts'
+
+  LambdasBasePath:
+    Type: String
+    Description: 'Base path prefix for Lambda code'
+
+  # --- THRESHOLDS ---
+  SuspiciousAccessThreshold:
+    Type: Number
+    Default: 5
+  HighVolumeThreshold:
+    Type: Number
+    Default: 100
+  FailedAccessThreshold:
+    Type: Number
+    Default: 10
+
+Conditions:
+  IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '']
+  HasDynamoDB: !Not [!Equals [!Ref DynamoDBTableToMonitor, '']]
+  UseRemoteSink: !Not [!Equals [!Ref RemoteSinkIdentifier, '']]
+
+Resources:
+  # ============================================================================
+  # OAM SINK (Core Account hub) - RECEIVER
+  # ============================================================================
+  MonitoringSink:
+    Type: AWS::Oam::Sink
+    Condition: IsCoreAccount
+    Properties:
+      Name: !Sub '${ProjectName}-${EnvironmentType}-monitoring-sink'
+      Policy:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Ref AllowedSourceAccountIds
+            Action:
+              - oam:CreateLink
+              - oam:UpdateLink
+            Resource: '*'
+            Condition:
+              'ForAllValues:StringEquals':
+                'oam:ResourceTypes':
+                  - AWS::CloudWatch::Metric
+                  - AWS::Logs::LogGroup
+                  - AWS::XRay::Trace
+      Tags:
+        Name: !Sub '${ProjectName}-${EnvironmentType}-monitoring-sink'
+
+  # ============================================================================
+  # OAM LINK (Source Account connector) - SENDER
+  # ============================================================================
+  MonitoringLink:
+    Type: AWS::Oam::Link
+    Properties:
+      LabelTemplate: '$AccountName'
+      ResourceTypes:
+        - AWS::CloudWatch::Metric
+        - AWS::Logs::LogGroup
+        - AWS::XRay::Trace
+      SinkIdentifier: !If [IsCoreAccount, !Ref MonitoringSink, !Ref RemoteSinkIdentifier]
+
+  # ============================================================================
+  # CLOUDTRAIL EVENT DATA STORE (S3 Data Events)
+  # ============================================================================
+  S3EventDataStore:
+    Type: AWS::CloudTrail::EventDataStore
+    Properties:
+      Name: !Sub '${ProjectName}-${EnvironmentType}-s3-access-monitoring'
+      MultiRegionEnabled: true
+      RetentionPeriod: 365
+      AdvancedEventSelectors:
+        - Name: S3ObjectAccessEvents
+          FieldSelectors:
+            - Field: eventCategory
+              Equals: ['Data']
+            - Field: resources.type
+              Equals: ['AWS::S3::Object']
+            - Field: resources.ARN
+              StartsWith: [!Sub 'arn:aws:s3:::${S3BucketToMonitor}/']
+
+  # ============================================================================
+  # LAMBDA 1: S3 URL Access Analyzer
+  # ============================================================================
+  UrlAccessAnalyzerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-${EnvironmentType}-s3-url-access-analyzer-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3UrlAccessAnalyzerPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ['cloudwatch:PutMetricData', 'sns:Publish', 'xray:PutTraceSegments', 'xray:PutTelemetryRecords']
+                Resource: '*'
+
+  UrlAccessAnalyzerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-${EnvironmentType}-s3-url-access-analyzer'
+      Handler: url_access_analyzer.lambda_handler
+      Role: !GetAtt UrlAccessAnalyzerRole.Arn
+      Runtime: python3.11
+      Timeout: 300
+      MemorySize: 512
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub '${LambdasBasePath}/pn-oam-url-access-analyzer/url_access_analyzer.zip'
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentType
+          SNS_TOPIC_ARN: !Ref AlarmSNSTopicArn
+          BUCKET_NAME: !Ref S3BucketToMonitor
+          ALERT_THRESHOLD: !Ref SuspiciousAccessThreshold
+
+  # ============================================================================
+  # LAMBDA 2: Unauthorized Access Validator (Checks Role whitelist)
+  # ============================================================================
+  UnauthorizedAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-${EnvironmentType}-unauthorized-access-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: UnauthorizedAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ['s3:GetObject', 's3:ListBucket']
+                Resource: ['*']
+              - Effect: Allow
+                Action: ['sns:Publish', 'cloudwatch:PutMetricData']
+                Resource: '*'
+
+  UnauthorizedAccessLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-${EnvironmentType}-unauthorized-access-validator'
+      Handler: access_validator.lambda_handler
+      Role: !GetAtt UnauthorizedAccessRole.Arn
+      Runtime: python3.11
+      Timeout: 120
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub '${LambdasBasePath}/pn-oam-unauthorized-access-analyzer/access_validator.zip'
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentType
+          SNS_TOPIC_ARN: !Ref AlarmSNSTopicArn
+          S3_BUCKET_NAME: !Ref S3BucketToMonitor
+          DYNAMODB_TABLE_NAME: !Ref DynamoDBTableToMonitor
+
+  # ============================================================================
+  # EVENT DISTR: CloudTrail (S3/DDB APIs) -> EventBridge Rules -> Lambdas
+  # ============================================================================
+  # Rule for S3 events
+  MonitoringS3Rule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${ProjectName}-${EnvironmentType}-monitoring-s3-rule'
+      EventPattern:
+        source: ['aws.s3']
+        detail-type: ['AWS API Call via CloudTrail']
+        detail:
+          eventSource: ['s3.amazonaws.com']
+          eventName: ['GetObject', 'PutObject', 'DeleteObject']
+          requestParameters:
+            bucketName: [!Ref S3BucketToMonitor]
+      Targets:
+        - Arn: !GetAtt UrlAccessAnalyzerLambda.Arn
+          Id: 'S3UrlAnalyzer'
+        - Arn: !GetAtt UnauthorizedAccessLambda.Arn
+          Id: 'UnauthorizedAccess'
+
+  # Permissions for EB to invoke Lambdas
+  InvokeUrlAnalyzerS3Permission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref UrlAccessAnalyzerLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt MonitoringS3Rule.Arn
+
+  InvokeUnauthorizedS3Permission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref UnauthorizedAccessLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt MonitoringS3Rule.Arn
+
+Outputs:
+  SinkArn:
+    Condition: IsCoreAccount
+    Value: !GetAtt MonitoringSink.Arn
+  LinkArn:
+    Value: !GetAtt MonitoringLink.Arn
