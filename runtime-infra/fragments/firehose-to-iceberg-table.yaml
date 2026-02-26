@@ -29,7 +29,7 @@ Parameters:
   DeliveryStreamNamePrefix:
     Type: String
     Description: Delivery stream prefix identifier
-    Default: 'postel-tracing'
+    Default: 'address-manager-tracing'
 
   BufferingIntervalSec:
     Type: Number
@@ -116,6 +116,7 @@ Resources:
               - glue:GetTableVersion
               - glue:GetTableVersions
               - glue:GetPartitions
+              - glue:UpdateTable
             Resource:
               - '*'
           - Sid: LakeFormationDataAccess
@@ -166,9 +167,23 @@ Resources:
         - !Ref DeliveryStreamLogGroup
         - !Ref ExistingFirehoseLogGroupName
 
+  DeliveryStreamLakeFormationDatabaseGrant:
+    Type: AWS::LakeFormation::Permissions
+    Condition: EnableLakeFormationGrantCondition
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !GetAtt DeliveryStreamRole.Arn
+      Resource:
+        DatabaseResource:
+          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
+          Name: !Ref DestinationNamespace
+      Permissions:
+        - DESCRIBE
+
   DeliveryStreamLakeFormationGrant:
     Type: AWS::LakeFormation::Permissions
     Condition: EnableLakeFormationGrantCondition
+    DependsOn: DeliveryStreamLakeFormationDatabaseGrant
     Properties:
       DataLakePrincipal:
         DataLakePrincipalIdentifier: !GetAtt DeliveryStreamRole.Arn
@@ -178,13 +193,9 @@ Resources:
           DatabaseName: !Ref DestinationNamespace
           Name: !Ref DestinationTableName
       Permissions:
-        - SELECT
-        - DESCRIBE
-        - INSERT
-        - DELETE
-        - ALTER
+        - ALL
 
-  PostelTracingIcebergDeliveryStream:
+  AddressManagerTracingIcebergDeliveryStream:
     Type: AWS::KinesisFirehose::DeliveryStream
     DependsOn:
       - DeliveryStreamRolePolicy
@@ -290,11 +301,11 @@ Resources:
 Outputs:
   DeliveryStreamName:
     Description: Name of delivery stream
-    Value: !Ref PostelTracingIcebergDeliveryStream
+    Value: !Ref AddressManagerTracingIcebergDeliveryStream
 
   DeliveryStreamArn:
     Description: ARN of delivery stream
-    Value: !GetAtt PostelTracingIcebergDeliveryStream.Arn
+    Value: !GetAtt AddressManagerTracingIcebergDeliveryStream.Arn
 
   DeliveryStreamErrorBucketName:
     Description: Name of the Firehose backup/error bucket
