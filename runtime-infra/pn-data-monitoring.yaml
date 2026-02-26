@@ -793,6 +793,16 @@ Resources:
       LogGroupName: !Sub "/aws/lambda/${DynamoDbExportFunction}"
       RetentionInDays: 3
   
+  DynamoDbExportFunctionAlarms:
+    Condition: HasDynamoDbExportTableNames
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref DynamoDbExportFunction
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        FilterPattern: "ERROR"
+  
 
   # Send codebuild events to Frankfurt; Needed by celonis :(
   SendCodeBuildEventsToFrankfurt: 
@@ -1484,6 +1494,16 @@ Resources:
         LogGroupName: !Ref PnAnalogRecipientsAnalyzerLambda
         LogGroupRetention: 14
         LogGroupPrefix: /aws/lambda
+
+  PnAnalogRecipientsAnalyzerLambdaAlarms:
+    Condition: IsCoreAccount
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref PnAnalogRecipientsAnalyzerLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        FilterPattern: "ERROR"
 
   PnAnalogRecipientsAnalyzerLambdaEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
