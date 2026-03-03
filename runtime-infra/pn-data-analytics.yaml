@@ -23,6 +23,34 @@ Parameters:
     Description: Suffix for the logs bucket name
     Default: "001"
 
+  ConfinfoAddressManagerTableBucketName:
+    Type: String
+    Default: ''
+    Description: S3 Tables table bucket name in confinfo for address manager tracing
+
+  EnvironmentType:
+    Type: String
+    Default: ''
+    Description: Environment type (dev, test, uat, hotfix, prod)
+
+Conditions:
+  HasSafeStorageAccountId: !And
+    - !Not [ !Equals [ !Ref SafeStorageAccountId, '' ] ]
+    - !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ] ]
+  HasConfinfoAddressManagerTableBucketName: !And
+    - !Not [ !Equals [ !Ref ConfinfoAddressManagerTableBucketName, '' ] ]
+    - !Not [ !Equals [ !Ref ConfinfoAddressManagerTableBucketName, '-' ] ]
+  HasEnvironmentType: !And
+    - !Not [ !Equals [ !Ref EnvironmentType, '' ] ]
+    - !Not [ !Equals [ !Ref EnvironmentType, '-' ] ]
+  HasConfinfoS3Tables: !And
+    - !Condition HasSafeStorageAccountId
+    - !Condition HasConfinfoAddressManagerTableBucketName
+  HasConfinfoS3TablesAndEnvironment: !And
+    - !Condition HasConfinfoS3Tables
+    - !Condition HasEnvironmentType
+  IsProdEnvironment: !Equals [ !Ref EnvironmentType, 'prod' ]
+
 Resources:
 
   ConfinfoExportDatabase:
@@ -310,6 +338,52 @@ Resources:
                   }
                 - DatabaseName: !Ref ConfinfoExportDatabase
                   TableName: !Ref EcRichiesteMetadatiGlueTable
+
+  AddressManagerTracingGlueResourceLinkDB:
+    Type: AWS::Glue::Database
+    Condition: HasConfinfoS3Tables
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: address_manager_tracing_link
+        TargetDatabase:
+          CatalogId: !Sub '${SafeStorageAccountId}:s3tablescatalog/${ConfinfoAddressManagerTableBucketName}'
+          DatabaseName: address_manager_tracing
+        CreateTableDefaultPermissions: []
+
+  AddressManagerTracingLFDescribeAdminCore:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasConfinfoS3TablesAndEnvironment
+    DependsOn: AddressManagerTracingGlueResourceLinkDB
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !If
+          - IsProdEnvironment
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/AdminAccess-${EnvironmentType}'
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtAdmin-core-${EnvironmentType}'
+      Resource:
+        DatabaseResource:
+          CatalogId: !Ref AWS::AccountId
+          Name: address_manager_tracing_link
+      Permissions:
+        - DESCRIBE
+
+  AddressManagerTracingLFDescribeReadonlyCore:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasConfinfoS3TablesAndEnvironment
+    DependsOn: AddressManagerTracingGlueResourceLinkDB
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !If
+          - IsProdEnvironment
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/ReadOnlyAccess-${EnvironmentType}'
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
+      Resource:
+        DatabaseResource:
+          CatalogId: !Ref AWS::AccountId
+          Name: address_manager_tracing_link
+      Permissions:
+        - DESCRIBE
 
 Outputs:
   ConfinfoExportDatabaseName:
