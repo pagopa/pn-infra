@@ -717,6 +717,10 @@ Parameters:
     AllowedValues:
       - true
       - false
+    
+  CpuArchitecture:
+    Type: String
+    Default: "X86_64"
 
 Mappings:
   ContainerMemory:
@@ -771,7 +775,6 @@ Mappings:
       clockdrift: 256
       microservice: 7936
       sidecarCwAgent: 256
-
 
 Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
@@ -1104,6 +1107,7 @@ Resources:
         - FARGATE
       Cpu: !Ref CpuValue
       Memory: !Ref MemoryAmount
+      CpuArchitecture: !Ref CpuArchitecture
       # A role needed by ECS.
       # "The ARN of the task execution role that containers in this task can assume. All containers in this task are granted the permissions that are specified in this role."
       # "There is an optional task execution IAM role that you can specify with Fargate to allow your Fargate tasks to make API calls to Amazon ECR."
