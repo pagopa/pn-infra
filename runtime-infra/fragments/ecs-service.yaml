@@ -721,6 +721,9 @@ Parameters:
   CpuArchitecture:
     Type: String
     Default: "X86_64"
+    AllowedValues:
+      - "X86_64"
+      - "ARM64"
 
 Mappings:
   ContainerMemory:
@@ -1107,7 +1110,8 @@ Resources:
         - FARGATE
       Cpu: !Ref CpuValue
       Memory: !Ref MemoryAmount
-      CpuArchitecture: !Ref CpuArchitecture
+      RuntimePlatform:
+        CpuArchitecture: !Ref CpuArchitecture
       # A role needed by ECS.
       # "The ARN of the task execution role that containers in this task can assume. All containers in this task are granted the permissions that are specified in this role."
       # "There is an optional task execution IAM role that you can specify with Fargate to allow your Fargate tasks to make API calls to Amazon ECR."
