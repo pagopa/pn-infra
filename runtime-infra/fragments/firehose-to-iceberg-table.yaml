@@ -31,6 +31,14 @@ Parameters:
     Description: Delivery stream prefix identifier
     Default: 'address-manager-tracing'
 
+  ErrorBucketNameSuffix:
+    Type: String
+    Description: Short suffix for deterministic Firehose error bucket name
+    Default: '001'
+    MinLength: 1
+    MaxLength: 12
+    AllowedPattern: '^[a-z0-9-]+$'
+
   BufferingIntervalSec:
     Type: Number
     Description: Firehose buffer interval in seconds
@@ -73,7 +81,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-firehose-errors-${AWS::AccountId}-${AWS::Region}'
+      BucketName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-${ErrorBucketNameSuffix}-${AWS::AccountId}-${AWS::Region}'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -154,7 +162,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      LogGroupName: !Sub '/aws/kinesisfirehose/${ProjectName}-${DeliveryStreamNamePrefix}-delivery-errors'
+      LogGroupName: !Sub '/aws/kinesisfirehose/${ProjectName}-${DeliveryStreamNamePrefix}-delivery-errors-nested'
       RetentionInDays: 30
 
   DeliveryStreamLogStream:
