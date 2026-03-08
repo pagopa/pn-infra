@@ -1,0 +1,409 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Cross-account access controls for S3 Tables (LF grants + Glue resource policy)
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Project/environment prefix used for policy SID naming
+
+  TableBucketName:
+    Type: String
+    Description: S3 Tables bucket name
+
+  TableNamespace:
+    Type: String
+    Description: S3 Tables namespace/database name
+
+  TableName:
+    Type: String
+    Description: S3 Tables table name
+
+  EnvironmentType:
+    Type: String
+    Default: '-'
+    Description: Environment type (dev, test, uat, hotfix, prod)
+
+  PnCoreAwsAccountId:
+    Type: String
+    Default: '-'
+    Description: Core account ID. If set, template behaves as confinfo; if empty/'-', behaves as core.
+
+  CoreSsoAdminRole:
+    Type: String
+    Default: '-'
+    Description: Optional core SSO role name (AWSReservedSSO_*) for dev cross-account grants
+
+  EnableGlueResourcePolicy:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable Glue resource policy management when cross principals are configured
+
+Conditions:
+  HasEnvironmentType: !And
+    - !Not [ !Equals [ !Ref EnvironmentType, '' ] ]
+    - !Not [ !Equals [ !Ref EnvironmentType, '-' ] ]
+
+  IsConfinfoAccount: !And
+    - !Not [ !Equals [ !Ref PnCoreAwsAccountId, '' ] ]
+    - !Not [ !Equals [ !Ref PnCoreAwsAccountId, '-' ] ]
+
+  IsCoreAccount: !Or
+    - !Equals [ !Ref PnCoreAwsAccountId, '' ]
+    - !Equals [ !Ref PnCoreAwsAccountId, '-' ]
+
+  IsProdEnvironment: !Equals [ !Ref EnvironmentType, 'prod' ]
+  IsDevEnvironment: !Equals [ !Ref EnvironmentType, 'dev' ]
+
+  HasCoreSsoAdminRole: !And
+    - !Not [ !Equals [ !Ref CoreSsoAdminRole, '' ] ]
+    - !Not [ !Equals [ !Ref CoreSsoAdminRole, '-' ] ]
+
+  HasCrossAccountContext: !And
+    - !Condition IsConfinfoAccount
+    - !Condition HasEnvironmentType
+
+  HasCoreSsoAdminRoleInConfinfoDev: !And
+    - !Condition HasCrossAccountContext
+    - !Condition IsDevEnvironment
+    - !Condition HasCoreSsoAdminRole
+
+  EnableGlueResourcePolicyCondition: !Equals [ !Ref EnableGlueResourcePolicy, 'true' ]
+
+  UseGlueCatalogResourcePolicy: !And
+    - !Condition HasCrossAccountContext
+    - !Condition EnableGlueResourcePolicyCondition
+
+Resources:
+  GlueCatalogPolicyRole:
+    Type: AWS::IAM::Role
+    Condition: UseGlueCatalogResourcePolicy
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: GlueCatalogPolicyExecution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+              - Effect: Allow
+                Action:
+                  - glue:GetResourcePolicy
+                  - glue:PutResourcePolicy
+                  - glue:DeleteResourcePolicy
+                Resource: '*'
+
+  GlueCatalogPolicyFunction:
+    Type: AWS::Lambda::Function
+    Condition: UseGlueCatalogResourcePolicy
+    Properties:
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt GlueCatalogPolicyRole.Arn
+      Timeout: 120
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import traceback
+          import urllib.request
+
+          glue = boto3.client("glue")
+
+
+          def _send(event, context, status, data=None, reason=None, physical_id=None):
+              body = {
+                  "Status": status,
+                  "Reason": reason or f"See CloudWatch logs: {context.log_stream_name}",
+                  "PhysicalResourceId": physical_id or context.log_stream_name,
+                  "StackId": event["StackId"],
+                  "RequestId": event["RequestId"],
+                  "LogicalResourceId": event["LogicalResourceId"],
+                  "Data": data or {},
+              }
+              payload = json.dumps(body).encode("utf-8")
+              request = urllib.request.Request(
+                  url=event["ResponseURL"],
+                  data=payload,
+                  method="PUT",
+                  headers={"content-type": "", "content-length": str(len(payload))},
+              )
+              urllib.request.urlopen(request)
+
+
+          def _compact(value):
+              if isinstance(value, list):
+                  out = []
+                  for item in value:
+                      c = _compact(item)
+                      if c is not None:
+                          out.append(c)
+                  return out
+              if isinstance(value, dict):
+                  out = {}
+                  for key, item in value.items():
+                      c = _compact(item)
+                      if c is not None:
+                          out[key] = c
+                  return out
+              if value is None:
+                  return None
+              return value
+
+
+          def _get_policy():
+              try:
+                  response = glue.get_resource_policy()
+                  return json.loads(response["PolicyInJson"]), response.get("PolicyHash")
+              except glue.exceptions.EntityNotFoundException:
+                  return {"Version": "2012-10-17", "Statement": []}, None
+
+
+          def _put_policy(policy, policy_hash):
+              args = {
+                  "PolicyInJson": json.dumps(policy),
+                  "EnableHybrid": "TRUE",
+              }
+              if policy_hash:
+                  args["PolicyHashCondition"] = policy_hash
+              glue.put_resource_policy(**args)
+
+
+          def _upsert_statement(policy, statement):
+              sid = statement.get("Sid")
+              statements = [s for s in policy.get("Statement", []) if s.get("Sid") != sid]
+              statements.append(statement)
+              policy["Version"] = policy.get("Version", "2012-10-17")
+              policy["Statement"] = statements
+              return policy
+
+
+          def _remove_statement(policy, sid):
+              policy["Version"] = policy.get("Version", "2012-10-17")
+              policy["Statement"] = [s for s in policy.get("Statement", []) if s.get("Sid") != sid]
+              return policy
+
+
+          def handler(event, context):
+              physical_id = event.get("PhysicalResourceId", "GlueCatalogResourcePolicy")
+              try:
+                  props = event.get("ResourceProperties", {})
+                  sid = props.get("StatementSid")
+                  statement = _compact(props.get("Statement", {}))
+                  request_type = event.get("RequestType")
+
+                  if sid and "Sid" not in statement:
+                      statement["Sid"] = sid
+
+                  if request_type in ("Create", "Update"):
+                      if not sid:
+                          raise ValueError("StatementSid is required")
+
+                      for _ in range(3):
+                          current_policy, policy_hash = _get_policy()
+                          updated_policy = _upsert_statement(current_policy, statement)
+                          try:
+                              _put_policy(updated_policy, policy_hash)
+                              break
+                          except glue.exceptions.ConditionCheckFailureException:
+                              continue
+
+                      _send(event, context, "SUCCESS", {"StatementSid": sid}, physical_id=physical_id)
+                      return
+
+                  if request_type == "Delete":
+                      if sid:
+                          for _ in range(3):
+                              current_policy, policy_hash = _get_policy()
+                              updated_policy = _remove_statement(current_policy, sid)
+
+                              if not updated_policy.get("Statement"):
+                                  try:
+                                      if policy_hash:
+                                          glue.delete_resource_policy(PolicyHashCondition=policy_hash)
+                                      else:
+                                          glue.delete_resource_policy()
+                                  except glue.exceptions.EntityNotFoundException:
+                                      pass
+                                  break
+
+                              try:
+                                  _put_policy(updated_policy, policy_hash)
+                                  break
+                              except glue.exceptions.ConditionCheckFailureException:
+                                  continue
+
+                      _send(event, context, "SUCCESS", {"StatementSid": sid}, physical_id=physical_id)
+                      return
+
+                  _send(event, context, "SUCCESS", {"IgnoredRequestType": request_type}, physical_id=physical_id)
+              except Exception as error:
+                  traceback.print_exc()
+                  _send(event, context, "FAILED", reason=str(error), physical_id=physical_id)
+
+  GlueCatalogResourcePolicy:
+    Type: Custom::GlueCatalogResourcePolicy
+    Condition: UseGlueCatalogResourcePolicy
+    DependsOn:
+      - GlueCatalogPolicyFunction
+    Properties:
+      ServiceToken: !GetAtt GlueCatalogPolicyFunction.Arn
+      StatementSid: !Sub '${ProjectName}-${TableNamespace}-${TableName}-cross-read'
+      Statement:
+        Sid: !Sub '${ProjectName}-${TableNamespace}-${TableName}-cross-read'
+        Effect: Allow
+        Principal:
+          AWS:
+            - !If
+              - IsProdEnvironment
+              - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/AdminAccess-${EnvironmentType}'
+              - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/SendExtAdmin-core-${EnvironmentType}'
+            - !If
+              - IsProdEnvironment
+              - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/ReadOnlyAccess-${EnvironmentType}'
+              - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
+            - !If
+              - HasCoreSsoAdminRoleInConfinfoDev
+              - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/aws-reserved/sso.amazonaws.com/eu-west-1/${CoreSsoAdminRole}'
+              - !Ref AWS::NoValue
+        Action:
+          - glue:GetDatabase
+          - glue:GetDatabases
+          - glue:GetTable
+          - glue:GetTables
+          - glue:GetTableVersion
+          - glue:GetTableVersions
+          - glue:GetPartition
+          - glue:GetPartitions
+        Resource:
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:*'
+
+  LFGrantLocalAdmin:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasEnvironmentType
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !If
+          - IsProdEnvironment
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/AdminAccess-${EnvironmentType}'
+          - !If
+            - IsCoreAccount
+            - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtAdmin-core-${EnvironmentType}'
+            - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtAdmin-confinfo-${EnvironmentType}'
+      Resource:
+        TableResource:
+          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
+          DatabaseName: !Ref TableNamespace
+          Name: !Ref TableName
+      Permissions:
+        - SELECT
+        - DESCRIBE
+
+  LFGrantLocalReadonly:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasEnvironmentType
+    DependsOn:
+      - LFGrantLocalAdmin
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !If
+          - IsProdEnvironment
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/ReadOnlyAccess-${EnvironmentType}'
+          - !If
+            - IsCoreAccount
+            - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
+            - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtReadOnly-confinfo-${EnvironmentType}'
+      Resource:
+        TableResource:
+          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
+          DatabaseName: !Ref TableNamespace
+          Name: !Ref TableName
+      Permissions:
+        - SELECT
+        - DESCRIBE
+
+  LFGrantCrossAdmin:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasCrossAccountContext
+    DependsOn:
+      - LFGrantLocalReadonly
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !If
+          - IsProdEnvironment
+          - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/AdminAccess-${EnvironmentType}'
+          - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/SendExtAdmin-core-${EnvironmentType}'
+      Resource:
+        TableResource:
+          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
+          DatabaseName: !Ref TableNamespace
+          Name: !Ref TableName
+      Permissions:
+        - SELECT
+        - DESCRIBE
+
+  LFGrantCrossReadonly:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasCrossAccountContext
+    DependsOn:
+      - LFGrantCrossAdmin
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !If
+          - IsProdEnvironment
+          - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/ReadOnlyAccess-${EnvironmentType}'
+          - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
+      Resource:
+        TableResource:
+          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
+          DatabaseName: !Ref TableNamespace
+          Name: !Ref TableName
+      Permissions:
+        - SELECT
+        - DESCRIBE
+
+  LFGrantCrossSsoDescribeDb:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasCoreSsoAdminRoleInConfinfoDev
+    DependsOn:
+      - LFGrantCrossReadonly
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/aws-reserved/sso.amazonaws.com/eu-west-1/${CoreSsoAdminRole}'
+      Resource:
+        DatabaseResource:
+          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
+          Name: !Ref TableNamespace
+      Permissions:
+        - DESCRIBE
+
+  LFGrantCrossSsoSelectTable:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasCoreSsoAdminRoleInConfinfoDev
+    DependsOn:
+      - LFGrantCrossSsoDescribeDb
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/aws-reserved/sso.amazonaws.com/eu-west-1/${CoreSsoAdminRole}'
+      Resource:
+        TableResource:
+          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
+          DatabaseName: !Ref TableNamespace
+          Name: !Ref TableName
+      Permissions:
+        - SELECT
+        - DESCRIBE
