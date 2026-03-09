@@ -4,7 +4,7 @@
 
 CICD_PROFILE=cicd
 AWS_REGION=eu-central-1
-TAG=v1.0.0
+TAG=v1.0.1
 IMAGE_NAME=clockdrift
 REPOSITORY=clockdrift ## ECR repository to host the container image 
 IMAGE=$REPOSITORY:$TAG

@@ -56,12 +56,22 @@ Parameters:
   ContainerImageClockdriftURI:
     Type: String
     Description: Container image URI for Clockdrift
-    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/clockdrift:v1.0.0
+    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/clockdrift:v1.0.1
 
   ContainerImageOtelURI:
     Type: String
     Description: Container image URI for Open telemetry
     Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-collector:v0.36.0
+
+  ContainerARMImageInjectorURI:
+    Type: String
+    Description: Container image URI for Open telemetry
+    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.33.0
+
+  ContainerARMCloudWatchAgentURI:
+    Type: String
+    Description: Container image URI for Cloud Watch Agent
+    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:v1.30-arm64
 
   ContainerImageInjectorURI:
     Type: String
@@ -717,6 +727,11 @@ Parameters:
     AllowedValues:
       - true
       - false
+    
+  CpuArchitecture:
+    Type: String
+    Default: "AMD"
+    AllowedValues: ["AMD", "ARM"]
 
 Mappings:
   ContainerMemory:
@@ -772,6 +787,13 @@ Mappings:
       microservice: 7936
       sidecarCwAgent: 256
 
+  ContainerImagesURI:
+    sidecarCwAgent:
+      ARM: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:v1.30-arm64
+      AMD: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:1.30
+    sidecarInjector:
+      ARM: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.33.0
+      AMD: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.32.0
 
 Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
@@ -809,6 +831,8 @@ Conditions:
   HasTaskRoleManagedPolicyArn: !Not [ !Equals [ !Ref TaskRoleManagedPolicyArn, '' ] ] 
 
   HasParentMicroserviceName: !Not [!Equals [!Ref ParentMicroserviceName, ""]]
+
+  HasArm64Architecture: !Equals [ !Ref CpuArchitecture, "ARM64" ]
 
   Env1Exist: !Not [ !Equals [!Ref ContainerEnvEntry1, '']]
   Env2Exist: !Not [ !Equals [!Ref ContainerEnvEntry2, '']]
@@ -1104,6 +1128,8 @@ Resources:
         - FARGATE
       Cpu: !Ref CpuValue
       Memory: !Ref MemoryAmount
+      RuntimePlatform:
+        CpuArchitecture: !If [ HasArm64Architecture, ARM64, X86_64 ]
       # A role needed by ECS.
       # "The ARN of the task execution role that containers in this task can assume. All containers in this task are granted the permissions that are specified in this role."
       # "There is an optional task execution IAM role that you can specify with Fargate to allow your Fargate tasks to make API calls to Amazon ECR."
@@ -1743,7 +1769,7 @@ Resources:
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
         - Name: sidecar-injector
-          Image: !Ref ContainerImageInjectorURI
+          Image: !FindInMap [ ContainerImagesURI, sidecarInjector, !Ref CpuArchitecture ]
           Essential: false
           MountPoints:
             - SourceVolume: "my-vol"
@@ -1758,7 +1784,7 @@ Resources:
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
         - Name: sidecar-cw-agent
-          Image: !Ref ContainerCloudWatchAgentURI
+          Image: !FindInMap [ ContainerImagesURI, sidecarCwAgent, !Ref CpuArchitecture ]
           Essential: false
           Cpu: '256'
           Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarCwAgent ]
