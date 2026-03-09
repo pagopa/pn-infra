@@ -25,30 +25,13 @@ Parameters:
 
   ConfinfoAddressManagerTableBucketName:
     Type: String
-    Default: ''
     Description: S3 Tables table bucket name in confinfo for address manager tracing
 
   EnvironmentType:
     Type: String
-    Default: ''
     Description: Environment type (dev, test, uat, hotfix, prod)
 
 Conditions:
-  HasSafeStorageAccountId: !And
-    - !Not [ !Equals [ !Ref SafeStorageAccountId, '' ] ]
-    - !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ] ]
-  HasConfinfoAddressManagerTableBucketName: !And
-    - !Not [ !Equals [ !Ref ConfinfoAddressManagerTableBucketName, '' ] ]
-    - !Not [ !Equals [ !Ref ConfinfoAddressManagerTableBucketName, '-' ] ]
-  HasEnvironmentType: !And
-    - !Not [ !Equals [ !Ref EnvironmentType, '' ] ]
-    - !Not [ !Equals [ !Ref EnvironmentType, '-' ] ]
-  HasConfinfoS3Tables: !And
-    - !Condition HasSafeStorageAccountId
-    - !Condition HasConfinfoAddressManagerTableBucketName
-  HasConfinfoS3TablesAndEnvironment: !And
-    - !Condition HasConfinfoS3Tables
-    - !Condition HasEnvironmentType
   IsProdEnvironment: !Equals [ !Ref EnvironmentType, 'prod' ]
 
 Resources:
@@ -339,9 +322,20 @@ Resources:
                 - DatabaseName: !Ref ConfinfoExportDatabase
                   TableName: !Ref EcRichiesteMetadatiGlueTable
 
+  # ---------------------------------------------------------------------------
+  # Address Manager Tracing — cross-account S3 Tables access from core
+  #
+  # Architecture:
+  #   1. DB resource link in core → points to confinfo s3tablescatalog
+  #   2. LF DESCRIBE on DB resource link (local catalog) → Admin + Readonly
+  #   Note: table resource link is NOT needed inside a database resource link
+  #   (Glue returns "Circular linking" error). The DB resource link automatically
+  #   exposes all remote tables. Cross-account SELECT grants are managed by
+  #   confinfo s3tables-access-control.yaml (LFGrantCrossAdmin / LFGrantCrossReadonly).
+  # ---------------------------------------------------------------------------
+
   AddressManagerTracingGlueResourceLinkDB:
     Type: AWS::Glue::Database
-    Condition: HasConfinfoS3Tables
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseInput:
@@ -353,7 +347,6 @@ Resources:
 
   AddressManagerTracingLFDescribeAdminCore:
     Type: AWS::LakeFormation::Permissions
-    Condition: HasConfinfoS3TablesAndEnvironment
     DependsOn: AddressManagerTracingGlueResourceLinkDB
     Properties:
       DataLakePrincipal:
@@ -370,7 +363,6 @@ Resources:
 
   AddressManagerTracingLFDescribeReadonlyCore:
     Type: AWS::LakeFormation::Permissions
-    Condition: HasConfinfoS3TablesAndEnvironment
     DependsOn: AddressManagerTracingGlueResourceLinkDB
     Properties:
       DataLakePrincipal:

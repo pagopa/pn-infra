@@ -20,46 +20,47 @@ Parameters:
 
   EnvironmentType:
     Type: String
-    Default: '-'
+    Default: ''
     Description: Environment type (dev, test, uat, hotfix, prod)
 
   PnCoreAwsAccountId:
     Type: String
-    Default: '-'
-    Description: Core account ID. If set, template behaves as confinfo; if empty/'-', behaves as core.
+    Default: ''
+    Description: Core account ID. If set, template behaves as confinfo; if empty, behaves as core.
 
   CoreSsoAdminRole:
     Type: String
-    Default: '-'
+    Default: ''
     Description: Optional core SSO role name (AWSReservedSSO_*) for dev cross-account grants
 
-  EnableGlueResourcePolicy:
+  AdditionalTablePrincipals:
     Type: String
-    Default: 'true'
-    AllowedValues:
-      - 'true'
-      - 'false'
-    Description: Enable Glue resource policy management when cross principals are configured
+    Default: ''
+    Description: >
+      Optional comma-separated list of additional role names in the same account to grant
+      SELECT + DESCRIBE on the table. The ARN is built automatically using AWS::AccountId.
+      Example: my-role,other-role
+
+  AdditionalCrossAccountPrincipals:
+    Type: String
+    Default: ''
+    Description: >
+      Optional comma-separated list of additional role names in the core account to grant
+      DESCRIBE on the database and SELECT + DESCRIBE on the table.
+      The ARN is built automatically using PnCoreAwsAccountId.
+      Example: ntt-dev,other-role
 
 Conditions:
-  HasEnvironmentType: !And
-    - !Not [ !Equals [ !Ref EnvironmentType, '' ] ]
-    - !Not [ !Equals [ !Ref EnvironmentType, '-' ] ]
+  HasEnvironmentType: !Not [ !Equals [ !Ref EnvironmentType, '' ] ]
 
-  IsConfinfoAccount: !And
-    - !Not [ !Equals [ !Ref PnCoreAwsAccountId, '' ] ]
-    - !Not [ !Equals [ !Ref PnCoreAwsAccountId, '-' ] ]
+  IsConfinfoAccount: !Not [ !Equals [ !Ref PnCoreAwsAccountId, '' ] ]
 
-  IsCoreAccount: !Or
-    - !Equals [ !Ref PnCoreAwsAccountId, '' ]
-    - !Equals [ !Ref PnCoreAwsAccountId, '-' ]
+  IsCoreAccount: !Equals [ !Ref PnCoreAwsAccountId, '' ]
 
   IsProdEnvironment: !Equals [ !Ref EnvironmentType, 'prod' ]
   IsDevEnvironment: !Equals [ !Ref EnvironmentType, 'dev' ]
 
-  HasCoreSsoAdminRole: !And
-    - !Not [ !Equals [ !Ref CoreSsoAdminRole, '' ] ]
-    - !Not [ !Equals [ !Ref CoreSsoAdminRole, '-' ] ]
+  HasCoreSsoAdminRole: !Not [ !Equals [ !Ref CoreSsoAdminRole, '' ] ]
 
   HasCrossAccountContext: !And
     - !Condition IsConfinfoAccount
@@ -70,13 +71,180 @@ Conditions:
     - !Condition IsDevEnvironment
     - !Condition HasCoreSsoAdminRole
 
-  EnableGlueResourcePolicyCondition: !Equals [ !Ref EnableGlueResourcePolicy, 'true' ]
-
-  UseGlueCatalogResourcePolicy: !And
-    - !Condition HasCrossAccountContext
-    - !Condition EnableGlueResourcePolicyCondition
+  UseGlueCatalogResourcePolicy: !Condition HasCrossAccountContext
 
 Resources:
+
+  # ---------------------------------------------------------------------------
+  # LF Grants — Custom Resource Lambda
+  #
+  # Known limitation: AWS::LakeFormation::Permissions does not support the
+  # federated S3 Tables catalog ID format (ACCOUNT_ID:s3tablescatalog/BUCKET).
+  # CloudFormation expects CatalogId to be a plain 12-digit account ID and
+  # either rejects the resource (Database) or silently skips the API call
+  # (TableResource / TableWithColumns).
+  #
+  # Refs:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-lakeformation-principalpermissions-databaseresource.html
+  # https://docs.aws.amazon.com/lake-formation/latest/dg/enable-s3-tables-catalog-integration.html
+  # https://repost.aws/questions/QULBeZIPCmSz6BdaR7JHTrow/how-to-grant-lakeformation-permission-to-s3-tables-data-lake
+  #
+  # Workaround: call lakeformation:GrantPermissions / RevokePermissions
+  # directly from a Lambda-backed Custom Resource.
+  # ---------------------------------------------------------------------------
+
+  LFGrantsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: LFGrantsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lakeformation:GrantPermissions
+                  - lakeformation:RevokePermissions
+                Resource: '*'
+
+  LFGrantsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt LFGrantsRole.Arn
+      Timeout: 60
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+
+          lf = boto3.client('lakeformation')
+
+
+          def _call(fn, principal, resource, permissions):
+              try:
+                  fn(
+                      Principal={'DataLakePrincipalIdentifier': principal},
+                      Resource=resource,
+                      Permissions=permissions,
+                  )
+              except Exception as e:
+                  # AlreadyExistsException on grant and InvalidInputException
+                  # on revoke of non-existing grant are both acceptable.
+                  if type(e).__name__ not in ('AlreadyExistsException', 'InvalidInputException'):
+                      raise
+
+
+          def _parse_csv(value):
+              return [v.strip() for v in value.split(',') if v.strip()] if value else []
+
+
+          def _role_arn(account_id, role_name):
+              return f'arn:aws:iam::{account_id}:role/{role_name}'
+
+
+          def handler(event, context):
+              print(json.dumps(event))
+              try:
+                  p = event['ResourceProperties']
+                  catalog_id       = p['CatalogId']
+                  db               = p['DatabaseName']
+                  table            = p['TableName']
+                  local_account    = p['LocalAccountId']
+                  cross_account    = p.get('CrossAccountId', '')
+                  fn = lf.revoke_permissions if event['RequestType'] == 'Delete' else lf.grant_permissions
+
+                  # TablePrincipalN  → SELECT + DESCRIBE on table only (same-account)
+                  # CrossPrincipalN  → DESCRIBE on database + SELECT + DESCRIBE on table (cross-account)
+                  # AdditionalTablePrincipals / AdditionalCrossAccountPrincipals → CSV of role names
+                  db_resource    = {'Database': {'CatalogId': catalog_id, 'Name': db}}
+                  table_resource = {'Table':    {'CatalogId': catalog_id, 'DatabaseName': db, 'Name': table}}
+
+                  for k, v in sorted(p.items()):
+                      if not v:
+                          continue
+                      if k.startswith('CrossPrincipal'):
+                          _call(fn, v, db_resource,    ['DESCRIBE'])
+                          _call(fn, v, table_resource, ['SELECT', 'DESCRIBE'])
+                      elif k.startswith('TablePrincipal'):
+                          _call(fn, v, table_resource, ['SELECT', 'DESCRIBE'])
+
+                  for name in _parse_csv(p.get('AdditionalCrossAccountPrincipals', '')):
+                      arn = _role_arn(cross_account, name) if cross_account else _role_arn(local_account, name)
+                      _call(fn, arn, db_resource,    ['DESCRIBE'])
+                      _call(fn, arn, table_resource, ['SELECT', 'DESCRIBE'])
+
+                  for name in _parse_csv(p.get('AdditionalTablePrincipals', '')):
+                      _call(fn, _role_arn(local_account, name), table_resource, ['SELECT', 'DESCRIBE'])
+
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+              except Exception as e:
+                  print(f'ERROR: {e}')
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {}, reason=str(e))
+
+  LFGrants:
+    Type: Custom::LFGrants
+    Condition: HasEnvironmentType
+    Properties:
+      ServiceToken: !GetAtt LFGrantsFunction.Arn
+      CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
+      DatabaseName: !Ref TableNamespace
+      TableName:    !Ref TableName
+      LocalAccountId: !Ref AWS::AccountId
+      CrossAccountId: !Ref PnCoreAwsAccountId
+      # Same-account principals (table only)
+      TablePrincipal1: !If
+        - IsProdEnvironment
+        - !Sub 'arn:aws:iam::${AWS::AccountId}:role/AdminAccess-${EnvironmentType}'
+        - !If
+          - IsCoreAccount
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtAdmin-core-${EnvironmentType}'
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtAdmin-confinfo-${EnvironmentType}'
+      TablePrincipal2: !If
+        - IsProdEnvironment
+        - !Sub 'arn:aws:iam::${AWS::AccountId}:role/ReadOnlyAccess-${EnvironmentType}'
+        - !If
+          - IsCoreAccount
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtReadOnly-confinfo-${EnvironmentType}'
+      # Cross-account principals (database DESCRIBE + table SELECT/DESCRIBE)
+      CrossPrincipal1: !If
+        - HasCrossAccountContext
+        - !If
+          - IsProdEnvironment
+          - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/AdminAccess-${EnvironmentType}'
+          - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/SendExtAdmin-core-${EnvironmentType}'
+        - ''
+      CrossPrincipal2: !If
+        - HasCrossAccountContext
+        - !If
+          - IsProdEnvironment
+          - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/ReadOnlyAccess-${EnvironmentType}'
+          - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
+        - ''
+      CrossPrincipal3: !If
+        - HasCoreSsoAdminRoleInConfinfoDev
+        - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/aws-reserved/sso.amazonaws.com/eu-west-1/${CoreSsoAdminRole}'
+        - ''
+      AdditionalTablePrincipals: !Ref AdditionalTablePrincipals
+      AdditionalCrossAccountPrincipals: !Ref AdditionalCrossAccountPrincipals
+
+  # ---------------------------------------------------------------------------
+  # Glue Catalog Resource Policy — Custom Resource Lambda (existing pattern)
+  # ---------------------------------------------------------------------------
+
   GlueCatalogPolicyRole:
     Type: AWS::IAM::Role
     Condition: UseGlueCatalogResourcePolicy
@@ -89,17 +257,13 @@ Resources:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
       Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
         - PolicyName: GlueCatalogPolicyExecution
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
               - Effect: Allow
                 Action:
                   - glue:GetResourcePolicy
@@ -119,141 +283,80 @@ Resources:
         ZipFile: |
           import json
           import boto3
-          import traceback
-          import urllib.request
+          import cfnresponse
 
           glue = boto3.client("glue")
 
 
-          def _send(event, context, status, data=None, reason=None, physical_id=None):
-              body = {
-                  "Status": status,
-                  "Reason": reason or f"See CloudWatch logs: {context.log_stream_name}",
-                  "PhysicalResourceId": physical_id or context.log_stream_name,
-                  "StackId": event["StackId"],
-                  "RequestId": event["RequestId"],
-                  "LogicalResourceId": event["LogicalResourceId"],
-                  "Data": data or {},
-              }
-              payload = json.dumps(body).encode("utf-8")
-              request = urllib.request.Request(
-                  url=event["ResponseURL"],
-                  data=payload,
-                  method="PUT",
-                  headers={"content-type": "", "content-length": str(len(payload))},
-              )
-              urllib.request.urlopen(request)
-
-
-          def _compact(value):
-              if isinstance(value, list):
-                  out = []
-                  for item in value:
-                      c = _compact(item)
-                      if c is not None:
-                          out.append(c)
-                  return out
-              if isinstance(value, dict):
-                  out = {}
-                  for key, item in value.items():
-                      c = _compact(item)
-                      if c is not None:
-                          out[key] = c
-                  return out
-              if value is None:
-                  return None
-              return value
-
-
           def _get_policy():
               try:
-                  response = glue.get_resource_policy()
-                  return json.loads(response["PolicyInJson"]), response.get("PolicyHash")
+                  r = glue.get_resource_policy()
+                  return json.loads(r["PolicyInJson"]), r.get("PolicyHash")
               except glue.exceptions.EntityNotFoundException:
                   return {"Version": "2012-10-17", "Statement": []}, None
 
 
           def _put_policy(policy, policy_hash):
-              args = {
-                  "PolicyInJson": json.dumps(policy),
-                  "EnableHybrid": "TRUE",
-              }
+              args = {"PolicyInJson": json.dumps(policy), "EnableHybrid": "TRUE"}
               if policy_hash:
                   args["PolicyHashCondition"] = policy_hash
               glue.put_resource_policy(**args)
 
 
-          def _upsert_statement(policy, statement):
-              sid = statement.get("Sid")
-              statements = [s for s in policy.get("Statement", []) if s.get("Sid") != sid]
-              statements.append(statement)
-              policy["Version"] = policy.get("Version", "2012-10-17")
-              policy["Statement"] = statements
+          def _upsert(policy, stmt):
+              sid = stmt.get("Sid")
+              policy["Statement"] = [s for s in policy.get("Statement", []) if s.get("Sid") != sid]
+              policy["Statement"].append(stmt)
               return policy
 
 
-          def _remove_statement(policy, sid):
-              policy["Version"] = policy.get("Version", "2012-10-17")
+          def _remove(policy, sid):
               policy["Statement"] = [s for s in policy.get("Statement", []) if s.get("Sid") != sid]
               return policy
 
 
+          def _compact(v):
+              if isinstance(v, list):  return [c for c in (_compact(i) for i in v) if c is not None]
+              if isinstance(v, dict):  return {k: c for k, i in v.items() if (c := _compact(i)) is not None}
+              return v
+
+
           def handler(event, context):
-              physical_id = event.get("PhysicalResourceId", "GlueCatalogResourcePolicy")
+              print(json.dumps(event))
               try:
-                  props = event.get("ResourceProperties", {})
-                  sid = props.get("StatementSid")
-                  statement = _compact(props.get("Statement", {}))
-                  request_type = event.get("RequestType")
+                  props  = event["ResourceProperties"]
+                  sid    = props["StatementSid"]
+                  stmt   = _compact(props.get("Statement", {}))
+                  if "Sid" not in stmt:
+                      stmt["Sid"] = sid
+                  phys   = event.get("PhysicalResourceId") or sid
 
-                  if sid and "Sid" not in statement:
-                      statement["Sid"] = sid
-
-                  if request_type in ("Create", "Update"):
-                      if not sid:
-                          raise ValueError("StatementSid is required")
-
+                  if event["RequestType"] in ("Create", "Update"):
                       for _ in range(3):
-                          current_policy, policy_hash = _get_policy()
-                          updated_policy = _upsert_statement(current_policy, statement)
+                          policy, h = _get_policy()
                           try:
-                              _put_policy(updated_policy, policy_hash)
+                              _put_policy(_upsert(policy, stmt), h)
                               break
                           except glue.exceptions.ConditionCheckFailureException:
                               continue
+                  elif event["RequestType"] == "Delete":
+                      for _ in range(3):
+                          policy, h = _get_policy()
+                          updated = _remove(policy, sid)
+                          try:
+                              if not updated.get("Statement"):
+                                  glue.delete_resource_policy(**({'PolicyHashCondition': h} if h else {}))
+                              else:
+                                  _put_policy(updated, h)
+                              break
+                          except (glue.exceptions.ConditionCheckFailureException,
+                                  glue.exceptions.EntityNotFoundException):
+                              continue
 
-                      _send(event, context, "SUCCESS", {"StatementSid": sid}, physical_id=physical_id)
-                      return
-
-                  if request_type == "Delete":
-                      if sid:
-                          for _ in range(3):
-                              current_policy, policy_hash = _get_policy()
-                              updated_policy = _remove_statement(current_policy, sid)
-
-                              if not updated_policy.get("Statement"):
-                                  try:
-                                      if policy_hash:
-                                          glue.delete_resource_policy(PolicyHashCondition=policy_hash)
-                                      else:
-                                          glue.delete_resource_policy()
-                                  except glue.exceptions.EntityNotFoundException:
-                                      pass
-                                  break
-
-                              try:
-                                  _put_policy(updated_policy, policy_hash)
-                                  break
-                              except glue.exceptions.ConditionCheckFailureException:
-                                  continue
-
-                      _send(event, context, "SUCCESS", {"StatementSid": sid}, physical_id=physical_id)
-                      return
-
-                  _send(event, context, "SUCCESS", {"IgnoredRequestType": request_type}, physical_id=physical_id)
-              except Exception as error:
-                  traceback.print_exc()
-                  _send(event, context, "FAILED", reason=str(error), physical_id=physical_id)
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {"StatementSid": sid}, physicalResourceId=phys)
+              except Exception as e:
+                  print(f'ERROR: {e}')
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {}, reason=str(e))
 
   GlueCatalogResourcePolicy:
     Type: Custom::GlueCatalogResourcePolicy
@@ -290,120 +393,29 @@ Resources:
           - glue:GetPartition
           - glue:GetPartitions
         Resource:
-          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:*'
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog/s3tablescatalog/${TableBucketName}'
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/s3tablescatalog/${TableBucketName}/${TableNamespace}'
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/s3tablescatalog/${TableBucketName}/${TableNamespace}/*'
 
-  LFGrantLocalAdmin:
-    Type: AWS::LakeFormation::Permissions
-    Condition: HasEnvironmentType
-    Properties:
-      DataLakePrincipal:
-        DataLakePrincipalIdentifier: !If
-          - IsProdEnvironment
-          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/AdminAccess-${EnvironmentType}'
-          - !If
-            - IsCoreAccount
-            - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtAdmin-core-${EnvironmentType}'
-            - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtAdmin-confinfo-${EnvironmentType}'
-      Resource:
-        TableResource:
-          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
-          DatabaseName: !Ref TableNamespace
-          Name: !Ref TableName
-      Permissions:
-        - SELECT
-        - DESCRIBE
-
-  LFGrantLocalReadonly:
-    Type: AWS::LakeFormation::Permissions
-    Condition: HasEnvironmentType
+  GlueCatalogRamSharePolicy:
+    Type: Custom::GlueCatalogResourcePolicy
+    Condition: UseGlueCatalogResourcePolicy
     DependsOn:
-      - LFGrantLocalAdmin
+      - GlueCatalogPolicyFunction
     Properties:
-      DataLakePrincipal:
-        DataLakePrincipalIdentifier: !If
-          - IsProdEnvironment
-          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/ReadOnlyAccess-${EnvironmentType}'
-          - !If
-            - IsCoreAccount
-            - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
-            - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtReadOnly-confinfo-${EnvironmentType}'
-      Resource:
-        TableResource:
-          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
-          DatabaseName: !Ref TableNamespace
-          Name: !Ref TableName
-      Permissions:
-        - SELECT
-        - DESCRIBE
-
-  LFGrantCrossAdmin:
-    Type: AWS::LakeFormation::Permissions
-    Condition: HasCrossAccountContext
-    DependsOn:
-      - LFGrantLocalReadonly
-    Properties:
-      DataLakePrincipal:
-        DataLakePrincipalIdentifier: !If
-          - IsProdEnvironment
-          - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/AdminAccess-${EnvironmentType}'
-          - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/SendExtAdmin-core-${EnvironmentType}'
-      Resource:
-        TableResource:
-          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
-          DatabaseName: !Ref TableNamespace
-          Name: !Ref TableName
-      Permissions:
-        - SELECT
-        - DESCRIBE
-
-  LFGrantCrossReadonly:
-    Type: AWS::LakeFormation::Permissions
-    Condition: HasCrossAccountContext
-    DependsOn:
-      - LFGrantCrossAdmin
-    Properties:
-      DataLakePrincipal:
-        DataLakePrincipalIdentifier: !If
-          - IsProdEnvironment
-          - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/ReadOnlyAccess-${EnvironmentType}'
-          - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
-      Resource:
-        TableResource:
-          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
-          DatabaseName: !Ref TableNamespace
-          Name: !Ref TableName
-      Permissions:
-        - SELECT
-        - DESCRIBE
-
-  LFGrantCrossSsoDescribeDb:
-    Type: AWS::LakeFormation::Permissions
-    Condition: HasCoreSsoAdminRoleInConfinfoDev
-    DependsOn:
-      - LFGrantCrossReadonly
-    Properties:
-      DataLakePrincipal:
-        DataLakePrincipalIdentifier: !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/aws-reserved/sso.amazonaws.com/eu-west-1/${CoreSsoAdminRole}'
-      Resource:
-        DatabaseResource:
-          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
-          Name: !Ref TableNamespace
-      Permissions:
-        - DESCRIBE
-
-  LFGrantCrossSsoSelectTable:
-    Type: AWS::LakeFormation::Permissions
-    Condition: HasCoreSsoAdminRoleInConfinfoDev
-    DependsOn:
-      - LFGrantCrossSsoDescribeDb
-    Properties:
-      DataLakePrincipal:
-        DataLakePrincipalIdentifier: !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/aws-reserved/sso.amazonaws.com/eu-west-1/${CoreSsoAdminRole}'
-      Resource:
-        TableResource:
-          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
-          DatabaseName: !Ref TableNamespace
-          Name: !Ref TableName
-      Permissions:
-        - SELECT
-        - DESCRIBE
+      ServiceToken: !GetAtt GlueCatalogPolicyFunction.Arn
+      StatementSid: !Sub '${ProjectName}-${TableNamespace}-${TableName}-ram-share'
+      Statement:
+        Sid: !Sub '${ProjectName}-${TableNamespace}-${TableName}-ram-share'
+        Effect: Allow
+        Principal:
+          Service:
+            - ram.amazonaws.com
+        Action:
+          - glue:ShareResource
+        Resource:
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog/s3tablescatalog/${TableBucketName}'
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/s3tablescatalog/${TableBucketName}/*'
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/s3tablescatalog/${TableBucketName}/*/*'
