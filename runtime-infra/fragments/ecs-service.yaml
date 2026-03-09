@@ -788,7 +788,7 @@ Mappings:
       sidecarCwAgent: 256
 
   ContainerImagesURI:
-    sidecarCWAgent:
+    sidecarCwAgent:
       ARM: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:v1.30-arm64
       AMD: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:1.30
     sidecarInjector:
@@ -1769,7 +1769,7 @@ Resources:
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
         - Name: sidecar-injector
-          Image: !FindInMap [ ContainerImagesURI, !Ref CpuArchitecture, sidecarInjector ]
+          Image: !FindInMap [ ContainerImagesURI, sidecarInjector, !Ref CpuArchitecture ]
           Essential: false
           MountPoints:
             - SourceVolume: "my-vol"
@@ -1784,7 +1784,7 @@ Resources:
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
         - Name: sidecar-cw-agent
-          Image: !FindInMap [ ContainerImagesURI, !Ref CpuArchitecture, sidecarCwAgent ]
+          Image: !FindInMap [ ContainerImagesURI, sidecarCwAgent, !Ref CpuArchitecture ]
           Essential: false
           Cpu: '256'
           Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarCwAgent ]
