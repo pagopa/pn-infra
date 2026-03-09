@@ -730,10 +730,8 @@ Parameters:
     
   CpuArchitecture:
     Type: String
-    Default: "X86_64"
-    AllowedValues:
-      - "X86_64"
-      - "ARM64"
+    Default: "AMD"
+    AllowedValues: ["AMD", "ARM"]
 
 Mappings:
   ContainerMemory:
@@ -788,6 +786,14 @@ Mappings:
       clockdrift: 256
       microservice: 7936
       sidecarCwAgent: 256
+
+  ContainerImagesURI:
+    sidecarCWAgent:
+      ARM: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:v1.30-arm64
+      AMD: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:1.30
+    sidecarInjector:
+      ARM: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.33.0
+      AMD: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.32.0
 
 Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
@@ -1123,7 +1129,7 @@ Resources:
       Cpu: !Ref CpuValue
       Memory: !Ref MemoryAmount
       RuntimePlatform:
-        CpuArchitecture: !Ref CpuArchitecture
+        CpuArchitecture: !If [ HasArm64Architecture, ARM64, X86_64 ]
       # A role needed by ECS.
       # "The ARN of the task execution role that containers in this task can assume. All containers in this task are granted the permissions that are specified in this role."
       # "There is an optional task execution IAM role that you can specify with Fargate to allow your Fargate tasks to make API calls to Amazon ECR."
@@ -1763,7 +1769,7 @@ Resources:
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
         - Name: sidecar-injector
-          Image: !If [ HasArm64Architecture, !Ref ContainerARMImageInjectorURI, !Ref ContainerImageInjectorURI ]
+          Image: !FindInMap [ ContainerImagesURI, !Ref CpuArchitecture, sidecarInjector ]
           Essential: false
           MountPoints:
             - SourceVolume: "my-vol"
@@ -1778,7 +1784,7 @@ Resources:
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
         - Name: sidecar-cw-agent
-          Image: !If [ HasArm64Architecture, !Ref ContainerARMCloudWatchAgentURI, !Ref ContainerCloudWatchAgentURI ]
+          Image: !FindInMap [ ContainerImagesURI, !Ref CpuArchitecture, sidecarCwAgent ]
           Essential: false
           Cpu: '256'
           Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarCwAgent ]
