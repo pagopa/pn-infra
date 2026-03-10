@@ -22,6 +22,9 @@ Parameters:
     Description: 'Kinesis source CDC stream crypto key ARN'
     Type: String
   
+  LogsKinesisSourceStreamName:
+    Description: 'Kinesis source Logs stream name'
+    Type: String
   LogsKinesisSourceStreamArn:
     Description: 'Kinesis source Logs stream ARN'
     Type: String
@@ -234,6 +237,7 @@ Resources:
         ProjectName: !Ref ProjectName
         TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
         StreamNamePrefix: logsToOpenSearch
+        KinesisStreamName: !Ref LogsKinesisSourceStreamName
         KinesisStreamArn: !Ref LogsKinesisSourceStreamArn
         KinesisStreamKMSKeyArn: !Ref LogsKinesisSourceStreamKeyArn
         OpenSearchClusterEndpoint: !Ref OpenSearchClusterEndpoint
