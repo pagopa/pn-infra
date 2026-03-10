@@ -59,6 +59,11 @@ Parameters:
       The ARN is built automatically using PnCoreAwsAccountId.
       Example: ntt-dev,other-role
 
+  LambdaRuntime:
+    Type: String
+    Default: python3.12
+    Description: Runtime for the custom resource Lambda functions in this fragment
+
   LFGrantsRoleName:
     Type: String
     Default: pn-lf-grants-role
@@ -110,7 +115,7 @@ Resources:
   LFGrantsFunction:
     Type: AWS::Lambda::Function
     Properties:
-      Runtime: python3.12
+      Runtime: !Ref LambdaRuntime
       Handler: index.handler
       Role: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${LFGrantsRoleName}'
       Timeout: 60
@@ -291,7 +296,7 @@ Resources:
     Type: AWS::Lambda::Function
     Condition: UseGlueCatalogResourcePolicy
     Properties:
-      Runtime: python3.12
+      Runtime: !Ref LambdaRuntime
       Handler: index.handler
       Role: !GetAtt GlueCatalogPolicyRole.Arn
       Timeout: 120
