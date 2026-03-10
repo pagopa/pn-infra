@@ -50,6 +50,11 @@ Parameters:
       The ARN is built automatically using PnCoreAwsAccountId.
       Example: ntt-dev,other-role
 
+  LFGrantsRoleName:
+    Type: String
+    Default: pn-lf-grants-role
+    Description: Name of the pre-created Lambda execution role used for LF grants custom resource
+
 Conditions:
   HasEnvironmentType: !Not [ !Equals [ !Ref EnvironmentType, '' ] ]
 
@@ -93,44 +98,40 @@ Resources:
   # directly from a Lambda-backed Custom Resource.
   # ---------------------------------------------------------------------------
 
-  LFGrantsRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      Path: /
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Policies:
-        - PolicyName: LFGrantsPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - lakeformation:GrantPermissions
-                  - lakeformation:RevokePermissions
-                Resource: '*'
-
   LFGrantsFunction:
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.12
       Handler: index.handler
-      Role: !GetAtt LFGrantsRole.Arn
+      Role: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${LFGrantsRoleName}'
       Timeout: 60
       Code:
         ZipFile: |
           import json
           import boto3
-          import cfnresponse
+          import urllib.request
 
           lf = boto3.client('lakeformation')
+
+
+          def _send(event, context, status, data=None, reason=None, physical_id=None):
+              body = {
+                  'Status': status,
+                  'Reason': reason or f'See CloudWatch logs: {context.log_stream_name}',
+                  'PhysicalResourceId': physical_id or event.get('PhysicalResourceId') or context.log_stream_name,
+                  'StackId': event['StackId'],
+                  'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId'],
+                  'Data': data or {},
+              }
+              payload = json.dumps(body).encode('utf-8')
+              request = urllib.request.Request(
+                  url=event['ResponseURL'],
+                  data=payload,
+                  method='PUT',
+                  headers={'content-type': '', 'content-length': str(len(payload))},
+              )
+              urllib.request.urlopen(request)
 
 
           def _call(fn, principal, resource, permissions):
@@ -189,10 +190,10 @@ Resources:
                   for name in _parse_csv(p.get('AdditionalTablePrincipals', '')):
                       _call(fn, _role_arn(local_account, name), table_resource, ['SELECT', 'DESCRIBE'])
 
-                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                  _send(event, context, 'SUCCESS', {})
               except Exception as e:
                   print(f'ERROR: {e}')
-                  cfnresponse.send(event, context, cfnresponse.FAILED, {}, reason=str(e))
+                  _send(event, context, 'FAILED', {}, reason=str(e))
 
   LFGrants:
     Type: Custom::LFGrants
@@ -283,9 +284,29 @@ Resources:
         ZipFile: |
           import json
           import boto3
-          import cfnresponse
+          import urllib.request
 
           glue = boto3.client("glue")
+
+
+          def _send(event, context, status, data=None, reason=None, physical_id=None):
+              body = {
+                  'Status': status,
+                  'Reason': reason or f'See CloudWatch logs: {context.log_stream_name}',
+                  'PhysicalResourceId': physical_id or event.get('PhysicalResourceId') or context.log_stream_name,
+                  'StackId': event['StackId'],
+                  'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId'],
+                  'Data': data or {},
+              }
+              payload = json.dumps(body).encode('utf-8')
+              request = urllib.request.Request(
+                  url=event['ResponseURL'],
+                  data=payload,
+                  method='PUT',
+                  headers={'content-type': '', 'content-length': str(len(payload))},
+              )
+              urllib.request.urlopen(request)
 
 
           def _get_policy():
@@ -353,10 +374,10 @@ Resources:
                                   glue.exceptions.EntityNotFoundException):
                               continue
 
-                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {"StatementSid": sid}, physicalResourceId=phys)
+                  _send(event, context, 'SUCCESS', {"StatementSid": sid}, physical_id=phys)
               except Exception as e:
                   print(f'ERROR: {e}')
-                  cfnresponse.send(event, context, cfnresponse.FAILED, {}, reason=str(e))
+                  _send(event, context, 'FAILED', {}, reason=str(e), physical_id=phys if 'phys' in locals() else None)
 
   GlueCatalogResourcePolicy:
     Type: Custom::GlueCatalogResourcePolicy
@@ -394,6 +415,7 @@ Resources:
           - glue:GetPartitions
         Resource:
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog/s3tablescatalog'
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog/s3tablescatalog/${TableBucketName}'
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/s3tablescatalog/${TableBucketName}/${TableNamespace}'
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/s3tablescatalog/${TableBucketName}/${TableNamespace}/*'
@@ -416,6 +438,7 @@ Resources:
           - glue:ShareResource
         Resource:
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog/s3tablescatalog'
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog/s3tablescatalog/${TableBucketName}'
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/s3tablescatalog/${TableBucketName}/*'
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/s3tablescatalog/${TableBucketName}/*/*'

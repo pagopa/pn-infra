@@ -322,17 +322,6 @@ Resources:
                 - DatabaseName: !Ref ConfinfoExportDatabase
                   TableName: !Ref EcRichiesteMetadatiGlueTable
 
-  # ---------------------------------------------------------------------------
-  # Address Manager Tracing — cross-account S3 Tables access from core
-  #
-  # Architecture:
-  #   1. DB resource link in core → points to confinfo s3tablescatalog
-  #   2. LF DESCRIBE on DB resource link (local catalog) → Admin + Readonly
-  #   Note: table resource link is NOT needed inside a database resource link
-  #   (Glue returns "Circular linking" error). The DB resource link automatically
-  #   exposes all remote tables. Cross-account SELECT grants are managed by
-  #   confinfo s3tables-access-control.yaml (LFGrantCrossAdmin / LFGrantCrossReadonly).
-  # ---------------------------------------------------------------------------
 
   AddressManagerTracingGlueResourceLinkDB:
     Type: AWS::Glue::Database
