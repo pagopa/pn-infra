@@ -31,6 +31,16 @@ Parameters:
     Description: Delivery stream prefix identifier
     Default: 'address-manager-tracing'
 
+  ExistingDeliveryRoleName:
+    Type: String
+    Default: ''
+    Description: >
+      Name of an existing IAM role to use for the Firehose delivery stream.
+      If empty (default), the fragment creates a new role named
+      ${ProjectName}-${DeliveryStreamNamePrefix}-delivery-role.
+      Use this when the role must be created before this stack (e.g. to allow
+      Lake Formation grants on the role before the delivery stream is created).
+
   ErrorBucketNameSuffix:
     Type: String
     Description: Short suffix for deterministic Firehose error bucket name
@@ -78,6 +88,7 @@ Conditions:
   CreateFirehoseLogGroup: !Equals [ !Ref ExistingFirehoseLogGroupName, '' ]
   HasOncallCondition: !Equals [ !Ref HasOncall, 'true' ]
   EnableLakeFormationGrantCondition: !Equals [ !Ref EnableLakeFormationGrant, 'true' ]
+  CreateDeliveryRole: !Equals [ !Ref ExistingDeliveryRoleName, '' ]
 
 Resources:
   DeliveryStreamErrorBucket:
@@ -94,6 +105,7 @@ Resources:
 
   DeliveryStreamRole:
     Type: AWS::IAM::Role
+    Condition: CreateDeliveryRole
     Properties:
       RoleName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-delivery-role'
       AssumeRolePolicyDocument:
@@ -109,7 +121,10 @@ Resources:
     Properties:
       PolicyName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-iceberg-policy'
       Roles:
-        - !Ref DeliveryStreamRole
+        - !If
+          - CreateDeliveryRole
+          - !Ref DeliveryStreamRole
+          - !Ref ExistingDeliveryRoleName
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -185,7 +200,10 @@ Resources:
     Condition: EnableLakeFormationGrantCondition
     Properties:
       DataLakePrincipal:
-        DataLakePrincipalIdentifier: !GetAtt DeliveryStreamRole.Arn
+        DataLakePrincipalIdentifier: !If
+          - CreateDeliveryRole
+          - !GetAtt DeliveryStreamRole.Arn
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ExistingDeliveryRoleName}'
       Resource:
         DatabaseResource:
           CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
@@ -199,7 +217,10 @@ Resources:
     DependsOn: DeliveryStreamLakeFormationDatabaseGrant
     Properties:
       DataLakePrincipal:
-        DataLakePrincipalIdentifier: !GetAtt DeliveryStreamRole.Arn
+        DataLakePrincipalIdentifier: !If
+          - CreateDeliveryRole
+          - !GetAtt DeliveryStreamRole.Arn
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ExistingDeliveryRoleName}'
       Resource:
         TableResource:
           CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
@@ -213,7 +234,6 @@ Resources:
     DependsOn:
       - DeliveryStreamRolePolicy
     Properties:
-      DeliveryStreamName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-delivery-stream-v1'
       DeliveryStreamType: DirectPut
       IcebergDestinationConfiguration:
         AppendOnly: true
@@ -234,11 +254,17 @@ Resources:
             S3ErrorOutputPrefix: !Sub 'iceberg-errors/${DestinationNamespace}/${DestinationTableName}/!{firehose:error-output-type}/'
         RetryOptions:
           DurationInSeconds: 300
-        RoleARN: !GetAtt DeliveryStreamRole.Arn
+        RoleARN: !If
+          - CreateDeliveryRole
+          - !GetAtt DeliveryStreamRole.Arn
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ExistingDeliveryRoleName}'
         s3BackupMode: FailedDataOnly
         S3Configuration:
           BucketARN: !GetAtt DeliveryStreamErrorBucket.Arn
-          RoleARN: !GetAtt DeliveryStreamRole.Arn
+          RoleARN: !If
+            - CreateDeliveryRole
+            - !GetAtt DeliveryStreamRole.Arn
+            - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ExistingDeliveryRoleName}'
           Prefix: !Sub 'iceberg-backup/${DestinationNamespace}/${DestinationTableName}/'
           ErrorOutputPrefix: 'iceberg-backup/errors/!{firehose:error-output-type}/'
           BufferingHints:
@@ -322,7 +348,10 @@ Outputs:
 
   DeliveryStreamRoleName:
     Description: Name of the IAM role used by the Firehose delivery stream
-    Value: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-delivery-role'
+    Value: !If
+      - CreateDeliveryRole
+      - !Ref DeliveryStreamRole
+      - !Ref ExistingDeliveryRoleName
 
   DeliveryStreamErrorBucketName:
     Description: Name of the Firehose backup/error bucket
