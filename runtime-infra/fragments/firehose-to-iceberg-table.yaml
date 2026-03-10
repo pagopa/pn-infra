@@ -91,6 +91,7 @@ Resources:
   DeliveryStreamRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-delivery-role'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -314,6 +315,10 @@ Outputs:
   DeliveryStreamArn:
     Description: ARN of delivery stream
     Value: !GetAtt AddressManagerTracingIcebergDeliveryStream.Arn
+
+  DeliveryStreamRoleName:
+    Description: Name of the IAM role used by the Firehose delivery stream
+    Value: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-delivery-role'
 
   DeliveryStreamErrorBucketName:
     Description: Name of the Firehose backup/error bucket

@@ -41,6 +41,15 @@ Parameters:
       SELECT + DESCRIBE on the table. The ARN is built automatically using AWS::AccountId.
       Example: my-role,other-role
 
+  FirehoseRoleName:
+    Type: String
+    Default: ''
+    Description: >
+      Optional name of the Firehose IAM role in the same account that writes to this table.
+      If set, grants DESCRIBE on the database and ALL on the table.
+      The ARN is built automatically using AWS::AccountId.
+      Example: pn-confinfo-dev-address-manager-tracing-delivery-role
+
   AdditionalCrossAccountPrincipals:
     Type: String
     Default: ''
@@ -190,6 +199,11 @@ Resources:
                   for name in _parse_csv(p.get('AdditionalTablePrincipals', '')):
                       _call(fn, _role_arn(local_account, name), table_resource, ['SELECT', 'DESCRIBE'])
 
+                  firehose_role = p.get('FirehoseRoleName', '').strip()
+                  if firehose_role:
+                      _call(fn, _role_arn(local_account, firehose_role), db_resource,    ['DESCRIBE'])
+                      _call(fn, _role_arn(local_account, firehose_role), table_resource, ['ALL'])
+
                   _send(event, context, 'SUCCESS', {})
               except Exception as e:
                   print(f'ERROR: {e}')
@@ -240,6 +254,7 @@ Resources:
         - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/aws-reserved/sso.amazonaws.com/eu-west-1/${CoreSsoAdminRole}'
         - ''
       AdditionalTablePrincipals: !Ref AdditionalTablePrincipals
+      FirehoseRoleName: !Ref FirehoseRoleName
       AdditionalCrossAccountPrincipals: !Ref AdditionalCrossAccountPrincipals
 
   # ---------------------------------------------------------------------------
