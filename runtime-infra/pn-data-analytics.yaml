@@ -36,9 +36,15 @@ Parameters:
     Type: String
     Description: Environment type (dev, test, uat, hotfix, prod)
 
+  EnableAddressManagerCrossAccountAccess:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: Whether to enable cross-account access to address manager tracing tables (only for prod environment)
+
 Conditions:
   IsProdEnvironment: !Equals [ !Ref EnvironmentType, 'prod' ]
-
+  IsAddressManagerCrossAccountAccessEnabled: !Equals [ !Ref EnableAddressManagerCrossAccountAccess, 'true' ]
 Resources:
 
   ConfinfoExportDatabase:
@@ -330,6 +336,7 @@ Resources:
 
   AddressManagerTracingGlueResourceLinkDB:
     Type: AWS::Glue::Database
+    Condition: IsAddressManagerCrossAccountAccessEnabled
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseName: !Sub 'address_manager_tracing_link_${AddressManagerTracingLinkSuffix}'
@@ -342,6 +349,7 @@ Resources:
   AddressManagerTracingLFDescribeAdminCore:
     Type: AWS::LakeFormation::Permissions
     DependsOn: AddressManagerTracingGlueResourceLinkDB
+    Condition: IsAddressManagerCrossAccountAccessEnabled
     Properties:
       DataLakePrincipal:
         DataLakePrincipalIdentifier: !If
@@ -358,6 +366,7 @@ Resources:
   AddressManagerTracingLFDescribeReadonlyCore:
     Type: AWS::LakeFormation::Permissions
     DependsOn: AddressManagerTracingGlueResourceLinkDB
+    Condition: IsAddressManagerCrossAccountAccessEnabled
     Properties:
       DataLakePrincipal:
         DataLakePrincipalIdentifier: !If
