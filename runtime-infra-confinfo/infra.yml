@@ -756,6 +756,62 @@ Resources:
           FunctionName: !Ref SesLambdaFunction
           SourceAccount: !Ref AWS::AccountId
 
+  PnLfGrantsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: pn-lf-grants-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSLakeFormationCrossAccountManager
+      Policies:
+        - PolicyName: LFGrantsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lakeformation:GrantPermissions
+                  - lakeformation:BatchGrantPermissions
+                  - lakeformation:RevokePermissions
+                  - lakeformation:BatchRevokePermissions
+                  - lakeformation:GetDataAccess
+                  - lakeformation:ListPermissions
+                  - glue:GetCatalog
+                  - glue:GetCatalogs
+                  - glue:GetDatabase
+                  - glue:GetDatabases
+                  - glue:GetTable
+                  - glue:GetTables
+                  - glue:GetTableVersion
+                  - glue:GetTableVersions
+                  - glue:GetPartition
+                  - glue:GetPartitions
+                  - glue:SearchTables
+                # Needed for S3 Tables LF permissions not handled granularly by CloudFormation.
+                Resource: '*'
+
+  PnLfGrantsRoleDataLakeSettings:
+    Type: AWS::LakeFormation::DataLakeSettings
+    DependsOn:
+      - PnLfGrantsRole
+    Properties:
+      MutationType: APPEND
+      Admins:
+        - DataLakePrincipalIdentifier: !GetAtt PnLfGrantsRole.Arn
+
   SesLambdaFunctionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -1198,6 +1254,14 @@ Resources:
         SpotStrategyDefinition: !Ref SpotStrategyDefinition
 
 Outputs:
+
+  PnLfGrantsRoleArn:
+    Description: ARN of the pn-lf-grants-role used by LF custom resources
+    Value: !GetAtt PnLfGrantsRole.Arn
+
+  PnLfGrantsRoleName:
+    Description: Name of the pn-lf-grants-role used by LF custom resources
+    Value: !Ref PnLfGrantsRole
 
   AlarmSNSTopicArn:
     Value: !Ref AlarmSNSTopicArn
