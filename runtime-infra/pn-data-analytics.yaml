@@ -27,6 +27,11 @@ Parameters:
     Type: String
     Description: S3 Tables table bucket name in confinfo for address manager tracing
 
+  AddressManagerTracingLinkSuffix:
+    Type: String
+    Default: '001'
+    Description: Suffix appended to the Glue database resource link name for address manager tracing
+
   EnvironmentType:
     Type: String
     Description: Environment type (dev, test, uat, hotfix, prod)
@@ -327,12 +332,12 @@ Resources:
     Type: AWS::Glue::Database
     Properties:
       CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Sub 'address_manager_tracing_link_${AddressManagerTracingLinkSuffix}'
       DatabaseInput:
-        Name: address_manager_tracing_link
+        Name: !Sub 'address_manager_tracing_link_${AddressManagerTracingLinkSuffix}'
         TargetDatabase:
           CatalogId: !Sub '${SafeStorageAccountId}:s3tablescatalog/${ConfinfoAddressManagerTableBucketName}'
           DatabaseName: address_manager_tracing
-        CreateTableDefaultPermissions: []
 
   AddressManagerTracingLFDescribeAdminCore:
     Type: AWS::LakeFormation::Permissions
@@ -346,7 +351,7 @@ Resources:
       Resource:
         DatabaseResource:
           CatalogId: !Ref AWS::AccountId
-          Name: address_manager_tracing_link
+          Name: !Sub 'address_manager_tracing_link_${AddressManagerTracingLinkSuffix}'
       Permissions:
         - DESCRIBE
 
@@ -362,7 +367,7 @@ Resources:
       Resource:
         DatabaseResource:
           CatalogId: !Ref AWS::AccountId
-          Name: address_manager_tracing_link
+          Name: !Sub 'address_manager_tracing_link_${AddressManagerTracingLinkSuffix}'
       Permissions:
         - DESCRIBE
 
