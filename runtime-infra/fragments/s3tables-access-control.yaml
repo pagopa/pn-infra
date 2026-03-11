@@ -440,6 +440,34 @@ Resources:
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/s3tablescatalog/${TableBucketName}/${TableNamespace}'
           - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/s3tablescatalog/${TableBucketName}/${TableNamespace}/*'
 
+  GlueCatalogResourcePolicyUpdateDatabase:
+    Type: Custom::GlueCatalogResourcePolicy
+    Condition: UseGlueCatalogResourcePolicy
+    DependsOn:
+      - GlueCatalogPolicyFunction
+    Properties:
+      ServiceToken: !GetAtt GlueCatalogPolicyFunction.Arn
+      StatementSid: !Sub '${ProjectName}-${TableNamespace}-${TableName}-cross-update-db-link'
+      Statement:
+        Sid: !Sub '${ProjectName}-${TableNamespace}-${TableName}-cross-update-db-link'
+        Effect: Allow
+        Principal:
+          AWS:
+            - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/pn-cd-pipeline-CodeBuildRole'
+            - !If
+              - HasCoreSsoAdminRoleInConfinfoDev
+              - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/aws-reserved/sso.amazonaws.com/eu-west-1/${CoreSsoAdminRole}'
+              - !Ref AWS::NoValue
+        Action:
+          - glue:GetDatabase
+          - glue:GetDatabases
+          - glue:UpdateDatabase
+        Resource:
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog/s3tablescatalog'
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog/s3tablescatalog/${TableBucketName}'
+          - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/s3tablescatalog/${TableBucketName}/${TableNamespace}'
+
   GlueCatalogRamSharePolicy:
     Type: Custom::GlueCatalogResourcePolicy
     Condition: UseGlueCatalogResourcePolicy
