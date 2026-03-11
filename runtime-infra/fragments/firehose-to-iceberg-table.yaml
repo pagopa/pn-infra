@@ -41,14 +41,6 @@ Parameters:
       Use this when the role must be created before this stack (e.g. to allow
       Lake Formation grants on the role before the delivery stream is created).
 
-  ErrorBucketNameSuffix:
-    Type: String
-    Description: Short suffix for deterministic Firehose error bucket name
-    Default: '001'
-    MinLength: 1
-    MaxLength: 12
-    AllowedPattern: '^[a-z0-9-]+$'
-
   BufferingIntervalSec:
     Type: Number
     Description: Firehose buffer interval in seconds
@@ -96,7 +88,6 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-${ErrorBucketNameSuffix}-${AWS::AccountId}-${AWS::Region}'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
