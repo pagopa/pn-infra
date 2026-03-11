@@ -44,12 +44,17 @@ Parameters:
   BufferingIntervalSec:
     Type: Number
     Description: Firehose buffer interval in seconds
-    Default: 60
+    Default: 120
 
   BufferingSizeMB:
     Type: Number
     Description: Firehose buffer size in MB
-    Default: 64
+    Default: 5
+
+  RetryDurationSec:
+    Type: Number
+    Description: Firehose retry duration in seconds for the Iceberg destination
+    Default: 300
 
   ExistingFirehoseLogGroupName:
     Type: String
@@ -228,6 +233,9 @@ Resources:
       DeliveryStreamType: DirectPut
       IcebergDestinationConfiguration:
         AppendOnly: true
+        BufferingHints:
+          IntervalInSeconds: !Ref BufferingIntervalSec
+          SizeInMBs: !Ref BufferingSizeMB
         CatalogConfiguration:
           CatalogArn: !Sub
             - 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog/s3tablescatalog/${TableBucketName}'
@@ -244,7 +252,7 @@ Resources:
             DestinationTableName: !Ref DestinationTableName
             S3ErrorOutputPrefix: !Sub 'iceberg-errors/${DestinationNamespace}/${DestinationTableName}/!{firehose:error-output-type}/'
         RetryOptions:
-          DurationInSeconds: 300
+          DurationInSeconds: !Ref RetryDurationSec
         RoleARN: !If
           - CreateDeliveryRole
           - !GetAtt DeliveryStreamRole.Arn
