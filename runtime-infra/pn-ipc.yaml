@@ -135,18 +135,9 @@ Parameters:
     Type: String
   SubnetsIds:
     Type: String
-  VPNVpcId:
-    Type: String
-    Description: 'VPC ID for VPN infrastructure'
-  VPNSubnetsIds:
-    Type: String
-    Description: 'Comma-delimited list of Subnet IDs for VPN infrastructure'
   VpcCidr:
     Type: String
     Description: 'CIDR block for core  VPC'
-  VPNVpcCidr:
-    Type: String
-    Description: 'CIDR block for VPN VPC'
   # ECSClusterName:
   #   Type: String
   CorsAllowedDomains:
@@ -960,48 +951,6 @@ Resources:
             - !Ref EFSSecurityGroup
           SubnetId: !Select [2, !Split [",", !Ref SubnetsIds]]
 
-  # EFS for VPN VPC
-  VPNFargateEFSFileSystem:
-    Type: AWS::EFS::FileSystem
-    Properties:
-        PerformanceMode: generalPurpose
-        Encrypted: true
-        ThroughputMode: bursting
-        FileSystemTags: 
-          - Key: Name
-            Value: Fargate-VPN-EFS
-          - Key: "pn-eni-related"
-            Value: "true"
-          - Key: "pn-eni-related-groupName-regexp"
-            Value: !Base64 "^infra-prod-VPNEFSSecurityGroup.*$"
-          - Key: Microservice
-            Value: pn-infra-monitoring
-
-  # create each mountpoint for VPN subnet:
-  MountVPNFargateEfsTarget1:
-      Type: AWS::EFS::MountTarget
-      Properties: 
-          FileSystemId: !Ref VPNFargateEFSFileSystem
-          SecurityGroups: 
-            - !Ref VPNEFSSecurityGroup
-          SubnetId: !Select [0, !Split [",", !Ref VPNSubnetsIds]]
-
-  MountVPNFargateEfsTarget2:
-      Type: AWS::EFS::MountTarget
-      Properties: 
-          FileSystemId: !Ref VPNFargateEFSFileSystem
-          SecurityGroups: 
-            - !Ref VPNEFSSecurityGroup
-          SubnetId: !Select [1, !Split [",", !Ref VPNSubnetsIds]]
-
-  MountVPNFargateEfsTarget3:
-      Type: AWS::EFS::MountTarget
-      Properties: 
-          FileSystemId: !Ref VPNFargateEFSFileSystem
-          SecurityGroups: 
-            - !Ref VPNEFSSecurityGroup
-          SubnetId: !Select [2, !Split [",", !Ref VPNSubnetsIds]] 
-
   EFSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -1013,21 +962,6 @@ Resources:
       SecurityGroupIngress:
         # Main VPC can mount EFS:
         - CidrIp: !Ref VpcCidr
-          IpProtocol: tcp
-          FromPort: 2049
-          ToPort: 2049
-
-  VPNEFSSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      VpcId: !Ref VPNVpcId
-      GroupDescription: VPN EFS Security Group
-      Tags:
-        - Key: Microservice
-          Value: pn-infra-monitoring
-      SecurityGroupIngress:
-        # VPN VPC can mount EFS:
-        - CidrIp: !Ref VPNVpcCidr
           IpProtocol: tcp
           FromPort: 2049
           ToPort: 2049
@@ -1575,8 +1509,6 @@ Outputs:
   #   Value: !Ref ECSClusterName
   FargateEFSFileSystemID:
     Value: !Ref FargateEFSFileSystem
-  VPNFargateEFSFileSystemID:
-    Value: !Ref VPNFargateEFSFileSystem
   CorsAllowedDomains:
     Value: !Ref CorsAllowedDomains
   # EcsDefaultSecurityGroup:
