@@ -663,11 +663,63 @@ Resources:
       VpcId: !Ref VpcId
       GroupDescription: EFS Security Group
       SecurityGroupIngress:
-        # All Subnet can mount EFS:
-        - CidrIp: 0.0.0.0/0
+        # Main VPC can mount EFS:
+        - CidrIp: !Ref VpcCidr
           IpProtocol: tcp
           FromPort: 2049
           ToPort: 2049
+
+  PdfRasterEFSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref PdfRasterVpcId
+      GroupDescription: PdfRaster EFS Security Group
+      SecurityGroupIngress:
+        # PdfRaster VPC can mount EFS:
+        - CidrIp: !Ref PdfRasterVpcCidr
+          IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+
+  # EFS for PdfRaster VPC
+  PdfRasterFargateEFSFileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+        PerformanceMode: generalPurpose
+        Encrypted: true
+        ThroughputMode: bursting
+        FileSystemTags: 
+          - Key: Name
+            Value: Fargate-PdfRaster-EFS
+          - Key: "pn-eni-related"
+            Value: "true"
+          - Key: "pn-eni-related-groupName-regexp"
+            Value: !Base64 "^infra-prod-PdfRasterEFSSecurityGroup.*$"
+
+  # create each mountpoint for PdfRaster subnet:
+  MountPdfRasterFargateEfsTarget1:
+      Type: AWS::EFS::MountTarget
+      Properties: 
+          FileSystemId: !Ref PdfRasterFargateEFSFileSystem
+          SecurityGroups: 
+            - !Ref PdfRasterEFSSecurityGroup
+          SubnetId: !Select [0, !Split [",", !Ref PdfRasterVpcSubnets]]
+
+  MountPdfRasterFargateEfsTarget2:
+      Type: AWS::EFS::MountTarget
+      Properties: 
+          FileSystemId: !Ref PdfRasterFargateEFSFileSystem
+          SecurityGroups: 
+            - !Ref PdfRasterEFSSecurityGroup
+          SubnetId: !Select [1, !Split [",", !Ref PdfRasterVpcSubnets]]
+
+  MountPdfRasterFargateEfsTarget3:
+      Type: AWS::EFS::MountTarget
+      Properties: 
+          FileSystemId: !Ref PdfRasterFargateEFSFileSystem
+          SecurityGroups: 
+            - !Ref PdfRasterEFSSecurityGroup
+          SubnetId: !Select [2, !Split [",", !Ref PdfRasterVpcSubnets]]
 
   ###                          PN-CONFINFO EVENT BUS                       ###
   ###########################################################################
@@ -1289,6 +1341,9 @@ Outputs:
   # EFS Filesystem:
   FargateEFSFileSystemID:
     Value: !Ref FargateEFSFileSystem
+
+  PdfRasterFargateEFSFileSystemID:
+    Value: !Ref PdfRasterFargateEFSFileSystem
 
   LogsBucketKmsKeyArn:
     Value: !Ref LogsBucketKmsKeyArn
