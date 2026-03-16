@@ -1738,12 +1738,12 @@ Resources:
               - Type: s3
                 Value: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${ParentMicroserviceName}/runtime-variable.env'
               - Type: s3
-                Value: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${ParentMicroserviceName}/application.env'
+                Value: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${ParentMicroserviceName}/application-${ApplicativeEnvFileChecksum}.env'
             - 
               - Type: s3
                 Value: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/runtime-variable.env'
               - Type: s3
-                Value: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/application.env'
+                Value: !Sub 'arn:${AWS::Partition}:s3:::pn-runtime-environment-variables-${AWS::Region}-${AWS::AccountId}/${MicroServiceUniqueName}/application-${ApplicativeEnvFileChecksum}.env'
           PortMappings:
             - ContainerPort: 8080
           LinuxParameters:
