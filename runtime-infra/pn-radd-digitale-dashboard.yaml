@@ -8,6 +8,7 @@ Parameters:
   ApiGatewayMandateLogGroupName:
     Type: String
     Description: 'Log Group for pn-mandate API Gateway Access Logs (used for 4XX Breakdown)'
+    Default: ''
   MicroserviceDeliveryLogGroupName:
     Type: String
     Description: 'Log Group for pn-delivery ECS Microservice'
@@ -312,7 +313,7 @@ Resources:
               "properties": {
                 "query": "SOURCE '${MicroserviceMandateLogGroupName}' | filter logger_name = 'it.pagopa.pn.commons.log.PnAuditLog' and source_channel_details = 'QR_CODE' and aud_type = 'AUD_DL_ACCEPT' and (message like 'SUCCESS' or level = 'ERROR') | fields @timestamp, level, uid, error_category, message | sort @timestamp desc | limit 50",
                 "region": "${AWS::Region}",
-                "title": "Raw Logs: Esiti Validazione CIE (Troubleshooting)",
+                "title": "Raw Logs: Esiti Validazione CIE",
                 "view": "table"
               }
             }
