@@ -74,7 +74,7 @@ Resources:
       FunctionName: !Sub 'Lambda-Ec2-stop-${EnvironmentType}'
       Code:
         S3Bucket: !Ref LambdasBucketName
-        S3Key: !Sub "${LambdasBasePath}/ecs-saving.zip"
+        S3Key: !Sub "${LambdasBasePath}/ec2-stop.zip"
       Environment:
         Variables:
           StopEc2FunctionTagName:
@@ -146,11 +146,11 @@ Resources:
     Properties:
       Runtime: python3.14
       Timeout: 120
-      Handler: ecs-saving.lambda_handler
-      FunctionName: !Sub 'Lambda-Ecs-CostSaving-${EnvironmentType}'
+      Handler: ecs-cost-saving.lambda_handler
+      FunctionName: !Sub 'Lambda-Ecs-Cost-Saving-${EnvironmentType}'
       Code:
         S3Bucket: !Ref LambdasBucketName
-        S3Key: !Sub "${LambdasBasePath}/ec2-stop.zip"
+        S3Key: !Sub "${LambdasBasePath}/ecs-cost-saving.zip"
       Environment:
         Variables:
           EcsDesireCountBucket:
