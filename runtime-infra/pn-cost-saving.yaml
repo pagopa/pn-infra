@@ -17,14 +17,14 @@ Parameters:
     Default: 'cron(0 19 * * ? *)'
     Description: Cron expression when ec2 stop
 
-  StopEcsFunctionCronExpression:
+  StopEcsCostSavingFunctionCronExpression:
     Type: String
     Default: 'cron(0 19 ? * MON-FRI *)'
     Description: Cron expression when ecs stop
 
-  StartEcsFunctionCronExpression:
+  StartEcsCostSavingFunctionCronExpression:
     Type: String
-    Default: 'cron(0 4 ? * MON-FRI *)'
+    Default: 'cron(0 5 ? * MON-FRI *)'
     Description: Cron expression when ecs start
 
   ECSClusterName:
@@ -230,7 +230,7 @@ Resources:
         Fn::If:
         - IsHotfixAccount
         - cron(0 19 ? * * *)
-        - !Ref StopEcsFunctionCronExpression
+        - !Ref StopEcsCostSavingFunctionCronExpression
       State: ENABLED
       Targets:
         - Arn: !GetAtt EcsCostSavingFunction.Arn
@@ -264,7 +264,7 @@ Resources:
         Fn::If:
         - IsHotfixAccount
         - cron(0 18 1 * ? *)
-        - !Ref StartEcsFunctionCronExpression
+        - !Ref StartEcsCostSavingFunctionCronExpression
       State: ENABLED
       Targets:
         - Arn: !GetAtt EcsCostSavingFunction.Arn
