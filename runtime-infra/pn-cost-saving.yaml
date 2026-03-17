@@ -222,7 +222,7 @@ Resources:
                   - "logs:PutLogEvents"
                 Resource: arn:aws:logs:*:*:*
 
-  StopEcsFunctionSchedule:
+  StopEcsCostSavingFunctionSchedule:
     Condition: IsStopEcsService
     Type: AWS::Events::Rule
     Properties:
@@ -234,20 +234,20 @@ Resources:
       State: ENABLED
       Targets:
         - Arn: !GetAtt EcsCostSavingFunction.Arn
-          Id: StopEcsFunction
+          Id: StopEcsCostSavingFunction
           Input: '{"action": "stop"}'
 
-  StopEcsFunctionInvokePermission:
+  StopEcsCostSavingFunctionInvokePermission:
     Condition: IsStopEcsService
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref EcsCostSavingFunction
       Principal: events.amazonaws.com
-      SourceArn: !GetAtt StopEcsFunctionSchedule.Arn
+      SourceArn: !GetAtt StopEcsCostSavingFunctionSchedule.Arn
       SourceAccount: !Ref AWS::AccountId
 
-  StopEcsFunctionLogGroup:
+  StopEcsCostSavingFunctionLogGroup:
     Condition: IsStopEcsService
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
@@ -256,7 +256,7 @@ Resources:
       LogGroupName: !Sub "/aws/lambda/${EcsCostSavingFunction}"
       RetentionInDays: 3
 
-  StartEcsFunctionSchedule:
+  StartEcsCostSavingFunctionSchedule:
     Condition: IsStopEcsService
     Type: AWS::Events::Rule
     Properties:
@@ -268,20 +268,20 @@ Resources:
       State: ENABLED
       Targets:
         - Arn: !GetAtt EcsCostSavingFunction.Arn
-          Id: StartEcsFunction
+          Id: StartEcsCostSavingFunction
           Input: '{"action": "start"}'
 
-  StartEcsFunctionInvokePermission:
+  StartEcsCostSavingFunctionInvokePermission:
     Condition: IsStopEcsService
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref EcsCostSavingFunction
       Principal: events.amazonaws.com
-      SourceArn: !GetAtt StartEcsFunctionSchedule.Arn
+      SourceArn: !GetAtt StartEcsCostSavingFunctionSchedule.Arn
       SourceAccount: !Ref AWS::AccountId
 
-  StartEcsFunctionLogGroup:
+  StartEcsCostSavingFunctionLogGroup:
     Condition: IsStopEcsService
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
