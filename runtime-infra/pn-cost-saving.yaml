@@ -17,14 +17,14 @@ Parameters:
     Default: 'cron(0 19 * * ? *)'
     Description: Cron expression when ec2 stop
 
-  StopEcsFunctionCronExpression:
+  StopEcsCostSavingFunctionCronExpression:
     Type: String
-    Default: 'cron(0 19 ? * MON-FRI *)'
+    Default: 'cron(0 20 ? * MON-FRI *)'
     Description: Cron expression when ecs stop
 
-  StartEcsFunctionCronExpression:
+  StartEcsCostSavingFunctionCronExpression:
     Type: String
-    Default: 'cron(0 4 ? * MON-FRI *)'
+    Default: 'cron(0 6 ? * MON-FRI *)'
     Description: Cron expression when ecs start
 
   ECSClusterName:
@@ -70,11 +70,11 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.14
-      Handler: ec2_saving.lambda_handler
+      Handler: ec2-stop.lambda_handler
       FunctionName: !Sub 'Lambda-Ec2-stop-${EnvironmentType}'
       Code:
         S3Bucket: !Ref LambdasBucketName
-        S3Key: !Sub "${LambdasBasePath}/pn-cost-saving.zip"
+        S3Key: !Sub "${LambdasBasePath}/ec2-stop.zip"
       Environment:
         Variables:
           StopEc2FunctionTagName:
@@ -146,11 +146,11 @@ Resources:
     Properties:
       Runtime: python3.14
       Timeout: 120
-      Handler: ecs_saving.lambda_handler
-      FunctionName: !Sub 'Lambda-Ecs-CostSaving-${EnvironmentType}'
+      Handler: ecs-cost-saving.lambda_handler
+      FunctionName: !Sub 'Lambda-Ecs-Cost-Saving-${EnvironmentType}'
       Code:
         S3Bucket: !Ref LambdasBucketName
-        S3Key: !Sub "${LambdasBasePath}/pn-cost-saving.zip"
+        S3Key: !Sub "${LambdasBasePath}/ecs-cost-saving.zip"
       Environment:
         Variables:
           EcsDesireCountBucket:
@@ -222,30 +222,45 @@ Resources:
                   - "logs:PutLogEvents"
                 Resource: arn:aws:logs:*:*:*
 
-  StopEcsFunctionSchedule:
+  EcsFunctionScheduleRole:
     Condition: IsStopEcsService
-    Type: AWS::Events::Rule
+    Type: AWS::IAM::Role
     Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: EcsSchedulerInvokePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt EcsCostSavingFunction.Arn
+
+  EcsFunctionStopSchedule:
+    Condition: IsStopEcsService
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub 'EcsFunctionStopSchedule-${EnvironmentType}'
       ScheduleExpression:
         Fn::If:
         - IsHotfixAccount
-        - cron(0 19 ? * * *)
-        - !Ref StopEcsFunctionCronExpression
+        - cron(0 20 ? * * *)
+        - !Ref StopEcsCostSavingFunctionCronExpression
+      ScheduleExpressionTimezone: Europe/Rome
       State: ENABLED
-      Targets:
-        - Arn: !GetAtt EcsCostSavingFunction.Arn
-          Id: StopEcsFunction
-          Input: '{"action": "stop"}'
-
-  StopEcsFunctionInvokePermission:
-    Condition: IsStopEcsService
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref EcsCostSavingFunction
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt StopEcsFunctionSchedule.Arn
-      SourceAccount: !Ref AWS::AccountId
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      Target:
+        Arn: !GetAtt EcsCostSavingFunction.Arn
+        RoleArn: !GetAtt EcsFunctionScheduleRole.Arn
+        Input: '{"action": "stop"}'
 
   StopEcsFunctionLogGroup:
     Condition: IsStopEcsService
@@ -256,30 +271,20 @@ Resources:
       LogGroupName: !Sub "/aws/lambda/${EcsCostSavingFunction}"
       RetentionInDays: 3
 
-  StartEcsFunctionSchedule:
+  EcsFunctionStartSchedule:
     Condition: IsStopEcsService
-    Type: AWS::Events::Rule
+    Type: AWS::Scheduler::Schedule
     Properties:
-      ScheduleExpression:
-        Fn::If:
-        - IsHotfixAccount
-        - cron(0 18 1 * ? *)
-        - !Ref StartEcsFunctionCronExpression
+      Name: !Sub 'EcsFunctionStartSchedule-${EnvironmentType}'
+      ScheduleExpression: !Ref StartEcsCostSavingFunctionCronExpression
+      ScheduleExpressionTimezone: Europe/Rome
       State: ENABLED
-      Targets:
-        - Arn: !GetAtt EcsCostSavingFunction.Arn
-          Id: StartEcsFunction
-          Input: '{"action": "start"}'
-
-  StartEcsFunctionInvokePermission:
-    Condition: IsStopEcsService
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref EcsCostSavingFunction
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt StartEcsFunctionSchedule.Arn
-      SourceAccount: !Ref AWS::AccountId
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      Target:
+        Arn: !GetAtt EcsCostSavingFunction.Arn
+        RoleArn: !GetAtt EcsFunctionScheduleRole.Arn
+        Input: '{"action": "start"}'
 
   StartEcsFunctionLogGroup:
     Condition: IsStopEcsService
