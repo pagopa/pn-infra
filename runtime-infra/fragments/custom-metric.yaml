@@ -88,7 +88,7 @@ Parameters:
       - true
       - false
 
-  EnabledAlarmActions:
+  HasAlarm:
     Type: String
     Description: "Create alarm"
     Default: true
@@ -98,7 +98,7 @@ Parameters:
 
 Conditions:
   HasOncallCondition: !Equals [ !Ref HasOncall, 'true' ]
-  HasEnabledAlarmAction: !Equals [ !Ref EnabledAlarmActions, 'true' ]
+  HasAlarmCondition: !Equals [ !Ref HasAlarm, 'true' ]
     
 Resources:
   # CloudWatch metric to filer ERROR - FATAL lines, in Log group
@@ -117,17 +117,18 @@ Resources:
   # Create alarm
   CustomErrorLogsMetricAlarm:
     Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmCondition
     DependsOn: CustomErrorLogsMetricFilter
     Properties:
       AlarmName: !Sub "${MetricName}-Alarm"
       AlarmDescription: !Sub "CloudWatch alarm on metric ${MetricName}."
       TreatMissingData: notBreaching
       AlarmActions: 
-        !If [HasEnabledAlarmAction, [ !Ref AlarmSNSTopicArn ], !Ref "AWS::NoValue"]
+        - !Ref AlarmSNSTopicArn
       #InsufficientDataActions:
       #  - !Ref AlarmSNSTopicArn
       OKActions:
-        !If [HasEnabledAlarmAction, [ !Ref AlarmSNSTopicArn ], !Ref "AWS::NoValue"]
+        - !Ref AlarmSNSTopicArn
       DatapointsToAlarm: !Ref DatapointsToAlarm
       MetricName: !Ref MetricName
       Namespace: !Ref MetricNamespace
