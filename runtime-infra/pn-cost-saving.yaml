@@ -243,11 +243,11 @@ Resources:
                   - lambda:InvokeFunction
                 Resource: !GetAtt EcsCostSavingFunction.Arn
 
-  StopEcsFunctionSchedule:
+  EcsFunctionStopSchedule:
     Condition: IsStopEcsService
     Type: AWS::Scheduler::Schedule
     Properties:
-      Name: !Sub 'StopEcsFunctionSchedule-${EnvironmentType}'
+      Name: !Sub 'EcsFunctionStopSchedule-${EnvironmentType}'
       ScheduleExpression:
         Fn::If:
         - IsHotfixAccount
@@ -271,11 +271,11 @@ Resources:
       LogGroupName: !Sub "/aws/lambda/${EcsCostSavingFunction}"
       RetentionInDays: 3
 
-  StartEcsFunctionSchedule:
+  EcsFunctionStartSchedule:
     Condition: IsStopEcsService
     Type: AWS::Scheduler::Schedule
     Properties:
-      Name: !Sub 'StartEcsFunctionSchedule-${EnvironmentType}'
+      Name: !Sub 'EcsFunctionStartSchedule-${EnvironmentType}'
       ScheduleExpression: !Ref StartEcsCostSavingFunctionCronExpression
       ScheduleExpressionTimezone: Europe/Rome
       State: ENABLED
