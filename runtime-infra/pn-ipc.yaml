@@ -135,6 +135,9 @@ Parameters:
     Type: String
   SubnetsIds:
     Type: String
+  VpcCidr:
+    Type: String
+    Description: 'CIDR block for core  VPC'
   # ECSClusterName:
   #   Type: String
   CorsAllowedDomains:
@@ -946,7 +949,7 @@ Resources:
           FileSystemId: !Ref FargateEFSFileSystem
           SecurityGroups: 
             - !Ref EFSSecurityGroup
-          SubnetId: !Select [2, !Split [",", !Ref SubnetsIds]] 
+          SubnetId: !Select [2, !Split [",", !Ref SubnetsIds]]
 
   EFSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -957,8 +960,8 @@ Resources:
         - Key: Microservice
           Value: pn-infra-monitoring
       SecurityGroupIngress:
-        # All Subnet can mount EFS:
-        - CidrIp: 0.0.0.0/0
+        # Main VPC can mount EFS:
+        - CidrIp: !Ref VpcCidr
           IpProtocol: tcp
           FromPort: 2049
           ToPort: 2049

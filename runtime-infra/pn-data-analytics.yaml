@@ -23,6 +23,28 @@ Parameters:
     Description: Suffix for the logs bucket name
     Default: "001"
 
+  ConfinfoAddressManagerTableBucketName:
+    Type: String
+    Description: S3 Tables table bucket name in confinfo for address manager tracing
+
+  AddressManagerTracingLinkSuffix:
+    Type: String
+    Default: '001'
+    Description: Suffix appended to the Glue database resource link name for address manager tracing
+
+  EnvironmentType:
+    Type: String
+    Description: Environment type (dev, test, uat, hotfix, prod)
+
+  EnableAddressManagerCrossAccountAccess:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: Whether to enable cross-account access to address manager tracing tables (only for prod environment)
+
+Conditions:
+  IsProdEnvironment: !Equals [ !Ref EnvironmentType, 'prod' ]
+  IsAddressManagerCrossAccountAccessEnabled: !Equals [ !Ref EnableAddressManagerCrossAccountAccess, 'true' ]
 Resources:
 
   ConfinfoExportDatabase:
@@ -310,6 +332,53 @@ Resources:
                   }
                 - DatabaseName: !Ref ConfinfoExportDatabase
                   TableName: !Ref EcRichiesteMetadatiGlueTable
+
+
+  AddressManagerTracingGlueResourceLinkDB:
+    Type: AWS::Glue::Database
+    Condition: IsAddressManagerCrossAccountAccessEnabled
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Sub 'address_manager_tracing_link_${AddressManagerTracingLinkSuffix}'
+      DatabaseInput:
+        Name: !Sub 'address_manager_tracing_link_${AddressManagerTracingLinkSuffix}'
+        TargetDatabase:
+          CatalogId: !Sub '${SafeStorageAccountId}:s3tablescatalog/${ConfinfoAddressManagerTableBucketName}'
+          DatabaseName: address_manager_tracing
+
+  AddressManagerTracingLFDescribeAdminCore:
+    Type: AWS::LakeFormation::Permissions
+    DependsOn: AddressManagerTracingGlueResourceLinkDB
+    Condition: IsAddressManagerCrossAccountAccessEnabled
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !If
+          - IsProdEnvironment
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/AdminAccess-${EnvironmentType}'
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtAdmin-core-${EnvironmentType}'
+      Resource:
+        DatabaseResource:
+          CatalogId: !Ref AWS::AccountId
+          Name: !Sub 'address_manager_tracing_link_${AddressManagerTracingLinkSuffix}'
+      Permissions:
+        - DESCRIBE
+
+  AddressManagerTracingLFDescribeReadonlyCore:
+    Type: AWS::LakeFormation::Permissions
+    DependsOn: AddressManagerTracingGlueResourceLinkDB
+    Condition: IsAddressManagerCrossAccountAccessEnabled
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !If
+          - IsProdEnvironment
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/ReadOnlyAccess-${EnvironmentType}'
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
+      Resource:
+        DatabaseResource:
+          CatalogId: !Ref AWS::AccountId
+          Name: !Sub 'address_manager_tracing_link_${AddressManagerTracingLinkSuffix}'
+      Permissions:
+        - DESCRIBE
 
 Outputs:
   ConfinfoExportDatabaseName:

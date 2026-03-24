@@ -1,0 +1,373 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create a DirectPut Firehose stream that writes to an existing S3 Tables Iceberg table
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Project name identifier
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: Alarm SNS topic ARN
+
+  TableBucketARN:
+    Type: String
+    Description: ARN of the destination S3 Tables table bucket
+
+  TableBucketName:
+    Type: String
+    Description: Name of the destination S3 Tables table bucket
+
+  DestinationNamespace:
+    Type: String
+    Description: Namespace (database) name inside S3 Tables catalog
+
+  DestinationTableName:
+    Type: String
+    Description: Destination Iceberg table name
+
+  DeliveryStreamNamePrefix:
+    Type: String
+    Description: Delivery stream prefix identifier
+    Default: 'address-manager-tracing'
+
+  ExistingDeliveryRoleName:
+    Type: String
+    Default: ''
+    Description: >
+      Name of an existing IAM role to use for the Firehose delivery stream.
+      If empty (default), the fragment creates a new role named
+      ${ProjectName}-${DeliveryStreamNamePrefix}-delivery-role.
+      Use this when the role must be created before this stack (e.g. to allow
+      Lake Formation grants on the role before the delivery stream is created).
+
+  BufferingIntervalSec:
+    Type: Number
+    Description: Firehose buffer interval in seconds
+    Default: 120
+
+  BufferingSizeMB:
+    Type: Number
+    Description: Firehose buffer size in MB
+    Default: 5
+
+  RetryDurationSec:
+    Type: Number
+    Description: Firehose retry duration in seconds for the Iceberg destination
+    Default: 300
+
+  ExistingFirehoseLogGroupName:
+    Type: String
+    Default: ''
+    Description: Existing CloudWatch LogGroup name for Firehose logs. If empty, the fragment creates one.
+
+  HasOncall:
+    Type: String
+    Description: Create oncall alarm
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
+  EnableLakeFormationGrant:
+    Type: String
+    Description: >
+      Enable Lake Formation grant for Firehose role on destination table via
+      AWS::LakeFormation::Permissions. Disabled by default because CFN LF permissions
+      are unreliable on federated S3 Tables catalog IDs. Use s3tables-access-control
+      fragment with FirehoseRoleName parameter to grant LF permissions instead.
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
+Conditions:
+  CreateFirehoseLogGroup: !Equals [ !Ref ExistingFirehoseLogGroupName, '' ]
+  HasOncallCondition: !Equals [ !Ref HasOncall, 'true' ]
+  EnableLakeFormationGrantCondition: !Equals [ !Ref EnableLakeFormationGrant, 'true' ]
+  CreateDeliveryRole: !Equals [ !Ref ExistingDeliveryRoleName, '' ]
+
+Resources:
+  DeliveryStreamErrorBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256 
+
+  DeliveryStreamRole:
+    Type: AWS::IAM::Role
+    Condition: CreateDeliveryRole
+    Properties:
+      RoleName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-delivery-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: sts:AssumeRole
+
+  DeliveryStreamRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-iceberg-policy'
+      Roles:
+        - !If
+          - CreateDeliveryRole
+          - !Ref DeliveryStreamRole
+          - !Ref ExistingDeliveryRoleName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: IcebergWrite
+            Effect: Allow
+            Action:
+              - s3tables:*
+            Resource:
+              - !Ref TableBucketARN
+              - !Sub '${TableBucketARN}/*'
+          - Sid: GlueCatalogRead
+            Effect: Allow
+            Action:
+              - glue:GetDatabase
+              - glue:GetDatabases
+              - glue:GetTable
+              - glue:GetTableVersion
+              - glue:GetTableVersions
+              - glue:GetPartitions
+              - glue:UpdateTable
+            Resource:
+              - '*'
+          - Sid: LakeFormationDataAccess
+            Effect: Allow
+            Action:
+              - lakeformation:GetDataAccess
+            Resource:
+              - '*'
+          - Sid: ErrorBucketWrite
+            Effect: Allow
+            Action:
+              - s3:AbortMultipartUpload
+              - s3:GetBucketLocation
+              - s3:GetObject
+              - s3:ListBucket
+              - s3:ListBucketMultipartUploads
+              - s3:PutObject
+            Resource:
+              - !GetAtt DeliveryStreamErrorBucket.Arn
+              - !Sub '${DeliveryStreamErrorBucket.Arn}/*'
+          - Sid: Logging
+            Effect: Allow
+            Action:
+              - logs:PutLogEvents
+              - logs:CreateLogStream
+            Resource:
+              - !If
+                - CreateFirehoseLogGroup
+                - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeliveryStreamLogGroup}:*'
+                - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ExistingFirehoseLogGroupName}:*'
+
+  DeliveryStreamLogGroup:
+    Condition: CreateFirehoseLogGroup
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub '/aws/kinesisfirehose/${ProjectName}-${DeliveryStreamNamePrefix}-delivery-errors-nested'
+      RetentionInDays: 30
+
+  DeliveryStreamLogStream:
+    Type: AWS::Logs::LogStream
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !If
+        - CreateFirehoseLogGroup
+        - !Ref DeliveryStreamLogGroup
+        - !Ref ExistingFirehoseLogGroupName
+
+  DeliveryStreamLakeFormationDatabaseGrant:
+    Type: AWS::LakeFormation::Permissions
+    Condition: EnableLakeFormationGrantCondition
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !If
+          - CreateDeliveryRole
+          - !GetAtt DeliveryStreamRole.Arn
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ExistingDeliveryRoleName}'
+      Resource:
+        DatabaseResource:
+          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
+          Name: !Ref DestinationNamespace
+      Permissions:
+        - DESCRIBE
+
+  DeliveryStreamLakeFormationGrant:
+    Type: AWS::LakeFormation::Permissions
+    Condition: EnableLakeFormationGrantCondition
+    DependsOn: DeliveryStreamLakeFormationDatabaseGrant
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !If
+          - CreateDeliveryRole
+          - !GetAtt DeliveryStreamRole.Arn
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ExistingDeliveryRoleName}'
+      Resource:
+        TableResource:
+          CatalogId: !Sub '${AWS::AccountId}:s3tablescatalog/${TableBucketName}'
+          DatabaseName: !Ref DestinationNamespace
+          Name: !Ref DestinationTableName
+      Permissions:
+        - ALL
+
+  AddressManagerTracingIcebergDeliveryStream:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    DependsOn:
+      - DeliveryStreamRolePolicy
+    Properties:
+      DeliveryStreamType: DirectPut
+      IcebergDestinationConfiguration:
+        AppendOnly: true
+        BufferingHints:
+          IntervalInSeconds: !Ref BufferingIntervalSec
+          SizeInMBs: !Ref BufferingSizeMB
+        CatalogConfiguration:
+          CatalogArn: !Sub
+            - 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog/s3tablescatalog/${TableBucketName}'
+            - TableBucketName: !Ref TableBucketName
+        CloudWatchLoggingOptions:
+          Enabled: true
+          LogGroupName: !If
+            - CreateFirehoseLogGroup
+            - !Ref DeliveryStreamLogGroup
+            - !Ref ExistingFirehoseLogGroupName
+          LogStreamName: !Ref DeliveryStreamLogStream
+        DestinationTableConfigurationList:
+          - DestinationDatabaseName: !Ref DestinationNamespace
+            DestinationTableName: !Ref DestinationTableName
+            S3ErrorOutputPrefix: !Sub 'iceberg-errors/${DestinationNamespace}/${DestinationTableName}/!{firehose:error-output-type}/'
+        RetryOptions:
+          DurationInSeconds: !Ref RetryDurationSec
+        RoleARN: !If
+          - CreateDeliveryRole
+          - !GetAtt DeliveryStreamRole.Arn
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ExistingDeliveryRoleName}'
+        s3BackupMode: FailedDataOnly
+        S3Configuration:
+          BucketARN: !GetAtt DeliveryStreamErrorBucket.Arn
+          RoleARN: !If
+            - CreateDeliveryRole
+            - !GetAtt DeliveryStreamRole.Arn
+            - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ExistingDeliveryRoleName}'
+          Prefix: !Sub 'iceberg-backup/${DestinationNamespace}/${DestinationTableName}/'
+          ErrorOutputPrefix: 'iceberg-backup/errors/!{firehose:error-output-type}/'
+          BufferingHints:
+            IntervalInSeconds: !Ref BufferingIntervalSec
+            SizeInMBs: !Ref BufferingSizeMB
+          CompressionFormat: UNCOMPRESSED
+          CloudWatchLoggingOptions:
+            Enabled: true
+            LogGroupName: !If
+              - CreateFirehoseLogGroup
+              - !Ref DeliveryStreamLogGroup
+              - !Ref ExistingFirehoseLogGroupName
+            LogStreamName: !Ref DeliveryStreamLogStream
+
+  DeliveryStreamErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    DependsOn:
+      - DeliveryStreamLogStream
+    Properties:
+      LogGroupName: !If
+        - CreateFirehoseLogGroup
+        - !Ref DeliveryStreamLogGroup
+        - !Ref ExistingFirehoseLogGroupName
+      FilterPattern: '?ERROR ?Error ?Exception ?AccessDenied'
+      MetricTransformations:
+        - MetricValue: '1'
+          MetricNamespace: Firehose
+          MetricName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-error-count'
+
+  DeliveryStreamErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn:
+      - DeliveryStreamErrorMetricFilter
+    Properties:
+      AlarmName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-delivery-stream-error-alarm'
+      AlarmDescription: Alarm for Firehose delivery stream errors
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      MetricName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-error-count'
+      Namespace: Firehose
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 60
+      Statistic: Sum
+      Threshold: 1
+
+  OncallDeliveryStreamErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasOncallCondition
+    DependsOn:
+      - DeliveryStreamErrorMetricFilter
+    Properties:
+      AlarmName: !Sub 'oncall-${ProjectName}-${DeliveryStreamNamePrefix}-delivery-stream-error-alarm'
+      AlarmDescription: Oncall alarm for Firehose delivery stream errors
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      MetricName: !Sub '${ProjectName}-${DeliveryStreamNamePrefix}-error-count'
+      Namespace: Firehose
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 60
+      Statistic: Sum
+      Threshold: 1
+
+Outputs:
+  DeliveryStreamName:
+    Description: Name of delivery stream
+    Value: !Ref AddressManagerTracingIcebergDeliveryStream
+
+  DeliveryStreamArn:
+    Description: ARN of delivery stream
+    Value: !GetAtt AddressManagerTracingIcebergDeliveryStream.Arn
+
+  DeliveryStreamRoleName:
+    Description: Name of the IAM role used by the Firehose delivery stream
+    Value: !If
+      - CreateDeliveryRole
+      - !Ref DeliveryStreamRole
+      - !Ref ExistingDeliveryRoleName
+
+  DeliveryStreamErrorBucketName:
+    Description: Name of the Firehose backup/error bucket
+    Value: !Ref DeliveryStreamErrorBucket
+
+  DeliveryStreamErrorAlarmArn:
+    Description: ARN of Firehose error alarm
+    Value: !GetAtt DeliveryStreamErrorAlarm.Arn
+
+  OncallDeliveryStreamErrorAlarmArn:
+    Description: ARN of Firehose oncall error alarm
+    Value: !If
+      - HasOncallCondition
+      - !GetAtt OncallDeliveryStreamErrorAlarm.Arn
+      - ''
