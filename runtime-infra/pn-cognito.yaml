@@ -23,6 +23,29 @@ Parameters:
 
   LambdaS3BucketKey:
     Type: String
+
+  PortaleHelpdeskDomain:
+    Type: String
+    Description: The domain for the Portale Helpdesk
+
+  CognitoDomainPrefix:
+    Type: String
+    Description: The prefix for the Cognito Hosted UI domain
+    Default: pn-helpdesk
+
+  EnvironmentType:
+    Type: String
+    Description: Environment name (e.g., dev, uat, prod)
+
+  AppCallbackURLPrefix:
+    Type: String
+    Description: The callback URL Prefix for the application
+    Default: callback
+
+  AppLogoutURLPrefix:
+    Type: String
+    Description: The logout URL Prefix for the application
+    Default: logout
     
 Resources:
   CognitoLogsS3:
@@ -139,6 +162,24 @@ Resources:
       UsernameConfiguration:
         CaseSensitive: false
 
+  UserPoolDomain:
+    Type: "AWS::Cognito::UserPoolDomain"
+    Properties:
+      Domain: !Sub "${CognitoDomainPrefix}-${EnvironmentType}"
+      UserPoolId: !Ref UserPool
+
+  UserPoolIdentityProviderGoogle:
+    Type: "AWS::Cognito::UserPoolIdentityProvider"
+    Properties:
+      ProviderName: Google
+      ProviderType: SAML
+      UserPoolId: !Ref UserPool
+      ProviderDetails:
+        MetadataFile: "{{resolve:secretsmanager:HelpdeskGoogleMetadata:SecretString}}"
+        IDPSignout: "true"
+      AttributeMapping:
+        email: "email"
+
   UserPoolClient:
     Type: "AWS::Cognito::UserPoolClient"
     Properties:
@@ -154,6 +195,20 @@ Resources:
         - ALLOW_USER_SRP_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
         - ALLOW_USER_PASSWORD_AUTH
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+      CallbackURLs:
+        - !Sub "https://${PortaleHelpdeskDomain}/${AppCallbackURLPrefix}"
+      LogoutURLs:
+        - !Sub "https://${PortaleHelpdeskDomain}/${AppLogoutURLPrefix}"
+      SupportedIdentityProviders:
+        - COGNITO
+        - Google
       UserPoolId: !Ref UserPool
 
   CognitoUserManagementRole:
