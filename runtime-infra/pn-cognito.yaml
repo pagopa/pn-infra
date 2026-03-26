@@ -27,7 +27,7 @@ Parameters:
   PortaleHelpdeskDomain:
     Type: String
     Description: The domain for the Portale Helpdesk
-    Default: helpdesk.dev.notifichedigitali.it #temporary for CF deploy
+    Default: helpdesk.dev.notifichedigitali.it #temporary for CF deploy pass by terraform
 
   CognitoDomainPrefix:
     Type: String
@@ -37,7 +37,7 @@ Parameters:
   EnvironmentType:
     Type: String
     Description: Environment name (e.g., dev, uat, prod)
-    Default: dev #temporary for CF deploy
+    Default: dev #temporary for CF deploy pass by terraform
 
   AppCallbackURLPrefix:
     Type: String
@@ -312,7 +312,7 @@ Resources:
       BillingMode: PAY_PER_REQUEST
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: false #temporary for CF deploy
-      TableName: !Sub "${ProjectName}-helpdesk-roles"
+      TableName: !Sub "${ProjectName}-helpdesk-roles-${EnvironmentType}"
       Tags:
         - Key: "Project"
           Value: !Ref ProjectName
