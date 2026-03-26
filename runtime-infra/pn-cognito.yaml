@@ -300,8 +300,8 @@ Resources:
 
   UserRolesTable:
     Type: "AWS::DynamoDB::Table"
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete  #temporary for CF deploy
+    UpdateReplacePolicy: Delete  #temporary for CF deploy
     Properties:
       AttributeDefinitions:
         - AttributeName: "email"
@@ -311,7 +311,7 @@ Resources:
           KeyType: "HASH"
       BillingMode: PAY_PER_REQUEST
       PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
+        PointInTimeRecoveryEnabled: false #temporary for CF deploy
       TableName: !Sub "${ProjectName}-helpdesk-roles"
       Tags:
         - Key: "Project"
