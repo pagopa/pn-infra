@@ -171,7 +171,7 @@ Resources:
   UserPoolIdentityProviderGoogle:
     Type: "AWS::Cognito::UserPoolIdentityProvider"
     Properties:
-      ProviderName: Google
+      ProviderName: !Sub "GoogleSAML-${EnvironmentType}"
       ProviderType: SAML
       UserPoolId: !Ref UserPool
       ProviderDetails:
@@ -208,7 +208,7 @@ Resources:
         - !Sub "https://${PortaleHelpdeskDomain}/${AppLogoutURLPrefix}"
       SupportedIdentityProviders:
         - COGNITO
-        - Google
+        - !Sub "GoogleSAML-${EnvironmentType}"
       UserPoolId: !Ref UserPool
 
   CognitoUserManagementRole:
