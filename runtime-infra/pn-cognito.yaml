@@ -195,6 +195,8 @@ Resources:
 
   PreTokenLogGroup:
     Type: "AWS::Logs::LogGroup"
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       RetentionInDays: 14 # paramter in prod 6 moths.
       LogGroupName: !Sub "/aws/lambda/${ProjectName}-helpdesk-pre-token-generation"
