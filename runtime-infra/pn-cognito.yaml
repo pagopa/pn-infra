@@ -48,7 +48,7 @@ Parameters:
     Type: String
     Description: The logout URL Prefix for the application
     Default: logout
-    
+
 Resources:
   CognitoLogsS3:
     Type: AWS::S3::Bucket
@@ -132,7 +132,72 @@ Resources:
     Type: "AWS::Logs::LogGroup"
     Properties:
       RetentionInDays: 14
-      LogGroupName: !Sub "/aws/lambda/${CognitoTriggerLambda}"
+      LogGroupName: !Sub "/aws/lambda/${ProjectName}-post-auth-cognito-trigger"
+
+  PreTokenGenerationLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${ProjectName}-helpdesk-pre-token-generation
+      Code:
+        S3Bucket: !Ref LambdaS3Bucket
+        S3Key: !Ref LambdaS3BucketKey
+      Description: Lambda to map user roles from DynamoDB to Cognito custom claims.
+      Environment:
+        Variables:
+          USER_ROLES_TABLE: !Ref UserRolesTable
+      Handler: handler.handler
+      Role: !GetAtt PreTokenLambdaRole.Arn
+      Runtime: python3.12
+      Timeout: 30
+
+  PreTokenLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Description: execution role for PreTokenGenerationLambda.
+      Path: /
+      Policies:
+        - PolicyName: pre-token-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: LogGroup
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:CreateLogGroup
+                  - logs:PutLogEvents
+                Resource:
+                - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-helpdesk-pre-token-generation:*"
+              - Sid: DynamoDBRead
+                Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                Resource: !GetAtt UserRolesTable.Arn
+      RoleName: !Sub ${ProjectName}-helpdesk-pre-token-role
+
+  PreTokenLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref PreTokenGenerationLambda
+      Principal: cognito-idp.amazonaws.com
+      SourceArn: !GetAtt UserPool.Arn
+
+  PreTokenLogGroup:
+    Type: "AWS::Logs::LogGroup"
+    Properties:
+      RetentionInDays: 14 # paramter in prod 6 moths.
+      LogGroupName: !Sub "/aws/lambda/${ProjectName}-helpdesk-pre-token-generation"
 
   UserPool:
     Type: "AWS::Cognito::UserPool"
@@ -146,7 +211,8 @@ Resources:
       AutoVerifiedAttributes:
         - email
       LambdaConfig:
-        PostAuthentication: !Sub "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${CognitoTriggerLambda}"        
+        PostAuthentication: !GetAtt CognitoTriggerLambda.Arn
+        PreTokenGeneration: !GetAtt PreTokenGenerationLambda.Arn
       Policies:
         PasswordPolicy:
           MinimumLength: 16
@@ -199,6 +265,7 @@ Resources:
         - ALLOW_USER_PASSWORD_AUTH
       AllowedOAuthFlows:
         - code
+        - implicit
       AllowedOAuthFlowsUserPoolClient: true
       AllowedOAuthScopes:
         - email
