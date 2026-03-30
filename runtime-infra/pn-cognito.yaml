@@ -24,6 +24,12 @@ Parameters:
   LambdaS3BucketKey:
     Type: String
 
+  LambdasBucketName:
+    Type: String
+
+  LambdasBasePath:
+    Type: String
+
   PortaleHelpdeskDomain:
     Type: String
     Description: The domain for the Portale Helpdesk
@@ -139,15 +145,15 @@ Resources:
     Properties:
       FunctionName: !Sub ${ProjectName}-helpdesk-pre-token-generation
       Code:
-        S3Bucket: !Ref LambdaS3Bucket
-        S3Key: !Ref LambdaS3BucketKey
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub "${LambdasBasePath}/pn-helpdesk-pre-token-generation.zip"
       Description: Lambda to map user roles from DynamoDB to Cognito custom claims.
       Environment:
         Variables:
           USER_ROLES_TABLE: !Ref UserRolesTable
       Handler: handler.handler
       Role: !GetAtt PreTokenLambdaRole.Arn
-      Runtime: python3.12
+      Runtime: python3.14
       Timeout: 30
 
   PreTokenLambdaRole:
