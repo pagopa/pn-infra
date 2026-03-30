@@ -24,12 +24,6 @@ Parameters:
   LambdaS3BucketKey:
     Type: String
 
-  LambdasBucketName:
-    Type: String
-
-  LambdasBasePath:
-    Type: String
-
   PortaleHelpdeskDomain:
     Type: String
     Description: The domain for the Portale Helpdesk
@@ -85,7 +79,7 @@ Resources:
       FunctionName: !Sub ${ProjectName}-post-auth-cognito-trigger
       Code: 
         S3Bucket: !Ref LambdaS3Bucket
-        S3Key: !Ref LambdaS3BucketKey
+        S3Key: !Sub "${LambdaS3BucketKey}/post-auth-trigger/post-auth-trigger_function.zip"
       Description: Cognito Post Confirmation Lambda Trigger.
       Environment:
         Variables:
@@ -145,8 +139,8 @@ Resources:
     Properties:
       FunctionName: !Sub ${ProjectName}-helpdesk-pre-token-generation
       Code:
-        S3Bucket: !Ref LambdasBucketName
-        S3Key: !Sub "${LambdasBasePath}/pn-helpdesk-pre-token-generation.zip"
+        S3Bucket: !Ref LambdaS3Bucket
+        S3Key: !Sub "${LambdaS3BucketKey}/helpdesk-pre-token-generation/helpdesk-pre-token-generation_function.zip"
       Description: Lambda to map user roles from DynamoDB to Cognito custom claims.
       Environment:
         Variables:
