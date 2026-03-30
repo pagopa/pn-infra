@@ -36,7 +36,7 @@ Parameters:
   CognitoDomainPrefix:
     Type: String
     Description: The prefix for the Cognito Hosted UI domain
-    Default: pn-helpdesk
+    Default: pn-helpdesk  #export this parameter for rollback case.
 
   EnvironmentType:
     Type: String
@@ -88,8 +88,10 @@ Resources:
       Environment:
         Variables:
           BucketName: !Ref CognitoLogsS3
+          USER_ROLES_TABLE: !Ref UserRolesTable
+          USER_POOL_ID: !Ref UserPool
       Handler: CognitoLogsLambda.handler
-      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-cognito-logs-role"
+      Role: !GetAtt CognitoLambdaRole.Arn
       Runtime: nodejs22.x
       Timeout: 30
 
@@ -130,6 +132,16 @@ Resources:
                 Action:
                   - S3:ListBucket
                 Resource: !Sub "arn:aws:s3:::${ProjectName}-cognito-logs"
+              - Sid: DynamoDBRead
+                Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                Resource: !GetAtt UserRolesTable.Arn
+              - Sid: CognitoUpdateUser
+                Effect: Allow
+                Action:
+                  - cognito-idp:AdminUpdateUserAttributes
+                Resource: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}"
       RoleName: !Sub ${ProjectName}-cognito-logs-role
 
   LambdaTriggerLogGroup:
@@ -137,73 +149,6 @@ Resources:
     Properties:
       RetentionInDays: 14
       LogGroupName: !Sub "/aws/lambda/${ProjectName}-post-auth-cognito-trigger"
-
-  PreTokenGenerationLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub ${ProjectName}-helpdesk-pre-token-generation
-      Code:
-        S3Bucket: !Ref LambdaS3Bucket
-        S3Key: !Ref HelpdeskLambdaS3BucketKey
-      Description: Lambda to map user roles from DynamoDB to Cognito custom claims.
-      Environment:
-        Variables:
-          USER_ROLES_TABLE: !Ref UserRolesTable
-      Handler: handler.handler
-      Role: !GetAtt PreTokenLambdaRole.Arn
-      Runtime: python3.14
-      Timeout: 30
-
-  PreTokenLambdaRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      Description: execution role for PreTokenGenerationLambda.
-      Path: /
-      Policies:
-        - PolicyName: pre-token-policy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Sid: LogGroup
-                Effect: Allow
-                Action:
-                  - logs:CreateLogStream
-                  - logs:CreateLogGroup
-                  - logs:PutLogEvents
-                Resource:
-                - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-helpdesk-pre-token-generation:*"
-              - Sid: DynamoDBRead
-                Effect: Allow
-                Action:
-                  - dynamodb:GetItem
-                  - dynamodb:Query
-                Resource: !GetAtt UserRolesTable.Arn
-      RoleName: !Sub ${ProjectName}-helpdesk-pre-token-role
-
-  PreTokenLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref PreTokenGenerationLambda
-      Principal: cognito-idp.amazonaws.com
-      SourceArn: !GetAtt UserPool.Arn
-
-  PreTokenLogGroup:
-    Type: "AWS::Logs::LogGroup"
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      RetentionInDays: 14 # paramter in prod 6 moths.
-      LogGroupName: !Sub "/aws/lambda/${ProjectName}-helpdesk-pre-token-generation"
 
   UserPool:
     Type: "AWS::Cognito::UserPool"
@@ -218,7 +163,6 @@ Resources:
         - email
       LambdaConfig:
         PostAuthentication: !GetAtt CognitoTriggerLambda.Arn
-        PreTokenGeneration: !GetAtt PreTokenGenerationLambda.Arn
       Policies:
         PasswordPolicy:
           MinimumLength: 16
