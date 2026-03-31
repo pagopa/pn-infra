@@ -24,10 +24,6 @@ Parameters:
   LambdaS3BucketKey:
     Type: String
 
-  HelpdeskLambdaS3BucketKey:
-    Type: String
-    Default: "-" #temporary for Cicd 
-
   PortaleHelpdeskDomain:
     Type: String
     Description: The domain for the Portale Helpdesk
@@ -89,7 +85,7 @@ Resources:
         Variables:
           BucketName: !Ref CognitoLogsS3
           USER_ROLES_TABLE: !Ref UserRolesTable
-          USER_POOL_ID: !Ref UserPool
+          USER_POOL_ID: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*"
       Handler: CognitoLogsLambda.handler
       Role: !GetAtt CognitoLambdaRole.Arn
       Runtime: nodejs22.x
@@ -141,7 +137,7 @@ Resources:
                 Effect: Allow
                 Action:
                   - cognito-idp:AdminUpdateUserAttributes
-                Resource: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}"
+                Resource: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*"
       RoleName: !Sub ${ProjectName}-cognito-logs-role
 
   LambdaTriggerLogGroup:
