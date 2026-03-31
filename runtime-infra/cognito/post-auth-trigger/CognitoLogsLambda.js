@@ -1,8 +1,3 @@
-import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
-import { DynamoDBClient, GetItemCommand } from "@aws-sdk/client-dynamodb";
-import { CognitoIdentityProviderClient, AdminUpdateUserAttributesCommand } from "@aws-sdk/client-cognito-identity-provider";
-import md5 from 'crypto-js';
-
 import { S3Client } from "@aws-sdk/client-s3";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { CognitoIdentityProviderClient } from "@aws-sdk/client-cognito-identity-provider";
@@ -15,6 +10,7 @@ const cognitoClient = new CognitoIdentityProviderClient();
 
 export const handler = async (event) => {
     if (!event) return event;
+    console.log("Cognito Trigger Event:", JSON.stringify(event, null, 2));
 
     try {
         const bucketName = process.env.BucketName;
@@ -25,12 +21,20 @@ export const handler = async (event) => {
         const userName = userAttributes.sub;
         const fileName = `${userName}.json`;
 
+        console.log(`Processing user: ${email} (Sub: ${userName})`);
+
         // 1. Audit Log su S3 (Parallelo)
         const auditPromise = (async () => {
+            console.log(`Checking audit log for ${fileName} in S3...`);
             const dataStr = JSON.stringify(userAttributes);
             const md5Hash = await getMD5HashFromFile(dataStr);
-            if (!(await checkIfUserExists(s3Client, bucketName, fileName))) {
+            const exists = await checkIfUserExists(s3Client, bucketName, fileName);
+            
+            if (!exists) {
+                console.log(`Writing new audit log to S3 for ${email}`);
                 await putObjectToS3(s3Client, bucketName, fileName, Buffer.from(dataStr), md5Hash);
+            } else {
+                console.log(`Audit log for ${email} already exists in S3.`);
             }
         })();
 
@@ -42,6 +46,7 @@ export const handler = async (event) => {
                 userPoolId,
                 userName: event.userName,
                 event
+                
             });
         }
 
@@ -51,5 +56,4 @@ export const handler = async (event) => {
     }
 
     return event;
-};
 };

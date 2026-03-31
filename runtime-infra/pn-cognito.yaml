@@ -49,6 +49,15 @@ Parameters:
     Description: The logout URL Prefix for the application
     Default: logout
 
+  LogLevel:
+    Type: String
+    Description: Log level for the Lambda trigger (e.g., INFO, DEBUG)
+    Default: DEBUG
+    AllowedValues:
+      - INFO
+      - DEBUG
+
+
 Resources:
   CognitoLogsS3:
     Type: AWS::S3::Bucket
@@ -85,6 +94,7 @@ Resources:
         Variables:
           BucketName: !Ref CognitoLogsS3
           USER_ROLES_TABLE: !Ref UserRolesTable
+          LOG_LEVEL: !Ref LogLevel
       Handler: CognitoLogsLambda.handler
       Role: !GetAtt CognitoLambdaRole.Arn
       Runtime: nodejs22.x
