@@ -12,7 +12,7 @@ export const handler = async(event) => {
 
             const bucket_name = process.env.BucketName;
             const roles_table = process.env.USER_ROLES_TABLE;
-            const userPoolId = process.env.USER_POOL_ID;
+            const userPoolId = event.userPoolId;
 
             const userAttributeJson =  event.request.userAttributes;
             const email = userAttributeJson.email;
