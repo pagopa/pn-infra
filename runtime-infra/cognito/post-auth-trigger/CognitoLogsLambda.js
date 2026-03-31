@@ -39,18 +39,45 @@ export const handler = async(event) => {
 
                     if (dbRes.Item && dbRes.Item.backoffice_tags) {
                         const tags = dbRes.Item.backoffice_tags.S;
-                        console.log(`Updating Cognito user ${email} with tags: ${tags}`);
+                        const expectedIdpId = dbRes.Item.expected_idpid ? dbRes.Item.expected_idpid.S : null;
                         
-                        await cognitoClient.send(new AdminUpdateUserAttributesCommand({
-                            UserPoolId: userPoolId,
-                            Username: event.userName, // Questo è lo username interno (es. 'google_123...')
-                            UserAttributes: [
-                                {
-                                    Name: 'custom:backoffice_tags',
-                                    Value: tags
-                                }
-                            ]
-                        }));
+                        // 3. Validazione dell'IdPID (Security Check)
+                        let issuerVerified = true;
+                        if (expectedIdpId) {
+                            const identities = userAttributeJson.identities ? JSON.parse(userAttributeJson.identities) : [];
+                            // Cerchiamo l'identità SAML o quella del provider Google
+                            const samlIdentity = identities.find(id => id.providerType === 'SAML' || id.providerName === 'Google');
+                            
+                            // In Cognito, per SAML/Google, l'issuer URL completo non è sempre presente in chiaro nelle identities,
+                            // ma spesso il providerName contiene il riferimento. Se l'issuer è nell'evento (es. request.userAttributes.identities),
+                            // controlliamo che contenga l'IdPID atteso.
+                            const identitiesStr = userAttributeJson.identities || "";
+                            if (!identitiesStr.includes(expectedIdpId)) {
+                                console.warn(`Security ALERT: User ${email} attempted login with wrong IdPID. Expected: ${expectedIdpId}`);
+                                issuerVerified = false;
+                            } else {
+                                console.log(`IdPID ${expectedIdpId} verified for user ${email}`);
+                            }
+                        }
+
+                        if (issuerVerified) {
+                            console.log(`Updating Cognito user ${email} with tags: ${tags}`);
+                            
+                            await cognitoClient.send(new AdminUpdateUserAttributesCommand({
+                                UserPoolId: userPoolId,
+                                Username: event.userName,
+                                UserAttributes: [
+                                    {
+                                        Name: 'custom:backoffice_tags',
+                                        Value: tags
+                                    },
+                                    {
+                                        Name: 'email_verified',
+                                        Value: 'true'
+                                    }
+                                ]
+                            }));
+                        }
                     } else {
                         console.log("No backoffice_tags found in DynamoDB for user:", email);
                     }
