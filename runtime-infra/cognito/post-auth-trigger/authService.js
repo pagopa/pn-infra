@@ -5,6 +5,7 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
     const { email, roles_table, userPoolId, userName, event, expectedIdpId } = params;
     const isDebug = process.env.LOG_LEVEL === 'DEBUG';
     
+    // Questo log è sempre visibile sia in INFO che in DEBUG
     console.log(`Starting role sync for ${email} on table ${roles_table}`);
     
     try {
