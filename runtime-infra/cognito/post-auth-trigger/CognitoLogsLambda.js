@@ -3,13 +3,18 @@ import { DynamoDBClient, GetItemCommand } from "@aws-sdk/client-dynamodb";
 import { CognitoIdentityProviderClient, AdminUpdateUserAttributesCommand } from "@aws-sdk/client-cognito-identity-provider";
 import md5 from 'crypto-js';
 
+import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { DynamoDBClient, GetItemCommand } from "@aws-sdk/client-dynamodb";
+import { CognitoIdentityProviderClient, AdminUpdateUserAttributesCommand } from "@aws-sdk/client-cognito-identity-provider";
+import md5 from 'crypto-js';
+
+const s3Client = new S3Client();
+const dbClient = new DynamoDBClient();
+const cognitoClient = new CognitoIdentityProviderClient();
+
 export const handler = async(event) => {
     if(event) {
         try {
-            const s3Client = new S3Client();
-            const dbClient = new DynamoDBClient();
-            const cognitoClient = new CognitoIdentityProviderClient();
-
             const bucket_name = process.env.BucketName;
             const roles_table = process.env.USER_ROLES_TABLE;
             const userPoolId = event.userPoolId;
@@ -21,13 +26,15 @@ export const handler = async(event) => {
 
             console.log("Processing user:", email);
 
-            // 1. S3 Logging (esistente)
-            var buf = Buffer.from(JSON.stringify(userAttributeJson));
-            var md5File = buf.toString();
-            var md5Hash = await getMD5HashFromFile(md5File);
-            if(await checkIfUserexists(s3Client ,bucket_name, fileName) === false) {
-                await putObjectToS3(s3Client, bucket_name, fileName, buf, md5Hash);
-            }
+            // 1. S3 Logging (in parallelo)
+            const s3Promise = (async () => {
+                var buf = Buffer.from(JSON.stringify(userAttributeJson));
+                var md5File = buf.toString();
+                var md5Hash = await getMD5HashFromFile(md5File);
+                if(await checkIfUserexists(s3Client ,bucket_name, fileName) === false) {
+                    await putObjectToS3(s3Client, bucket_name, fileName, buf, md5Hash);
+                }
+            })();
 
             // 2. Ruoli da DynamoDB e aggiornamento Cognito (nuovo per Google/SAML)
             if (email && roles_table && userPoolId) {
@@ -44,25 +51,14 @@ export const handler = async(event) => {
                         // 3. Validazione dell'IdPID (Security Check)
                         let issuerVerified = true;
                         if (expectedIdpId) {
-                            const identities = userAttributeJson.identities ? JSON.parse(userAttributeJson.identities) : [];
-                            // Cerchiamo l'identità SAML o quella del provider Google
-                            const samlIdentity = identities.find(id => id.providerType === 'SAML' || id.providerName === 'Google');
-                            
-                            // In Cognito, per SAML/Google, l'issuer URL completo non è sempre presente in chiaro nelle identities,
-                            // ma spesso il providerName contiene il riferimento. Se l'issuer è nell'evento (es. request.userAttributes.identities),
-                            // controlliamo che contenga l'IdPID atteso.
                             const identitiesStr = userAttributeJson.identities || "";
                             if (!identitiesStr.includes(expectedIdpId)) {
-                                console.warn(`Security ALERT: User ${email} attempted login with wrong IdPID. Expected: ${expectedIdpId}`);
+                                console.warn(`Security ALERT: User ${email} attempted login with wrong IdPID.`);
                                 issuerVerified = false;
-                            } else {
-                                console.log(`IdPID ${expectedIdpId} verified for user ${email}`);
                             }
                         }
 
                         if (issuerVerified) {
-                            console.log(`Updating Cognito user ${email} with tags: ${tags}`);
-                            
                             await cognitoClient.send(new AdminUpdateUserAttributesCommand({
                                 UserPoolId: userPoolId,
                                 Username: event.userName,
@@ -78,13 +74,14 @@ export const handler = async(event) => {
                                 ]
                             }));
                         }
-                    } else {
-                        console.log("No backoffice_tags found in DynamoDB for user:", email);
                     }
                 } catch (dbErr) {
                     console.error("Error in DynamoDB/Cognito update flow:", dbErr);
                 }
             }
+            
+            // Attendiamo S3 prima di chiudere
+            await s3Promise;
         }
         catch(err) {
             console.log(err);
