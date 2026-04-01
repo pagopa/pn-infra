@@ -39,7 +39,7 @@ export const handler = async (event) => {
         }
 
         // 2. Sincronizzazione Ruoli (Solo per PreTokenGeneration V1)
-        if (triggerSource === 'PreTokenGeneration_Authentication') {
+        if (triggerSource === 'PreTokenGeneration_Authentication' || triggerSource === 'TokenGeneration_HostedAuth') {
             if (email && rolesTable) {
                 return await syncUserRoles(dbClient, cognitoClient, {
                     email,

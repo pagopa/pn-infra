@@ -5,7 +5,7 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
     const { email, roles_table, userPoolId, userName, event, expectedIdpId } = params;
     const isDebug = process.env.LOG_LEVEL === 'DEBUG';
     
-    console.log(`Starting role sync for ${email} on table ${roles_table} (PreToken V1)`);
+    console.log(`Starting role sync for ${email} on table ${roles_table} (PreToken V2)`);
     
     try {
         const dbRes = await dbClient.send(new GetItemCommand({
@@ -24,20 +24,13 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
             console.log(`Found roles for ${email}: ${tags}.`);
 
             let issuerVerified = true;
-            // Logica di verifica IdPID temporaneamente disabilitata per i test
+            // Teniamo commentato per i test iniziali se necessario
             /*
             if (dbExpectedIdpId) {
                 const identitiesStr = (event.request.userAttributes && event.request.userAttributes.identities) || "";
-                
-                if (isDebug) {
-                    console.log(`DEBUG: User identities string: ${identitiesStr}`);
-                }
-
                 if (!identitiesStr.includes(dbExpectedIdpId)) {
-                    console.warn(`SECURITY ALERT: User ${email} attempted login with wrong IdPID. Identities: ${identitiesStr}`);
+                    console.warn(`SECURITY ALERT: User ${email} attempted login with wrong IdPID.`);
                     issuerVerified = false;
-                } else {
-                    console.log(`IdPID ${dbExpectedIdpId} verified for ${email}`);
                 }
             }
             */
@@ -54,17 +47,24 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
                     ]
                 }));
 
-                // 2. OVERRIDE ID TOKEN (per l'App che legge dal Token V1)
+                // 2. OVERRIDE TOKEN FORMATO V2 (per avere tutto popolato atomisticamente)
                 event.response = {
-                    claimsOverrideDetails: {
-                        claimsToAddOrOverride: {
-                            "custom:backoffice_tags": tags,
-                            "email_verified": "true"
+                    claimsAndScopeOverrideDetails: {
+                        idTokenGeneration: {
+                            claimsToAddOrOverride: {
+                                "custom:backoffice_tags": tags,
+                                "email_verified": "true"
+                            }
+                        },
+                        accessTokenGeneration: {
+                            claimsToAddOrOverride: {
+                                "custom:backoffice_tags": tags
+                            }
                         }
                     }
                 };
                 
-                console.log(`SUCCESS: Updated DB and Prepared V1 Token override for ${email}`);
+                console.log(`SUCCESS: Updated DB and Prepared V2 Token override for ${email}`);
             }
         }
         
