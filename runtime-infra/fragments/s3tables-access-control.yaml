@@ -77,7 +77,6 @@ Conditions:
   IsCoreAccount: !Equals [ !Ref PnCoreAwsAccountId, '' ]
 
   IsProdEnvironment: !Equals [ !Ref EnvironmentType, 'prod' ]
-  IsDevEnvironment: !Equals [ !Ref EnvironmentType, 'dev' ]
 
   HasCoreSsoAdminRole: !Not [ !Equals [ !Ref CoreSsoAdminRole, '' ] ]
 
@@ -85,9 +84,8 @@ Conditions:
     - !Condition IsConfinfoAccount
     - !Condition HasEnvironmentType
 
-  HasCoreSsoAdminRoleInConfinfoDev: !And
+  HasCoreSsoAdminRoleInConfinfo: !And
     - !Condition HasCrossAccountContext
-    - !Condition IsDevEnvironment
     - !Condition HasCoreSsoAdminRole
 
   UseGlueCatalogResourcePolicy: !Condition HasCrossAccountContext
@@ -255,7 +253,7 @@ Resources:
           - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
         - ''
       CrossPrincipal3: !If
-        - HasCoreSsoAdminRoleInConfinfoDev
+        - HasCoreSsoAdminRoleInConfinfo
         - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/aws-reserved/sso.amazonaws.com/eu-west-1/${CoreSsoAdminRole}'
         - ''
       AdditionalTablePrincipals: !Ref AdditionalTablePrincipals
@@ -421,7 +419,7 @@ Resources:
               - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/ReadOnlyAccess-${EnvironmentType}'
               - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
             - !If
-              - HasCoreSsoAdminRoleInConfinfoDev
+              - HasCoreSsoAdminRoleInConfinfo
               - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/aws-reserved/sso.amazonaws.com/eu-west-1/${CoreSsoAdminRole}'
               - !Ref AWS::NoValue
         Action:
@@ -455,7 +453,7 @@ Resources:
           AWS:
             - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/pn-cd-pipeline-CodeBuildRole'
             - !If
-              - HasCoreSsoAdminRoleInConfinfoDev
+              - HasCoreSsoAdminRoleInConfinfo
               - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/aws-reserved/sso.amazonaws.com/eu-west-1/${CoreSsoAdminRole}'
               - !Ref AWS::NoValue
         Action:
