@@ -168,6 +168,7 @@ Resources:
       AutoVerifiedAttributes:
         - email
       LambdaConfig:
+        PreTokenGeneration: !GetAtt CognitoTriggerLambda.Arn
         PostAuthentication: !GetAtt CognitoTriggerLambda.Arn
       Policies:
         PasswordPolicy:

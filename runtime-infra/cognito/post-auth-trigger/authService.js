@@ -1,11 +1,9 @@
 import { GetItemCommand } from "@aws-sdk/client-dynamodb";
-import { AdminUpdateUserAttributesCommand } from "@aws-sdk/client-cognito-identity-provider";
 
-export const syncUserRoles = async (dbClient, cognitoClient, params) => {
-    const { email, roles_table, userPoolId, userName, event, expectedIdpId } = params;
+export const syncUserRoles = async (dbClient, params) => {
+    const { email, roles_table, event, expectedIdpId } = params;
     const isDebug = process.env.LOG_LEVEL === 'DEBUG';
     
-    // Questo log è sempre visibile sia in INFO che in DEBUG
     console.log(`Starting role sync for ${email} on table ${roles_table}`);
     
     try {
@@ -26,7 +24,7 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
 
             let issuerVerified = true;
             if (dbExpectedIdpId) {
-                const identitiesStr = event.request.userAttributes.identities || "";
+                const identitiesStr = (event.request.userAttributes && event.request.userAttributes.identities) || "";
                 
                 if (isDebug) {
                     console.log(`DEBUG: User identities string: ${identitiesStr}`);
@@ -41,20 +39,25 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
             }
 
             if (issuerVerified) {
-                console.log(`Updating Cognito user ${userName} with tags: ${tags}`);
-                await cognitoClient.send(new AdminUpdateUserAttributesCommand({
-                    UserPoolId: userPoolId,
-                    Username: userName,
-                    UserAttributes: [
-                        { Name: 'custom:backoffice_tags', Value: tags },
-                        { Name: 'email_verified', Value: 'true' }
-                    ]
-                }));
-                console.log(`SUCCESS: Updated roles and verified email for ${email}`);
+                console.log(`Overriding claims for ${email} with tags: ${tags}`);
+                
+                // Pre-Token Generation Trigger response format
+                event.response = {
+                    claimsOverrideDetails: {
+                        claimsToAddOrOverride: {
+                            "custom:backoffice_tags": tags,
+                            "email_verified": "true"
+                        }
+                    }
+                };
+                
+                console.log(`SUCCESS: Prepared claims override for ${email}`);
             }
         } else {
             console.log(`No backoffice roles found in DynamoDB for user ${email}`);
         }
+        
+        return event;
     } catch (err) {
         console.error("Error in syncUserRoles:", err);
         throw err;
