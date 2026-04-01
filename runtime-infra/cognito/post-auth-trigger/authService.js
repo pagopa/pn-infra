@@ -39,19 +39,26 @@ export const syncUserRoles = async (dbClient, params) => {
             }
 
             if (issuerVerified) {
-                console.log(`Overriding claims for ${email} with tags: ${tags}`);
+                console.log(`Overriding claims for ${email} with tags: ${tags} (PreTokenGeneration V2)`);
                 
-                // Pre-Token Generation Trigger response format
+                // Pre-Token Generation Trigger response format V2.0 (forza l'arricchimento nel login)
                 event.response = {
-                    claimsOverrideDetails: {
-                        claimsToAddOrOverride: {
-                            "custom:backoffice_tags": tags,
-                            "email_verified": "true"
+                    claimsAndScopeOverrideDetails: {
+                        idTokenGeneration: {
+                            claimsToAddOrOverride: {
+                                "custom:backoffice_tags": tags,
+                                "email_verified": "true"
+                            }
+                        },
+                        accessTokenGeneration: {
+                            claimsToAddOrOverride: {
+                                "custom:backoffice_tags": tags
+                            }
                         }
                     }
                 };
                 
-                console.log(`SUCCESS: Prepared claims override for ${email}`);
+                console.log(`SUCCESS: Prepared V2 claims override for ${email}`);
             }
         } else {
             console.log(`No backoffice roles found in DynamoDB for user ${email}`);
