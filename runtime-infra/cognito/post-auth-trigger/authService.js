@@ -1,10 +1,11 @@
 import { GetItemCommand } from "@aws-sdk/client-dynamodb";
+import { AdminUpdateUserAttributesCommand } from "@aws-sdk/client-cognito-identity-provider";
 
-export const syncUserRoles = async (dbClient, params) => {
-    const { email, roles_table, event, expectedIdpId } = params;
+export const syncUserRoles = async (dbClient, cognitoClient, params) => {
+    const { email, roles_table, userPoolId, userName, event, expectedIdpId } = params;
     const isDebug = process.env.LOG_LEVEL === 'DEBUG';
     
-    console.log(`Starting role sync for ${email} on table ${roles_table}`);
+    console.log(`Starting role sync for ${email} on table ${roles_table} (PreToken V1)`);
     
     try {
         const dbRes = await dbClient.send(new GetItemCommand({
@@ -26,42 +27,36 @@ export const syncUserRoles = async (dbClient, params) => {
             if (dbExpectedIdpId) {
                 const identitiesStr = (event.request.userAttributes && event.request.userAttributes.identities) || "";
                 
-                if (isDebug) {
-                    console.log(`DEBUG: User identities string: ${identitiesStr}`);
-                }
-
                 if (!identitiesStr.includes(dbExpectedIdpId)) {
-                    console.warn(`SECURITY ALERT: User ${email} attempted login with wrong IdPID. Identities: ${identitiesStr}`);
+                    console.warn(`SECURITY ALERT: User ${email} attempted login with wrong IdPID.`);
                     issuerVerified = false;
-                } else {
-                    console.log(`IdPID ${dbExpectedIdpId} verified for ${email}`);
                 }
             }
 
             if (issuerVerified) {
-                console.log(`Overriding claims for ${email} with tags: ${tags} (PreTokenGeneration V2)`);
-                
-                // Pre-Token Generation Trigger response format V2.0 (forza l'arricchimento nel login)
+                // 1. AGGIORNAMENTO DATABASE (per Amplify SDK che legge dall'utente)
+                console.log(`Updating Cognito DB for user ${userName} with tags: ${tags}`);
+                await cognitoClient.send(new AdminUpdateUserAttributesCommand({
+                    UserPoolId: userPoolId,
+                    Username: userName,
+                    UserAttributes: [
+                        { Name: 'custom:backoffice_tags', Value: tags },
+                        { Name: 'email_verified', Value: 'true' }
+                    ]
+                }));
+
+                // 2. OVERRIDE ID TOKEN (per l'App che legge dal Token V1)
                 event.response = {
-                    claimsAndScopeOverrideDetails: {
-                        idTokenGeneration: {
-                            claimsToAddOrOverride: {
-                                "custom:backoffice_tags": tags,
-                                "email_verified": "true"
-                            }
-                        },
-                        accessTokenGeneration: {
-                            claimsToAddOrOverride: {
-                                "custom:backoffice_tags": tags
-                            }
+                    claimsOverrideDetails: {
+                        claimsToAddOrOverride: {
+                            "custom:backoffice_tags": tags,
+                            "email_verified": "true"
                         }
                     }
                 };
                 
-                console.log(`SUCCESS: Prepared V2 claims override for ${email}`);
+                console.log(`SUCCESS: Updated DB and Prepared V1 Token override for ${email}`);
             }
-        } else {
-            console.log(`No backoffice roles found in DynamoDB for user ${email}`);
         }
         
         return event;

@@ -159,7 +159,6 @@ Resources:
   UserPool:
     Type: "AWS::Cognito::UserPool"
     Properties:
-      UserPoolTier: ESSENTIALS
       AccountRecoverySetting:
         RecoveryMechanisms:
           - Name: admin_only
@@ -171,9 +170,6 @@ Resources:
       LambdaConfig:
         PreTokenGeneration: !GetAtt CognitoTriggerLambda.Arn
         PostAuthentication: !GetAtt CognitoTriggerLambda.Arn
-        PreTokenGenerationConfig:
-          LambdaArn: !GetAtt CognitoTriggerLambda.Arn
-          LambdaVersion: V2_0
       Policies:
         PasswordPolicy:
           MinimumLength: 16

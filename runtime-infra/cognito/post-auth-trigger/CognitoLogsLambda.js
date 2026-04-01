@@ -1,10 +1,12 @@
 import { S3Client } from "@aws-sdk/client-s3";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { CognitoIdentityProviderClient } from "@aws-sdk/client-cognito-identity-provider";
 import { putObjectToS3, checkIfUserExists, getMD5HashFromFile } from './utils.js';
 import { syncUserRoles } from './authService.js';
 
 const s3Client = new S3Client();
 const dbClient = new DynamoDBClient();
+const cognitoClient = new CognitoIdentityProviderClient();
 
 export const handler = async (event) => {
     if (!event) return event;
@@ -22,7 +24,6 @@ export const handler = async (event) => {
 
         // 1. Audit Log su S3 (Solo per PostAuthentication)
         if (triggerSource === 'PostAuthentication_Authentication') {
-            console.log(`Writing Audit Log for ${email} to S3...`);
             try {
                 const dataStr = JSON.stringify(userAttributes);
                 const md5Hash = await getMD5HashFromFile(dataStr);
@@ -30,9 +31,6 @@ export const handler = async (event) => {
                 
                 if (!exists) {
                     await putObjectToS3(s3Client, bucketName, fileName, Buffer.from(dataStr), md5Hash);
-                    console.log(`Audit Log for ${email} successfully written.`);
-                } else {
-                    console.log(`Audit Log for ${email} already exists.`);
                 }
             } catch (s3Err) {
                 console.error("S3 Audit Error:", s3Err);
@@ -40,13 +38,14 @@ export const handler = async (event) => {
             return event;
         }
 
-        // 2. Sincronizzazione Ruoli e Override dei Claims (Solo per PreTokenGeneration)
+        // 2. Sincronizzazione Ruoli (Solo per PreTokenGeneration V1)
         if (triggerSource === 'PreTokenGeneration_Authentication') {
-            console.log(`Processing Roles for ${email} (PreTokenGeneration)...`);
             if (email && rolesTable) {
-                return await syncUserRoles(dbClient, {
+                return await syncUserRoles(dbClient, cognitoClient, {
                     email,
                     roles_table: rolesTable,
+                    userPoolId: event.userPoolId,
+                    userName: event.userName,
                     event,
                     expectedIdpId
                 });
