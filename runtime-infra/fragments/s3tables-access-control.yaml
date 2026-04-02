@@ -222,34 +222,32 @@ Resources:
       TableName:    !Ref TableName
       LocalAccountId: !Ref AWS::AccountId
       CrossAccountId: !Ref PnCoreAwsAccountId
-      # Same-account principals (table only)
       TablePrincipal1: !If
         - IsProdEnvironment
-        - !Sub 'arn:aws:iam::${AWS::AccountId}:role/AdminAccess-${EnvironmentType}'
+        - ''
         - !If
           - IsCoreAccount
           - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtAdmin-core-${EnvironmentType}'
           - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtAdmin-confinfo-${EnvironmentType}'
       TablePrincipal2: !If
         - IsProdEnvironment
-        - !Sub 'arn:aws:iam::${AWS::AccountId}:role/ReadOnlyAccess-${EnvironmentType}'
+        - ''
         - !If
           - IsCoreAccount
           - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
           - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtReadOnly-confinfo-${EnvironmentType}'
-      # Cross-account principals (database DESCRIBE + table SELECT/DESCRIBE)
       CrossPrincipal1: !If
         - HasCrossAccountContext
         - !If
           - IsProdEnvironment
-          - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/AdminAccess-${EnvironmentType}'
+          - !Ref PnCoreAwsAccountId
           - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/SendExtAdmin-core-${EnvironmentType}'
         - ''
       CrossPrincipal2: !If
         - HasCrossAccountContext
         - !If
           - IsProdEnvironment
-          - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/ReadOnlyAccess-${EnvironmentType}'
+          - ''
           - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
         - ''
       CrossPrincipal3: !If
@@ -412,11 +410,11 @@ Resources:
           AWS:
             - !If
               - IsProdEnvironment
-              - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/AdminAccess-${EnvironmentType}'
+              - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:root'
               - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/SendExtAdmin-core-${EnvironmentType}'
             - !If
               - IsProdEnvironment
-              - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/ReadOnlyAccess-${EnvironmentType}'
+              - !Ref AWS::NoValue
               - !Sub 'arn:aws:iam::${PnCoreAwsAccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
             - !If
               - HasCoreSsoAdminRoleInConfinfo
