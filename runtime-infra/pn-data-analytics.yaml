@@ -43,7 +43,6 @@ Parameters:
     Description: Whether to enable cross-account access to address manager tracing tables (only for prod environment)
 
 Conditions:
-  IsProdEnvironment: !Equals [ !Ref EnvironmentType, 'prod' ]
   IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
   IsAddressManagerCrossAccountAccessEnabled: !Equals [ !Ref EnableAddressManagerCrossAccountAccess, 'true' ]
   IsAddressManagerCrossAccountAccessEnabledNotProd: !And
