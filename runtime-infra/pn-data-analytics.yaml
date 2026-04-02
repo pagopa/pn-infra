@@ -44,7 +44,11 @@ Parameters:
 
 Conditions:
   IsProdEnvironment: !Equals [ !Ref EnvironmentType, 'prod' ]
+  IsNotProdEnvironment: !Not [ !Equals [ !Ref EnvironmentType, 'prod' ] ]
   IsAddressManagerCrossAccountAccessEnabled: !Equals [ !Ref EnableAddressManagerCrossAccountAccess, 'true' ]
+  IsAddressManagerCrossAccountAccessEnabledNotProd: !And
+    - !Condition IsAddressManagerCrossAccountAccessEnabled
+    - !Condition IsNotProdEnvironment
 Resources:
 
   ConfinfoExportDatabase:
@@ -349,13 +353,10 @@ Resources:
   AddressManagerTracingLFDescribeAdminCore:
     Type: AWS::LakeFormation::Permissions
     DependsOn: AddressManagerTracingGlueResourceLinkDB
-    Condition: IsAddressManagerCrossAccountAccessEnabled
+    Condition: IsAddressManagerCrossAccountAccessEnabledNotProd
     Properties:
       DataLakePrincipal:
-        DataLakePrincipalIdentifier: !If
-          - IsProdEnvironment
-          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/AdminAccess-${EnvironmentType}'
-          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtAdmin-core-${EnvironmentType}'
+        DataLakePrincipalIdentifier: !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtAdmin-core-${EnvironmentType}'
       Resource:
         DatabaseResource:
           CatalogId: !Ref AWS::AccountId
@@ -366,13 +367,10 @@ Resources:
   AddressManagerTracingLFDescribeReadonlyCore:
     Type: AWS::LakeFormation::Permissions
     DependsOn: AddressManagerTracingGlueResourceLinkDB
-    Condition: IsAddressManagerCrossAccountAccessEnabled
+    Condition: IsAddressManagerCrossAccountAccessEnabledNotProd
     Properties:
       DataLakePrincipal:
-        DataLakePrincipalIdentifier: !If
-          - IsProdEnvironment
-          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/ReadOnlyAccess-${EnvironmentType}'
-          - !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
+        DataLakePrincipalIdentifier: !Sub 'arn:aws:iam::${AWS::AccountId}:role/SendExtReadOnly-core-${EnvironmentType}'
       Resource:
         DatabaseResource:
           CatalogId: !Ref AWS::AccountId
