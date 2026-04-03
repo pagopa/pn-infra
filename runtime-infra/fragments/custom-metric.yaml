@@ -72,12 +72,10 @@ Parameters:
 
   OncallComparisonOperator:
     Type: String
-    Default: ""
     Description: "The arithmetic operation to use when comparing the specified statistic and threshold"
 
   OncallStatistic:
     Type: String
-    Default: ""
     Description: "The statistic for the metric associated with the alarm"
 
   HasOncall:
@@ -88,8 +86,17 @@ Parameters:
       - true
       - false
 
+  HasAlarm:
+    Type: String
+    Description: "Create alarm"
+    Default: true
+    AllowedValues:
+      - true
+      - false
+
 Conditions:
   HasOncallCondition: !Equals [ !Ref HasOncall, 'true' ]
+  HasAlarmCondition: !Equals [ !Ref HasAlarm, 'true' ]
     
 Resources:
   # CloudWatch metric to filer ERROR - FATAL lines, in Log group
@@ -108,6 +115,7 @@ Resources:
   # Create alarm
   CustomErrorLogsMetricAlarm:
     Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmCondition
     DependsOn: CustomErrorLogsMetricFilter
     Properties:
       AlarmName: !Sub "${MetricName}-Alarm"
