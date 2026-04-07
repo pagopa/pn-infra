@@ -144,6 +144,14 @@ Resources:
                 Action:
                   - sns:Publish
                 Resource: !Ref AlarmSNSTopicArn
+              - Effect: Allow
+                Action:
+                  - kinesis:GetRecords
+                  - kinesis:GetShardIterator
+                  - kinesis:DescribeStream
+                  - kinesis:DescribeStreamSummary
+                  - kinesis:ListShards
+                Resource: !Ref CdcKinesisStreamArn
 
   InfraSecMonitoringDynamoAlertLambdaLogGroup:
     Type: AWS::Logs::LogGroup
