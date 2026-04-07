@@ -38,16 +38,17 @@ export const handler = async (event) => {
             return event;
         }
 
-        // 2. Sincronizzazione Ruoli (Solo per PreTokenGeneration V1)
+        // 2. Sincronizzazione Ruoli (Solo per PreTokenGeneration V2)
         if (triggerSource === 'PreTokenGeneration_Authentication' || triggerSource === 'TokenGeneration_HostedAuth') {
             if (email && rolesTable) {
-                return await syncUserRoles(dbClient, cognitoClient, {
+                return await syncUserRoles(dbClient, cognitoClient, s3Client, {
                     email,
                     roles_table: rolesTable,
                     userPoolId: event.userPoolId,
                     userName: event.userName,
                     event,
-                    expectedIdpId
+                    expectedIdpId,
+                    bucketName: bucketName
                 });
             }
         }

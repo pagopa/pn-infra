@@ -1,8 +1,11 @@
 import { GetItemCommand } from "@aws-sdk/client-dynamodb";
 import { AdminUpdateUserAttributesCommand } from "@aws-sdk/client-cognito-identity-provider";
 
-export const syncUserRoles = async (dbClient, cognitoClient, params) => {
-    const { email, roles_table, userPoolId, userName, event, expectedIdpId } = params;
+import { GetItemCommand } from "@aws-sdk/client-dynamodb";
+import { AdminUpdateUserAttributesCommand } from "@aws-sdk/client-cognito-identity-provider";
+
+export const syncUserRoles = async (dbClient, cognitoClient, s3Client, params) => {
+    const { email, roles_table, userPoolId, userName, event, expectedIdpId, bucketName } = params;
     const isDebug = process.env.LOG_LEVEL === 'DEBUG';
     
     console.log(`Starting role sync for ${email} on table ${roles_table} (PreToken V2)`);
@@ -22,6 +25,17 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
             const dbExpectedIdpId = dbRes.Item.expected_idpid ? dbRes.Item.expected_idpid.S : expectedIdpId;
             
             console.log(`Found roles for ${email}: ${tags}.`);
+
+            // Audit Log via CloudWatch (verrà captato dai sistemi di log aggregation)
+            console.log(JSON.stringify({
+                eventType: "AUD-HD-LOGIN",
+                timestamp: new Date().toISOString(),
+                user: email,
+                sub: userName,
+                roles: tags,
+                triggerSource: event.triggerSource,
+                userPoolId: userPoolId
+            }));
 
             let issuerVerified = true;
             // Teniamo commentato per i test iniziali se necessario
