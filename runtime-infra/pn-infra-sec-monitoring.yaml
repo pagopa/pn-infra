@@ -94,16 +94,20 @@ Parameters:
     Default: '{}'
     Description: 'JSON map tableName->policy (no-delete|append-only|standard) for CDC validation'
 
-  DataStoreRetentionDays:
-    Type: Number
-    Default: 30
-    Description: 'Retention period (in days) for CloudTrail Event Data Store'
-
   CloudtrailEventDataStoreEnabled:
     Type: String
     AllowedValues: ['true', 'false']
     Default: 'false'
     Description: 'If Cloudtrail Event Data Store is enabled'
+
+  LambdasBucketName:
+    Type: String
+    Description: S3 bucket name containing Lambda deployment packages
+
+  LambdasBasePath:
+    Type: String
+    Description: S3 key prefix for Lambda deployment packages
+    Default: ''
 
 Conditions:
   HasCloudTrailLogsEnabled: !Equals [!Ref EnableCloudTrailLogs, 'true']
@@ -166,8 +170,8 @@ Resources:
       Timeout: 60
       MemorySize: 256
       Code:
-        S3Bucket: !Ref DynamoAlertLambdaCodeBucket
-        S3Key: !Ref DynamoAlertLambdaCodeKey
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/infra-sec-monitoring-dynamo-alert.zip
       Environment:
         Variables:
           SNS_TOPIC_ARN: !Ref AlarmSNSTopicArn
@@ -482,8 +486,8 @@ Resources:
       Timeout: 60
       MemorySize: 256
       Code:
-        S3Bucket: !Ref DynamoAlertLambdaCodeBucket
-        S3Key: !Ref DynamoAlertLambdaCodeKey
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/infra-sec-url-access-analyzer-alert.zip
       Environment:
         Variables:
           SNS_TOPIC_ARN: !Ref AlarmSNSTopicArn
