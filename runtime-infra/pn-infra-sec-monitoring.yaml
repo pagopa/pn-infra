@@ -59,6 +59,10 @@ Parameters:
   CdcKinesisStreamArn:
     Type: String
     Description: 'ARN of Kinesis CDC stream'
+
+  CdcKinesisStreamKeyArn:
+    Type: String
+    Description: 'ARN of KMS key for decrypting CDC stream (if encrypted)'
     
   MonitoringCoreEventBusName:
     Type: String
@@ -153,6 +157,10 @@ Resources:
                   - kinesis:ListShards
                   - kinesis:ListStreams
                 Resource: !Ref CdcKinesisStreamArn
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                Resource: !Ref CdcKinesisStreamKeyArn
 
   InfraSecMonitoringDynamoAlertLambdaLogGroup:
     Type: AWS::Logs::LogGroup
