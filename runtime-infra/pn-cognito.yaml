@@ -39,16 +39,6 @@ Parameters:
     Description: Environment name (e.g., dev, uat, prod)
     Default: dev #temporary for CF deploy pass by terraform
 
-  AppCallbackURLPrefix:
-    Type: String
-    Description: The callback URL Prefix for the application
-    Default: callback
-
-  AppLogoutURLPrefix:
-    Type: String
-    Description: The logout URL Prefix for the application
-    Default: logout
-
   LogLevel:
     Type: String
     Description: Log level for the Lambda trigger (e.g., INFO, DEBUG)
@@ -233,9 +223,9 @@ Resources:
         - openid
         - profile
       CallbackURLs:
-        - !Sub "https://${PortaleHelpdeskDomain}/${AppCallbackURLPrefix}"
+        - !Sub "https://${PortaleHelpdeskDomain}"
       LogoutURLs:
-        - !Sub "https://${PortaleHelpdeskDomain}/${AppLogoutURLPrefix}"
+        - !Sub "https://${PortaleHelpdeskDomain}"
       SupportedIdentityProviders:
         - COGNITO
         - !Sub "GoogleSAML-${EnvironmentType}"
