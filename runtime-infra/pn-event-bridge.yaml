@@ -25,10 +25,6 @@ Parameters:
     Description: "SafeStorage AWS Account id. Useful to grant rights to send feedback to EventBus"
     Type: String
 
-  ServiceDeskPaperChannelUser:
-    Description: "PaperChannel user dedicatet to ServiceDesk"
-    Type: String
-
   EventBusDeadLetterQueueMaximumRetentionPeriod:
     Type: Number
     Description: "The number of seconds that Amazon SQS retains a message. You can specify an integer 
@@ -202,13 +198,6 @@ Parameters:
     Type: String
     Description: ACM DLQ alarm ARN
 
-  # PaperChannel to ServiceDesk
-  PaperChannelToServiceDeskQueueARN:
-    Type: String
-
-  PaperChannelToServiceDeskQueueURL:
-    Type: String
-
   # F24 to PaperChannel
   F24ToPaperChannelQueueURL:
     Type: String
@@ -335,7 +324,6 @@ Resources:
                   - !Ref "AddressManagerToDeliveryPushQueueARN"
                   - !Ref "AddressManagerToRaddAltQueueARN"
                   - !Ref "AcmAlarmsQueueARN"
-                  - !Ref "PaperChannelToServiceDeskQueueARN"
                   - !Ref "SafeStorageToF24QueueARN"
                   - !Ref "F24ToPaperChannelQueueARN"
                   - !Ref "F24ToDeliveryPushQueueARN"
@@ -416,7 +404,6 @@ Resources:
         - !Ref "NationalRegistries2SelcPGQueueURL"  
         - !Ref "AddressManagerToDeliveryPushQueueURL"  
         - !Ref "AddressManagerToRaddAltQueueURL"
-        - !Ref "PaperChannelToServiceDeskQueueURL"
         - !Ref "F24ToPaperChannelQueueURL"
         - !Ref "F24ToDeliveryPushQueueURL"
         - !Ref "SafeStorageToF24QueueURL"
@@ -445,7 +432,6 @@ Resources:
               - !Ref "NationalRegistries2SelcPGQueueARN"        
               - !Ref "AddressManagerToDeliveryPushQueueARN"  
               - !Ref "AddressManagerToRaddAltQueueARN" 
-              - !Ref "PaperChannelToServiceDeskQueueARN"
               - !Ref "F24ToPaperChannelQueueARN"
               - !Ref "F24ToDeliveryPushQueueARN"
               - !Ref "SafeStorageToF24QueueARN"
@@ -915,38 +901,6 @@ Resources:
               }       
         - Id: !Sub '${ProjectName}-CoreEventBus-to-paper-evt-enricher'
           Arn: !Ref PnPaperEventEnricherInputQueueARN
-          InputPath: $.detail
-          DeadLetterConfig: 
-            Arn: !GetAtt EventBusDeadLetterQueue.Arn
-
-  # Send PaperChannel Response to servicedesk
-  # pn-paper-channel
-  PnCoreEventBusToServiceDeskPaperChannelResponseQueue:
-    Type: AWS::Events::Rule
-    Properties: 
-      Description: Route PaperChannel Events to pn-servicedesk
-      RoleArn: !GetAtt "EventBusEnqueueRole.Arn"
-      EventBusName: !Ref PnCoreEventBus
-      EventPattern:
-        detail-type: [ "PaperChannelOutcomeEvent" ]
-        detail:
-          clientId: [ !Ref ServiceDeskPaperChannelUser ]
-      Targets: 
-        - Arn: !GetAtt MatchedEventsLoggerFunction.Arn
-          Id: !Sub ${ProjectName}-Logger-PaperChannel2ServiceDesk
-          InputTransformer:
-            InputPathsMap:
-              "timestamp": "$.time"
-            InputTemplate: |
-              {
-                  "timestamp": <timestamp>,
-                  "ruleArn": <aws.events.rule-arn>,
-                  "ruleName": <aws.events.rule-name>,
-                  "ingestionTime": <aws.events.event.ingestion-time>,
-                  "originalEvent": <aws.events.event.json>
-              }       
-        - Id: !Sub '${ProjectName}-CoreEventBus-SafeStore2ServiceDesk'
-          Arn: !Ref PaperChannelToServiceDeskQueueARN
           InputPath: $.detail
           DeadLetterConfig: 
             Arn: !GetAtt EventBusDeadLetterQueue.Arn
