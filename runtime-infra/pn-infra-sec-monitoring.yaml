@@ -708,9 +708,6 @@ Resources:
                 Action: sns:Publish
                 Resource: !Ref CriticalAlarmSNSTopicArn
               - Effect: Allow
-                Action: cloudwatch:PutMetricData
-                Resource: "*"
-              - Effect: Allow
                 Action:
                   - sqs:ReceiveMessage
                   - sqs:DeleteMessage
@@ -741,7 +738,7 @@ Resources:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/infra-sec-access-validator-alert.zip
       Runtime: python3.11
-      Timeout: 60
+      Timeout: 20
       MemorySize: 256
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
       Environment:
