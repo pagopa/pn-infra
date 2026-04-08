@@ -601,7 +601,7 @@ Resources:
             tableName: !Ref DynamoDBAccessValidatorTables
       Targets:
         - Id: SecurityEventQueue
-          Arn: !GetAtt SecurityEventsQueue.Outputs.QueueArn
+          Arn: !GetAtt SecurityEventsQueue.Outputs.QueueARN
 
   #===========================================================================
   # Rule: Monitor access patterns to critical S3 prefixes (requires CloudTrail Event Data Store)
@@ -632,7 +632,7 @@ Resources:
               - !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
       Targets:
         - Id: SecurityEventQueue
-          Arn: !GetAtt SecurityEventsQueue.Outputs.QueueArn
+          Arn: !GetAtt SecurityEventsQueue.Outputs.QueueARN
 
   SecurityEventsQueue:
     Type: AWS::CloudFormation::Stack
@@ -648,7 +648,7 @@ Resources:
     Type: AWS::SQS::QueuePolicy
     Properties:
       Queues:
-        - !GetAtt SecurityEventsQueue.Outputs.QueueUrl
+        - !GetAtt SecurityEventsQueue.Outputs.QueueURL
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -657,7 +657,7 @@ Resources:
             Principal:
               Service: events.amazonaws.com
             Action: sqs:SendMessage
-            Resource: !GetAtt SecurityEventsQueue.Outputs.Queue
+            Resource: !GetAtt SecurityEventsQueue.Outputs.QueueARN
             Condition:
               ArnEquals:
                 aws:SourceArn:
@@ -673,7 +673,7 @@ Resources:
               - sqs:ReceiveMessage
               - sqs:DeleteMessage
               - sqs:GetQueueAttributes
-            Resource: !GetAtt SecurityEventsQueue.Outputs.Queue
+            Resource: !GetAtt SecurityEventsQueue.Outputs.QueueARN
             Condition:
               StringEquals:
                 aws:SourceAccount: !Ref AWS::AccountId
@@ -715,7 +715,7 @@ Resources:
                   - sqs:ReceiveMessage
                   - sqs:DeleteMessage
                   - sqs:GetQueueAttributes
-                Resource: !GetAtt SecurityEventsQueue.Outputs.QueueArn
+                Resource: !GetAtt SecurityEventsQueue.Outputs.QueueARN
               - Effect: Allow
                 Action: s3:GetObject
                 Resource:
@@ -760,7 +760,7 @@ Resources:
   SecurityEventsEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
-      EventSourceArn: !GetAtt SecurityEventsQueue.Outputs.QueueArn
+      EventSourceArn: !GetAtt SecurityEventsQueue.Outputs.QueueARN
       FunctionName: !Ref AccessValidatorFunction
       BatchSize: 10
       MaximumBatchingWindowInSeconds: 5
