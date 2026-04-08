@@ -139,7 +139,7 @@ def publish_emf_metrics(log_entry):
 
     timestamp_ms = int(datetime.utcnow().timestamp() * 1000)
 
-    base_dimensions = ["Environment", "BucketName"]
+    base_dimensions = ["BucketName"]
 
     metrics = []
 
@@ -168,8 +168,7 @@ def publish_emf_metrics(log_entry):
                     }
                 ],
             },
-            "Environment": ENVIRONMENT,
-            "BucketName": BUCKET_NAME,
+            "BucketName": log_entry.get("bucket"),
             metric_name: value,
         }
 
