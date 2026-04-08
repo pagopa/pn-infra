@@ -107,6 +107,34 @@ Parameters:
     Description: S3 key prefix for Lambda deployment packages
     Default: ''
 
+  DynamoDBAccessValidatorTables:
+    Type: CommaDelimitedList
+    Description: 'DynamoDB tables to monitor for access patterns (requires CloudTrail Event Data Store)'
+
+  AlarmSNSTopicName:
+    Type: String
+    Description: 'Name of SNS topic for alarms'
+
+  LambdaReservedConcurrency:
+    Type: Number
+    Default: 10
+    Description: 'Reserved concurrency for Lambda functions'
+
+  ExpectedCsvHash:
+    Type: String
+    Description: 'Expected hash of the authorized_roles.csv file for integrity validation'
+
+  AlertOnCrossAccountAccess:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: 'Whether to alert on cross-account access events'
+
+  AllowedAccountIds:
+    Type: CommaDelimitedList
+    Description: 'List of allowed account IDs for cross-account access (if AlertOnCrossAccountAccess is true)'
+    Default: ''
+
 Conditions:
   HasCloudTrailLogsEnabled: !Equals [!Ref EnableCloudTrailLogs, 'true']
   MonitorS3Condition: !Equals [!Ref MonitorS3, 'true']
@@ -118,6 +146,7 @@ Conditions:
   HasS3CriticalPrefixMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalS3Prefixes], "" ] ]
   HasDynamoDBCriticalTableMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalDynamoDBTables], "" ] ]
   HasCloudtrailEventDataStoreEnabledAndIsConfinfoAccount: !And [ !Equals [!Ref CloudtrailEventDataStoreEnabled, 'true'], !Condition IsConfinfoAccount ]
+  HasDynamoDBAccessValidatorTables: !Not [ !Equals [ !Join  [",", !Ref DynamoDBAccessValidatorTables], "" ] ]
   
 Resources:
 
@@ -188,6 +217,7 @@ Resources:
           SNS_TOPIC_ARN: !Ref CriticalAlarmSNSTopicArn
           TABLE_CONFIG: !Ref DynamoAlertLambdaTableConfig
           ENVIRONMENT: !Ref EnvironmentType
+      ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
 
   InfraSecMonitoringDynamoAlertLambdaEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
@@ -408,6 +438,9 @@ Resources:
         DynamoDBTableName: pn-Timelines
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
 
+  # ============================================================================
+  # EventBridge rules for S3 access monitoring (presigned URL usage and access denied events)
+  # ============================================================================
 
   # ============================================================================
   # Rule: S3 GetObject (presigned URL file download)
@@ -469,6 +502,8 @@ Resources:
           requestParameters:
             bucketName:
               - !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
+            key:
+              - anything-but: "favicon.ico"
       Targets:
         - Arn: !GetAtt InfraSecMonitoringUrlAccessAnalyzerAlertLambda.Arn
           Id: "SendToLambda"
@@ -503,6 +538,7 @@ Resources:
           SNS_TOPIC_ARN: !Ref CriticalAlarmSNSTopicArn
           TABLE_CONFIG: !Ref DynamoAlertLambdaTableConfig
           ENVIRONMENT: !Ref EnvironmentType
+      ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
 
   InfraSecMonitoringUrlAccessAnalyzerAlertLambdaRole:
     Type: AWS::IAM::Role
@@ -531,6 +567,210 @@ Resources:
                   - sns:Publish
                 Resource: !Ref CriticalAlarmSNSTopicArn
 
+  # ============================================================================
+  # EventBridge rules for access validator 
+  # ============================================================================
+
+  #===========================================================================
+  # Rule: Monitor access patterns to critical DynamoDB tables (requires CloudTrail Event Data Store)
+  #===========================================================================
+  DynamoDbAccessMonitorRule:
+    Type: AWS::Events::Rule
+    Condition: HasDynamoDBAccessValidatorTables
+    Properties:
+      Name: !Sub "${EnvironmentType}-dynamodb-access-monitor"
+      Description: "Monitor all DynamoDB access to Critical DynamoDB tables (CloudTrail filters to data events only)"
+      EventPattern:
+        source:
+          - aws.dynamodb
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - dynamodb.amazonaws.com
+          eventName:
+            - GetItem
+            - PutItem
+            - UpdateItem
+            - DeleteItem
+            - BatchGetItem
+            - BatchWriteItem
+            - Query
+            - Scan
+          requestParameters:
+            tableName:
+              - !Ref DynamoDBAccessValidatorTables
+      Targets:
+        - Id: SecurityEventQueue
+          Arn: !GetAtt SecurityEventsQueue.Outputs.QueueArn
+
+  #===========================================================================
+  # Rule: Monitor access patterns to critical S3 prefixes (requires CloudTrail Event Data Store)
+  #===========================================================================
+  S3AccessMonitorRule:
+    Type: AWS::Events::Rule
+    Condition: HasCloudtrailEventDataStoreEnabledAndIsConfinfoAccount
+    Properties:
+      Name: !Sub "${EnvironmentType}-s3-access-monitor"
+      Description: "Monitor S3 access to safestorage bucket (CloudTrail filters to critical prefix only)"
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - s3.amazonaws.com
+          eventName:
+            - GetObject
+            - PutObject
+            - DeleteObject
+            - DeleteObjects
+            - CopyObject
+            - RestoreObject
+          requestParameters:
+            bucketName:
+              - !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
+      Targets:
+        - Id: SecurityEventQueue
+          Arn: !GetAtt SecurityEventsQueue.Outputs.QueueArn
+
+  SecurityEventsQueue:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub "${ProjectName}-security-events-queue"
+        QueueRetentionSeconds: 1209600 # 14 days
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+        HasDLQ: "true"
+        QueueHasAlarm: "true"
+
+  SecurityEventsQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref SecurityEventsQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowEventBridgeToSendMessage
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt SecurityEventsQueue.Outputs.Queue
+            Condition:
+              ArnEquals:
+                aws:SourceArn:
+                  - !GetAtt DynamoDbAccessMonitorRule.Arn
+                  - !GetAtt S3AccessMonitorRule.Arn
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+          - Sid: AllowLambdaToReceiveMessages
+            Effect: Allow
+            Principal:
+              AWS: !GetAtt AccessValidatorRole.Arn
+            Action:
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+            Resource: !GetAtt SecurityEventsQueue.Outputs.Queue
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+
+
+  # ============================================================================
+  # IAM Role for Lambda
+  # ============================================================================
+  AccessValidatorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-infra-sec-access-validator-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "${ProjectName}-infra-sec-access-validator-policy"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref CriticalAlarmSNSTopicArn
+              - Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt SecurityEventsQueue.Outputs.Queue
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/infra-sec-access-validator/authorized_roles.csv"
+
+  # ============================================================================
+  # Lambda Function
+  # ============================================================================
+  AccessValidatorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ProjectName}-infra-sec-access-validator-alert"
+      RetentionInDays: 14
+
+  AccessValidatorFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: AccessValidatorLogGroup
+    Properties:
+      FunctionName: !Sub "${ProjectName}-infra-sec-access-validator-alert"
+      Handler: access_validator.lambda_handler
+      Role: !GetAtt AccessValidatorRole.Arn
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/infra-sec-access-validator-aler.zip
+      Runtime: python3.11
+      Timeout: 60
+      MemorySize: 256
+      ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref CriticalAlarmSNSTopicArn
+          DYNAMODB_TABLE_NAMES: !Ref DynamoDBAccessValidatorTables
+          S3_BUCKET_NAME: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
+          AUTHORIZED_ROLES_CSV: "" 
+          CSV_HASH: !Ref ExpectedCsvHash
+          CSV_S3_BUCKET: !Sub "pn-datamonitoring-${AWS::Region}-${AWS::AccountId}"
+          CSV_S3_KEY: "infra-sec-access-validator/authorized_roles.csv"
+          ENVIRONMENT: !Ref EnvironmentType
+          ALERT_ON_CROSS_ACCOUNT: !Ref AlertOnCrossAccountAccess
+          ALLOWED_ACCOUNT_IDS: !Join [",", !Ref AllowedAccountIds]
+
+  SecurityEventsEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt SecurityEventsQueue.Outputs.QueueArn
+      FunctionName: !Ref AccessValidatorFunction
+      BatchSize: 10
+      MaximumBatchingWindowInSeconds: 5
+      ScalingConfig:
+        MaximumConcurrency: !Ref LambdaReservedConcurrency
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
 Outputs:
   Version:
     Value: !Ref Version
