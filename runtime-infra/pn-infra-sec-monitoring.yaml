@@ -69,9 +69,11 @@ Parameters:
     Default: 'pn-core-monitoring-bus'
     Description: 'EventBridge bus name in Core account for receiving monitoring events'
 
-  AlarmSNSTopicArn:
+  CriticalAlarmSNSTopicArn:
     Type: String
     Description: 'ARN of SNS topic for critical alerts'
+
+  
 
   CriticalDynamoDBTables:
     Type: CommaDelimitedList
@@ -147,7 +149,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !Ref AlarmSNSTopicArn
+                Resource: !Ref CriticalAlarmSNSTopicArn
               - Effect: Allow
                 Action:
                   - kinesis:GetRecords
@@ -183,7 +185,7 @@ Resources:
         S3Key: !Sub ${LambdasBasePath}/infra-sec-monitoring-dynamo-alert.zip
       Environment:
         Variables:
-          SNS_TOPIC_ARN: !Ref AlarmSNSTopicArn
+          SNS_TOPIC_ARN: !Ref CriticalAlarmSNSTopicArn
           TABLE_CONFIG: !Ref DynamoAlertLambdaTableConfig
           ENVIRONMENT: !Ref EnvironmentType
 
@@ -197,7 +199,7 @@ Resources:
       StartingPosition: LATEST
 
   # --------------------------
-  # CloudTrail Confinfo
+  # CloudTrail Configuration
   # --------------------------
   InfraSecMonitoringCloudTrail:
     Condition: HasCloudTrailLogsEnabled
@@ -305,7 +307,7 @@ Resources:
           eventName: ["DeleteTable"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref AlarmSNSTopicArn
+          Arn: !Ref CriticalAlarmSNSTopicArn
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -331,7 +333,7 @@ Resources:
               pointInTimeRecoveryEnabled: [false]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref AlarmSNSTopicArn
+          Arn: !Ref CriticalAlarmSNSTopicArn
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -353,7 +355,7 @@ Resources:
             deletionProtectionEnabled: [false]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref AlarmSNSTopicArn
+          Arn: !Ref CriticalAlarmSNSTopicArn
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -379,7 +381,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref AlarmSNSTopicArn
+          Arn: !Ref CriticalAlarmSNSTopicArn
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -498,7 +500,7 @@ Resources:
         S3Key: !Sub ${LambdasBasePath}/infra-sec-url-access-analyzer-alert.zip
       Environment:
         Variables:
-          SNS_TOPIC_ARN: !Ref AlarmSNSTopicArn
+          SNS_TOPIC_ARN: !Ref CriticalAlarmSNSTopicArn
           TABLE_CONFIG: !Ref DynamoAlertLambdaTableConfig
           ENVIRONMENT: !Ref EnvironmentType
 
@@ -527,7 +529,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !Ref AlarmSNSTopicArn
+                Resource: !Ref CriticalAlarmSNSTopicArn
 
 Outputs:
   Version:
