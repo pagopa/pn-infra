@@ -598,8 +598,7 @@ Resources:
             - Query
             - Scan
           requestParameters:
-            tableName:
-              - !Ref DynamoDBAccessValidatorTables
+            tableName: !Ref DynamoDBAccessValidatorTables
       Targets:
         - Id: SecurityEventQueue
           Arn: !GetAtt SecurityEventsQueue.Outputs.QueueArn
@@ -651,7 +650,7 @@ Resources:
     Type: AWS::SQS::QueuePolicy
     Properties:
       Queues:
-        - !Ref SecurityEventsQueue
+        - !GetAtt SecurityEventsQueue.Outputs.QueueUrl
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -718,7 +717,7 @@ Resources:
                   - sqs:ReceiveMessage
                   - sqs:DeleteMessage
                   - sqs:GetQueueAttributes
-                Resource: !GetAtt SecurityEventsQueue.Outputs.Queue
+                Resource: !GetAtt SecurityEventsQueue.Outputs.QueueArn
               - Effect: Allow
                 Action: s3:GetObject
                 Resource:
@@ -742,7 +741,7 @@ Resources:
       Role: !GetAtt AccessValidatorRole.Arn
       Code:
         S3Bucket: !Ref LambdasBucketName
-        S3Key: !Sub ${LambdasBasePath}/infra-sec-access-validator-aler.zip
+        S3Key: !Sub ${LambdasBasePath}/infra-sec-access-validator-alert.zip
       Runtime: python3.11
       Timeout: 60
       MemorySize: 256
@@ -750,7 +749,7 @@ Resources:
       Environment:
         Variables:
           SNS_TOPIC_ARN: !Ref CriticalAlarmSNSTopicArn
-          DYNAMODB_TABLE_NAMES: !Ref DynamoDBAccessValidatorTables
+          DYNAMODB_TABLE_NAMES: !Join [",", !Ref DynamoDBAccessValidatorTables]
           S3_BUCKET_NAME: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
           AUTHORIZED_ROLES_CSV: "" 
           CSV_HASH: !Ref ExpectedCsvHash
