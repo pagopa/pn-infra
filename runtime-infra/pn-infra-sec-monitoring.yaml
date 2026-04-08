@@ -640,8 +640,6 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub "${ProjectName}-security-events-queue"
-        QueueRetentionSeconds: 1209600 # 14 days
-        DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
         HasDLQ: "true"
         QueueHasAlarm: "true"
