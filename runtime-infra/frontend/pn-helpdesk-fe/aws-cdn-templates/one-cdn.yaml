@@ -41,6 +41,10 @@ Parameters:
     Description: "The Url of web API: useful for content-security-policy"
     Type: String
 
+  CognitoAuthDomain:
+    Description: "The Url of Cognito Auth: useful for content-security-policy"
+    Type: String
+
   BoWebApiUrl:
     Description: "The Url of bo web API: useful for content-security-policy"
     Type: String
@@ -301,6 +305,7 @@ Resources:
                   - "frame-src 'self' data:;"
                   - !Sub " connect-src 'self' \
                     https://cognito-idp.eu-south-1.amazonaws.com/ \
+                    https://${CognitoAuthDomain}/ \
                     ${WebApiUrl} \
                     ${BoWebApiUrl}; \
                     style-src 'self' 'unsafe-inline' ; \
