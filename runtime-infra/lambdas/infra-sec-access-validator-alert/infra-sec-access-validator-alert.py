@@ -43,6 +43,32 @@ ALLOWED_ACCOUNT_IDS = os.environ.get('ALLOWED_ACCOUNT_IDS', '').split(',')
 ALLOWED_ACCOUNT_IDS = [acc.strip() for acc in ALLOWED_ACCOUNT_IDS if acc.strip()]
 
 
+def build_alert_subject(severity, alert_type):
+    return f"[{ENVIRONMENT}] {severity}: {alert_type}"
+
+
+def build_alert_body(alert_type, severity, detected_at, resource, operation, summary, details=None):
+    lines = [
+        f"Alert Type: {alert_type}",
+        f"Severity: {severity}",
+        f"Environment: {ENVIRONMENT}",
+        f"Detected At: {detected_at or datetime.utcnow().isoformat()}",
+        f"Resource: {resource or 'Unknown'}",
+        f"Operation/Event: {operation or 'Unknown'}",
+        f"Summary: {summary}",
+    ]
+
+    if details:
+        lines.append("")
+        lines.append("Details:")
+        for key, value in details.items():
+            if value is None or value == "":
+                continue
+            lines.append(f"{key}: {value}")
+
+    return "\n".join(lines)
+
+
 def validate_csv_integrity(csv_content):
     """
     Verify CSV hasn't been tampered with by comparing hash.
@@ -60,29 +86,27 @@ def validate_csv_integrity(csv_content):
         
         # Send critical alert
         try:
+            message = build_alert_body(
+                alert_type='CSV Integrity Violation',
+                severity='CRITICAL',
+                detected_at=datetime.utcnow().isoformat(),
+                resource=(f"s3://{CSV_S3_BUCKET}/{CSV_S3_KEY}" if CSV_S3_BUCKET else 'AUTHORIZED_ROLES_CSV'),
+                operation='CSV validation',
+                summary='Authorized roles CSV hash does not match the expected value.',
+                details={
+                    'Expected SHA256': EXPECTED_CSV_HASH,
+                    'Actual SHA256': actual_hash,
+                    'Lambda': os.environ.get('AWS_LAMBDA_FUNCTION_NAME', 'unknown'),
+                    'Action Required': (
+                        'Investigate who modified the CSV; review CloudTrail for Lambda configuration changes; '
+                        'compare the current CSV with Git; restore it if unauthorized; review recent access attempts.'
+                    )
+                }
+            )
             sns.publish(
                 TopicArn=SNS_TOPIC_ARN,
-                Subject='CRITICAL: CSV Integrity Violation - Possible Tampering',
-                Message=f"""
-CRITICAL SECURITY ALERT: CSV INTEGRITY VIOLATION
-
-The authorized roles CSV has been modified without proper deployment!
-This could indicate a privilege escalation attack.
-
-Expected SHA256: {EXPECTED_CSV_HASH}
-Actual SHA256:   {actual_hash}
-
-IMMEDIATE ACTION REQUIRED:
-1. Investigate who modified the CSV
-2. Review CloudTrail logs for Lambda configuration changes
-3. Compare current CSV with Git repository
-4. Restore CSV from Git if unauthorized
-5. Review all recent access attempts
-
-Environment: {ENVIRONMENT}
-Lambda: {os.environ.get('AWS_LAMBDA_FUNCTION_NAME', 'unknown')}
-Time: {datetime.utcnow().isoformat()}
-"""
+                Subject=build_alert_subject('CRITICAL', 'CSV Integrity Violation'),
+                Message=message
             )
         except Exception as e:
             print(f"Failed to send integrity violation alert: {str(e)}")
@@ -118,71 +142,196 @@ def load_csv_content():
     raise ValueError("No CSV source configured. Set AUTHORIZED_ROLES_CSV or CSV_S3_BUCKET.")
 
 
+# CSV schema constants
+_REQUIRED_CSV_COLUMNS = {'ARN', 'Access', 'Resources'}
+_OPTIONAL_CSV_COLUMNS = {'Role'}
+_VALID_ACCESS_LEVELS = {'Full', 'ReadOnly', 'ReadWrite'}
+
+# EMF metric publication constants
+EMF_NAMESPACE = 'CustomSecurity/AccessValidator'
+EMF_DIMENSIONS = [["ResourceType", "Operation"]]
+EMF_METRIC_UNIT = 'Count'
+
+
 class AuthorizedRolesRegistry:
-    """Parse and manage authorized roles from CSV"""
+    """Parse and manage authorized roles from CSV.
+    
+    Expected CSV format (semicolon-delimited):
+        ARN;Access;Resources
+        or
+        Role;ARN;Access;Resources
+    
+    Required columns: ARN, Access, Resources
+    Optional columns: Role (ignored if present)
+    Access must be one of: Full, ReadOnly, ReadWrite
+    """
     
     def __init__(self, csv_content):
         self.roles = []
         self.parse_csv(csv_content)
     
     def parse_csv(self, csv_content):
-        """Parse CSV content into structured role data"""
+        """Parse and strictly validate CSV content into structured role data.
+        
+        Raises ValueError if:
+        - Missing any of the required columns: ARN, Access, Resources
+        - Contains columns other than required + optional ones
+        - Any row contains an access level not in {Full, ReadOnly, ReadWrite}
+        """
         reader = csv.DictReader(StringIO(csv_content), delimiter=';')
         
-        for row in reader:
+        # Validate CSV structure
+        if not reader.fieldnames:
+            raise ValueError("CSV is empty or has no headers")
+        
+        actual_columns = {col.strip() for col in reader.fieldnames}
+        
+        # Check required columns
+        missing = _REQUIRED_CSV_COLUMNS - actual_columns
+        if missing:
+            raise ValueError(
+                f"CSV missing required columns: {sorted(missing)}. "
+                f"Required: {sorted(_REQUIRED_CSV_COLUMNS)}"
+            )
+        
+        # Check for unexpected columns
+        allowed = _REQUIRED_CSV_COLUMNS | _OPTIONAL_CSV_COLUMNS
+        extra = actual_columns - allowed
+        if extra:
+            raise ValueError(
+                f"CSV contains unexpected columns: {sorted(extra)}. "
+                f"Allowed: {sorted(allowed)}"
+            )
+        
+        for row_num, row in enumerate(reader, start=2):
+            arn       = row['ARN'].strip()
+            access    = row['Access'].strip()
+            resources = row['Resources'].strip()
+            
+            if access not in _VALID_ACCESS_LEVELS:
+                raise ValueError(
+                    f"Invalid access level '{access}' on CSV row {row_num} for ARN '{arn}'. "
+                    f"Allowed values: {sorted(_VALID_ACCESS_LEVELS)}"
+                )
+            
             self.roles.append({
-                'account': row['Account'].strip(),
-                'role_name': row['Role'].strip(),
-                'arn': row['ARN'].strip(),
-                'access': row['Access'].strip(),
-                'resources': row['Resources'].strip()
+                'arn':       arn,
+                'access':    access,
+                'resources': resources
             })
         
         print(f"Loaded {len(self.roles)} authorized roles from CSV")
     
     def is_authorized(self, principal_arn, resource_type, operation, account_id):
         """
-        Check if a principal ARN is authorized for the operation
+        Check if a principal ARN is authorized for the operation.
+        
+        For assumed-role principals, extracts the role name and account from the ARN
+        and matches against CSV entries by role name + account, not by full ARN substring.
         """
         # CRITICAL SECURITY CHECK: Validate account ID first
         if ALLOWED_ACCOUNT_IDS and account_id not in ALLOWED_ACCOUNT_IDS:
-            return False, None, f"Account ID {account_id} not in allowed accounts list. This prevents role name spoofing from unauthorized accounts."
+            return False, None, (
+                f"Account ID {account_id} not in allowed accounts list. "
+                "This prevents role ARN spoofing from unauthorized accounts."
+            )
         
-        # Extract role name from ARN
-        if ':assumed-role/' in principal_arn:
-            role_part = principal_arn.split(':assumed-role/')[1]
-            role_name = role_part.split('/')[0]
-        elif ':role/' in principal_arn:
-            role_name = principal_arn.split(':role/')[1]
-        elif ':user/' in principal_arn:
-            role_name = principal_arn.split(':user/')[1]
-        else:
+        # Extract principal's role name and account from CloudTrail ARN
+        principal_role_name, principal_account = self._extract_role_info(principal_arn)
+        
+        if not principal_role_name:
             return False, None, f"Unable to parse principal ARN: {principal_arn}"
         
-        # Check against authorized roles
+        # Check against authorized roles by role name + account
         for role in self.roles:
-            if role_name in role['arn'] or role['role_name'] == role_name:
-                resource_match = False
-                if resource_type == 'dynamodb' and 'DynamoDB' in role['resources']:
+            csv_role_name, csv_account = self._extract_role_info(role['arn'])
+            
+            # Match both role name and account ID
+            if principal_role_name != csv_role_name or principal_account != csv_account:
+                continue
+            
+            resource_match = False
+            role_resources = role['resources']
+            role_resources_lower = role_resources.lower()
+            if resource_type == 'dynamodb':
+                # Support both legacy labels ("DynamoDB") and ARN-based values
+                if (
+                    'dynamodb' in role_resources_lower or
+                    resource_type in role_resources_lower
+                ):
                     resource_match = True
-                elif resource_type == 's3' and 'S3 bucket' in role['resources']:
+            elif resource_type == 's3':
+                # Support both legacy labels ("S3 bucket") and ARN-based values
+                if (
+                    's3 bucket' in role_resources_lower or
+                    'arn:aws:s3:::' in role_resources_lower or
+                    resource_type in role_resources_lower
+                ):
                     resource_match = True
-                
-                if not resource_match:
-                    continue
-                
-                access_level = role['access']
-                operation_allowed = self._check_operation_permission(operation, access_level, resource_type)
-                
-                if operation_allowed:
-                    return True, role, f"Authorized: {role['role_name']} with {access_level} access"
-                else:
-                    return False, role, f"Insufficient permissions: {role['role_name']} has {access_level} but operation requires more"
+            
+            if not resource_match:
+                continue
+            
+            access_level = role['access']
+            operation_allowed = self._check_operation_permission(operation, access_level, resource_type)
+            
+            if operation_allowed:
+                return True, role, f"Authorized: {csv_role_name} with {access_level} access"
+            else:
+                return False, role, (
+                    f"Insufficient permissions: {csv_role_name} has {access_level} "
+                    "but operation requires more"
+                )
         
-        return False, None, f"Role not found in authorized list: {role_name}"
+        return False, None, (
+            f"Role {principal_role_name} (account: {principal_account}) not found "
+            "in authorized list"
+        )
+    
+    @staticmethod
+    def _extract_role_info(arn):
+        """
+        Extract role name and account ID from an IAM ARN.
+        
+        Handles:
+        - arn:aws:iam::123456789:role/MyRole → ('MyRole', '123456789')
+        - arn:aws:iam::123456789:role/path/To/MyRole → ('MyRole', '123456789')
+        - arn:aws:iam::123456789:assumed-role/MyRole/session → ('MyRole', '123456789')
+        - arn:aws:iam::123456789:user/MyUser → ('MyUser', '123456789')
+        
+        Returns: (role_name, account_id) or (None, None) if unable to parse
+        """
+        parts = arn.split(":")
+        if len(parts) < 6:
+            return None, None
+        
+        account_id = parts[4]
+        resource_part = ":".join(parts[5:])
+        
+        # Extract role name from various ARN formats
+        role_name = None
+        if resource_part.startswith("role/"):
+            # role/MyRole or role/path/To/MyRole -> take last segment as role name
+            role_name = resource_part[len("role/"):].split("/")[-1]
+        elif resource_part.startswith("assumed-role/"):
+            # assumed-role/MyRole/session-name
+            assumed_parts = resource_part.split("/")
+            if len(assumed_parts) >= 2:
+                role_name = assumed_parts[1]
+        elif resource_part.startswith("user/"):
+            # user/MyUser
+            role_name = resource_part[len("user/"):].split("/")[-1]
+        
+        return role_name, account_id
     
     def _check_operation_permission(self, operation, access_level, resource_type):
-        """Check if an operation is allowed for the given access level"""
+        """Check if an operation is allowed for the given access level.
+        
+        Supported access levels:
+          Full      – all operations
+          ReadOnly  – read operations only
+          ReadWrite – read and write operations
+        """
         read_ops = {
             'dynamodb': ['GetItem', 'BatchGetItem', 'Query', 'Scan'],
             's3': ['GetObject', 'ListBucket', 'HeadObject']
@@ -191,27 +340,17 @@ class AuthorizedRolesRegistry:
             'dynamodb': ['PutItem', 'UpdateItem', 'BatchWriteItem'],
             's3': ['PutObject', 'CopyObject']
         }
-        delete_ops = {
-            'dynamodb': ['DeleteItem'],
-            's3': ['DeleteObject', 'DeleteObjects']
-        }
-        restore_ops = {
-            's3': ['RestoreObject']
-        }
         
-        if access_level in ['Full', 'FullAdmin', 'MasterAdmin']:
+        if access_level == 'Full':
             return True
-        if 'ReadOnly' in access_level:
+        if access_level == 'ReadOnly':
             return operation in read_ops.get(resource_type, [])
-        if 'Read/Write' in access_level:
-            return operation in read_ops.get(resource_type, []) or operation in write_ops.get(resource_type, [])
-        if 'Read/Write/Delete' in access_level:
-            return (operation in read_ops.get(resource_type, []) or 
-                    operation in write_ops.get(resource_type, []) or 
-                    operation in delete_ops.get(resource_type, []))
-        if 'ReadOnly/Restore' in access_level:
-            return (operation in read_ops.get(resource_type, []) or 
-                    operation in restore_ops.get(resource_type, []))
+        if access_level == 'ReadWrite':
+            return (
+                operation in read_ops.get(resource_type, []) or
+                operation in write_ops.get(resource_type, [])
+            )
+        # Should never reach here after CSV validation, but be safe
         return False
 
 
@@ -277,15 +416,15 @@ def lambda_handler(event, context):
                 account_id
             )
             
-            publish_metric('AccessAttempts', 1, resource_type, event_name)
+            publish_emf_metric('AccessAttempts', 1, resource_type, event_name)
             
             if is_authorized:
                 print(f"AUTHORIZED: {reason}")
-                publish_metric('AuthorizedAccess', 1, resource_type, event_name)
+                publish_emf_metric('AuthorizedAccess', 1, resource_type, event_name)
                 log_access(detail, 'AUTHORIZED', matched_role, reason)
             else:
                 print(f"UNAUTHORIZED: {reason}")
-                publish_metric('UnauthorizedAccess', 1, resource_type, event_name)
+                publish_emf_metric('UnauthorizedAccess', 1, resource_type, event_name)
                 send_unauthorized_access_alert(detail, reason, matched_role)
                 log_access(detail, 'UNAUTHORIZED', matched_role, reason)
         
@@ -294,7 +433,7 @@ def lambda_handler(event, context):
             import traceback
             traceback.print_exc()
             
-            publish_metric('ValidationErrors', 1, 'unknown', 'error')
+            publish_emf_metric('ValidationErrors', 1, 'unknown', 'error')
             
             failed_items.append({
                 'itemIdentifier': record['messageId']
@@ -305,39 +444,37 @@ def lambda_handler(event, context):
     }
 
 
-def publish_metric(metric_name, value, resource_type, operation):
+def publish_emf_metric(metric_name, value, resource_type, operation):
     """
-    Publish custom CloudWatch metric using Embedded Metric Format (EMF).
-    This avoids direct CloudWatch API calls, preventing throttling and reducing costs.
+    Publish a custom CloudWatch metric using Embedded Metric Format (EMF).
+
+    EMF metrics are emitted by printing a JSON payload to stdout.
+    The top-level metric key must exactly match the metric Name definition.
     """
     try:
-        # EMF requires timestamp in milliseconds
-        timestamp = int(datetime.utcnow().timestamp() * 1000)
+        timestamp_ms = int(datetime.utcnow().timestamp() * 1000)
+
+        emf_metric_definition = {
+            "Name": metric_name,
+            "Unit": EMF_METRIC_UNIT
+        }
         
-        # Construct the EMF JSON payload
         emf_payload = {
             "_aws": {
-                "Timestamp": timestamp,
+                "Timestamp": timestamp_ms,
                 "CloudWatchMetrics": [
                     {
-                        "Namespace": "CustomSecurity",
-                        "Dimensions": [["Environment", "ResourceType", "Operation"]],
-                        "Metrics": [
-                            {
-                                "Name": metric_name,
-                                "Unit": "Count"
-                            }
-                        ]
+                        "Namespace": EMF_NAMESPACE,
+                        "Dimensions": EMF_DIMENSIONS,
+                        "Metrics": [emf_metric_definition]
                     }
                 ]
             },
-            "Environment": ENVIRONMENT,
             "ResourceType": resource_type,
             "Operation": operation,
-            metric_name: value  # The actual metric value must be a top-level property matching the Name
+            metric_name: value
         }
         
-        # Printing to stdout automatically registers the metric in CloudWatch via the logs agent
         print(json.dumps(emf_payload))
         
     except Exception as e:
@@ -353,7 +490,7 @@ def log_access(detail, status, matched_role, reason):
         'operation': detail.get('eventName'),
         'resource': detail.get('requestParameters', {}),
         'source_ip': detail.get('sourceIPAddress'),
-        'matched_role': matched_role['role_name'] if matched_role else None,
+        'matched_role_arn': matched_role['arn'] if matched_role else None,
         'reason': reason
     }
     print(f"ACCESS_LOG: {json.dumps(log_entry)}")
@@ -365,11 +502,12 @@ def send_unauthorized_access_alert(detail, reason, matched_role):
         user_identity = detail.get('userIdentity', {})
         request_params = detail.get('requestParameters', {})
         event_name = detail.get('eventName')
+        event_source = detail.get('eventSource')
         
         object_info = []
-        if 'key' in request_params:
+        if event_source == 's3.amazonaws.com' and isinstance(request_params.get('key'), str):
             object_info.append(f"s3://{request_params.get('bucketName')}/{request_params['key']}")
-        elif 'delete' in request_params and isinstance(request_params['delete'], dict):
+        elif event_source == 's3.amazonaws.com' and 'delete' in request_params and isinstance(request_params['delete'], dict):
             objects = request_params['delete'].get('object', [])
             if isinstance(objects, list):
                 for obj in objects[:10]:
@@ -378,83 +516,44 @@ def send_unauthorized_access_alert(detail, reason, matched_role):
                 if len(objects) > 10:
                     object_info.append(f"... and {len(objects) - 10} more objects")
         
-        message_lines = [
-            "=" * 70,
-            "⚠️  SECURITY ALERT: UNAUTHORIZED ACCESS DETECTED",
-            "=" * 70,
-            "",
-            f"Environment: {ENVIRONMENT}",
-            f"Time: {detail.get('eventTime')}",
-            f"Event ID: {detail.get('eventID')}",
-            "",
-            "PRINCIPAL INFORMATION:",
-            "-" * 70,
-            f"  Type: {user_identity.get('type')}",
-            f"  ARN: {user_identity.get('arn')}",
-            f"  Principal ID: {user_identity.get('principalId')}",
-            f"  Account ID: {user_identity.get('accountId')}",
-            f"  Source IP: {detail.get('sourceIPAddress')}",
-            f"  User Agent: {detail.get('userAgent')}",
-            "",
-            "ACCESS ATTEMPT:",
-            "-" * 70,
-            f"  Operation: {event_name}",
-            f"  Event Source: {detail.get('eventSource')}",
-            # Modified to show dynamic table name or bucket name safely
-            f"  Resource: {request_params.get('tableName', request_params.get('bucketName', 'Unknown'))}",
-        ]
-        
-        if object_info:
-            message_lines.append("  Objects:")
-            for obj in object_info:
-                message_lines.append(f"    - {obj}")
-        else:
-            message_lines.append(f"  Request Details: {json.dumps(request_params, indent=4)}")
-        
-        message_lines.extend([
-            "",
-            "MONITORING RESULT:",
-            "-" * 70,
-            f"  Status: UNAUTHORIZED (Not in authorized roles list)",
-            f"  Reason: {reason}",
-            f"  Note: This is a MONITORING alert - the operation was NOT blocked",
-        ])
-        
-        if matched_role:
-            message_lines.extend([
-                f"  Matched Role: {matched_role['role_name']}",
-                f"  Allowed Access: {matched_role['access']}",
-                f"  Allowed Resources: {matched_role['resources']}"
-            ])
-        
-        message_lines.extend([
-            "",
-            "=" * 70,
-            "RECOMMENDED ACTIONS:",
-            "=" * 70,
-            "1. Review if this access should be authorized",
-            "2. If legitimate, add the role to authorized-roles.csv",
-            "3. If suspicious, investigate the principal and source IP",
-            "4. Review CloudTrail logs for full event details",
-            "5. Check if credentials may be compromised",
-            "",
-            "IMPORTANT: This is a detective control (monitoring only).",
-            "The operation was NOT prevented. To block unauthorized access,",
-            "implement preventive controls (IAM policies, SCPs, bucket policies).",
-            "",
-            f"CloudTrail Event ID: {detail.get('eventID')}",
-            f"AWS Region: {detail.get('awsRegion')}",
-            "",
-            "CloudWatch Logs:",
-            f"  /aws/lambda/{os.environ.get('AWS_LAMBDA_FUNCTION_NAME', 'unknown')}",
-            ""
-        ])
-        
-        message = "\n".join(message_lines)
+        resource_name = request_params.get('tableName', request_params.get('bucketName', 'Unknown'))
+        resource = ", ".join(object_info) if object_info else resource_name
+
+        message = build_alert_body(
+            alert_type='Unauthorized Access',
+            severity='CRITICAL',
+            detected_at=detail.get('eventTime'),
+            resource=resource,
+            operation=event_name,
+            summary='Access attempt not present in the authorized roles list or not allowed for the requested operation.',
+            details={
+                'Event ID': detail.get('eventID'),
+                'Event Source': detail.get('eventSource'),
+                'Principal Type': user_identity.get('type'),
+                'Principal ARN': user_identity.get('arn'),
+                'Principal ID': user_identity.get('principalId'),
+                'Account ID': user_identity.get('accountId'),
+                'Source IP': detail.get('sourceIPAddress'),
+                'User Agent': detail.get('userAgent'),
+                'Objects': '; '.join(object_info) if object_info else None,
+                'Request Details': json.dumps(request_params, indent=2) if not object_info else None,
+                'Reason': reason,
+                'Matched Role ARN': matched_role['arn'] if matched_role else None,
+                'Allowed Access': matched_role['access'] if matched_role else None,
+                'Allowed Resources': matched_role['resources'] if matched_role else None,
+                'AWS Region': detail.get('awsRegion'),
+                'CloudWatch Logs': f"/aws/lambda/{os.environ.get('AWS_LAMBDA_FUNCTION_NAME', 'unknown')}",
+                'Action Required': (
+                    'Review if this access should be authorized; if legitimate add the role to authorized-roles.csv; '
+                    'if suspicious investigate the principal and source IP; review CloudTrail logs; check credential compromise.'
+                ),
+                'Note': 'This is a detective control. The operation was not blocked.',
+            }
+        )
         
         response = sns.publish(
             TopicArn=SNS_TOPIC_ARN,
-            Subject=f'CRITICAL: Unauthorized Access Detected - {ENVIRONMENT}',
+            Subject=build_alert_subject('CRITICAL', 'Unauthorized Access'),
             Message=message
         )
         

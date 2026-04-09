@@ -40,7 +40,33 @@ if not isinstance(TABLE_CONFIG, dict):
 print(f"Initialization complete. TABLE_CONFIG loaded: {TABLE_CONFIG}")
 
 # CloudWatch EMF namespace
-METRIC_NAMESPACE = 'CustomDynamoDB'
+METRIC_NAMESPACE = 'CustomSecurity/DynamoDB'
+
+
+def build_alert_subject(severity, alert_type):
+    return f"[{ENVIRONMENT}] {severity}: {alert_type}"
+
+
+def build_alert_body(alert_type, severity, detected_at, resource, operation, summary, details=None):
+    lines = [
+        f"Alert Type: {alert_type}",
+        f"Severity: {severity}",
+        f"Environment: {ENVIRONMENT}",
+        f"Detected At: {detected_at or datetime.utcnow().isoformat()}",
+        f"Resource: {resource or 'Unknown'}",
+        f"Operation/Event: {operation or 'Unknown'}",
+        f"Summary: {summary}",
+    ]
+
+    if details:
+        lines.append("")
+        lines.append("Details:")
+        for key, value in details.items():
+            if value is None or value == "":
+                continue
+            lines.append(f"{key}: {value}")
+
+    return "\n".join(lines)
 
 TABLE_POLICIES = {
     "no-delete": {"INSERT", "MODIFY"},
@@ -187,26 +213,31 @@ def send_alert(violations):
         group_key = f"{v['Table']} ({v['EventType']})"
         summary[group_key] += 1
 
-    message_lines = [
-        "CRITICAL ALERT: Table Policy Violations Detected",
-        f"Total Violations in this batch: {len(violations)}",
-        f"Time: {datetime.utcnow().isoformat()}",
-        "=" * 60,
-        "Violation Summary:"
-    ]
+    unique_tables = sorted({v['Table'] for v in violations})
+    unique_events = sorted({v['EventType'] for v in violations})
+    summary_lines = []
 
     for key, count in summary.items():
-        message_lines.append(f"  - {key}: {count} violation(s)")
+        summary_lines.append(f"- {key}: {count} violation(s)")
 
-    message_lines.extend([
-        "-" * 60,
-        "Action Required: Please check CloudWatch logs for the 'VIOLATION DETAIL PAYLOAD' to see the exact keys and data modified."
-    ])
-
-    message = "\n".join(message_lines)
+    message = build_alert_body(
+        alert_type="DynamoDB Table Policy Violation",
+        severity="CRITICAL",
+        detected_at=datetime.utcnow().isoformat(),
+        resource=", ".join(unique_tables),
+        operation=", ".join(unique_events),
+        summary=f"Detected {len(violations)} policy violation(s) in the current batch.",
+        details={
+            "Violation Count": len(violations),
+            "Tables": ", ".join(unique_tables),
+            "Event Types": ", ".join(unique_events),
+            "Batch Summary": "\n".join(summary_lines),
+            "Action Required": "Check CloudWatch logs for 'VIOLATION DETAIL PAYLOAD' to inspect exact keys and modified data.",
+        }
+    )
 
     sns.publish(
         TopicArn=SNS_TOPIC_ARN,
-        Subject=f"CRITICAL: {len(violations)} Table Policy Violations in {ENVIRONMENT}",
+        Subject=build_alert_subject("CRITICAL", "DynamoDB Table Policy Violation"),
         Message=message
     )

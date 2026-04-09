@@ -21,6 +21,32 @@ ALERT_THRESHOLD = int(os.environ.get("ALERT_THRESHOLD", "5"))
 access_tracker = defaultdict(lambda: {"count": 0, "ips": set(), "first_seen": None})
 
 
+def build_alert_subject(severity, alert_type):
+    return f"[{ENVIRONMENT}] {severity}: {alert_type}"
+
+
+def build_alert_body(alert_type, severity, detected_at, resource, operation, summary, details=None):
+    lines = [
+        f"Alert Type: {alert_type}",
+        f"Severity: {severity}",
+        f"Environment: {ENVIRONMENT}",
+        f"Detected At: {detected_at or datetime.utcnow().isoformat()}",
+        f"Resource: {resource or 'Unknown'}",
+        f"Operation/Event: {operation or 'Unknown'}",
+        f"Summary: {summary}",
+    ]
+
+    if details:
+        lines.append("")
+        lines.append("Details:")
+        for key, value in details.items():
+            if value is None or value == "":
+                continue
+            lines.append(f"{key}: {value}")
+
+    return "\n".join(lines)
+
+
 def lambda_handler(event, context):
     print(f"Received event: {json.dumps(event)}")
 
@@ -65,7 +91,12 @@ def lambda_handler(event, context):
 
         # Suspicious checks
         if is_suspicious_access(log_entry):
-            send_alert(log_entry, "Suspicious access pattern detected")
+            send_alert(
+                log_entry,
+                "Suspicious access pattern detected",
+                alert_type="S3 Suspicious Access",
+                severity="WARNING",
+            )
 
         return {"statusCode": 200, "body": "EMF metrics emitted"}
 
@@ -113,7 +144,12 @@ def handle_failed_access(log_entry):
     print(f"ACCESS_DENIED from {source_ip} - {error_code}")
 
     if access_tracker[key]["count"] >= ALERT_THRESHOLD:
-        send_alert(log_entry, f"Multiple failed access attempts from {source_ip}")
+        send_alert(
+            log_entry,
+            f"Multiple failed access attempts from {source_ip}",
+            alert_type="S3 Failed Access Attempts",
+            severity="CRITICAL",
+        )
 
 
 def is_suspicious_access(log_entry):
@@ -160,7 +196,7 @@ def publish_emf_metrics(log_entry):
                 "Timestamp": timestamp_ms,
                 "CloudWatchMetrics": [
                     {
-                        "Namespace": "S3URLMonitoring",
+                        "Namespace": "CustomSecurity/URLAccessAnalyzer",
                         "Dimensions": [base_dimensions],
                         "Metrics": [
                             {"Name": metric_name, "Unit": "Count"}
@@ -179,24 +215,34 @@ def publish_emf_metrics(log_entry):
 # SNS ALERT
 # --------------------------------------------------------------------------
 
-def send_alert(log_entry, message):
+def send_alert(log_entry, message, alert_type, severity):
     if not SNS_TOPIC_ARN:
         return
 
-    body = f"""
-S3 Presigned URL Access Alert
+    resource = log_entry.get("bucket") or "Unknown"
+    if log_entry.get("object_key"):
+        resource = f"s3://{log_entry.get('bucket')}/{log_entry.get('object_key')}"
 
-Message: {message}
-Object: {log_entry.get("object_key")}
-IP: {log_entry.get("source_ip")}
-Error: {log_entry.get("error_code")}
-
-Environment: {ENVIRONMENT}
-"""
+    body = build_alert_body(
+        alert_type=alert_type,
+        severity=severity,
+        detected_at=log_entry.get("timestamp"),
+        resource=resource,
+        operation=log_entry.get("event_name"),
+        summary=message,
+        details={
+            "Bucket": log_entry.get("bucket"),
+            "Object Key": log_entry.get("object_key"),
+            "Source IP": log_entry.get("source_ip"),
+            "User Agent": log_entry.get("user_agent"),
+            "Error Code": log_entry.get("error_code"),
+            "Presigned URL": log_entry.get("is_presigned"),
+        },
+    )
 
     sns.publish(
         TopicArn=SNS_TOPIC_ARN,
-        Subject=f"[{ENVIRONMENT}] S3 URL Access Alert",
+        Subject=build_alert_subject(severity, alert_type),
         Message=body,
     )
 
