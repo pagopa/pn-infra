@@ -41,8 +41,8 @@ Parameters:
     Description: "The Url of web API: useful for content-security-policy"
     Type: String
 
-  CognitoAuthDomain:
-    Description: "The Url of Cognito Auth: useful for content-security-policy"
+  EnvironmentType:
+    Description: "Environment type (dev, uat, prod, hotfix)"
     Type: String
 
   BoWebApiUrl:
@@ -305,7 +305,7 @@ Resources:
                   - "frame-src 'self' data:;"
                   - !Sub " connect-src 'self' \
                     https://cognito-idp.eu-south-1.amazonaws.com/ \
-                    https://${CognitoAuthDomain}/ \
+                    https://pn-helpdesk-${EnvironmentType}.auth.eu-south-1.amazoncognito.com/ \
                     ${WebApiUrl} \
                     ${BoWebApiUrl}; \
                     style-src 'self' 'unsafe-inline' ; \
