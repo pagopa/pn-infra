@@ -81,6 +81,16 @@ Parameters:
     Default: ''
     Description: Alarm SNS Topic ARN
 
+  BlockRateThresholdPercent:
+    Type: Number
+    Default: 15
+    Description: Percentage threshold over total requests that triggers the generic block rate alarm
+
+  OncallBlockRateThresholdPercent:
+    Type: String
+    Default: ''
+    Description: If set, creates the oncall generic block rate alarm using this percentage threshold over total requests
+
   EnhancedWebSecurityEnabled:
     Type: String
     Default: false
@@ -112,6 +122,8 @@ Conditions:
   HasAllowedCidrs: !Not [!Equals [!Ref AllowedCidrs, '']]
 
   HasAlarmTopic: !Not [!Equals [!Ref AlarmSNSTopicArn, '']]
+
+  RequiresOncallBlockRateAlarm: !And [ !Condition HasAlarmTopic, !Not [!Equals [!Ref OncallBlockRateThresholdPercent, '']] ]
 
   RequirestLimitAlarm: !And [ !Condition HasAlarmTopic, !Condition AddRateRuleCondition ]
 
@@ -945,6 +957,48 @@ Resources:
       OKActions:
         - !Ref AlarmSNSTopicArn
 
+  GenericBlockRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmTopic
+    Properties:
+      AlarmName: !Sub '${WAFName}-GenericBlockedRequestsAlarm'
+      AlarmDescription: "CloudWatch alarm for when the percentage of blocked requests exceeds the configured threshold"
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: "WebACL"
+                  Value: !Ref WAFName
+              MetricName: "BlockedRequests"
+              Namespace: "AWS/WAFV2"
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m2
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: "WebACL"
+                  Value: !Ref WAFName
+              MetricName: AllowedRequests
+              Namespace: "AWS/WAFV2"
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: e1
+          Expression: !Sub 'IF(m1+m2>0 AND m1/(m1+m2)>=${BlockRateThresholdPercent}/100, 1, 0)'
+          Label: !Sub '${WAFName}-GenericBlockedRequestsAlarm-Metric'
+      TreatMissingData: "notBreaching"
+      Threshold: 1
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      EvaluationPeriods: 20
+      DatapointsToAlarm: 15
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+
   OncallWebLimitBlockRequestAlarm:
     Type: AWS::CloudWatch::Alarm
     Condition: RequirestLimitAlarm
@@ -984,6 +1038,48 @@ Resources:
       TreatMissingData: "notBreaching"
       Threshold: 1
       ComparisonOperator: "GreaterThanOrEqualToThreshold" 
+      EvaluationPeriods: 20
+      DatapointsToAlarm: 15
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn        
+
+  OncallGenericBlockRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: RequiresOncallBlockRateAlarm
+    Properties:
+      AlarmName: !Sub 'oncall-${WAFName}-GenericBlockedRequestsAlarm'
+      AlarmDescription: "CloudWatch oncall alarm for when the percentage of blocked requests exceeds the configured threshold"
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: "WebACL"
+                  Value: !Ref WAFName
+              MetricName: "BlockedRequests"
+              Namespace: "AWS/WAFV2"
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: m2
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: "WebACL"
+                  Value: !Ref WAFName
+              MetricName: AllowedRequests
+              Namespace: "AWS/WAFV2"
+            Period: 60
+            Stat: Sum
+          ReturnData: False
+        - Id: e1
+          Expression: !Sub 'IF(m1+m2>0 AND m1/(m1+m2)>=${OncallBlockRateThresholdPercent}/100, 1, 0)'
+          Label: !Sub 'oncall-${WAFName}-GenericBlockedRequestsAlarm-Metric'
+      TreatMissingData: "notBreaching"
+      Threshold: 1
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
       EvaluationPeriods: 20
       DatapointsToAlarm: 15
       AlarmActions:
