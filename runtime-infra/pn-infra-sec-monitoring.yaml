@@ -134,24 +134,6 @@ Parameters:
     Default: 'true'
     Description: 'Whether to deploy the access validator Lambda function and related resources'
 
-  PnInfraSecAccessValidatorEnabled:
-    Type: String
-    AllowedValues: ['true', 'false']
-    Default: 'true'
-    Description: 'Whether to enable access validation for critical resources (DynamoDB tables, S3 prefixes)'
-
-
-  PnInfraSecMonitoringDynamoAlertEnabled:
-    Type: String
-    AllowedValues: ['true', 'false']
-    Default: 'true'
-    Description: 'Whether to enable DynamoDB alert monitoring'
-
-  PnInfraInfraSecMonitoringUrlAccessAnalyzerAlert:
-    Type: String
-    AllowedValues: ['true', 'false']
-    Default: 'true'
-    Description: 'Whether to enable URL access analyzer alert'
 
 Conditions:
   HasCloudTrailLogsEnabled: !Equals [!Ref EnableCloudTrailLogs, 'true']
@@ -164,9 +146,6 @@ Conditions:
   HasS3CriticalPrefixMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalS3Prefixes], "" ] ]
   HasDynamoDBCriticalTableMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalDynamoDBTables], "" ] ]
   HasCloudtrailEventDataStoreEnabledAndIsConfinfoAccount: !And [ !Equals [!Ref CloudtrailEventDataStoreEnabled, 'true'], !Condition IsConfinfoAccount ]
-  HasPnInfraSecAccessValidatorEnabled: !Equals [!Ref PnInfraSecAccessValidatorEnabled, 'true']
-  HasPnInfraSecMonitoringDynamoAlertEnabled: !Equals [!Ref PnInfraSecMonitoringDynamoAlertEnabled, 'true']
-  HasPnInfraInfraSecMonitoringUrlAccessAnalyzerAlert: !Equals [!Ref PnInfraInfraSecMonitoringUrlAccessAnalyzerAlert, 'true']
 
 Resources:
 
@@ -221,7 +200,6 @@ Resources:
 
   InfraSecMonitoringDynamoAlertLambda:
     Type: AWS::Lambda::Function
-    Condition: HasPnInfraSecMonitoringDynamoAlertEnabled
     Properties:
       FunctionName: !Sub "${ProjectName}-infra-sec-monitoring-dynamo-alert"
       Description: "Validates CDC events against Dynamo table policies and emits violations"
@@ -241,7 +219,6 @@ Resources:
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
 
   InfraSecMonitoringDynamoAlertLambdaEventSourceMapping:
-    Condition: HasPnInfraSecMonitoringDynamoAlertEnabled
     Type: AWS::Lambda::EventSourceMapping
     Properties:
       BatchSize: 100
@@ -526,8 +503,6 @@ Resources:
           requestParameters:
             bucketName:
               - !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
-            key:
-              - anything-but: "favicon.ico"
       Targets:
         - Arn: !GetAtt InfraSecMonitoringUrlAccessAnalyzerAlertLambda.Arn
           Id: "SendToLambda"
@@ -552,7 +527,6 @@ Resources:
       
   InfraSecMonitoringUrlAccessAnalyzerAlertLambda:
     Type: AWS::Lambda::Function
-    Condition: HasPnInfraInfraSecMonitoringUrlAccessAnalyzerAlert
     Properties:
       FunctionName: !Sub "${ProjectName}-infra-sec-url-access-analyzer-alert"
       Description: "Analyzes S3 access events to detect potential unauthorized access patterns (e.g., presigned URL abuse, access denied events)"
@@ -607,7 +581,6 @@ Resources:
   #===========================================================================
   PnInfraSecDynamoDbAccessMonitorRule:
     Type: AWS::Events::Rule
-    Condition: HasPnInfraSecAccessValidatorEnabled
     Properties:
       Name: "pn-infra-sec-dynamodb-access-monitoring"
       Description: "Monitor all DynamoDB access to Critical DynamoDB tables (CloudTrail filters to data events only)"
@@ -639,7 +612,6 @@ Resources:
   #===========================================================================
   PnInfraSecS3AccessMonitorRule:
     Type: AWS::Events::Rule
-    Condition: HasPnInfraSecAccessValidatorEnabled
     Properties:
       Name: "pn-infra-sec-s3-access-monitoring"
       Description: "Monitor S3 access to safestorage bucket (CloudTrail filters to critical prefix only)"
@@ -760,7 +732,6 @@ Resources:
 
   InfraSecAccessValidatorFunction:
     Type: AWS::Lambda::Function
-    Condition: HasPnInfraSecAccessValidatorEnabled
     DependsOn: AccessValidatorLogGroup
     Properties:
       FunctionName: !Sub "${ProjectName}-infra-sec-access-validator-alert"
@@ -787,7 +758,6 @@ Resources:
           ALLOWED_ACCOUNT_IDS: !Join [",", !Ref AllowedAccountIds]
 
   SecurityEventsEventSourceMapping:
-    Condition: HasPnInfraSecAccessValidatorEnabled
     Type: AWS::Lambda::EventSourceMapping
     Properties:
       EventSourceArn: !GetAtt SecurityEventsQueue.Outputs.QueueARN
