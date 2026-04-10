@@ -520,6 +520,12 @@ Resources:
       Principal: "events.amazonaws.com"
       SourceArn: !GetAtt S3AccessDeniedRule.Arn
 
+  InfraSecMonitoringUrlAccessAnalyzerAlertLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ProjectName}-infra-sec-url-access-analyzer-alert"
+      RetentionInDays: !Ref LogRetentionDays
+      
   InfraSecMonitoringUrlAccessAnalyzerAlertLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -765,6 +771,7 @@ Resources:
         MaximumConcurrency: !Ref LambdaReservedConcurrency
       FunctionResponseTypes:
         - ReportBatchItemFailures
+
 Outputs:
   Version:
     Value: !Ref Version

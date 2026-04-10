@@ -284,11 +284,13 @@ class AuthorizedRolesRegistry:
                 )
         
         return False, None, (
-            f"Role {principal_role_name} (account: {principal_account}) not found "
-            "in authorized list"
+            f"Role not found "
+            "in authorized list {principal_role_name} (account: {principal_account}) "
         )
     
     @staticmethod
+
+    
     def _extract_role_info(arn):
         """
         Extract role name and account ID from an IAM ARN.
@@ -407,8 +409,6 @@ def lambda_handler(event, context):
                 if object_key and not object_key.startswith(f"{S3_CRITICAL_PREFIX}/"):
                     print(f"WARNING: S3 event for non-critical prefix: {object_key} (expected: {S3_CRITICAL_PREFIX}/)")
             
-            print(f"Access attempt: {principal_arn} (Account: {account_id}) -> {resource_type}:{resource_name}{f'/{object_key}' if object_key else ''} ({event_name})")
-            
             is_authorized, matched_role, reason = registry.is_authorized(
                 principal_arn, 
                 resource_type, 
@@ -423,7 +423,7 @@ def lambda_handler(event, context):
                 publish_emf_metric('AuthorizedAccess', 1, resource_type, event_name)
                 log_access(detail, 'AUTHORIZED', matched_role, reason)
             else:
-                print(f"UNAUTHORIZED: {reason}")
+                print(f"UNAUTHORIZED: {reason} | Access attempt: {principal_arn} (Account: {account_id}) -> {resource_type}:{resource_name}{f'/{object_key}' if object_key else ''} ({event_name})")
                 publish_emf_metric('UnauthorizedAccess', 1, resource_type, event_name)
                 send_unauthorized_access_alert(detail, reason, matched_role)
                 log_access(detail, 'UNAUTHORIZED', matched_role, reason)
@@ -491,7 +491,8 @@ def log_access(detail, status, matched_role, reason):
         'resource': detail.get('requestParameters', {}),
         'source_ip': detail.get('sourceIPAddress'),
         'matched_role_arn': matched_role['arn'] if matched_role else None,
-        'reason': reason
+        'reason': reason,
+        'resource_type': detail.get('eventSource')
     }
     print(f"ACCESS_LOG: {json.dumps(log_entry)}")
 
