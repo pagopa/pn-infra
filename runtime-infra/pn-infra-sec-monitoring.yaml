@@ -63,17 +63,10 @@ Parameters:
   CdcKinesisStreamKeyArn:
     Type: String
     Description: 'ARN of KMS key for decrypting CDC stream (if encrypted)'
-    
-  MonitoringCoreEventBusName:
-    Type: String
-    Default: 'pn-core-monitoring-bus'
-    Description: 'EventBridge bus name in Core account for receiving monitoring events'
 
   CriticalAlarmSNSTopicArn:
     Type: String
     Description: 'ARN of SNS topic for critical alerts'
-
-  
 
   CriticalDynamoDBTables:
     Type: CommaDelimitedList
@@ -428,6 +421,7 @@ Resources:
       Parameters:
         DynamoDBTableName: pn-ConfidentialObjects
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
+        EnableUnauthorizedRoleAttempts: false
 
   pnTimelineCriticalMonitoring:
     Condition: HasCloudTrailLogsEnabledAndIsCoreAccount
@@ -437,6 +431,7 @@ Resources:
       Parameters:
         DynamoDBTableName: pn-Timelines
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
+        EnableUnauthorizedRoleAttempts: false
 
   # ============================================================================
   # EventBridge rules for S3 access monitoring (presigned URL usage and access denied events)

@@ -40,7 +40,9 @@ if not isinstance(TABLE_CONFIG, dict):
 print(f"Initialization complete. TABLE_CONFIG loaded: {TABLE_CONFIG}")
 
 # CloudWatch EMF namespace
-METRIC_NAMESPACE = 'CustomSecurity/DynamoDB'
+EMF_NAMESPACE = 'CustomSecurity/DynamoDB'
+EMF_DIMENSIONS = [["TableName"]]
+EMF_METRIC_UNIT = 'Count'
 
 
 def build_alert_subject(severity, alert_type):
@@ -185,9 +187,9 @@ def publish_emf_metric(table_name, metric_name, value):
                 "Timestamp": int(datetime.utcnow().timestamp() * 1000),
                 "CloudWatchMetrics": [
                     {
-                        "Namespace": METRIC_NAMESPACE,
-                        "Dimensions": [["TableName"]],
-                        "Metrics": [{"Name": metric_name, "Unit": "Count"}]
+                        "Namespace": EMF_NAMESPACE,
+                        "Dimensions": EMF_DIMENSIONS,
+                        "Metrics": [{"Name": metric_name, "Unit": EMF_METRIC_UNIT}]
                     }
                 ]
             },

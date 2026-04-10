@@ -17,6 +17,10 @@ ENVIRONMENT = os.environ.get("ENVIRONMENT", "production")
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN")
 ALERT_THRESHOLD = int(os.environ.get("ALERT_THRESHOLD", "5"))
 
+EMF_NAMESPACE = "CustomSecurity/URLAccessAnalyzer"
+EMF_DIMENSIONS = [["BucketName"]]
+EMF_METRIC_UNIT = "Count"
+
 # Local tracker
 access_tracker = defaultdict(lambda: {"count": 0, "ips": set(), "first_seen": None})
 
@@ -196,10 +200,10 @@ def publish_emf_metrics(log_entry):
                 "Timestamp": timestamp_ms,
                 "CloudWatchMetrics": [
                     {
-                        "Namespace": "CustomSecurity/URLAccessAnalyzer",
-                        "Dimensions": [base_dimensions],
+                        "Namespace": EMF_NAMESPACE,
+                        "Dimensions": EMF_DIMENSIONS,
                         "Metrics": [
-                            {"Name": metric_name, "Unit": "Count"}
+                            {"Name": metric_name, "Unit": EMF_METRIC_UNIT}
                         ],
                     }
                 ],
