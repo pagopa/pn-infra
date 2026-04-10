@@ -128,12 +128,6 @@ Parameters:
     Description: 'List of allowed account IDs for cross-account access (if AlertOnCrossAccountAccess is true)'
     Default: ''
 
-  EnableAccessValidator:
-    Type: String
-    AllowedValues: ['true', 'false']
-    Default: 'true'
-    Description: 'Whether to deploy the access validator Lambda function and related resources'
-
 
 Conditions:
   HasCloudTrailLogsEnabled: !Equals [!Ref EnableCloudTrailLogs, 'true']
@@ -426,8 +420,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/tables-monitoring.yaml"
       Parameters:
         DynamoDBTableName: pn-ConfidentialObjects
-        CloudTrailLogGroupName: !Ref CloudTrailLogGroup
-        EnableUnauthorizedRoleAttempts: false
+        CloudTrailLogGroupName: !GetAtt CloudTrailLogGroup.LogGroupName
 
   pnTimelineCriticalMonitoring:
     Condition: HasCloudTrailLogsEnabledAndIsCoreAccount
@@ -436,8 +429,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/tables-monitoring.yaml"
       Parameters:
         DynamoDBTableName: pn-Timelines
-        CloudTrailLogGroupName: !Ref CloudTrailLogGroup
-        EnableUnauthorizedRoleAttempts: false
+        CloudTrailLogGroupName: !GetAtt CloudTrailLogGroup.LogGroupName
 
   # ============================================================================
   # EventBridge rules for S3 access monitoring (presigned URL usage and access denied events)
@@ -776,7 +768,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/s3-prefix-monitoring.yaml"
       Parameters:
         SNSTopicArn: !Ref CriticalAlarmSNSTopicArn
-        CloudTrailLogGroupName: !Ref CloudTrailLogGroup
+        CloudTrailLogGroupName: !GetAtt CloudTrailLogGroup.LogGroupName
         BucketName: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
         CriticalPrefix: "PN_NOTIFICATION"
 
@@ -784,3 +776,16 @@ Outputs:
   Version:
     Value: !Ref Version
     Description: 'Template version'
+  CloudTrailLogGroupName:
+    Condition: HasCloudTrailLogsEnabled
+    Value: !Ref CloudTrailLogGroup
+    Description: 'CloudTrail Log Group Name'
+  DynamoAlertLambdaFunctionName:
+    Value: !Ref InfraSecMonitoringDynamoAlertLambda
+    Description: 'DynamoDB Alert Lambda Function Name'
+  UrlAccessAnalyzerLambdaFunctionName:
+    Value: !Ref InfraSecMonitoringUrlAccessAnalyzerAlertLambda
+    Description: 'URL Access Analyzer Lambda Function Name'
+  AccessValidatorLambdaFunctionName:
+    Value: !Ref InfraSecAccessValidatorFunction
+    Description: 'Access Validator Lambda Function Name'
