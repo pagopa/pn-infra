@@ -164,8 +164,7 @@ Conditions:
   HasS3CriticalPrefixMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalS3Prefixes], "" ] ]
   HasDynamoDBCriticalTableMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalDynamoDBTables], "" ] ]
   HasCloudtrailEventDataStoreEnabledAndIsConfinfoAccount: !And [ !Equals [!Ref CloudtrailEventDataStoreEnabled, 'true'], !Condition IsConfinfoAccount ]
-  HasPnInfraSecAccessValidatorEnabled: !Equals [!Ref EnableAccessValidator, 'true']
-  HasPnInfraSecS3UrlAccessValidatorEnabled:  !Equals [!Ref EnableAccessValidator, 'true']
+  HasPnInfraSecAccessValidatorEnabled: !Equals [!Ref PnInfraSecAccessValidatorEnabled, 'true']
   HasPnInfraSecMonitoringDynamoAlertEnabled: !Equals [!Ref PnInfraSecMonitoringDynamoAlertEnabled, 'true']
   HasPnInfraInfraSecMonitoringUrlAccessAnalyzerAlert: !Equals [!Ref PnInfraInfraSecMonitoringUrlAccessAnalyzerAlert, 'true']
 
@@ -226,7 +225,7 @@ Resources:
     Properties:
       FunctionName: !Sub "${ProjectName}-infra-sec-monitoring-dynamo-alert"
       Description: "Validates CDC events against Dynamo table policies and emits violations"
-      Runtime: python3.12
+      Runtime: python3.14
       Handler: infra-sec-monitoring-dynamo-alert.lambda_handler
       Role: !GetAtt InfraSecMonitoringDynamoAlertLambdaRole.Arn
       Timeout: 60
@@ -557,7 +556,7 @@ Resources:
     Properties:
       FunctionName: !Sub "${ProjectName}-infra-sec-url-access-analyzer-alert"
       Description: "Analyzes S3 access events to detect potential unauthorized access patterns (e.g., presigned URL abuse, access denied events)"
-      Runtime: python3.12
+      Runtime: python3.14
       Handler: infra-sec-url-access-analyzer-alert.lambda_handler
       Role: !GetAtt InfraSecMonitoringUrlAccessAnalyzerAlertLambdaRole.Arn
       Timeout: 60
@@ -770,7 +769,7 @@ Resources:
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/infra-sec-access-validator-alert.zip
-      Runtime: python3.11
+      Runtime: python3.14
       Timeout: 20
       MemorySize: 256
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
