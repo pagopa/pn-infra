@@ -58,8 +58,7 @@ Parameters:
 Conditions:
 
   HasAlarmTopic: !Not [!Equals [!Ref AlarmSNSTopicArn, '']]
-  HasOncallBlockedRequestsAlarmThreshold: !Not [!Equals [!Ref OncallBlockedRequestsAlarmThresholdPercent, '']]
-  HasOncallBlockedRequestsAlarm: !And [!Condition HasAlarmTopic, !Condition HasOncallBlockedRequestsAlarmThreshold]
+  RequiresOncallBlockedRequestsAlarm: !And [!Condition HasAlarmTopic, !Not [!Equals [!Ref OncallBlockedRequestsAlarmThresholdPercent, '']]]
 
 Resources:
 
@@ -259,7 +258,7 @@ Resources:
 
   OncallApplicativeThrottlingBlockedRequestsAlarm:
     Type: AWS::CloudWatch::Alarm
-    Condition: HasOncallBlockedRequestsAlarm
+    Condition: RequiresOncallBlockedRequestsAlarm
     Properties:
       AlarmName: !Sub 'oncall-pn-applicative-throttling-${ThrottlingGroupString}-BlockedRequestsAlarm'
       AlarmDescription: "CloudWatch oncall alarm for when the percentage of blocked requests exceeds the configured threshold"
