@@ -86,10 +86,40 @@ Parameters:
     Default: 15
     Description: Percentage threshold over total requests that triggers the generic block rate alarm
 
+  BlockRateMinTraffic:
+    Type: Number
+    Default: 20
+    Description: Minimum total requests for the generic block rate alarm
+
+  BlockRateAlarmPeriodSeconds:
+    Type: Number
+    Default: 60
+    Description: Period seconds for the generic block rate alarm
+
+  BlockRateAlarmEvaluationPeriods:
+    Type: Number
+    Default: 20
+    Description: Evaluation periods for the generic block rate alarm
+
+  BlockRateAlarmDatapointsToAlarm:
+    Type: Number
+    Default: 10
+    Description: Datapoints to alarm for the generic block rate alarm
+
   OncallBlockRateThresholdPercent:
     Type: String
     Default: ''
     Description: If set, creates the oncall generic block rate alarm using this percentage threshold over total requests
+
+  OncallBlockRateMinTraffic:
+    Type: Number
+    Default: 20
+    Description: Minimum total requests for the oncall generic block rate alarm
+
+  OncallBlockRateAlarmDatapointsToAlarm:
+    Type: Number
+    Default: 10
+    Description: Datapoints to alarm for the oncall generic block rate alarm
 
   EnhancedWebSecurityEnabled:
     Type: String
@@ -976,7 +1006,7 @@ Resources:
                   Value: ALL
               MetricName: "BlockedRequests"
               Namespace: "AWS/WAFV2"
-            Period: 60
+            Period: !Ref BlockRateAlarmPeriodSeconds
             Stat: Sum
           ReturnData: False
         - Id: m2
@@ -991,17 +1021,17 @@ Resources:
                   Value: ALL
               MetricName: AllowedRequests
               Namespace: "AWS/WAFV2"
-            Period: 60
+            Period: !Ref BlockRateAlarmPeriodSeconds
             Stat: Sum
           ReturnData: False
         - Id: e1
-          Expression: !Sub 'IF(m1+m2>0 AND m1/(m1+m2)>=${BlockRateThresholdPercent}/100, 1, 0)'
+          Expression: !Sub 'IF(m1+m2>${BlockRateMinTraffic} AND m1/(m1+m2)>=${BlockRateThresholdPercent}/100, 1, 0)'
           Label: !Sub '${WAFName}-GenericBlockedRequestsAlarm-Metric'
       TreatMissingData: "notBreaching"
       Threshold: 1
       ComparisonOperator: "GreaterThanOrEqualToThreshold"
-      EvaluationPeriods: 20
-      DatapointsToAlarm: 15
+      EvaluationPeriods: !Ref BlockRateAlarmEvaluationPeriods
+      DatapointsToAlarm: !Ref BlockRateAlarmDatapointsToAlarm
       AlarmActions:
         - !Ref AlarmSNSTopicArn
       OKActions:
@@ -1024,7 +1054,7 @@ Resources:
                   Value: !Join ["-", ["MetricForRateBasedRule", !Ref WAFName]]
               MetricName: "BlockedRequests"
               Namespace: "AWS/WAFV2"
-            Period: 60
+            Period: !Ref BlockRateAlarmPeriodSeconds
             Stat: Sum
           ReturnData: False
         - Id: m2
@@ -1087,17 +1117,17 @@ Resources:
                   Value: ALL
               MetricName: AllowedRequests
               Namespace: "AWS/WAFV2"
-            Period: 60
+            Period: !Ref BlockRateAlarmPeriodSeconds
             Stat: Sum
           ReturnData: False
         - Id: e1
-          Expression: !Sub 'IF(m1+m2>0 AND m1/(m1+m2)>=${OncallBlockRateThresholdPercent}/100, 1, 0)'
+          Expression: !Sub 'IF(m1+m2>${OncallBlockRateMinTraffic} AND m1/(m1+m2)>=${OncallBlockRateThresholdPercent}/100, 1, 0)'
           Label: !Sub 'oncall-${WAFName}-GenericBlockedRequestsAlarm-Metric'
       TreatMissingData: "notBreaching"
       Threshold: 1
       ComparisonOperator: "GreaterThanOrEqualToThreshold"
-      EvaluationPeriods: 20
-      DatapointsToAlarm: 15
+      EvaluationPeriods: !Ref BlockRateAlarmEvaluationPeriods
+      DatapointsToAlarm: !Ref OncallBlockRateAlarmDatapointsToAlarm
       AlarmActions:
         - !Ref AlarmSNSTopicArn
       OKActions:
