@@ -50,10 +50,50 @@ Parameters:
     Description: "The percentage threshold over total requests that triggers the blocked requests alarm."
     Default: 10
 
+  BlockedRequestsMinTraffic:
+    Type: Number
+    Description: "Minimum total requests required before evaluating the standard blocked requests alarm."
+    Default: 20
+
+  BlockedRequestsAlarmPeriodSeconds:
+    Type: Number
+    Description: "Period in seconds used by the standard blocked requests alarm."
+    Default: 60
+
+  BlockedRequestsAlarmEvaluationPeriods:
+    Type: Number
+    Description: "Number of evaluation periods for the standard blocked requests alarm."
+    Default: 20
+
+  BlockedRequestsAlarmDatapointsToAlarm:
+    Type: Number
+    Description: "Number of breaching datapoints required to trigger the standard blocked requests alarm."
+    Default: 10
+
   OncallBlockedRequestsAlarmThresholdPercent:
     Type: String
     Description: "If set, creates the oncall blocked requests alarm using this percentage threshold over total requests."
     Default: ''
+
+  OncallBlockedRequestsMinTraffic:
+    Type: Number
+    Description: "Minimum total requests required before evaluating the oncall blocked requests alarm."
+    Default: 20
+
+  OncallBlockedRequestsAlarmPeriodSeconds:
+    Type: Number
+    Description: "Period in seconds used by the oncall blocked requests alarm."
+    Default: 60
+
+  OncallBlockedRequestsAlarmEvaluationPeriods:
+    Type: Number
+    Description: "Number of evaluation periods for the oncall blocked requests alarm."
+    Default: 20
+
+  OncallBlockedRequestsAlarmDatapointsToAlarm:
+    Type: Number
+    Description: "Number of breaching datapoints required to trigger the oncall blocked requests alarm."
+    Default: 10
 
 Conditions:
 
@@ -225,7 +265,7 @@ Resources:
                   Value: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}-rule-throttling-metric'
               MetricName: "BlockedRequests"
               Namespace: "AWS/WAFV2"
-            Period: 60
+            Period: !Ref BlockedRequestsAlarmPeriodSeconds
             Stat: Sum
           ReturnData: False
         - Id: m2
@@ -240,17 +280,17 @@ Resources:
                   Value: ALL
               MetricName: AllowedRequests
               Namespace: "AWS/WAFV2"
-            Period: 60
+            Period: !Ref BlockedRequestsAlarmPeriodSeconds
             Stat: Sum
           ReturnData: False
         - Id: e1
-          Expression: !Sub 'IF(m1+m2>0 AND m1/(m1+m2)>=${BlockedRequestsAlarmThresholdPercent}/100, 1, 0)'
+          Expression: !Sub 'IF(m1+m2>${BlockedRequestsMinTraffic} AND m1/(m1+m2)>=${BlockedRequestsAlarmThresholdPercent}/100, 1, 0)'
           Label: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}-BlockedRequestsAlarm-Metric'
       TreatMissingData: "notBreaching"
       Threshold: 1
       ComparisonOperator: "GreaterThanOrEqualToThreshold"
-      EvaluationPeriods: 20
-      DatapointsToAlarm: 15
+      EvaluationPeriods: !Ref BlockedRequestsAlarmEvaluationPeriods
+      DatapointsToAlarm: !Ref BlockedRequestsAlarmDatapointsToAlarm
       AlarmActions:
         - !Ref AlarmSNSTopicArn
       OKActions:
@@ -275,7 +315,7 @@ Resources:
                   Value: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}-rule-throttling-metric'
               MetricName: "BlockedRequests"
               Namespace: "AWS/WAFV2"
-            Period: 60
+            Period: !Ref OncallBlockedRequestsAlarmPeriodSeconds
             Stat: Sum
           ReturnData: False
         - Id: m2
@@ -290,17 +330,17 @@ Resources:
                   Value: ALL
               MetricName: AllowedRequests
               Namespace: "AWS/WAFV2"
-            Period: 60
+            Period: !Ref OncallBlockedRequestsAlarmPeriodSeconds
             Stat: Sum
           ReturnData: False
         - Id: e1
-          Expression: !Sub 'IF(m1+m2>0 AND m1/(m1+m2)>=${OncallBlockedRequestsAlarmThresholdPercent}/100, 1, 0)'
+          Expression: !Sub 'IF(m1+m2>${OncallBlockedRequestsMinTraffic} AND m1/(m1+m2)>=${OncallBlockedRequestsAlarmThresholdPercent}/100, 1, 0)'
           Label: !Sub 'oncall-pn-applicative-throttling-${ThrottlingGroupString}-BlockedRequestsAlarm-Metric'
       TreatMissingData: "notBreaching"
       Threshold: 1
       ComparisonOperator: "GreaterThanOrEqualToThreshold"
-      EvaluationPeriods: 20
-      DatapointsToAlarm: 15
+      EvaluationPeriods: !Ref OncallBlockedRequestsAlarmEvaluationPeriods
+      DatapointsToAlarm: !Ref OncallBlockedRequestsAlarmDatapointsToAlarm
       AlarmActions:
         - !Ref AlarmSNSTopicArn
       OKActions:
