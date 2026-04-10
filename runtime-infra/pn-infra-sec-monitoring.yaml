@@ -761,16 +761,16 @@ Resources:
       FunctionResponseTypes:
         - ReportBatchItemFailures
 
-  #PnNotificationS3MonitoringCriticalPrefix:
-  #  Condition: HasCloudTrailLogsEnabledAndIsConfinfoAccount
-  #  Type: AWS::CloudFormation::Stack
-  #  Properties:
-  #    TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/s3-prefix-monitoring.yaml"
-  #    Parameters:
-  #      SNSTopicArn: !Ref CriticalAlarmSNSTopicArn
-  #      CloudTrailLogGroupName: !Ref CloudTrailLogGroup
-  #      BucketName: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
-  #      CriticalPrefix: "PN_NOTIFICATION"
+  PnNotificationS3MonitoringCriticalPrefix:
+    Condition: HasCloudTrailLogsEnabledAndIsConfinfoAccount
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/s3-prefix-monitoring.yaml"
+      Parameters:
+        SNSTopicArn: !Ref CriticalAlarmSNSTopicArn
+        CloudTrailLogGroupName: !Ref CloudTrailLogGroup
+        BucketName: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
+        CriticalPrefix: "PN_NOTIFICATION"
 
 Outputs:
   Version:
