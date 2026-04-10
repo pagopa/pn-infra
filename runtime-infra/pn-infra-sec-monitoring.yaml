@@ -420,7 +420,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/tables-monitoring.yaml"
       Parameters:
         DynamoDBTableName: pn-ConfidentialObjects
-        CloudTrailLogGroupName: !GetAtt CloudTrailLogGroup.LogGroupName
+        CloudTrailLogGroupName: !Ref CloudTrailLogGroup
 
   pnTimelineCriticalMonitoring:
     Condition: HasCloudTrailLogsEnabledAndIsCoreAccount
@@ -429,7 +429,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/tables-monitoring.yaml"
       Parameters:
         DynamoDBTableName: pn-Timelines
-        CloudTrailLogGroupName: !GetAtt CloudTrailLogGroup.LogGroupName
+        CloudTrailLogGroupName: !Ref CloudTrailLogGroup
 
   # ============================================================================
   # EventBridge rules for S3 access monitoring (presigned URL usage and access denied events)
@@ -768,7 +768,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/s3-prefix-monitoring.yaml"
       Parameters:
         SNSTopicArn: !Ref CriticalAlarmSNSTopicArn
-        CloudTrailLogGroupName: !GetAtt CloudTrailLogGroup.LogGroupName
+        CloudTrailLogGroupName: !Ref CloudTrailLogGroup
         BucketName: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
         CriticalPrefix: "PN_NOTIFICATION"
 
