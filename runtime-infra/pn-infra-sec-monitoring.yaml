@@ -128,6 +128,31 @@ Parameters:
     Description: 'List of allowed account IDs for cross-account access (if AlertOnCrossAccountAccess is true)'
     Default: ''
 
+  EnableAccessValidator:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: 'Whether to deploy the access validator Lambda function and related resources'
+
+  PnInfraSecAccessValidatorEnabled:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: 'Whether to enable access validation for critical resources (DynamoDB tables, S3 prefixes)'
+
+
+  PnInfraSecMonitoringDynamoAlertEnabled:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: 'Whether to enable DynamoDB alert monitoring'
+
+  PnInfraInfraSecMonitoringUrlAccessAnalyzerAlert:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: 'Whether to enable URL access analyzer alert'
+
 Conditions:
   HasCloudTrailLogsEnabled: !Equals [!Ref EnableCloudTrailLogs, 'true']
   MonitorS3Condition: !Equals [!Ref MonitorS3, 'true']
@@ -139,8 +164,11 @@ Conditions:
   HasS3CriticalPrefixMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalS3Prefixes], "" ] ]
   HasDynamoDBCriticalTableMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalDynamoDBTables], "" ] ]
   HasCloudtrailEventDataStoreEnabledAndIsConfinfoAccount: !And [ !Equals [!Ref CloudtrailEventDataStoreEnabled, 'true'], !Condition IsConfinfoAccount ]
-  HasDynamoDBAccessValidatorTables: !Not [ !Equals [ !Join  [",", !Ref DynamoDBAccessValidatorTables], "" ] ]
-  
+  HasPnInfraSecAccessValidatorEnabled: !Equals [!Ref EnableAccessValidator, 'true']
+  HasPnInfraSecS3UrlAccessValidatorEnabled:  !Equals [!Ref EnableAccessValidator, 'true']
+  HasPnInfraSecMonitoringDynamoAlertEnabled: !Equals [!Ref PnInfraSecMonitoringDynamoAlertEnabled, 'true']
+  HasPnInfraInfraSecMonitoringUrlAccessAnalyzerAlert: !Equals [!Ref PnInfraInfraSecMonitoringUrlAccessAnalyzerAlert, 'true']
+
 Resources:
 
   # --------------------------
@@ -194,6 +222,7 @@ Resources:
 
   InfraSecMonitoringDynamoAlertLambda:
     Type: AWS::Lambda::Function
+    Condition: HasPnInfraSecMonitoringDynamoAlertEnabled
     Properties:
       FunctionName: !Sub "${ProjectName}-infra-sec-monitoring-dynamo-alert"
       Description: "Validates CDC events against Dynamo table policies and emits violations"
@@ -213,6 +242,7 @@ Resources:
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
 
   InfraSecMonitoringDynamoAlertLambdaEventSourceMapping:
+    Condition: HasPnInfraSecMonitoringDynamoAlertEnabled
     Type: AWS::Lambda::EventSourceMapping
     Properties:
       BatchSize: 100
@@ -417,7 +447,7 @@ Resources:
     Condition: HasCloudTrailLogsEnabledAndIsConfinfoAccount
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/s3tables-monitoring.yaml"
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/tables-monitoring.yaml"
       Parameters:
         DynamoDBTableName: pn-ConfidentialObjects
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
@@ -427,7 +457,7 @@ Resources:
     Condition: HasCloudTrailLogsEnabledAndIsCoreAccount
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/s3tables-monitoring.yaml"
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/tables-monitoring.yaml"
       Parameters:
         DynamoDBTableName: pn-Timelines
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
@@ -523,6 +553,7 @@ Resources:
       
   InfraSecMonitoringUrlAccessAnalyzerAlertLambda:
     Type: AWS::Lambda::Function
+    Condition: HasPnInfraInfraSecMonitoringUrlAccessAnalyzerAlert
     Properties:
       FunctionName: !Sub "${ProjectName}-infra-sec-url-access-analyzer-alert"
       Description: "Analyzes S3 access events to detect potential unauthorized access patterns (e.g., presigned URL abuse, access denied events)"
@@ -569,17 +600,17 @@ Resources:
                 Resource: !Ref CriticalAlarmSNSTopicArn
 
   # ============================================================================
-  # EventBridge rules for access validator 
+  # Access monitoring rules
   # ============================================================================
 
   #===========================================================================
   # Rule: Monitor access patterns to critical DynamoDB tables (requires CloudTrail Event Data Store)
   #===========================================================================
-  DynamoDbAccessMonitorRule:
+  PnInfraSecDynamoDbAccessMonitorRule:
     Type: AWS::Events::Rule
-    Condition: HasDynamoDBAccessValidatorTables
+    Condition: HasPnInfraSecAccessValidatorEnabled
     Properties:
-      Name: !Sub "${EnvironmentType}-dynamodb-access-monitor"
+      Name: "pn-infra-sec-dynamodb-access-monitoring"
       Description: "Monitor all DynamoDB access to Critical DynamoDB tables (CloudTrail filters to data events only)"
       EventPattern:
         source:
@@ -607,11 +638,11 @@ Resources:
   #===========================================================================
   # Rule: Monitor access patterns to critical S3 prefixes (requires CloudTrail Event Data Store)
   #===========================================================================
-  S3AccessMonitorRule:
+  PnInfraSecS3AccessMonitorRule:
     Type: AWS::Events::Rule
-    Condition: HasCloudtrailEventDataStoreEnabledAndIsConfinfoAccount
+    Condition: HasPnInfraSecAccessValidatorEnabled
     Properties:
-      Name: !Sub "${EnvironmentType}-s3-access-monitor"
+      Name: "pn-infra-sec-s3-access-monitoring"
       Description: "Monitor S3 access to safestorage bucket (CloudTrail filters to critical prefix only)"
       EventPattern:
         source:
@@ -662,8 +693,8 @@ Resources:
             Condition:
               ArnEquals:
                 aws:SourceArn:
-                  - !GetAtt DynamoDbAccessMonitorRule.Arn
-                  - !GetAtt S3AccessMonitorRule.Arn
+                  - !GetAtt PnInfraSecDynamoDbAccessMonitorRule.Arn
+                  - !GetAtt PnInfraSecS3AccessMonitorRule.Arn
               StringEquals:
                 aws:SourceAccount: !Ref AWS::AccountId
           - Sid: AllowLambdaToReceiveMessages
@@ -728,8 +759,9 @@ Resources:
       LogGroupName: !Sub "/aws/lambda/${ProjectName}-infra-sec-access-validator-alert"
       RetentionInDays: 14
 
-  AccessValidatorFunction:
+  InfraSecAccessValidatorFunction:
     Type: AWS::Lambda::Function
+    Condition: HasPnInfraSecAccessValidatorEnabled
     DependsOn: AccessValidatorLogGroup
     Properties:
       FunctionName: !Sub "${ProjectName}-infra-sec-access-validator-alert"
@@ -756,16 +788,28 @@ Resources:
           ALLOWED_ACCOUNT_IDS: !Join [",", !Ref AllowedAccountIds]
 
   SecurityEventsEventSourceMapping:
+    Condition: HasPnInfraSecAccessValidatorEnabled
     Type: AWS::Lambda::EventSourceMapping
     Properties:
       EventSourceArn: !GetAtt SecurityEventsQueue.Outputs.QueueARN
-      FunctionName: !Ref AccessValidatorFunction
+      FunctionName: !Ref InfraSecAccessValidatorFunction
       BatchSize: 10
       MaximumBatchingWindowInSeconds: 5
       ScalingConfig:
         MaximumConcurrency: !Ref LambdaReservedConcurrency
       FunctionResponseTypes:
         - ReportBatchItemFailures
+
+  PnNotificationS3MonitoringCriticalPrefix:
+    Condition: HasCloudTrailLogsEnabledAndIsConfinfoAccount
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/s3-prefix-monitoring.yaml"
+      Parameters:
+        SNSTopicArn: !Ref CriticalAlarmSNSTopicArn
+        CloudTrailLogGroupName: !Ref CloudTrailLogGroup
+        BucketName: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
+        CriticalPrefix: "PN_NOTIFICATION"
 
 Outputs:
   Version:
