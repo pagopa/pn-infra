@@ -74,7 +74,7 @@ Resources:
       FilterName: !Sub "s3-deletion-attempts-${CriticalPrefix}"
       # Pattern per catturare sia DeleteObject che DeleteObjects sul prefisso specifico
       FilterPattern: !Sub 
-        - '{ ($.eventName = "DeleteObject" || $.eventName = "DeleteObjects") && $.requestParameters.bucketName = "${BName}" && $.requestParameters.key = "${Prefix}*" }'
+        - '{ ($.eventName = "DeleteObject" || $.eventName = "DeleteObjects") && $.resources[0].ARN = "*${BName}*" && $.resources[1].ARN = "*${Prefix}*" }'
         - BName: !Ref BucketName
           Prefix: !Ref CriticalPrefix
       MetricTransformations:
@@ -89,7 +89,7 @@ Resources:
       LogGroupName: !Ref CloudTrailLogGroupName
       FilterName: !Sub "s3-failed-deletion-attempts-${CriticalPrefix}"
       FilterPattern: !Sub 
-        - '{ ($.eventName = "DeleteObject" || $.eventName = "DeleteObjects") && $.errorCode = "AccessDenied" && $.requestParameters.bucketName = "${BName}" && $.requestParameters.key = "${Prefix}*" }'
+        - '{ ($.eventName = "DeleteObject" || $.eventName = "DeleteObjects") && $.errorCode = "AccessDenied" && $.resources[0].ARN = "*${BName}*" && $.resources[1].ARN = "*${Prefix}*" }'
         - BName: !Ref BucketName
           Prefix: !Ref CriticalPrefix
       MetricTransformations:
@@ -104,7 +104,7 @@ Resources:
       LogGroupName: !Ref CloudTrailLogGroupName
       FilterName: !Sub "s3-failed-access-${CriticalPrefix}"
       FilterPattern: !Sub 
-        - '{ $.errorCode = "AccessDenied" && $.requestParameters.bucketName = "${BName}" && $.requestParameters.key = "${Prefix}*" }'
+        - '{ $.errorCode = "AccessDenied" && $.resources[0].ARN = "*${BName}*" && $.resources[1].ARN = "*${Prefix}*" }'
         - BName: !Ref BucketName
           Prefix: !Ref CriticalPrefix
       MetricTransformations:
