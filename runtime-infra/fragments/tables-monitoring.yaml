@@ -88,7 +88,7 @@ Resources:
       FilterPattern: '{ ($.eventName = UpdateItem) || ($.eventName = DeleteItem) || ($.eventName = BatchWriteItem) }'
       MetricTransformations:
         - MetricName: "AppendOnlyViolations"
-          MetricNamespace: "CustomMetrics/DynamoDB"
+          MetricNamespace: "CustomSecurity/DynamoDB"
           MetricValue: "1"
           Dimensions:
             - Key: TableName
@@ -106,7 +106,7 @@ Resources:
       FilterPattern: !Sub '{ ($.eventName = DeleteTable) && ($.requestParameters.tableName = "${DynamoDBTableName}") }'
       MetricTransformations:
         - MetricName: "TableDeletionAttempts"
-          MetricNamespace: "CustomMetrics/DynamoDB"
+          MetricNamespace: "CustomSecurity/DynamoDB"
           MetricValue: "1"
           Dimensions:
             - Key: TableName
@@ -124,7 +124,7 @@ Resources:
       FilterPattern: '{ ($.eventName = BatchWriteItem) }'
       MetricTransformations:
         - MetricName: "BatchWriteDeleteAttempts"
-          MetricNamespace: "CustomMetrics/DynamoDB"
+          MetricNamespace: "CustomSecurity/DynamoDB"
           MetricValue: "1"
           Dimensions:
             - Key: TableName
@@ -142,7 +142,7 @@ Resources:
       FilterPattern: !Sub '{ ($.eventName = UpdateItem) || ($.eventName = DeleteItem) || ($.eventName = BatchWriteItem) && ($.requestParameters.tableName = "${DynamoDBTableName}") }'
       MetricTransformations:
         - MetricName: "UnauthorizedRoleAttempts"
-          MetricNamespace: "CustomMetrics/DynamoDB"
+          MetricNamespace: "CustomSecurity/DynamoDB"
           MetricValue: "1"
           Dimensions:
             - Key: TableName
@@ -161,7 +161,7 @@ Resources:
       EvaluationPeriods: 1
       Threshold: 0
       MetricName: AppendOnlyViolations
-      Namespace: "CustomMetrics/DynamoDB"
+      Namespace: "CustomSecurity/DynamoDB"
       Statistic: Sum
       Period: 300
       TreatMissingData: notBreaching
@@ -184,7 +184,7 @@ Resources:
       EvaluationPeriods: 1
       Threshold: 0
       MetricName: TableDeletionAttempts
-      Namespace: "CustomMetrics/DynamoDB"
+      Namespace: "CustomSecurity/DynamoDB"
       Statistic: Sum
       Period: 300
       TreatMissingData: notBreaching
@@ -207,7 +207,7 @@ Resources:
       EvaluationPeriods: 1
       Threshold: 0
       MetricName: BatchWriteDeleteAttempts
-      Namespace: "CustomMetrics/DynamoDB"
+      Namespace: "CustomSecurity/DynamoDB"
       Statistic: Sum
       Period: 300
       TreatMissingData: notBreaching
@@ -230,7 +230,7 @@ Resources:
       EvaluationPeriods: 1
       Threshold: 0
       MetricName: UnauthorizedRoleAttempts
-      Namespace: "CustomMetrics/DynamoDB"
+      Namespace: "CustomSecurity/DynamoDB"
       Statistic: Sum
       Period: 300
       TreatMissingData: notBreaching
