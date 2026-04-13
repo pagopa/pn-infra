@@ -80,10 +80,7 @@ Resources:
       MetricTransformations:
         - MetricValue: "1"
           MetricNamespace: "CustomSecurity/S3"
-          MetricName: "DeletionCount"
-          Dimensions:
-            - Value: !Ref CriticalPrefix
-              Key: "Prefix"
+          MetricName: !Sub "DeletionCount-${CriticalPrefix}"
 
   # 2. S3 FAILED Deletion Attempts (AccessDenied)
   S3FailedDeletionsMetricFilter:
@@ -98,10 +95,7 @@ Resources:
       MetricTransformations:
         - MetricValue: "1"
           MetricNamespace: "CustomSecurity/S3"
-          MetricName: "FailedDeletionCount"
-          Dimensions:
-            - Value: !Ref CriticalPrefix
-              Key: "Prefix"
+          MetricName: !Sub "FailedDeletionCount-${CriticalPrefix}"
 
   # 3. S3 General Failed Access (AccessDenied)
   S3FailedAccessMetricFilter:
@@ -116,9 +110,6 @@ Resources:
       MetricTransformations:
         - MetricValue: "1"
           MetricNamespace: "CustomSecurity/S3"
-          MetricName: "FailedAccessCount"
-          Dimensions:
-            - Value: !Ref CriticalPrefix
-              Key: "Prefix"
+          MetricName: !Sub "FailedAccessCount-${CriticalPrefix}"
 
   
