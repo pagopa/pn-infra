@@ -85,7 +85,7 @@ Resources:
     Properties:
       FilterName: !Sub "${DynamoDBTableName}-append-only-violations"
       LogGroupName: !Ref CloudTrailLogGroupName
-      FilterPattern: '{ ($.eventName = UpdateItem) || ($.eventName = DeleteItem) || ($.eventName = BatchWriteItem) }'
+      FilterPattern: !Sub '{ ($.eventName = UpdateItem) || ($.eventName = DeleteItem) || ($.eventName = BatchWriteItem) && ($.requestParameters.tableName = "${DynamoDBTableName}") }'
       MetricTransformations:
         - MetricName: "AppendOnlyViolations"
           MetricNamespace: "CustomSecurity/DynamoDB"
@@ -121,7 +121,7 @@ Resources:
     Properties:
       FilterName: !Sub "${DynamoDBTableName}-batch-write-violations"
       LogGroupName: !Ref CloudTrailLogGroupName
-      FilterPattern: '{ ($.eventName = BatchWriteItem) }'
+      FilterPattern: !Sub '{ ($.eventName = BatchWriteItem) && ($.requestParameters.tableName = "${DynamoDBTableName}") }'
       MetricTransformations:
         - MetricName: "BatchWriteDeleteAttempts"
           MetricNamespace: "CustomSecurity/DynamoDB"
