@@ -45,11 +45,17 @@ Parameters:
     Default: 365
     Description: 'CloudWatch Logs retention (0=infinite)'
 
-  MonitorS3:
+  S3MonitoringEnabled:
     Type: String
     AllowedValues: ['true', 'false']
     Default: 'true'
     Description: 'Monitor S3 bucket deletion events?'
+  
+  DynamoDBMonitoringEnabled:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: 'Monitor DynamoDB critical table events?'
 
   PITRExcludedTables:
     Type: CommaDelimitedList
@@ -128,10 +134,21 @@ Parameters:
     Description: 'List of allowed account IDs for cross-account access (if AlertOnCrossAccountAccess is true)'
     Default: ''
 
+  EnableDynamoLambdaAlert:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: 'Whether to enable the DynamoDB CDC alert Lambda function'
+
+  DynamoDBCdcKinesisFilterPattern:
+    Type: String
+    Default: '{}'
+    Description: 'JSON filter pattern for DynamoDB CDC events from Kinesis stream'
 
 Conditions:
   HasCloudTrailLogsEnabled: !Equals [!Ref EnableCloudTrailLogs, 'true']
-  MonitorS3Condition: !Equals [!Ref MonitorS3, 'true']
+  HasMonitoringS3Enabled: !Equals [!Ref S3MonitoringEnabled, 'true']
+  HasMonitoringDynamoDBEnabled: !Equals [!Ref DynamoDBMonitoringEnabled, 'true']
   IsMultiRegionTrailCondition: !Equals [!Ref MultiRegionTrail, 'true']
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
@@ -200,8 +217,8 @@ Resources:
       Runtime: python3.14
       Handler: infra-sec-monitoring-dynamo-alert.lambda_handler
       Role: !GetAtt InfraSecMonitoringDynamoAlertLambdaRole.Arn
-      Timeout: 60
-      MemorySize: 256
+      Timeout: 20
+      MemorySize: 128
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/infra-sec-monitoring-dynamo-alert.zip
@@ -216,10 +233,18 @@ Resources:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
       BatchSize: 100
-      Enabled: true
+      Enabled: !Ref EnableDynamoLambdaAlert
       EventSourceArn: !Ref CdcKinesisStreamArn
       FunctionName: !Ref InfraSecMonitoringDynamoAlertLambda
       StartingPosition: LATEST
+      FilterCriteria:
+        Filters:
+          - Pattern: !Sub |
+              {
+                "data": {
+                  "tableName": ${DynamoDBCdcKinesisFilterPattern}
+                }
+              }
 
   # --------------------------
   # CloudTrail Configuration
@@ -306,22 +331,36 @@ Resources:
               - logs:PutLogEvents
               - logs:DescribeLogStreams
             Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/cloudtrail/${ProjectName}-${InfraSecTrailName}:*"
-          - Effect: Allow
-            Action:
-              - kinesis:GetRecords
-              - kinesis:GetShardIterator
-              - kinesis:DescribeStream
-              - kinesis:ListShards
-            Resource: !Ref CdcKinesisStreamArn
 
   # --------------------------
-  # EventBridge Rules
+  # EventBridge Critical Rules
   # --------------------------
+  EventBridgeSNSPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref CriticalAlarmSNSTopicArn
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowEventBridgeToPublish
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: SNS:Publish
+            Resource: !Ref CriticalAlarmSNSTopicArn
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
 
+  # ============================================================================
+  # EventBridge rule to monitor DynamoDB critical tables
+  # ============================================================================
   DynamoDBTableDeletionRule:
     Type: AWS::Events::Rule
+    Condition: HasMonitoringDynamoDBEnabled
     Properties:
-      Name: !Sub "${ProjectName}-dynamodb-deletion-alert"
+      Name: !Sub "${ProjectName}-infra-sec-dynamodb-deletion-alert"
       EventPattern:
         source: ["aws.dynamodb"]
         detail-type: ["AWS API Call via CloudTrail"]
@@ -338,12 +377,13 @@ Resources:
               sourceIP: $.detail.sourceIPAddress
               tableName: $.detail.requestParameters.tableName
             InputTemplate: !Sub |
-              "CRITICAL ALERT: DynamoDB Table Deletion - Environment: ${EnvironmentType} - Table: <tableName> - User: <user> - IP: <sourceIP> - Time: <time>"
+              "CRITICAL ALERT: DynamoDB Table Deletion Attempt - Environment: ${EnvironmentType} - Table: <tableName> - User: <user> - Source IP: <sourceIP> - Time: <time> - ACTION REQUIRED: Investigate immediately and check CloudTrail"
 
   DynamoDBPITRDisabledRule:
     Type: AWS::Events::Rule
+    Condition: HasMonitoringDynamoDBEnabled
     Properties:
-      Name: !Sub "${ProjectName}-pitr-disabled"
+      Name: !Sub "${ProjectName}-infra-sec-pitr-disabled"
       EventPattern:
         source: ["aws.dynamodb"]
         detail-type: ["AWS API Call via CloudTrail"]
@@ -363,12 +403,13 @@ Resources:
               user: $.detail.userIdentity.principalId
               tableName: $.detail.requestParameters.tableName
             InputTemplate: !Sub |
-              "CRITICAL: PITR Disabled - Environment: ${EnvironmentType} - Table: <tableName> - User: <user> - Time: <time>"
+              "CRITICAL: Point-in-Time Recovery Disabled - Environment: ${EnvironmentType} - Table: <tableName> - User: <user> - Time: <time> - ACTION REQUIRED: Re-enable PITR immediately"
 
   DynamoDBDeletionProtectionRule:
     Type: AWS::Events::Rule
+    Condition: HasMonitoringDynamoDBEnabled
     Properties:
-      Name: !Sub "${ProjectName}-deletion-protection-disabled"
+      Name: !Sub "${ProjectName}-infra-sec-deletion-protection-disabled"
       EventPattern:
         source: ["aws.dynamodb"]
         detail-type: ["AWS API Call via CloudTrail"]
@@ -383,17 +424,50 @@ Resources:
             InputPathsMap:
               time: $.time
               user: $.detail.userIdentity.principalId
+              userArn: $.detail.userIdentity.arn
               tableName: $.detail.requestParameters.tableName
               sourceIP: $.detail.sourceIPAddress
+              eventID: $.detail.eventID,
+              region: $.detail.awsRegion
             InputTemplate: !Sub |
-              "CRITICAL: Deletion Protection Disabled - Environment: ${EnvironmentType} - Table: <tableName> - User: <user> - IP: <sourceIP> - Time: <time>"
+              "CRITICAL: DynamoDB Deletion Protection Disabled - Environment: ${EnvironmentType} - Table: <tableName> - User: <user> (ARN: <userArn>) - Source IP: <sourceIP> - Time: <time> - Region: <region> - ACTION REQUIRED: Re-enable immediately with: aws dynamodb update-table --table-name <tableName> --deletion-protection-enabled - CloudTrail Event ID: <eventID>"
 
+  # ============================================================================
+  # EventBridge rule to monitor S3 critical buckets
+  # ============================================================================
+  S3BucketPolicyChangeRule:
+    Type: AWS::Events::Rule
+    Condition: HasMonitoringS3Enabled
+    Properties:
+      Name: !Sub "${ProjectName}-infra-sec-s3-policy-change"
+      Description: "Alert on S3 bucket policy changes for critical buckets"
+      State: ENABLED
+      EventPattern:
+        source: ["aws.s3"]
+        detail-type: ["AWS API Call via CloudTrail"]
+        detail:
+          eventSource: ["s3.amazonaws.com"]
+          eventName: ["PutBucketPolicy", "DeleteBucketPolicy", "PutBucketAcl"]
+          requestParameters:
+            bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
+      Targets:
+        - Id: SendToSNS
+          Arn: !Ref CriticalAlarmSNSTopicArn
+          InputTransformer:
+            InputPathsMap:
+              time: "$.time"
+              user: "$.detail.userIdentity.principalId"
+              eventName: "$.detail.eventName"
+              bucketName: "$.detail.requestParameters.bucketName"
+            InputTemplate: !Sub '"ALERT: S3 Bucket Policy Change - Environment: ${EnvironmentType} - Bucket: <bucketName> - Operation: <eventName> - User: <user> - Time: <time> - ACTION REQUIRED: Review and verify authorization"'
 
   S3BucketDeletionRule:
-    Condition: MonitorS3Condition
     Type: AWS::Events::Rule
+    Condition: HasMonitoringS3Enabled
     Properties:
-      Name: !Sub "${ProjectName}-s3-deletion-alert"
+      Name: !Sub "${ProjectName}-infra-sec-s3-bucket-deletion-alert"
+      Description: "Alert on S3 bucket deletion attempts for critical buckets"
+      State: ENABLED
       EventPattern:
         source: ["aws.s3"]
         detail-type: ["AWS API Call via CloudTrail"]
@@ -407,12 +481,99 @@ Resources:
           Arn: !Ref CriticalAlarmSNSTopicArn
           InputTransformer:
             InputPathsMap:
-              time: $.time
-              user: $.detail.userIdentity.principalId
-              bucketName: $.detail.requestParameters.bucketName
-            InputTemplate: !Sub |
-              "CRITICAL: S3 Bucket Deletion - Environment: ${EnvironmentType} - Bucket: <bucketName> - User: <user> - Time: <time>"
+              time: "$.time"
+              user: "$.detail.userIdentity.principalId"
+              userArn: "$.detail.userIdentity.arn"
+              sourceIP: "$.detail.sourceIPAddress"
+              bucketName: "$.detail.requestParameters.bucketName"
+              region: "$.region"
+              eventID: "$.detail.eventID"
+            InputTemplate: !Sub '"CRITICAL ALERT: S3 Bucket Deletion Attempt - Environment: ${EnvironmentType} - Bucket: <bucketName> - User: <user> (ARN: <userArn>) - Source IP: <sourceIP> - Time: <time> - Region: <region> - ACTION REQUIRED: Investigate immediately. CloudTrail Event ID: <eventID>"'
 
+  S3PublicAccessChangeRule:
+    Type: AWS::Events::Rule
+    Condition: HasMonitoringS3Enabled
+    Properties:
+      Name: !Sub "${ProjectName}-infra-sec-s3-public-access-change"
+      Description: "Alert on S3 public access block changes for critical buckets"
+      State: ENABLED
+      EventPattern:
+        source: ["aws.s3"]
+        detail-type: ["AWS API Call via CloudTrail"]
+        detail:
+          eventSource: ["s3.amazonaws.com"]
+          eventName: ["PutBucketPublicAccessBlock"]
+          requestParameters:
+            bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
+      Targets:
+        - Id: SendToSNS
+          Arn: !Ref CriticalAlarmSNSTopicArn
+          InputTransformer:
+            InputPathsMap:
+              time: "$.time"
+              user: "$.detail.userIdentity.principalId"
+              eventName: "$.detail.eventName"
+              bucketName: "$.detail.requestParameters.bucketName"
+            InputTemplate: !Sub '"CRITICAL ALERT: S3 Public Access Block Change - Environment: ${EnvironmentType} - Bucket: <bucketName> - Operation: <eventName> - User: <user> - Time: <time> - ACTION REQUIRED: Verify public access settings immediately"'
+
+  S3LifecyclePolicyChangeRule:
+    Type: AWS::Events::Rule
+    Condition: HasMonitoringS3Enabled
+    Properties:
+      Name: !Sub "${ProjectName}-infra-sec-s3-lifecycle-policy-change"
+      Description: "Alert on S3 lifecycle policy changes for critical buckets"
+      State: ENABLED
+      EventPattern:
+        source: ["aws.s3"]
+        detail-type: ["AWS API Call via CloudTrail"]
+        detail:
+          eventSource: ["s3.amazonaws.com"]
+          eventName: ["PutBucketLifecycleConfiguration", "DeleteBucketLifecycle"]
+          requestParameters:
+            bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
+      Targets:
+        - Id: SendToSNS
+          Arn: !Ref CriticalAlarmSNSTopicArn
+          InputTransformer:
+            InputPathsMap:
+              time: "$.time"
+              user: "$.detail.userIdentity.principalId"
+              eventName: "$.detail.eventName"
+              bucketName: "$.detail.requestParameters.bucketName"
+              sourceIP: "$.detail.sourceIPAddress"
+            InputTemplate: !Sub '"ALERT: S3 Lifecycle Policy Change - Environment: ${EnvironmentType} - Bucket: <bucketName> - Operation: <eventName> - User: <user> - Source IP: <sourceIP> - Time: <time> - ACTION REQUIRED: Review lifecycle policy changes to ensure they are authorized"'
+
+  S3VersioningChangeRule:
+    Type: AWS::Events::Rule
+    Condition: HasMonitoringS3Enabled
+    Properties:
+      Name: !Sub "${ProjectName}-infra-sec-s3-versioning-change"
+      Description: "Alert on S3 versioning configuration changes for critical buckets"
+      State: ENABLED
+      EventPattern:
+        source: ["aws.s3"]
+        detail-type: ["AWS API Call via CloudTrail"]
+        detail:
+          eventSource: ["s3.amazonaws.com"]
+          eventName: ["PutBucketVersioning"]
+          requestParameters:
+            bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
+      Targets:
+        - Id: SendToSNS
+          Arn: !Ref CriticalAlarmSNSTopicArn
+          InputTransformer:
+            InputPathsMap:
+              time: "$.time"
+              user: "$.detail.userIdentity.principalId"
+              eventName: "$.detail.eventName"
+              bucketName: "$.detail.requestParameters.bucketName"
+              sourceIP: "$.detail.sourceIPAddress"
+            InputTemplate: !Sub '"CRITICAL ALERT: S3 Versioning Configuration Change - Environment: ${EnvironmentType} - Bucket: <bucketName> - Operation: <eventName> - User: <user> - Source IP: <sourceIP> - Time: <time> - ACTION REQUIRED: Verify versioning is still enabled for data protection"'
+
+  # ============================================================================
+  # Metric Filters for critical DynamoDB tables
+  # ============================================================================
+  # DA DEPRECARE
   pnConfidentialObjectsCriticalMonitoring:
     Condition: HasCloudTrailLogsEnabledAndIsConfinfoAccount
     Type: AWS::CloudFormation::Stack
@@ -432,17 +593,28 @@ Resources:
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
 
   # ============================================================================
-  # EventBridge rules for S3 access monitoring (presigned URL usage and access denied events)
+  # Metric Filter to detect S3
   # ============================================================================
+  PnNotificationS3MonitoringCriticalPrefix:
+    Condition: HasCloudTrailLogsEnabledAndIsConfinfoAccount
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/s3-prefix-monitoring.yaml"
+      Parameters:
+        SNSTopicArn: !Ref CriticalAlarmSNSTopicArn
+        CloudTrailLogGroupName: !Ref CloudTrailLogGroup
+        BucketName: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
+        CriticalPrefix: "PN_NOTIFICATION"
 
   # ============================================================================
-  # Rule: S3 GetObject (presigned URL file download)
+  # EventBridge rules for critical S3 access patterns (e.g., GetObject on presigned URLs, AccessDenied events on critical buckets)
+  # UrlAccessAnalyzerAlertLambda
   # ============================================================================
   S3GetObjectRule:
     Condition: HasCloudtrailEventDataStoreEnabledAndIsConfinfoAccount
     Type: AWS::Events::Rule
     Properties:
-      Name: !Sub "${EnvironmentType}-s3-url-getobject"
+      Name: !Sub "${ProjectName}-infra-sec-s3-url-getobject"
       Description: "Capture S3 GetObject events for URL access monitoring"
       EventPattern:
         source:
@@ -460,9 +632,6 @@ Resources:
       Targets:
         - Arn: !GetAtt InfraSecMonitoringUrlAccessAnalyzerAlertLambda.Arn
           Id: "SendToLambda"
-      Tags:
-        - Key: Environment
-          Value: !Ref EnvironmentType
 
   S3GetObjectPermission:
     Condition: HasCloudtrailEventDataStoreEnabledAndIsConfinfoAccount
@@ -474,13 +643,14 @@ Resources:
       SourceArn: !GetAtt S3GetObjectRule.Arn
 
   # ============================================================================
-  # Rule: AccessDenied events for S3
+  # EventBridge rule to capture S3 AccessDenied events for critical buckets (potential unauthorized access attempts or presigned URL abuse)
+  # UrlAccessAnalyzerAlertLambda
   # ============================================================================
   S3AccessDeniedRule:
     Condition: HasCloudtrailEventDataStoreEnabledAndIsConfinfoAccount
     Type: AWS::Events::Rule
     Properties:
-      Name: !Sub "${EnvironmentType}-s3-url-access-denied"
+      Name: !Sub "${ProjectName}-infra-sec-s3-url-access-denied"
       Description: "Capture S3 AccessDenied events for security monitoring"
       EventPattern:
         source:
@@ -498,9 +668,6 @@ Resources:
       Targets:
         - Arn: !GetAtt InfraSecMonitoringUrlAccessAnalyzerAlertLambda.Arn
           Id: "SendToLambda"
-      Tags:
-        - Key: Environment
-          Value: !Ref EnvironmentType
 
   S3AccessDeniedPermission:
     Condition: HasCloudtrailEventDataStoreEnabledAndIsConfinfoAccount
@@ -511,6 +678,9 @@ Resources:
       Principal: "events.amazonaws.com"
       SourceArn: !GetAtt S3AccessDeniedRule.Arn
 
+  # ============================================================================
+  # Lambda function to analyze S3 access patterns and generate alerts for potential unauthorized access (e.g., presigned URL abuse, repeated access denied events from same IP)
+  # ============================================================================  
   InfraSecMonitoringUrlAccessAnalyzerAlertLambdaLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -525,8 +695,8 @@ Resources:
       Runtime: python3.14
       Handler: infra-sec-url-access-analyzer-alert.lambda_handler
       Role: !GetAtt InfraSecMonitoringUrlAccessAnalyzerAlertLambdaRole.Arn
-      Timeout: 60
-      MemorySize: 256
+      Timeout: 20
+      MemorySize: 128
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/infra-sec-url-access-analyzer-alert.zip
@@ -564,17 +734,15 @@ Resources:
                   - sns:Publish
                 Resource: !Ref CriticalAlarmSNSTopicArn
 
-  # ============================================================================
-  # Access monitoring rules
-  # ============================================================================
 
   #===========================================================================
-  # Rule: Monitor access patterns to critical DynamoDB tables (requires CloudTrail Event Data Store)
+  # EventBridge rule to monitor access patterns to critical DynamoDB tables (e.g., GetItem, PutItem, UpdateItem on critical tables - requires CloudTrail Event Data Store)
+  # AccessValidatorLambda
   #===========================================================================
   PnInfraSecDynamoDbAccessMonitorRule:
     Type: AWS::Events::Rule
     Properties:
-      Name: "pn-infra-sec-dynamodb-access-monitoring"
+      Name: !Sub "${ProjectName}-infra-sec-dynamodb-access-monitoring"
       Description: "Monitor all DynamoDB access to Critical DynamoDB tables (CloudTrail filters to data events only)"
       EventPattern:
         source:
@@ -597,15 +765,16 @@ Resources:
             tableName: !Ref DynamoDBAccessValidatorTables
       Targets:
         - Id: SecurityEventQueue
-          Arn: !GetAtt SecurityEventsQueue.Outputs.QueueARN
+          Arn: !GetAtt PnInfraSecEventsQueue.Outputs.QueueARN
 
   #===========================================================================
-  # Rule: Monitor access patterns to critical S3 prefixes (requires CloudTrail Event Data Store)
+  # EventBridge rule to monitor access patterns to critical S3 prefixes (e.g., GetObject on presigned URLs, AccessDenied events on critical buckets - requires CloudTrail Event Data Store)
+  # AccessValidatorLambda
   #===========================================================================
   PnInfraSecS3AccessMonitorRule:
     Type: AWS::Events::Rule
     Properties:
-      Name: "pn-infra-sec-s3-access-monitoring"
+      Name: !Sub "${ProjectName}-infra-sec-s3-access-monitoring"
       Description: "Monitor S3 access to safestorage bucket (CloudTrail filters to critical prefix only)"
       EventPattern:
         source:
@@ -627,23 +796,26 @@ Resources:
               - !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
       Targets:
         - Id: SecurityEventQueue
-          Arn: !GetAtt SecurityEventsQueue.Outputs.QueueARN
+          Arn: !GetAtt PnInfraSecEventsQueue.Outputs.QueueARN
 
-  SecurityEventsQueue:
+  #===========================================================================
+  # SQS Queue to receive security events from EventBridge for further processing and alerting by Lambda for DynamoDB and S3 access patterns (e.g., to correlate access patterns, detect anomalies, etc.)
+  #===========================================================================
+  PnInfraSecEventsQueue:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
-        QueueName: !Sub "${ProjectName}-security-events-queue"
+        QueueName: !Sub "${ProjectName}-infra-sec-events-queue"
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
         HasDLQ: "true"
         QueueHasAlarm: "true"
 
-  SecurityEventsQueuePolicy:
+  PnInfraSecEventsQueuePolicy:
     Type: AWS::SQS::QueuePolicy
     Properties:
       Queues:
-        - !GetAtt SecurityEventsQueue.Outputs.QueueURL
+        - !GetAtt PnInfraSecEventsQueue.Outputs.QueueURL
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -652,7 +824,7 @@ Resources:
             Principal:
               Service: events.amazonaws.com
             Action: sqs:SendMessage
-            Resource: !GetAtt SecurityEventsQueue.Outputs.QueueARN
+            Resource: !GetAtt PnInfraSecEventsQueue.Outputs.QueueARN
             Condition:
               ArnEquals:
                 aws:SourceArn:
@@ -668,14 +840,14 @@ Resources:
               - sqs:ReceiveMessage
               - sqs:DeleteMessage
               - sqs:GetQueueAttributes
-            Resource: !GetAtt SecurityEventsQueue.Outputs.QueueARN
+            Resource: !GetAtt PnInfraSecEventsQueue.Outputs.QueueARN
             Condition:
               StringEquals:
                 aws:SourceAccount: !Ref AWS::AccountId
 
 
   # ============================================================================
-  # IAM Role for Lambda
+  # Lambda function to validate access patterns to critical DynamoDB tables and S3 prefixes, correlate with authorized access patterns, and generate alerts for potential unauthorized access or anomalous patterns
   # ============================================================================
   AccessValidatorRole:
     Type: AWS::IAM::Role
@@ -707,15 +879,12 @@ Resources:
                   - sqs:ReceiveMessage
                   - sqs:DeleteMessage
                   - sqs:GetQueueAttributes
-                Resource: !GetAtt SecurityEventsQueue.Outputs.QueueARN
+                Resource: !GetAtt PnInfraSecEventsQueue.Outputs.QueueARN
               - Effect: Allow
                 Action: s3:GetObject
                 Resource:
                   - !Sub "arn:aws:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/infra-sec-access-validator/authorized_roles.csv"
 
-  # ============================================================================
-  # Lambda Function
-  # ============================================================================
   AccessValidatorLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -749,10 +918,10 @@ Resources:
           ALERT_ON_CROSS_ACCOUNT: !Ref AlertOnCrossAccountAccess
           ALLOWED_ACCOUNT_IDS: !Join [",", !Ref AllowedAccountIds]
 
-  SecurityEventsEventSourceMapping:
+  PnInfraSecEventsEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
-      EventSourceArn: !GetAtt SecurityEventsQueue.Outputs.QueueARN
+      EventSourceArn: !GetAtt PnInfraSecEventsQueue.Outputs.QueueARN
       FunctionName: !Ref InfraSecAccessValidatorFunction
       BatchSize: 10
       MaximumBatchingWindowInSeconds: 5
@@ -761,16 +930,6 @@ Resources:
       FunctionResponseTypes:
         - ReportBatchItemFailures
 
-  PnNotificationS3MonitoringCriticalPrefix:
-    Condition: HasCloudTrailLogsEnabledAndIsConfinfoAccount
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/s3-prefix-monitoring.yaml"
-      Parameters:
-        SNSTopicArn: !Ref CriticalAlarmSNSTopicArn
-        CloudTrailLogGroupName: !Ref CloudTrailLogGroup
-        BucketName: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
-        CriticalPrefix: "PN_NOTIFICATION"
 
 Outputs:
   Version:
