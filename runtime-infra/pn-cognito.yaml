@@ -62,8 +62,15 @@ Parameters:
     Description: The ARN of the Kinesis Stream for audit logs
     Default: ""
 
+  LogFilterPattern:
+    Type: String
+    Description: "Filter pattern for CloudWatch Logs Subscription"
+    Default: "AUDIT10Y"
+
 Conditions:
-  SendLogToKinesis: !Not [ !Equals [ !Ref KinesisAuditStreamArn, '' ] ]
+  SendLogToKinesis: !And 
+    - !Not [ !Equals [ !Ref KinesisAuditStreamArn, "" ] ]
+    - !Not [ !Equals [ !Ref LogFilterPattern, "" ] ]
 
 Resources:
   CognitoLogsS3:
@@ -167,7 +174,7 @@ Resources:
         LogGroupName: !Sub "${ProjectName}-post-auth-cognito-trigger-v2"
         LogGroupPrefix: "/aws/lambda"
         LogGroupRetention: !Ref LogGroupRetentionInDays
-        LogFilterPattern: "AUDIT10Y"
+        LogFilterPattern: !Ref LogFilterPattern
         LogsKinesisSourceStreamArn: ""
 
   SubscriptionFilterServiceRole:
@@ -206,7 +213,7 @@ Resources:
     Properties:
       RoleArn: !GetAtt SubscriptionFilterServiceRole.Arn
       LogGroupName: !GetAtt CognitoTriggerLogGroupStack.Outputs.LogGroupName
-      FilterPattern: "AUDIT10Y"
+      FilterPattern: !Ref LogFilterPattern
       DestinationArn: !Ref KinesisAuditStreamArn
 
   UserPool:
