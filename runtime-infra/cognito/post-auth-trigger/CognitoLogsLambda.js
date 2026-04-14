@@ -2,7 +2,6 @@ import { S3Client } from "@aws-sdk/client-s3";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { CognitoIdentityProviderClient } from "@aws-sdk/client-cognito-identity-provider";
 import { putObjectToS3, checkIfUserExists, getMD5HashFromFile } from './utils.js';
-import { syncUserRoles } from './authService.js';
 
 const s3Client = new S3Client();
 const dbClient = new DynamoDBClient();
@@ -36,20 +35,6 @@ export const handler = async (event) => {
                 console.error("S3 Audit Error:", s3Err);
             }
             return event;
-        }
-
-        // 2. Sincronizzazione Ruoli (Solo per PreTokenGeneration V1)
-        if (triggerSource === 'PreTokenGeneration_Authentication' || triggerSource === 'TokenGeneration_HostedAuth') {
-            if (email && rolesTable) {
-                return await syncUserRoles(dbClient, cognitoClient, {
-                    email,
-                    roles_table: rolesTable,
-                    userPoolId: event.userPoolId,
-                    userName: event.userName,
-                    event,
-                    expectedIdpId
-                });
-            }
         }
 
         return event;

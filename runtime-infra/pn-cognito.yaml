@@ -57,13 +57,13 @@ Parameters:
     Description: The base URL for the CloudFormation templates
     Default: ""
 
-  KinesisAuditStreamName:
+  KinesisAuditStreamArn:
     Type: String
-    Description: The name of the Kinesis Stream for audit logs
+    Description: The ARN of the Kinesis Stream for audit logs
     Default: ""
 
 Conditions:
-  SendLogToKinesis: !Not [ !Equals [ !Ref KinesisAuditStreamName, '' ] ]
+  SendLogToKinesis: !Not [ !Equals [ !Ref KinesisAuditStreamArn, '' ] ]
 
 Resources:
   CognitoLogsS3:
@@ -168,7 +168,46 @@ Resources:
         LogGroupPrefix: "/aws/lambda"
         LogGroupRetention: !Ref LogGroupRetentionInDays
         LogFilterPattern: "AUDIT10Y"
-        LogsKinesisSourceStreamArn: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${KinesisAuditStreamName}"
+        LogsKinesisSourceStreamArn: ""
+
+  SubscriptionFilterServiceRole:
+    Condition: SendLogToKinesis
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: !Sub "logs.${AWS::Region}.amazonaws.com"
+      Path: /
+      Policies:
+        - PolicyName: !Sub "${ProjectName}-logs-subscription-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - kinesis:PutRecord
+                Resource: !Ref KinesisAuditStreamArn
+              - Effect: Allow
+                Action:
+                  - kms:GenerateDataKey
+                  - kms:Encrypt
+                Resource: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*"
+                Condition:
+                  StringLike:
+                    "kms:ViaService": !Sub "kinesis.${AWS::Region}.amazonaws.com"
+
+  SubscriptionFilter:
+    Condition: SendLogToKinesis
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      RoleArn: !GetAtt SubscriptionFilterServiceRole.Arn
+      LogGroupName: !GetAtt LambdaTriggerLogGroup.Outputs.LogGroupName
+      FilterPattern: "AUDIT10Y"
+      DestinationArn: !Ref KinesisAuditStreamArn
 
   UserPool:
     Type: "AWS::Cognito::UserPool"
