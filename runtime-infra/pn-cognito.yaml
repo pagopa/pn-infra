@@ -52,6 +52,11 @@ Parameters:
     Description: Log group retention in days
     Default: 14
 
+  TemplateBaseUrl:
+    Type: String
+    Description: The base URL for the CloudFormation templates
+    Default: ""
+
   KinesisAuditStreamName:
     Type: String
     Description: The name of the Kinesis Stream for audit logs
@@ -89,7 +94,7 @@ Resources:
     Properties: 
       FunctionName: !Sub ${ProjectName}-post-auth-cognito-trigger
       LoggingConfig:
-        LogGroup: !Ref LambdaTriggerLogGroup
+        LogGroup: !GetAtt LambdaTriggerLogGroup.Outputs.LogGroupName
       Code: 
         S3Bucket: !Ref LambdaS3Bucket
         S3Key: !Ref LambdaS3BucketKey
@@ -155,43 +160,15 @@ Resources:
       RoleName: !Sub ${ProjectName}-cognito-logs-role
 
   LambdaTriggerLogGroup:
-    Type: "AWS::Logs::LogGroup"
+    Type: AWS::CloudFormation::Stack
     Properties:
-      RetentionInDays: !Ref LogGroupRetentionInDays
-      LogGroupName: !Sub "/aws/lambda/${ProjectName}-post-auth-cognito-trigger-v2"
-
-  ### Subscription filters with Kinesis
-  SubscriptionFilter:
-    Condition: SendLogToKinesis
-    Type: AWS::Logs::SubscriptionFilter
-    Properties:
-      RoleArn: !GetAtt "SubscriptionFilterServiceRole.Arn"
-      LogGroupName: !Ref LambdaTriggerLogGroup
-      FilterPattern: "AUDIT10Y"
-      DestinationArn: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${KinesisAuditStreamName}"
-
-  ### IAM Role used by Subscription filters
-  SubscriptionFilterServiceRole:
-    Condition: SendLogToKinesis
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service: logs.amazonaws.com
-        Version: "2012-10-17"
-      Path: /
-      Policies:
-        - PolicyName: !Sub '${ProjectName}-logs-subscription-role'
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Action:
-                  - kinesis:PutRecord
-                Effect: Allow
-                Resource: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${KinesisAuditStreamName}"
+      TemplateURL: !Sub "${TemplateBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub "${ProjectName}-post-auth-cognito-trigger-v2"
+        LogGroupPrefix: "/aws/lambda"
+        LogGroupRetention: !Ref LogGroupRetentionInDays
+        LogFilterPattern: "AUDIT10Y"
+        LogsKinesisSourceStreamArn: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${KinesisAuditStreamName}"
 
   UserPool:
     Type: "AWS::Cognito::UserPool"
