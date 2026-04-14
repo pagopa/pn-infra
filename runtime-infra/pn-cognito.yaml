@@ -47,13 +47,18 @@ Parameters:
       - INFO
       - DEBUG
 
-  LogsKinesisSourceStreamArn:
+  LogGroupRetentionInDays:
+    Type: Number
+    Description: Log group retention in days
+    Default: 14
+
+  KinesisAuditStreamName:
     Type: String
-    Description: The ARN of the Kinesis Stream for logs
-    Default: "ENABLED"
+    Description: The name of the Kinesis Stream for audit logs
+    Default: ""
 
 Conditions:
-  SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
+  SendLogToKinesis: !Not [ !Equals [ !Ref KinesisAuditStreamName, '' ] ]
 
 Resources:
   CognitoLogsS3:
@@ -152,7 +157,7 @@ Resources:
   LambdaTriggerLogGroup:
     Type: "AWS::Logs::LogGroup"
     Properties:
-      RetentionInDays: 14
+      RetentionInDays: !Ref LogGroupRetentionInDays
       LogGroupName: !Sub "/aws/lambda/${ProjectName}-post-auth-cognito-trigger-v2"
 
   ### Subscription filters with Kinesis
@@ -163,7 +168,7 @@ Resources:
       RoleArn: !GetAtt "SubscriptionFilterServiceRole.Arn"
       LogGroupName: !Ref LambdaTriggerLogGroup
       FilterPattern: "AUDIT10Y"
-      DestinationArn: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${ProjectName}-logs-delivery-stream"
+      DestinationArn: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${KinesisAuditStreamName}"
 
   ### IAM Role used by Subscription filters
   SubscriptionFilterServiceRole:
@@ -186,7 +191,7 @@ Resources:
               - Action:
                   - kinesis:PutRecord
                 Effect: Allow
-                Resource: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${ProjectName}-logs-delivery-stream"
+                Resource: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${KinesisAuditStreamName}"
 
   UserPool:
     Type: "AWS::Cognito::UserPool"
