@@ -94,7 +94,7 @@ Resources:
     Properties: 
       FunctionName: !Sub ${ProjectName}-post-auth-cognito-trigger
       LoggingConfig:
-        LogGroup: !GetAtt LambdaTriggerLogGroup.Outputs.LogGroupName
+        LogGroup: !GetAtt CognitoTriggerLogGroupStack.Outputs.LogGroupName
       Code: 
         S3Bucket: !Ref LambdaS3Bucket
         S3Key: !Ref LambdaS3BucketKey
@@ -159,7 +159,7 @@ Resources:
                 Resource: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*"
       RoleName: !Sub ${ProjectName}-cognito-logs-role
 
-  LambdaTriggerLogGroup:
+  CognitoTriggerLogGroupStack:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBaseUrl}/fragments/log-group.yaml"
@@ -205,7 +205,7 @@ Resources:
     Type: AWS::Logs::SubscriptionFilter
     Properties:
       RoleArn: !GetAtt SubscriptionFilterServiceRole.Arn
-      LogGroupName: !GetAtt LambdaTriggerLogGroup.Outputs.LogGroupName
+      LogGroupName: !GetAtt CognitoTriggerLogGroupStack.Outputs.LogGroupName
       FilterPattern: "AUDIT10Y"
       DestinationArn: !Ref KinesisAuditStreamArn
 
