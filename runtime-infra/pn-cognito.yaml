@@ -47,9 +47,14 @@ Parameters:
       - INFO
       - DEBUG
 
-  TemplateBucketBaseUrl:
+  TemplateBaseUrl:
     Type: String
     Description: The base URL for the CloudFormation templates
+    Default: ""
+
+  LogsKinesisSourceStreamArn:
+    Type: String
+    Description: The ARN of the Kinesis Stream for logs
     Default: ""
 
 
@@ -81,6 +86,8 @@ Resources:
     Type: AWS::Lambda::Function
     Properties: 
       FunctionName: !Sub ${ProjectName}-post-auth-cognito-trigger
+      LoggingConfig:
+        LogGroup: !GetAtt LambdaTriggerLogGroup.Outputs.LogGroupName
       Code: 
         S3Bucket: !Ref LambdaS3Bucket
         S3Key: !Ref LambdaS3BucketKey
@@ -122,7 +129,7 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:PutLogEvents
                 Resource:
-                - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-post-auth-cognito-trigger:*"
+                - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-post-auth-cognito-trigger-v2:*"
               - Sid: S3PutObject
                 Effect: Allow
                 Action: 
@@ -148,13 +155,13 @@ Resources:
   LambdaTriggerLogGroup:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      TemplateURL: !Sub "${TemplateBaseUrl}/fragments/log-group.yaml"
       Parameters:
-        LogGroupName: !Sub "${ProjectName}-post-auth-cognito-trigger"
+        LogGroupName: !Sub "${ProjectName}-post-auth-cognito-trigger-v2"
         LogGroupPrefix: "/aws/lambda"
-        LogGroupRetention: 14  #PROBABILY TO MODIFY
+        LogGroupRetention: 14
         LogFilterPattern: "AUDIT10Y"
-        # LogsKinesisSourceStreamArn: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/pn-logs-delivery-stream"
+        LogsKinesisSourceStreamArn: !Ref LogsKinesisSourceStreamArn
 
   UserPool:
     Type: "AWS::Cognito::UserPool"
