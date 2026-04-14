@@ -47,16 +47,13 @@ Parameters:
       - INFO
       - DEBUG
 
-  TemplateBaseUrl:
-    Type: String
-    Description: The base URL for the CloudFormation templates
-    Default: ""
-
   LogsKinesisSourceStreamArn:
     Type: String
     Description: The ARN of the Kinesis Stream for logs
-    Default: ""
+    Default: "ENABLED"
 
+Conditions:
+  SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
 
 Resources:
   CognitoLogsS3:
@@ -87,7 +84,7 @@ Resources:
     Properties: 
       FunctionName: !Sub ${ProjectName}-post-auth-cognito-trigger
       LoggingConfig:
-        LogGroup: !GetAtt LambdaTriggerLogGroup.Outputs.LogGroupName
+        LogGroup: !Ref LambdaTriggerLogGroup
       Code: 
         S3Bucket: !Ref LambdaS3Bucket
         S3Key: !Ref LambdaS3BucketKey
@@ -153,15 +150,43 @@ Resources:
       RoleName: !Sub ${ProjectName}-cognito-logs-role
 
   LambdaTriggerLogGroup:
-    Type: AWS::CloudFormation::Stack
+    Type: "AWS::Logs::LogGroup"
     Properties:
-      TemplateURL: !Sub "${TemplateBaseUrl}/fragments/log-group.yaml"
-      Parameters:
-        LogGroupName: !Sub "${ProjectName}-post-auth-cognito-trigger-v2"
-        LogGroupPrefix: "/aws/lambda"
-        LogGroupRetention: 14
-        LogFilterPattern: "AUDIT10Y"
-        LogsKinesisSourceStreamArn: !Ref LogsKinesisSourceStreamArn
+      RetentionInDays: 14
+      LogGroupName: !Sub "/aws/lambda/${ProjectName}-post-auth-cognito-trigger-v2"
+
+  ### Subscription filters with Kinesis
+  SubscriptionFilter:
+    Condition: SendLogToKinesis
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      RoleArn: !GetAtt "SubscriptionFilterServiceRole.Arn"
+      LogGroupName: !Ref LambdaTriggerLogGroup
+      FilterPattern: "AUDIT10Y"
+      DestinationArn: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${ProjectName}-logs-delivery-stream"
+
+  ### IAM Role used by Subscription filters
+  SubscriptionFilterServiceRole:
+    Condition: SendLogToKinesis
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: logs.amazonaws.com
+        Version: "2012-10-17"
+      Path: /
+      Policies:
+        - PolicyName: !Sub '${ProjectName}-logs-subscription-role'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - kinesis:PutRecord
+                Effect: Allow
+                Resource: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${ProjectName}-logs-delivery-stream"
 
   UserPool:
     Type: "AWS::Cognito::UserPool"
