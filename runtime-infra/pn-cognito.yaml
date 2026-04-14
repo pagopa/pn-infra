@@ -47,6 +47,11 @@ Parameters:
       - INFO
       - DEBUG
 
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: The base URL for the CloudFormation templates
+    Default: ""
+
 
 Resources:
   CognitoLogsS3:
@@ -141,10 +146,15 @@ Resources:
       RoleName: !Sub ${ProjectName}-cognito-logs-role
 
   LambdaTriggerLogGroup:
-    Type: "AWS::Logs::LogGroup"
+    Type: AWS::CloudFormation::Stack
     Properties:
-      RetentionInDays: 14
-      LogGroupName: !Sub "/aws/lambda/${ProjectName}-post-auth-cognito-trigger"
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub "${ProjectName}-post-auth-cognito-trigger"
+        LogGroupPrefix: "/aws/lambda"
+        LogGroupRetention: 14  #PROBABILY TO MODIFY
+        LogFilterPattern: "AUDIT10Y"
+        # LogsKinesisSourceStreamArn: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/pn-logs-delivery-stream"
 
   UserPool:
     Type: "AWS::Cognito::UserPool"

@@ -7,6 +7,18 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
     
     console.log(`Starting role sync for ${email} on table ${roles_table} (PreToken V2)`);
     
+    // AUDIT LOG: BEFORE
+    console.log(JSON.stringify({
+        "@timestamp": new Date().toISOString(),
+        "message": `[AUD_HD_LOGIN] BEFORE - Start syncUserRoles - user=${email} sub=${userName}`,
+        "level": "INFO",
+        "aud_type": "AUD_HD_LOGIN",
+        "user": email,
+        "sub": userName,
+        "triggerSource": event.triggerSource,
+        "tags": ["AUDIT10Y"]
+    }));
+
     try {
         const dbRes = await dbClient.send(new GetItemCommand({
             TableName: roles_table,
@@ -24,7 +36,7 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
             console.log(`Found roles for ${email}: ${tags}.`);
 
             let issuerVerified = true;
-            // Teniamo commentato per i test iniziali se necessario
+            // Keep commented for initial testing if needed
             /*
             if (dbExpectedIdpId) {
                 const identitiesStr = (event.request.userAttributes && event.request.userAttributes.identities) || "";
@@ -36,7 +48,7 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
             */
 
             if (issuerVerified) {
-                // 1. AGGIORNAMENTO DATABASE (per Amplify SDK che legge dall'utente)
+                // 1. DATABASE UPDATE (for Amplify SDK reading from user)
                 console.log(`Updating Cognito DB for user ${userName} with tags: ${tags}`);
                 await cognitoClient.send(new AdminUpdateUserAttributesCommand({
                     UserPoolId: userPoolId,
@@ -47,7 +59,7 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
                     ]
                 }));
 
-                // 2. OVERRIDE TOKEN FORMATO V2 (per avere tutto popolato atomisticamente)
+                // 2. TOKEN OVERRIDE V2 FORMAT (atomic population)
                 event.response = {
                     claimsAndScopeOverrideDetails: {
                         idTokenGeneration: {
@@ -64,12 +76,77 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
                     }
                 };
                 
+                // AUDIT LOG: SUCCESS
+                console.log(JSON.stringify({
+                    "@timestamp": new Date().toISOString(),
+                    "message": `[AUD_HD_LOGIN] SUCCESS - User logged in and roles synchronized - user=${email} roles=${tags}`,
+                    "level": "INFO",
+                    "aud_type": "AUD_HD_LOGIN",
+                    "user": email,
+                    "sub": userName,
+                    "roles": tags,
+                    "status": "SUCCESS",
+                    "tags": ["AUDIT10Y"]
+                }));
+
                 console.log(`SUCCESS: Updated DB and Prepared V2 Token override for ${email}`);
             }
+        } else {
+            // DEPROVISIONING: User not in DynamoDB (or no tags)
+            console.warn(`DEPROVISIONING: User ${email} not found in DynamoDB. Stripping all roles.`);
+
+            // 1. COGNITO DATABASE CLEANUP (security)
+            await cognitoClient.send(new AdminUpdateUserAttributesCommand({
+                UserPoolId: userPoolId,
+                Username: userName,
+                UserAttributes: [
+                    { Name: 'custom:backoffice_tags', Value: "" }
+                ]
+            }));
+
+            // 2. EMPTY TOKEN OVERRIDE (User logs in but has no permissions)
+            event.response = {
+                claimsAndScopeOverrideDetails: {
+                    idTokenGeneration: {
+                        claimsToAddOrOverride: {
+                            "custom:backoffice_tags": ""
+                        }
+                    },
+                    accessTokenGeneration: {
+                        claimsToAddOrOverride: {
+                            "custom:backoffice_tags": ""
+                        }
+                    }
+                }
+            };
+
+            // AUDIT LOG: FAILURE (User not in DB)
+            console.log(JSON.stringify({
+                "@timestamp": new Date().toISOString(),
+                "message": `[AUD_HD_LOGIN] FAILURE - User not found in DynamoDB roles table - user=${email}`,
+                "level": "WARN",
+                "aud_type": "AUD_HD_LOGIN",
+                "user": email,
+                "sub": userName,
+                "status": "FAILURE",
+                "tags": ["AUDIT10Y"]
+            }));
         }
         
         return event;
     } catch (err) {
+        // AUDIT LOG: FAILURE (Critical Exception)
+        console.log(JSON.stringify({
+            "@timestamp": new Date().toISOString(),
+            "message": `[AUD_HD_LOGIN] FAILURE - Exception during syncUserRoles - error=${err.message}`,
+            "level": "ERROR",
+            "aud_type": "AUD_HD_LOGIN",
+            "user": email,
+            "sub": userName,
+            "status": "FAILURE",
+            "tags": ["AUDIT10Y"]
+        }));
+
         console.error("Error in syncUserRoles:", err);
         throw err;
     }
