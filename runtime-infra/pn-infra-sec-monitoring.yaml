@@ -427,7 +427,7 @@ Resources:
               userArn: $.detail.userIdentity.arn
               tableName: $.detail.requestParameters.tableName
               sourceIP: $.detail.sourceIPAddress
-              eventID: $.detail.eventID,
+              eventID: $.detail.eventID
               region: $.detail.awsRegion
             InputTemplate: !Sub |
               "CRITICAL: DynamoDB Deletion Protection Disabled - Environment: ${EnvironmentType} - Table: <tableName> - User: <user> (ARN: <userArn>) - Source IP: <sourceIP> - Time: <time> - Region: <region> - ACTION REQUIRED: Re-enable immediately with: aws dynamodb update-table --table-name <tableName> --deletion-protection-enabled - CloudTrail Event ID: <eventID>"
