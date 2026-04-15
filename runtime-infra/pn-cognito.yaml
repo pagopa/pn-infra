@@ -62,9 +62,6 @@ Parameters:
     Description: The ARN of the Kinesis Stream for audit logs
     Default: ""
 
-Conditions:
-  SendLogToKinesis: !Not [ !Equals [ !Ref KinesisAuditStreamArn, '' ] ]
-
 Resources:
   CognitoLogsS3:
     Type: AWS::S3::Bucket
