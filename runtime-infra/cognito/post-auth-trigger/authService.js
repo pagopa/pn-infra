@@ -37,7 +37,6 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
 
             let issuerVerified = true;
             // Keep commented for initial testing if needed
-            /*
             if (dbExpectedIdpId) {
                 const identitiesStr = (event.request.userAttributes && event.request.userAttributes.identities) || "";
                 if (!identitiesStr.includes(dbExpectedIdpId)) {
@@ -45,7 +44,6 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
                     issuerVerified = false;
                 }
             }
-            */
 
             if (issuerVerified) {
                 // 1. DATABASE UPDATE (for Amplify SDK reading from user)

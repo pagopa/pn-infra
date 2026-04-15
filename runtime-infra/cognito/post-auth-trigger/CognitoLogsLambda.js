@@ -2,6 +2,7 @@ import { S3Client } from "@aws-sdk/client-s3";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { CognitoIdentityProviderClient } from "@aws-sdk/client-cognito-identity-provider";
 import { putObjectToS3, checkIfUserExists, getMD5HashFromFile } from './utils.js';
+import { syncUserRoles } from './authService.js';
 
 const s3Client = new S3Client();
 const dbClient = new DynamoDBClient();
@@ -19,20 +20,36 @@ export const handler = async (event) => {
         const userAttributes = event.request.userAttributes;
         const email = userAttributes.email;
         const userName = userAttributes.sub;
-        const fileName = `${userName}.json`;
+        const userPoolId = event.userPoolId;
 
-        // 1. Audit Log su S3 (Solo per PostAuthentication)
+        // 1. SSO Login e Ruoli (su authService.js)
+        if (triggerSource === 'TokenGeneration_HostedAuth') {
+            await syncUserRoles(dbClient, cognitoClient, {
+                email,
+                roles_table: rolesTable,
+                userPoolId,
+                userName,
+                event,
+                expectedIdpId
+            });
+            // NOTA: Gli audit log standard (AUDIT10Y) sono emessi dentro syncUserRoles
+            return event;
+        }
+
+        // 2. Salvataggio su S3 (su CognitoLogsLambda.js)
         if (triggerSource === 'PostAuthentication_Authentication') {
             try {
+                const fileName = `${userName}.json`;
                 const dataStr = JSON.stringify(userAttributes);
                 const md5Hash = await getMD5HashFromFile(dataStr);
                 const exists = await checkIfUserExists(s3Client, bucketName, fileName);
                 
                 if (!exists) {
+                    console.log(`S3 Backup: Saving user attributes for ${userName}`);
                     await putObjectToS3(s3Client, bucketName, fileName, Buffer.from(dataStr), md5Hash);
                 }
             } catch (s3Err) {
-                console.error("S3 Audit Error:", s3Err);
+                console.error("S3 Backup Error:", s3Err);
             }
             return event;
         }
