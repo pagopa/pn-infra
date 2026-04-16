@@ -1,25 +1,17 @@
 import { GetItemCommand } from "@aws-sdk/client-dynamodb";
 import { AdminUpdateUserAttributesCommand } from "@aws-sdk/client-cognito-identity-provider";
+import { auditLog } from "./log.js";
 
 export const syncUserRoles = async (dbClient, cognitoClient, params) => {
     const { email, roles_table, userPoolId, userName, event, expectedIdpId } = params;
     const isDebug = process.env.LOG_LEVEL === 'DEBUG';
+    const aud_orig = "https://helpdesk.dev.notifichedigitali.it";
+    const aud_type = "AUD_HD_LOGIN";
     
     console.log(`Starting role sync for ${email} on table ${roles_table} (PreToken V2)`);
     
     // AUDIT LOG: BEFORE
-    console.log(JSON.stringify({
-        "@timestamp": new Date().toISOString(),
-        "@version": "1",
-        "message": `[AUD_HD_LOGIN] - INFO - BEFORE - Start syncUserRoles - user=${email} sub=${userName}`,
-        "logger_name": "it.pagopa.pn.commons.log.PnAuditLog",
-        "level": "INFO",
-        "level_value": 20000,
-        "aud_type": "AUD_HD_LOGIN",
-        "aud_orig": "https://helpdesk.dev.notifichedigitali.it",
-        "uid": userName,
-        "tags": ["AUDIT10Y"]
-    }));
+    auditLog("Start syncUserRoles", aud_type, aud_orig, "", "PF", "PF-" + userName, null, userName).info("info");
 
     try {
         const dbRes = await dbClient.send(new GetItemCommand({
@@ -77,18 +69,7 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
                 };
                 
                 // AUDIT LOG: SUCCESS
-                console.log(JSON.stringify({
-                    "@timestamp": new Date().toISOString(),
-                    "@version": "1",
-                    "message": `[AUD_HD_LOGIN] SUCCESS - User logged in and roles synchronized - user=${email} roles=${tags}`,
-                    "logger_name": "it.pagopa.pn.commons.log.PnAuditLog",
-                    "level": "INFO",
-                    "level_value": 20000,
-                    "uid": userName,
-                    "aud_type": "AUD_HD_LOGIN",
-                    "aud_orig": "https://helpdesk.dev.notifichedigitali.it",
-                    "tags": ["AUDIT10Y"]
-                }));
+                auditLog("User logged in and roles synchronized", aud_type, aud_orig, "OK", "PF", "PF-" + userName, null, userName).info("success");
 
                 console.log(`SUCCESS: Updated DB and Prepared V2 Token override for ${email}`);
             }
@@ -122,35 +103,13 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
             };
 
             // AUDIT LOG: FAILURE (User not in DB)
-            console.log(JSON.stringify({
-                "@timestamp": new Date().toISOString(),
-                "@version": "1",
-                "message": `[AUD_HD_LOGIN] FAILURE - User not found in DynamoDB roles table - user=${email}`,
-                "logger_name": "it.pagopa.pn.commons.log.PnAuditLog",
-                "level": "WARN",
-                "level_value": 30000,
-                "uid": userName,
-                "aud_type": "AUD_HD_LOGIN",
-                "aud_orig": "https://helpdesk.dev.notifichedigitali.it",
-                "tags": ["AUDIT10Y"]
-            }));
+            auditLog("User not found in DynamoDB roles table", aud_type, aud_orig, "KO", "PF", "PF-" + userName, null, userName).warn("error");
         }
         
         return event;
     } catch (err) {
         // AUDIT LOG: FAILURE (Critical Exception)
-        console.log(JSON.stringify({
-            "@timestamp": new Date().toISOString(),
-            "@version": "1",
-            "message": `[AUD_HD_LOGIN] FAILURE - Exception during syncUserRoles - error=${err.message}`,
-            "logger_name": "it.pagopa.pn.commons.log.PnAuditLog",
-            "level": "ERROR",
-            "level_value": 40000,
-            "uid": userName,
-            "aud_type": "AUD_HD_LOGIN",
-            "aud_orig": "https://helpdesk.dev.notifichedigitali.it",
-            "tags": ["AUDIT10Y"]
-        }));
+        auditLog(`Exception during syncUserRoles: ${err.message}`, aud_type, aud_orig, "KO", "PF", "PF-" + userName, null, userName).error("error");
 
         console.error("Error in syncUserRoles:", err);
         throw err;
