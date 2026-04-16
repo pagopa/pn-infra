@@ -10,12 +10,14 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
     // AUDIT LOG: BEFORE
     console.log(JSON.stringify({
         "@timestamp": new Date().toISOString(),
-        "message": `[AUD_HD_LOGIN] BEFORE - Start syncUserRoles - user=${email} sub=${userName}`,
+        "@version": "1",
+        "message": `[AUD_HD_LOGIN] - INFO - BEFORE - Start syncUserRoles - user=${email} sub=${userName}`,
+        "logger_name": "it.pagopa.pn.commons.log.PnAuditLog",
         "level": "INFO",
+        "level_value": 20000,
         "aud_type": "AUD_HD_LOGIN",
-        "user": email,
-        "sub": userName,
-        "triggerSource": event.triggerSource,
+        "aud_orig": "https://helpdesk.dev.notifichedigitali.it",
+        "uid": userName,
         "tags": ["AUDIT10Y"]
     }));
 
@@ -77,13 +79,14 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
                 // AUDIT LOG: SUCCESS
                 console.log(JSON.stringify({
                     "@timestamp": new Date().toISOString(),
+                    "@version": "1",
                     "message": `[AUD_HD_LOGIN] SUCCESS - User logged in and roles synchronized - user=${email} roles=${tags}`,
+                    "logger_name": "it.pagopa.pn.commons.log.PnAuditLog",
                     "level": "INFO",
+                    "level_value": 20000,
+                    "uid": userName,
                     "aud_type": "AUD_HD_LOGIN",
-                    "user": email,
-                    "sub": userName,
-                    "roles": tags,
-                    "status": "SUCCESS",
+                    "aud_orig": "https://helpdesk.dev.notifichedigitali.it",
                     "tags": ["AUDIT10Y"]
                 }));
 
@@ -121,12 +124,14 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
             // AUDIT LOG: FAILURE (User not in DB)
             console.log(JSON.stringify({
                 "@timestamp": new Date().toISOString(),
+                "@version": "1",
                 "message": `[AUD_HD_LOGIN] FAILURE - User not found in DynamoDB roles table - user=${email}`,
+                "logger_name": "it.pagopa.pn.commons.log.PnAuditLog",
                 "level": "WARN",
+                "level_value": 30000,
+                "uid": userName,
                 "aud_type": "AUD_HD_LOGIN",
-                "user": email,
-                "sub": userName,
-                "status": "FAILURE",
+                "aud_orig": "https://helpdesk.dev.notifichedigitali.it",
                 "tags": ["AUDIT10Y"]
             }));
         }
@@ -136,12 +141,14 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
         // AUDIT LOG: FAILURE (Critical Exception)
         console.log(JSON.stringify({
             "@timestamp": new Date().toISOString(),
+            "@version": "1",
             "message": `[AUD_HD_LOGIN] FAILURE - Exception during syncUserRoles - error=${err.message}`,
+            "logger_name": "it.pagopa.pn.commons.log.PnAuditLog",
             "level": "ERROR",
+            "level_value": 40000,
+            "uid": userName,
             "aud_type": "AUD_HD_LOGIN",
-            "user": email,
-            "sub": userName,
-            "status": "FAILURE",
+            "aud_orig": "https://helpdesk.dev.notifichedigitali.it",
             "tags": ["AUDIT10Y"]
         }));
 
