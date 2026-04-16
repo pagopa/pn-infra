@@ -102,6 +102,11 @@ Parameters:
     Type: String
     Default: '-'
     Description: Data lake account id 2
+  
+  InfraSecTopicName:
+    Type: String
+    Description: 'Infrastructure security topic name'
+    Default: 'pn-InfraSecTopic'
 
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
@@ -493,6 +498,18 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogsKinesisSourceStreamArn: !GetAtt LogsKinesisStream.Arn
         
+  InfraSecTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Ref InfraSecTopicName
+
+  InfraSecTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: '{{resolve:ssm:/notification/infra/email}}'
+      TopicArn: !Ref InfraSecTopic
+      
 Outputs:
   LogsBucketKmsKeyArn:
     Value: 
@@ -566,3 +583,7 @@ Outputs:
   ESMKinesisFailureNotificationsBucketName:
     Value: !Ref ESMKinesisFailureNotificationsBucket
     Description: 'Bucket name for ESM Kinesis failure notifications'
+
+  InfraSecTopicArn:
+    Value: !Ref InfraSecTopic
+    Description: 'Infrastructure security topic ARN'

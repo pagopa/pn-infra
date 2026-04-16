@@ -98,6 +98,11 @@ Parameters:
     Type: Number
     Default: 14
     Description: Number of days of Default Retention ObjectLock
+  
+  InfraSecTopicName:
+    Type: String
+    Description: 'Infrastructure security topic name'
+    Default: 'pn-InfraSecTopic'
 
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
@@ -487,6 +492,18 @@ Resources:
                 "aws:SourceArn": !Sub "arn:${AWS::Partition}:s3:*:*:${ProjectName}-logs-bucket-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}"
               StringEquals:
                 "aws:SourceAccount": !Ref AWS::AccountId
+  
+  InfraSecTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Ref InfraSecTopicName
+
+  InfraSecTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: '{{resolve:ssm:/notification/infra/email}}'
+      TopicArn: !Ref InfraSecTopic
 
 Outputs:
   LogsBucketKmsKeyArn:
@@ -580,3 +597,7 @@ Outputs:
 
   LogRetention:
     Value: !Ref LogRetention
+  
+  InfraSecTopicArn:
+    Value: !Ref InfraSecTopic
+    Description: 'Infrastructure security topic ARN'

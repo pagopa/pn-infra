@@ -323,6 +323,10 @@ Parameters:
     Type: String
     Description: 'Bucket name for ESM Kinesis failure notifications'
 
+  InfraSecTopicArn:
+    Type: String
+    Description: 'Infrastructure security topic ARN'
+
 Conditions:
   IsAlbArnEmpty: !Equals [ !Ref ApplicationLoadBalancerArn, '-' ]
   IsAlbArnDnsEmpty: !Equals [ !Ref ApplicationLoadBalancerAwsDns, '-' ]
@@ -1562,4 +1566,7 @@ Outputs:
 
   ESMKinesisFailureNotificationsBucketName:
     Value: !Ref ESMKinesisFailureNotificationsBucketName
+
+  InfraSecTopicArn:
+    Value: !Ref InfraSecTopicArn
     

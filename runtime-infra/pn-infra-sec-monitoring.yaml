@@ -70,7 +70,7 @@ Parameters:
     Type: String
     Description: 'ARN of KMS key for decrypting CDC stream (if encrypted)'
 
-  CriticalAlarmSNSTopicArn:
+  InfraSecTopicArn:
     Type: String
     Description: 'ARN of SNS topic for critical alerts'
 
@@ -188,7 +188,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !Ref CriticalAlarmSNSTopicArn
+                Resource: !Ref InfraSecTopicArn
               - Effect: Allow
                 Action:
                   - kinesis:GetRecords
@@ -224,7 +224,7 @@ Resources:
         S3Key: !Sub ${LambdasBasePath}/infra-sec-monitoring-dynamo-alert.zip
       Environment:
         Variables:
-          SNS_TOPIC_ARN: !Ref CriticalAlarmSNSTopicArn
+          SNS_TOPIC_ARN: !Ref InfraSecTopicArn
           TABLE_CONFIG: !Ref DynamoAlertLambdaTableConfig
           ENVIRONMENT: !Ref EnvironmentType
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
@@ -339,7 +339,7 @@ Resources:
     Type: AWS::SNS::TopicPolicy
     Properties:
       Topics:
-        - !Ref CriticalAlarmSNSTopicArn
+        - !Ref InfraSecTopicArn
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -348,7 +348,7 @@ Resources:
             Principal:
               Service: events.amazonaws.com
             Action: SNS:Publish
-            Resource: !Ref CriticalAlarmSNSTopicArn
+            Resource: !Ref InfraSecTopicArn
             Condition:
               StringEquals:
                 aws:SourceAccount: !Ref "AWS::AccountId"
@@ -369,7 +369,7 @@ Resources:
           eventName: ["DeleteTable"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref CriticalAlarmSNSTopicArn
+          Arn: !Ref InfraSecTopicArn
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -396,7 +396,7 @@ Resources:
               pointInTimeRecoveryEnabled: [false]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref CriticalAlarmSNSTopicArn
+          Arn: !Ref InfraSecTopicArn
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -419,7 +419,7 @@ Resources:
             deletionProtectionEnabled: [false]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref CriticalAlarmSNSTopicArn
+          Arn: !Ref InfraSecTopicArn
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -452,7 +452,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref CriticalAlarmSNSTopicArn
+          Arn: !Ref InfraSecTopicArn
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -478,7 +478,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref CriticalAlarmSNSTopicArn
+          Arn: !Ref InfraSecTopicArn
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -507,7 +507,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref CriticalAlarmSNSTopicArn
+          Arn: !Ref InfraSecTopicArn
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -533,7 +533,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref CriticalAlarmSNSTopicArn
+          Arn: !Ref InfraSecTopicArn
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -560,7 +560,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref CriticalAlarmSNSTopicArn
+          Arn: !Ref InfraSecTopicArn
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -582,6 +582,7 @@ Resources:
       Parameters:
         DynamoDBTableName: pn-ConfidentialObjects
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
+        SnsTopicArn: !Ref AlarmSNSTopicName
 
   pnTimelineCriticalMonitoring:
     Condition: HasCloudTrailLogsEnabledAndIsCoreAccount
@@ -591,6 +592,7 @@ Resources:
       Parameters:
         DynamoDBTableName: pn-Timelines
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
+        SnsTopicArn: !Ref AlarmSNSTopicName
 
   # ============================================================================
   # Metric Filter to detect S3
@@ -601,7 +603,7 @@ Resources:
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/s3-prefix-monitoring.yaml"
       Parameters:
-        SNSTopicArn: !Ref CriticalAlarmSNSTopicArn
+        SNSTopicArn: !Ref AlarmSNSTopicName
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
         BucketName: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
         CriticalPrefix: "PN_NOTIFICATION"
@@ -702,7 +704,7 @@ Resources:
         S3Key: !Sub ${LambdasBasePath}/infra-sec-url-access-analyzer-alert.zip
       Environment:
         Variables:
-          SNS_TOPIC_ARN: !Ref CriticalAlarmSNSTopicArn
+          SNS_TOPIC_ARN: !Ref InfraSecTopicArn
           TABLE_CONFIG: !Ref DynamoAlertLambdaTableConfig
           ENVIRONMENT: !Ref EnvironmentType
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
@@ -732,7 +734,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !Ref CriticalAlarmSNSTopicArn
+                Resource: !Ref InfraSecTopicArn
 
 
   #===========================================================================
@@ -873,7 +875,7 @@ Resources:
                 Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
               - Effect: Allow
                 Action: sns:Publish
-                Resource: !Ref CriticalAlarmSNSTopicArn
+                Resource: !Ref InfraSecTopicArn
               - Effect: Allow
                 Action:
                   - sqs:ReceiveMessage
@@ -907,7 +909,7 @@ Resources:
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
       Environment:
         Variables:
-          SNS_TOPIC_ARN: !Ref CriticalAlarmSNSTopicArn
+          SNS_TOPIC_ARN: !Ref InfraSecTopicArn
           DYNAMODB_TABLE_NAMES: !Join [",", !Ref DynamoDBAccessValidatorTables]
           S3_BUCKET_NAME: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
           AUTHORIZED_ROLES_CSV: "" 
