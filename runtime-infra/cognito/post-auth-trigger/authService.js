@@ -3,15 +3,15 @@ import { AdminUpdateUserAttributesCommand } from "@aws-sdk/client-cognito-identi
 import { auditLog } from "./log.js";
 
 export const syncUserRoles = async (dbClient, cognitoClient, params) => {
-    const { email, roles_table, userPoolId, userName, event, expectedIdpId } = params;
+    const { email, roles_table, userPoolId, userName, event, expectedIdpId, envType } = params;
     const isDebug = process.env.LOG_LEVEL === 'DEBUG';
-    const aud_orig = "https://helpdesk.dev.notifichedigitali.it";
+    const aud_orig = envType;
     const aud_type = "AUD_HD_LOGIN";
     
     console.log(`Starting role sync for ${email} on table ${roles_table} (PreToken V2)`);
     
     // AUDIT LOG: BEFORE
-    auditLog("Start syncUserRoles", aud_type, aud_orig, "", "PF", "PF-" + userName, null, userName).info("info");
+    auditLog(`INFO - Start syncUserRoles - sub=${userName}`, aud_type, aud_orig, userName);
 
     try {
         const dbRes = await dbClient.send(new GetItemCommand({
@@ -69,7 +69,7 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
                 };
                 
                 // AUDIT LOG: SUCCESS
-                auditLog("User logged in and roles synchronized", aud_type, aud_orig, "OK", "PF", "PF-" + userName, null, userName).info("success");
+                auditLog(`SUCCESS - User logged in and roles synchronized - sub=${userName} roles=${tags}`, aud_type, aud_orig, userName);
 
                 console.log(`SUCCESS: Updated DB and Prepared V2 Token override for ${email}`);
             }
@@ -103,13 +103,13 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
             };
 
             // AUDIT LOG: FAILURE (User not in DB)
-            auditLog("User not found in DynamoDB roles table", aud_type, aud_orig, "KO", "PF", "PF-" + userName, null, userName).warn("error");
+            auditLog(`FAILURE - User not found in DynamoDB roles table - sub=${userName}`, aud_type, aud_orig, userName);
         }
         
         return event;
     } catch (err) {
         // AUDIT LOG: FAILURE (Critical Exception)
-        auditLog(`Exception during syncUserRoles: ${err.message}`, aud_type, aud_orig, "KO", "PF", "PF-" + userName, null, userName).error("error");
+        auditLog(`FAILURE - Exception during syncUserRoles: ${err.message}`, aud_type, aud_orig, userName);
 
         console.error("Error in syncUserRoles:", err);
         throw err;

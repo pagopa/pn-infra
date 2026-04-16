@@ -17,6 +17,7 @@ export const handler = async (event) => {
         const bucketName = process.env.BucketName;
         const rolesTable = process.env.USER_ROLES_TABLE;
         const expectedIdpId = process.env.EXPECTED_IDPID;
+        const envType = process.env.ENVIRONMENT_TYPE || "dev";
         const userAttributes = event.request.userAttributes;
         const email = userAttributes.email;
         const userName = userAttributes.sub;
@@ -30,7 +31,8 @@ export const handler = async (event) => {
                 userPoolId,
                 userName,
                 event,
-                expectedIdpId
+                expectedIdpId,
+                envType
             });
             // NOTA: Gli audit log standard (AUDIT10Y) sono emessi dentro syncUserRoles
             return event;

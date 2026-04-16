@@ -101,7 +101,8 @@ Resources:
           BucketName: !Ref CognitoLogsS3
           USER_ROLES_TABLE: !Ref UserRolesTable
           LOG_LEVEL: !Ref LogLevel
-          AWS_LAMBDA_LOG_FORMAT: JSON
+          ENVIRONMENT_TYPE: !Ref EnvironmentType
+          AWS_LAMBDA_LOG_FORMAT: Text
       Handler: CognitoLogsLambda.handler
       Role: !GetAtt CognitoLambdaRole.Arn
       Runtime: nodejs22.x
