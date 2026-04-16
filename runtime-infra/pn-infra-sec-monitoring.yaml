@@ -145,6 +145,11 @@ Parameters:
     Default: '{}'
     Description: 'JSON filter pattern for DynamoDB CDC events from Kinesis stream'
 
+  InfraSecTopicName:
+    Type: String
+    Description: 'SNS topic name for security alerts'
+    Default: "pn-InfraSecTopic"
+
 Conditions:
   HasCloudTrailLogsEnabled: !Equals [!Ref EnableCloudTrailLogs, 'true']
   HasMonitoringS3Enabled: !Equals [!Ref S3MonitoringEnabled, 'true']
@@ -188,7 +193,10 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !Ref InfraSecTopicArn
+                Resource: !If
+                  - IsConfinfoAccount
+                  - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+                  - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
               - Effect: Allow
                 Action:
                   - kinesis:GetRecords
@@ -224,7 +232,10 @@ Resources:
         S3Key: !Sub ${LambdasBasePath}/infra-sec-monitoring-dynamo-alert.zip
       Environment:
         Variables:
-          SNS_TOPIC_ARN: !Ref InfraSecTopicArn
+          SNS_TOPIC_ARN: !If
+            - IsConfinfoAccount
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
           TABLE_CONFIG: !Ref DynamoAlertLambdaTableConfig
           ENVIRONMENT: !Ref EnvironmentType
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
@@ -236,6 +247,7 @@ Resources:
       Enabled: !Ref EnableDynamoLambdaAlert
       EventSourceArn: !Ref CdcKinesisStreamArn
       FunctionName: !Ref InfraSecMonitoringDynamoAlertLambda
+      MaximumRetryAttempts: 3
       StartingPosition: LATEST
       FilterCriteria:
         Filters:
@@ -369,7 +381,10 @@ Resources:
           eventName: ["DeleteTable"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If
+            - IsConfinfoAccount
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -396,7 +411,10 @@ Resources:
               pointInTimeRecoveryEnabled: [false]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If
+            - IsConfinfoAccount
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -419,7 +437,10 @@ Resources:
             deletionProtectionEnabled: [false]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If
+            - IsConfinfoAccount
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -452,7 +473,10 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If
+            - IsConfinfoAccount
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -478,7 +502,10 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If
+            - IsConfinfoAccount
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -507,7 +534,10 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If
+            - IsConfinfoAccount
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -533,7 +563,10 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If
+            - IsConfinfoAccount
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -560,7 +593,10 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If
+            - IsConfinfoAccount
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -582,7 +618,10 @@ Resources:
       Parameters:
         DynamoDBTableName: pn-ConfidentialObjects
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
-        SnsTopicArn: !Ref AlarmSNSTopicName
+        SnsTopicArn: !If
+          - IsConfinfoAccount
+          - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+          - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
 
   pnTimelineCriticalMonitoring:
     Condition: HasCloudTrailLogsEnabledAndIsCoreAccount
@@ -592,7 +631,10 @@ Resources:
       Parameters:
         DynamoDBTableName: pn-Timelines
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
-        SnsTopicArn: !Ref AlarmSNSTopicName
+        SnsTopicArn: !If
+          - IsConfinfoAccount
+          - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+          - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
 
   # ============================================================================
   # Metric Filter to detect S3
@@ -603,7 +645,10 @@ Resources:
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/s3-prefix-monitoring.yaml"
       Parameters:
-        SNSTopicArn: !Ref AlarmSNSTopicName
+        SNSTopicArn: !If
+          - IsConfinfoAccount
+          - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+          - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
         BucketName: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
         CriticalPrefix: "PN_NOTIFICATION"
@@ -734,7 +779,10 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !Ref InfraSecTopicArn
+                Resource: !If
+                  - IsConfinfoAccount
+                  - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+                  - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
 
 
   #===========================================================================
@@ -874,8 +922,12 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
               - Effect: Allow
-                Action: sns:Publish
-                Resource: !Ref InfraSecTopicArn
+                Action:
+                  - sns:Publish
+                Resource: !If
+                  - IsConfinfoAccount
+                  - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+                  - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
               - Effect: Allow
                 Action:
                   - sqs:ReceiveMessage
@@ -891,7 +943,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/lambda/${ProjectName}-infra-sec-access-validator-alert"
-      RetentionInDays: 14
+      RetentionInDays: !Ref LogRetentionDays
 
   InfraSecAccessValidatorFunction:
     Type: AWS::Lambda::Function
@@ -927,11 +979,11 @@ Resources:
       FunctionName: !Ref InfraSecAccessValidatorFunction
       BatchSize: 10
       MaximumBatchingWindowInSeconds: 5
+      MaximumRetryAttempts: 3
       ScalingConfig:
         MaximumConcurrency: !Ref LambdaReservedConcurrency
       FunctionResponseTypes:
         - ReportBatchItemFailures
-
 
 Outputs:
   Version:

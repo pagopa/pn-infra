@@ -107,6 +107,11 @@ Parameters:
     Type: String
     Description: 'Infrastructure security topic name'
     Default: 'pn-InfraSecTopic'
+  
+  ConfidentialInfoAccountId:
+    Type: String
+    Default: ''
+    Description: AWS AccountId of the confidential info account in same environment
 
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
@@ -117,6 +122,8 @@ Conditions:
 
   CdcOnDemandDisabled: !Not [!Equals [!Ref CdcStreamMode, ON_DEMAND]]
   LogsOnDemandDisabled: !Not [!Equals [!Ref LogsStreamMode, ON_DEMAND]]
+
+  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
 
 Resources:
   
@@ -510,6 +517,37 @@ Resources:
       Endpoint: '{{resolve:ssm:/notification/infra/email}}'
       TopicArn: !Ref InfraSecTopic
       
+  CanPublishInfraSecTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowServices
+            Effect: Allow
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+                - "cloudwatch.amazonaws.com"
+            Action:
+              - 'sns:Publish'
+            Resource:
+              - !Ref InfraSecTopic
+          - Fn::If: 
+            - HasConfidentialInfoAccountId
+            - Sid: AllowPublishFromConfinfo
+              Effect: Allow
+              Action:
+              - 'sns:Publish'
+              Principal:
+                AWS: 
+                  - !Sub arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root
+              Resource:
+                - !Ref InfraSecTopic
+            - !Ref AWS::NoValue
+      Topics:
+        - !Ref InfraSecTopic
+        
 Outputs:
   LogsBucketKmsKeyArn:
     Value: 
