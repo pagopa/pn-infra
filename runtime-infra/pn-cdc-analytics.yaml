@@ -109,12 +109,11 @@ Resources:
       Description: Workgroup for querying data in Athena
       State: ENABLED
       WorkGroupConfiguration:
-        EnforceWorkGroupConfiguration: false
+        EnforceWorkGroupConfiguration: true
         ResultConfiguration:
           OutputLocation: !Sub s3://${AthenaResultsBucket}/
-#          EncryptionConfiguration:
-#            EncryptionOption: SSE_KMS
-#            KmsKey: !Ref LogsBucketKmsKeyArn
+          EncryptionConfiguration:
+            EncryptionOption: SSE_S3
 
   GlueDatabase:
     Type: AWS::Glue::Database

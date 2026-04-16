@@ -642,10 +642,11 @@ Resources:
       Description: WorkGroup for Log analytics queries
       State: ENABLED
       WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: true
         ResultConfiguration:
           OutputLocation: !Sub s3://${AthenaResultsBucket}/
-          # EncryptionConfiguration:
-          #   EncryptionOption: SSE_KMS
+          EncryptionConfiguration:
+            EncryptionOption: SSE_S3
 
   GlueDatabaseConfInfo:
     Type: AWS::Glue::Database
@@ -1135,7 +1136,8 @@ Resources:
       Description: WorkGroup for Log analytics queries
       State: ENABLED
       WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: true
         ResultConfiguration:
           OutputLocation: !Sub s3://${AthenaResultsBucket}/confinfo-results/
-          # EncryptionConfiguration:
-          #   EncryptionOption: SSE_KMS
+          EncryptionConfiguration:
+            EncryptionOption: SSE_S3

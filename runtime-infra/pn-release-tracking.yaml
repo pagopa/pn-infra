@@ -175,9 +175,11 @@ Resources:
       RecursiveDeleteOption: true
       State: ENABLED
       WorkGroupConfiguration:
-        EnforceWorkGroupConfiguration: false
+        EnforceWorkGroupConfiguration: true
         ResultConfiguration:
           OutputLocation: !Sub s3://${ReleaseTrackingResultsBucket}/
+          EncryptionConfiguration:
+            EncryptionOption: SSE_S3
 
   ReleaseTrackingGlueDatabase:
     Type: AWS::Glue::Database
