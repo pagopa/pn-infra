@@ -8,10 +8,10 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
     const aud_orig = envType;
     const aud_type = "AUD_HD_LOGIN";
     
-    console.log(`Starting role sync for ${email} on table ${roles_table} (PreToken V2)`);
+    // auditLog replaces console.log to avoid ingestion errors
     
     // AUDIT LOG: BEFORE
-    auditLog(`INFO - Start syncUserRoles - sub=${userName}`, aud_type, aud_orig, userName);
+    auditLog(`Start syncUserRoles - sub=${userName}`, aud_type, aud_orig, userName);
 
     try {
         const dbRes = await dbClient.send(new GetItemCommand({
@@ -20,28 +20,27 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
         }));
 
         if (isDebug) {
-            console.log(`DEBUG: DynamoDB response for ${email}:`, JSON.stringify(dbRes.Item, null, 2));
+            auditLog(`DynamoDB response for sub=${userName}`, aud_type, aud_orig, userName);
         }
 
         if (dbRes.Item && dbRes.Item.backoffice_tags) {
             const tags = dbRes.Item.backoffice_tags.S;
             const dbExpectedIdpId = dbRes.Item.expected_idpid ? dbRes.Item.expected_idpid.S : expectedIdpId;
             
-            console.log(`Found roles for ${email}: ${tags}.`);
+            auditLog(`Found roles for sub=${userName}: ${tags}`, aud_type, aud_orig, userName);
 
             let issuerVerified = true;
-            // Keep commented for initial testing if needed
             if (dbExpectedIdpId) {
                 const identitiesStr = (event.request.userAttributes && event.request.userAttributes.identities) || "";
                 if (!identitiesStr.includes(dbExpectedIdpId)) {
-                    console.warn(`SECURITY ALERT: User ${email} attempted login with wrong IdPID.`);
+                    auditLog(`SECURITY ALERT: User with sub=${userName} attempted login with wrong IdPID`, aud_type, aud_orig, userName);
                     issuerVerified = false;
                 }
             }
 
             if (issuerVerified) {
                 // 1. DATABASE UPDATE (for Amplify SDK reading from user)
-                console.log(`Updating Cognito DB for user ${userName} with tags: ${tags}`);
+                auditLog(`Updating Cognito DB for user sub=${userName} with tags: ${tags}`, aud_type, aud_orig, userName);
                 await cognitoClient.send(new AdminUpdateUserAttributesCommand({
                     UserPoolId: userPoolId,
                     Username: userName,
@@ -69,13 +68,11 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
                 };
                 
                 // AUDIT LOG: SUCCESS
-                auditLog(`SUCCESS - User logged in and roles synchronized - sub=${userName} roles=${tags}`, aud_type, aud_orig, userName);
-
-                console.log(`SUCCESS: Updated DB and Prepared V2 Token override for ${email}`);
+                auditLog(`User logged in and roles synchronized - sub=${userName} roles=${tags}`, aud_type, aud_orig, userName);
             }
         } else {
             // DEPROVISIONING: User not in DynamoDB (or no tags)
-            console.warn(`DEPROVISIONING: User ${email} not found in DynamoDB. Stripping all roles.`);
+            auditLog(`DEPROVISIONING: User with sub=${userName} not found in DynamoDB. Stripping all roles`, aud_type, aud_orig, userName);
 
             // 1. COGNITO DATABASE CLEANUP (security)
             await cognitoClient.send(new AdminUpdateUserAttributesCommand({
@@ -103,13 +100,13 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
             };
 
             // AUDIT LOG: FAILURE (User not in DB)
-            auditLog(`FAILURE - User not found in DynamoDB roles table - sub=${userName}`, aud_type, aud_orig, userName);
+            auditLog(`User not found in DynamoDB roles table - sub=${userName}`, aud_type, aud_orig, userName);
         }
         
         return event;
     } catch (err) {
         // AUDIT LOG: FAILURE (Critical Exception)
-        auditLog(`FAILURE - Exception during syncUserRoles: ${err.message}`, aud_type, aud_orig, userName);
+        auditLog(`Exception during syncUserRoles: ${err.message}`, aud_type, aud_orig, userName);
 
         console.error("Error in syncUserRoles:", err);
         throw err;

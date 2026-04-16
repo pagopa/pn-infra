@@ -11,7 +11,8 @@ const cognitoClient = new CognitoIdentityProviderClient();
 export const handler = async (event) => {
     if (!event) return event;
     const triggerSource = event.triggerSource;
-    console.log(`Cognito Trigger [${triggerSource}] Event:`, JSON.stringify(event, null, 2));
+    // Log deactivated to prevent OpenSearch ingestion errors
+    // console.log(`Cognito Trigger [${triggerSource}] Event:`, JSON.stringify(event, null, 2));
 
     try {
         const bucketName = process.env.BucketName;
