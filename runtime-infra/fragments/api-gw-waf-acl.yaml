@@ -121,6 +121,16 @@ Parameters:
     Default: 10
     Description: Datapoints to alarm for the oncall generic block rate alarm
 
+  OncallBlockRateAlarmPeriodSeconds:
+    Type: Number
+    Default: 60
+    Description: Period seconds for the oncall generic block rate alarm
+
+  OncallBlockRateAlarmEvaluationPeriods:
+    Type: Number
+    Default: 20
+    Description: Evaluation periods for the oncall generic block rate alarm
+
   EnhancedWebSecurityEnabled:
     Type: String
     Default: false
@@ -1102,7 +1112,7 @@ Resources:
                   Value: ALL
               MetricName: "BlockedRequests"
               Namespace: "AWS/WAFV2"
-            Period: !Ref BlockRateAlarmPeriodSeconds
+            Period: !Ref OncallBlockRateAlarmPeriodSeconds
             Stat: Sum
           ReturnData: False
         - Id: m2
@@ -1117,7 +1127,7 @@ Resources:
                   Value: ALL
               MetricName: AllowedRequests
               Namespace: "AWS/WAFV2"
-            Period: !Ref BlockRateAlarmPeriodSeconds
+            Period: !Ref OncallBlockRateAlarmPeriodSeconds
             Stat: Sum
           ReturnData: False
         - Id: e1
@@ -1126,7 +1136,7 @@ Resources:
       TreatMissingData: "notBreaching"
       Threshold: 1
       ComparisonOperator: "GreaterThanOrEqualToThreshold"
-      EvaluationPeriods: !Ref BlockRateAlarmEvaluationPeriods
+      EvaluationPeriods: !Ref OncallBlockRateAlarmEvaluationPeriods
       DatapointsToAlarm: !Ref OncallBlockRateAlarmDatapointsToAlarm
       AlarmActions:
         - !Ref AlarmSNSTopicArn
