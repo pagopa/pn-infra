@@ -27,7 +27,7 @@ Parameters:
     AllowedValues: ["true","false"]
     Default: "true"
 
-  SNSTopicArn:
+  SnsTopicArn:
     Type: String
   
   EnableS3DeletionMetricFilterAlarm:
@@ -50,7 +50,7 @@ Conditions:
   HasS3DeletionMetricFilter: !Equals [ !Ref EnableS3DeletionMetricFilter, "true" ]
   HasS3FailedDeletionsMetricFilter: !Equals [ !Ref EnableS3FailedDeletionsMetricFilter, "true" ]
   HasS3FailedAccessMetricFilter: !Equals [ !Ref EnableS3FailedAccessMetricFilter, "true" ]
-  HasSNSTopicArn: !Not [ !Equals [ !Ref SNSTopicArn, "" ] ]
+  HasSnsTopicArn: !Not [ !Equals [ !Ref SnsTopicArn, "" ] ]
   HasS3DeletionMetricFilterAlarm: !And 
     - !Equals [ !Ref EnableS3DeletionMetricFilterAlarm, "true" ]
     - !Condition HasS3DeletionMetricFilter
