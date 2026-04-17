@@ -563,17 +563,6 @@ Resources:
   # ============================================================================
   # Metric Filters for critical DynamoDB tables
   # ============================================================================
-  # DA DEPRECARE
-  pnConfidentialObjectsCriticalMonitoring:
-    Condition: HasCloudTrailLogsEnabledAndIsConfinfoAccount
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/tables-monitoring.yaml"
-      Parameters:
-        DynamoDBTableName: pn-ConfidentialObjects
-        CloudTrailLogGroupName: !Ref CloudTrailLogGroup
-        SnsTopicArn: !Ref AlarmSNSTopicArn
-
   pnTimelineCriticalMonitoring:
     Condition: HasCloudTrailLogsEnabledAndIsCoreAccount
     Type: AWS::CloudFormation::Stack
