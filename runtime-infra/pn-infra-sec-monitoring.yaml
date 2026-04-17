@@ -624,7 +624,7 @@ Resources:
       Parameters:
         DynamoDBTableName: pn-ConfidentialObjects
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
-        SnsTopicArn: !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+        SnsTopicArn: !Ref AlarmSNSTopicName
 
   pnTimelineCriticalMonitoring:
     Condition: HasCloudTrailLogsEnabledAndIsCoreAccount
@@ -634,7 +634,7 @@ Resources:
       Parameters:
         DynamoDBTableName: pn-Timelines
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
-        SnsTopicArn: !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
+        SnsTopicArn: !Ref AlarmSNSTopicName
 
   # ============================================================================
   # Metric Filter to detect S3
@@ -645,7 +645,7 @@ Resources:
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/s3-prefix-monitoring.yaml"
       Parameters:
-        SNSTopicArn: !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
+        SnsTopicArn: !Ref AlarmSNSTopicName
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
         BucketName: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
         CriticalPrefix: "PN_NOTIFICATION"
