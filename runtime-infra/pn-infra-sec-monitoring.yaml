@@ -370,6 +370,8 @@ Resources:
             Condition:
               StringLike:
                 sns:ResourceName: !Sub "${InfraSecTopicName}"
+              StringEquals:
+                aws:SourceAccount: !Ref "AWS::AccountId"
 
   # ============================================================================
   # EventBridge rule to monitor DynamoDB critical tables
