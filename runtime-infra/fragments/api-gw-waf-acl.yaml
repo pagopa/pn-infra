@@ -88,7 +88,7 @@ Parameters:
 
   BlockRateMinTraffic:
     Type: Number
-    Default: 20
+    Default: 10
     Description: Minimum total requests for the generic block rate alarm
 
   BlockRateAlarmPeriodSeconds:
@@ -113,7 +113,7 @@ Parameters:
 
   OncallBlockRateMinTraffic:
     Type: Number
-    Default: 20
+    Default: 10
     Description: Minimum total requests for the oncall generic block rate alarm
 
   OncallBlockRateAlarmDatapointsToAlarm:
@@ -1054,7 +1054,7 @@ Resources:
                   Value: !Join ["-", ["MetricForRateBasedRule", !Ref WAFName]]
               MetricName: "BlockedRequests"
               Namespace: "AWS/WAFV2"
-            Period: !Ref BlockRateAlarmPeriodSeconds
+            Period: 60
             Stat: Sum
           ReturnData: False
         - Id: m2
@@ -1102,7 +1102,7 @@ Resources:
                   Value: ALL
               MetricName: "BlockedRequests"
               Namespace: "AWS/WAFV2"
-            Period: 60
+            Period: !Ref BlockRateAlarmPeriodSeconds
             Stat: Sum
           ReturnData: False
         - Id: m2
