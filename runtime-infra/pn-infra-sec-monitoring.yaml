@@ -365,11 +365,11 @@ Resources:
             Action: SNS:Publish
             Resource: !If 
               - IsConfinfoAccount
-              - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
-              - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
+              - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:*"
+              - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:*"
             Condition:
-              StringEquals:
-                aws:SourceAccount: !Ref "AWS::AccountId"
+              StringLike:
+                sns:ResourceName: !Sub "${InfraSecTopicName}"
 
   # ============================================================================
   # EventBridge rule to monitor DynamoDB critical tables
