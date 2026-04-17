@@ -493,41 +493,41 @@ Resources:
               StringEquals:
                 "aws:SourceAccount": !Ref AWS::AccountId
 
-  InfraSecTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Ref InfraSecTopicName
-      
-  CanPublishInfraSecTopicPolicy:
-    Type: AWS::SNS::TopicPolicy
-    Properties:
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Sid: AllowServices
-            Effect: Allow
-            Principal:
-              Service:
-                - "events.amazonaws.com"
-                - "cloudwatch.amazonaws.com"
-            Action:
-              - 'sns:Publish'
-            Resource:
-              - !Ref InfraSecTopic
-          - !If 
-            - HasPnCoreAwsAccountId
-            - Sid: AllowPublishFromPnCore
-              Effect: Allow
-              Action:
-              - 'sns:Publish'
-              Principal:
-                AWS: 
-                  - !Sub arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root
-              Resource:
-                - !Ref InfraSecTopic
-            - !Ref AWS::NoValue
-      Topics:
-        - !Ref InfraSecTopic
+#  InfraSecTopic:
+#    Type: AWS::SNS::Topic
+#    Properties:
+#      TopicName: !Ref InfraSecTopicName
+#      
+#  CanPublishInfraSecTopicPolicy:
+#    Type: AWS::SNS::TopicPolicy
+#    Properties:
+#      PolicyDocument:
+#        Version: "2012-10-17"
+#        Statement:
+#          - Sid: AllowServices
+#            Effect: Allow
+#            Principal:
+#              Service:
+#                - "events.amazonaws.com"
+#                - "cloudwatch.amazonaws.com"
+#            Action:
+#              - 'sns:Publish'
+#            Resource:
+#              - !Ref InfraSecTopic
+#          - !If 
+#            - HasPnCoreAwsAccountId
+#            - Sid: AllowPublishFromPnCore
+#              Effect: Allow
+#              Action:
+#              - 'sns:Publish'
+#              Principal:
+#                AWS: 
+#                  - !Sub arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root
+#              Resource:
+#                - !Ref InfraSecTopic
+#            - !Ref AWS::NoValue
+#      Topics:
+#        - !Ref InfraSecTopic
 
 Outputs:
   LogsBucketKmsKeyArn:
@@ -622,6 +622,6 @@ Outputs:
   LogRetention:
     Value: !Ref LogRetention
 
-  InfraSecTopicArn:
-    Value: !Ref InfraSecTopic
-    Description: 'Infrastructure security topic ARN'
+#  InfraSecTopicArn:
+#    Value: !Ref InfraSecTopic
+#    Description: 'Infrastructure security topic ARN'
