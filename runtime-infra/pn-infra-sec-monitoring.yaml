@@ -146,6 +146,10 @@ Parameters:
     Description: 'SNS topic name for security alerts'
     Default: "pn-InfraSecTopic"
 
+  InfraSecTopicArn:
+    Type: String
+    Description: 'SNS topic ARN for security alerts (overrides InfraSecTopicName if provided)'
+
 Conditions:
   HasCloudTrailLogsEnabled: !Equals [!Ref EnableCloudTrailLogs, 'true']
   HasMonitoringS3Enabled: !Equals [!Ref S3MonitoringEnabled, 'true']
@@ -189,10 +193,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !If
-                  - IsConfinfoAccount
-                  - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:*"
-                  - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:*"
+                Resource: !Ref InfraSecTopicArn
                 Condition:
                   StringLike:
                     sns:ResourceName: !Sub "${InfraSecTopicName}"
@@ -231,10 +232,7 @@ Resources:
         S3Key: !Sub ${LambdasBasePath}/infra-sec-monitoring-dynamo-alert.zip
       Environment:
         Variables:
-          SNS_TOPIC_ARN: !If
-            - IsConfinfoAccount
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
+          SNS_TOPIC_ARN: !Ref InfraSecTopicArn
           TABLE_CONFIG: !Ref DynamoAlertLambdaTableConfig
           ENVIRONMENT: !Ref EnvironmentType
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
@@ -349,12 +347,8 @@ Resources:
   EventBridgeSNSPolicy:
     Type: AWS::SNS::TopicPolicy
     Properties:
-      Topics: !If
-            - IsConfinfoAccount
-            -
-              - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
-            - 
-              - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
+      Topics: 
+        - !Ref InfraSecTopicArn
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -363,10 +357,7 @@ Resources:
             Principal:
               Service: events.amazonaws.com
             Action: SNS:Publish
-            Resource: !If 
-              - IsConfinfoAccount
-              - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:*"
-              - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:*"
+            Resource: !Ref InfraSecTopicArn
             Condition:
               StringLike:
                 sns:ResourceName: !Sub "${InfraSecTopicName}"
@@ -389,10 +380,7 @@ Resources:
           eventName: ["DeleteTable"]
       Targets:
         - Id: SendToSNS
-          Arn: !If
-            - IsConfinfoAccount
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
+          Arn: !Ref InfraSecTopicArn
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -419,10 +407,7 @@ Resources:
               pointInTimeRecoveryEnabled: [false]
       Targets:
         - Id: SendToSNS
-          Arn: !If
-            - IsConfinfoAccount
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
+          Arn: !Ref InfraSecTopicArn
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -481,10 +466,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !If
-            - IsConfinfoAccount
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
+          Arn: !Ref InfraSecTopicArn
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -510,10 +492,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !If
-            - IsConfinfoAccount
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
+          Arn: !Ref InfraSecTopicArn
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -542,10 +521,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !If
-            - IsConfinfoAccount
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
+          Arn: !Ref InfraSecTopicArn
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -571,10 +547,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !If
-            - IsConfinfoAccount
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
+          Arn: !Ref InfraSecTopicArn
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -601,10 +574,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !If
-            - IsConfinfoAccount
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
+          Arn: !Ref InfraSecTopicArn
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -748,10 +718,7 @@ Resources:
         S3Key: !Sub ${LambdasBasePath}/infra-sec-url-access-analyzer-alert.zip
       Environment:
         Variables:
-          SNS_TOPIC_ARN: !If
-            - IsConfinfoAccount
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
+          SNS_TOPIC_ARN: !Ref InfraSecTopicArn
           TABLE_CONFIG: !Ref DynamoAlertLambdaTableConfig
           ENVIRONMENT: !Ref EnvironmentType
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
@@ -929,10 +896,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !If
-                  - IsConfinfoAccount
-                  - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:*"
-                  - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:*"
+                Resource: !Ref InfraSecTopicArn
                 Condition:
                   StringLike:
                     sns:ResourceName: !Sub "${InfraSecTopicName}"
@@ -969,10 +933,7 @@ Resources:
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
       Environment:
         Variables:
-          SNS_TOPIC_ARN: !If 
-            - IsConfinfoAccount
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}"
-            - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}"
+          SNS_TOPIC_ARN: !Ref InfraSecTopicArn
           DYNAMODB_TABLE_NAMES: !Join [",", !Ref DynamoDBAccessValidatorTables]
           S3_BUCKET_NAME: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
           AUTHORIZED_ROLES_CSV: "" 
