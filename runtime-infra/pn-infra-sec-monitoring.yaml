@@ -344,29 +344,6 @@ Resources:
               - logs:DescribeLogStreams
             Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/cloudtrail/${ProjectName}-${InfraSecTrailName}:*"
 
-  # --------------------------
-  # EventBridge Critical Rules
-  # --------------------------
-  EventBridgeSNSPolicy:
-    Type: AWS::SNS::TopicPolicy
-    Properties:
-      Topics: 
-        - !Ref InfraSecTopicArn
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: AllowEventBridgeToPublish
-            Effect: Allow
-            Principal:
-              Service: events.amazonaws.com
-            Action: SNS:Publish
-            Resource: !Ref InfraSecTopicArn
-            Condition:
-              StringLike:
-                sns:ResourceName: !Sub "${InfraSecTopicName}"
-              StringEquals:
-                aws:SourceAccount: !Ref "AWS::AccountId"
-
   # ============================================================================
   # EventBridge rule to monitor DynamoDB critical tables
   # ============================================================================
