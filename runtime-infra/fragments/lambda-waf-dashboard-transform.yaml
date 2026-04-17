@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Template for the WAF dashboard CloudFormation macro
+
+Parameters:
+  LambdasBucketName:
+    Type: String
+    Description: Bucket name where lambdas zip are saved
+
+  LambdasBasePath:
+    Type: String
+    Description: bucket path that contains the lambdas zip
+
+Resources:
+
+  WafDashboardTransformFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        !Sub [
+          "/aws/lambda/${groupName}",
+          { groupName: !Ref WafDashboardTransformFunction }
+        ]
+      RetentionInDays: 14
+
+  WafDashboardTransformFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: WafDashboardDiscovery
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - wafv2:ListWebACLs
+                  - wafv2:GetLoggingConfiguration
+                Resource: '*'
+
+  WafDashboardTransformFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.14
+      Handler: main.handler
+      Timeout: 60
+      Role: !GetAtt WafDashboardTransformFunctionRole.Arn
+      FunctionName: WafDashboardTransform
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/waf-dashboard-transform.zip
+
+  WafDashboardMacro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Name: WafDashboardMacro
+      FunctionName: !GetAtt WafDashboardTransformFunction.Arn
+
+Outputs:
+  WafDashboardTransformFunctionArn:
+    Description: ARN of the WAF dashboard transform Lambda function
+    Value: !GetAtt WafDashboardTransformFunction.Arn
+  WafDashboardTransformFunctionName:
+    Description: Name of the WAF dashboard transform Lambda function
+    Value: !Ref WafDashboardTransformFunction

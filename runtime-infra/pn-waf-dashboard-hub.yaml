@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'CloudWatch WAF dashboard hub generated through WafDashboardMacro'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: 'Project name'
+
+  DashboardPrefix:
+    Type: String
+    Default: 'WAF-Hub'
+    Description: 'Suffix used for the summary dashboard name'
+
+  DashboardDetailPrefix:
+    Type: String
+    Default: 'WAF-Detail'
+    Description: 'Suffix used for the detail dashboard names'
+
+  DefaultMetricPeriodSeconds:
+    Type: Number
+    Default: 300
+    Description: 'Default metric period in seconds used for time-series widgets'
+
+  MaxSparklineWafs:
+    Type: Number
+    Default: 12
+    Description: 'Maximum number of WAFs rendered as sparklines in the summary dashboard'
+
+Resources:
+  'Fn::Transform':
+    Name: 'WafDashboardMacro'
+    Parameters:
+      Action: 'Resources'
+      Component: 'All'
+      ProjectName: !Ref ProjectName
+      DashboardPrefix: !Ref DashboardPrefix
+      DashboardDetailPrefix: !Ref DashboardDetailPrefix
+      Region: !Ref AWS::Region
+      DefaultMetricPeriodSeconds: !Ref DefaultMetricPeriodSeconds
+      MaxSparklineWafs: !Ref MaxSparklineWafs
+
+Outputs:
+  'Fn::Transform':
+    Name: 'WafDashboardMacro'
+    Parameters:
+      Action: 'Outputs'
+      Component: 'Outputs'
+      ProjectName: !Ref ProjectName
+      DashboardPrefix: !Ref DashboardPrefix
+      DashboardDetailPrefix: !Ref DashboardDetailPrefix
+      Region: !Ref AWS::Region
+      DefaultMetricPeriodSeconds: !Ref DefaultMetricPeriodSeconds
+      MaxSparklineWafs: !Ref MaxSparklineWafs
