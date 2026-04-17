@@ -542,7 +542,7 @@ Resources:
     Properties:
       Protocol: email
       Endpoint: '{{resolve:ssm:/notification/infra/email}}'
-      TopicArn: !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${ConfidentialInfoAccountId}:${InfraSecTopicName}"
+      TopicArn: !Ref InfraSecTopic
         
 Outputs:
   LogsBucketKmsKeyArn:
