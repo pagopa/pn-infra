@@ -805,6 +805,7 @@ Resources:
         AlarmSNSTopicName: !Ref AlarmSNSTopicArn
         HasDLQ: "true"
         QueueHasAlarm: "true"
+        MaxReceiveCount: 3
 
   PnInfraSecEventsQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -921,7 +922,6 @@ Resources:
       FunctionName: !Ref InfraSecAccessValidatorFunction
       BatchSize: 10
       MaximumBatchingWindowInSeconds: 5
-      MaximumRetryAttempts: 3
       ScalingConfig:
         MaximumConcurrency: !Ref LambdaReservedConcurrency
       FunctionResponseTypes:
