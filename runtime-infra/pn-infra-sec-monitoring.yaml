@@ -141,7 +141,7 @@ Parameters:
 
   DynamoDBCdcKinesisFilterPattern:
     Type: String
-    Default: '[]'
+    Default: ''
     Description: 'JSON array of DynamoDB table names to filter CDC events for (e.g., ["table1", "table2"])'
 
   InfraSecTopicName:
@@ -165,7 +165,8 @@ Conditions:
   HasS3CriticalPrefixMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalS3Prefixes], "" ] ]
   HasDynamoDBCriticalTableMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalDynamoDBTables], "" ] ]
   HasCloudtrailEventDataStoreEnabledAndIsConfinfoAccount: !And [ !Equals [!Ref CloudtrailEventDataStoreEnabled, 'true'], !Condition IsConfinfoAccount ]
-
+  HasDynamoDBCdcKinesisFilterPattern: !Not [ !Equals [ !Ref DynamoDBCdcKinesisFilterPattern, "" ] ]
+  
 Resources:
 
   # --------------------------
@@ -242,6 +243,7 @@ Resources:
 
   InfraSecMonitoringDynamoAlertLambdaEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
+    Condition: HasDynamoDBCdcKinesisFilterPattern
     Properties:
       BatchSize: 100
       Enabled: !Ref EnableDynamoLambdaAlert
