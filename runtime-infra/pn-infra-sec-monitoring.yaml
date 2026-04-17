@@ -109,9 +109,9 @@ Parameters:
     Description: 'DynamoDB tables to monitor for access patterns (requires CloudTrail Event Data Store)'
     Default: ''
 
-  AlarmSNSTopicName:
+  AlarmSNSTopicArn:
     Type: String
-    Description: 'Name of SNS topic for alarms'
+    Description: 'ARN of SNS topic for alarms'
 
   LambdaReservedConcurrency:
     Type: Number
@@ -599,7 +599,7 @@ Resources:
       Parameters:
         DynamoDBTableName: pn-ConfidentialObjects
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
-        SnsTopicArn: !Ref AlarmSNSTopicName
+        SnsTopicArn: !Ref AlarmSNSTopicArn
 
   pnTimelineCriticalMonitoring:
     Condition: HasCloudTrailLogsEnabledAndIsCoreAccount
@@ -609,7 +609,7 @@ Resources:
       Parameters:
         DynamoDBTableName: pn-Timelines
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
-        SnsTopicArn: !Ref AlarmSNSTopicName
+        SnsTopicArn: !Ref AlarmSNSTopicArn
 
   # ============================================================================
   # Metric Filter to detect S3
@@ -620,7 +620,7 @@ Resources:
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/s3-prefix-monitoring.yaml"
       Parameters:
-        SnsTopicArn: !Ref AlarmSNSTopicName
+        SnsTopicArn: !Ref AlarmSNSTopicArn
         CloudTrailLogGroupName: !Ref CloudTrailLogGroup
         BucketName: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
         CriticalPrefix: "PN_NOTIFICATION"
@@ -832,7 +832,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub "${ProjectName}-infra-sec-events-queue"
-        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+        AlarmSNSTopicName: !Ref AlarmSNSTopicArn
         HasDLQ: "true"
         QueueHasAlarm: "true"
 
