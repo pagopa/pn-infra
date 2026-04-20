@@ -18,7 +18,7 @@ export const handler = async (event) => {
         const bucketName = process.env.BucketName;
         const rolesTable = process.env.USER_ROLES_TABLE;
         const expectedIdpId = process.env.EXPECTED_IDPID;
-        const envType = process.env.ENVIRONMENT_TYPE || "dev";
+        const envType = process.env.ENVIRONMENT_TYPE;
         const userAttributes = event.request.userAttributes;
         const email = userAttributes.email;
         const userName = userAttributes.sub;
