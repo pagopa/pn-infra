@@ -102,6 +102,16 @@ Parameters:
     Type: String
     Default: '-'
     Description: Data lake account id 2
+  
+  InfraSecTopicName:
+    Type: String
+    Description: 'Infrastructure security topic name'
+    Default: 'pn-InfraSecTopic'
+  
+  ConfidentialInfoAccountId:
+    Type: String
+    Default: ''
+    Description: AWS AccountId of the confidential info account in same environment
 
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
@@ -112,6 +122,8 @@ Conditions:
 
   CdcOnDemandDisabled: !Not [!Equals [!Ref CdcStreamMode, ON_DEMAND]]
   LogsOnDemandDisabled: !Not [!Equals [!Ref LogsStreamMode, ON_DEMAND]]
+
+  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
 
 Resources:
   
@@ -493,6 +505,45 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogsKinesisSourceStreamArn: !GetAtt LogsKinesisStream.Arn
         
+  InfraSecTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Ref InfraSecTopicName
+
+  InfraSecTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: '{{resolve:ssm:/notification/infra/email}}'
+      TopicArn: !Ref InfraSecTopic
+      
+  CanPublishInfraSecTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowServices
+            Effect: Allow
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+                - "cloudwatch.amazonaws.com"
+            Action:
+              - 'sns:Publish'
+            Resource:
+              - !Ref InfraSecTopic
+      Topics:
+        - !Ref InfraSecTopic
+
+  InfraSecConfidentialTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasConfidentialInfoAccountId
+    Properties:
+      Protocol: email
+      Endpoint: '{{resolve:ssm:/notification/infra/email}}'
+      TopicArn: !Ref InfraSecTopic
+        
 Outputs:
   LogsBucketKmsKeyArn:
     Value: 
@@ -566,3 +617,7 @@ Outputs:
   ESMKinesisFailureNotificationsBucketName:
     Value: !Ref ESMKinesisFailureNotificationsBucket
     Description: 'Bucket name for ESM Kinesis failure notifications'
+
+  InfraSecTopicArn:
+    Value: !Ref InfraSecTopic
+    Description: 'Infrastructure security topic ARN'

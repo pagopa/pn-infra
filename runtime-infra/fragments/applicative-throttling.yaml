@@ -35,7 +35,95 @@ Parameters:
     AllowedValues: [60, 120, 300, 600]
     Description: Throttling period duration
 
+  AlarmSNSTopicArn:
+    Type: String
+    Description: "ARN of the SNS topic for alarm notifications. If empty, no alarms get created"
+    Default: ''
+
+  LogRetentionDays:
+    Type: Number
+    Description: "The number of days to retain WAF logs in the CloudWatch Log Group."
+    Default: 14
+
+  BlockedRequestsAlarmThresholdPercent:
+    Type: Number
+    Description: "The percentage threshold over total requests that triggers the blocked requests alarm."
+    Default: 10
+
+  BlockedRequestsMinTraffic:
+    Type: Number
+    Description: "Minimum total requests required before evaluating the standard blocked requests alarm."
+    Default: 10
+
+  BlockedRequestsAlarmPeriodSeconds:
+    Type: Number
+    Description: "Period in seconds used by the standard blocked requests alarm."
+    Default: 60
+
+  BlockedRequestsAlarmEvaluationPeriods:
+    Type: Number
+    Description: "Number of evaluation periods for the standard blocked requests alarm."
+    Default: 20
+
+  BlockedRequestsAlarmDatapointsToAlarm:
+    Type: Number
+    Description: "Number of breaching datapoints required to trigger the standard blocked requests alarm."
+    Default: 10
+
+  OncallBlockedRequestsAlarmThresholdPercent:
+    Type: String
+    Description: "If set, creates the oncall blocked requests alarm using this percentage threshold over total requests."
+    Default: ''
+
+  OncallBlockedRequestsMinTraffic:
+    Type: Number
+    Description: "Minimum total requests required before evaluating the oncall blocked requests alarm."
+    Default: 10
+
+  OncallBlockedRequestsAlarmPeriodSeconds:
+    Type: Number
+    Description: "Period in seconds used by the oncall blocked requests alarm."
+    Default: 60
+
+  OncallBlockedRequestsAlarmEvaluationPeriods:
+    Type: Number
+    Description: "Number of evaluation periods for the oncall blocked requests alarm."
+    Default: 20
+
+  OncallBlockedRequestsAlarmDatapointsToAlarm:
+    Type: Number
+    Description: "Number of breaching datapoints required to trigger the oncall blocked requests alarm."
+    Default: 10
+
+Conditions:
+
+  HasAlarmTopic: !Not [!Equals [!Ref AlarmSNSTopicArn, '']]
+  RequiresOncallBlockedRequestsAlarm: !And [!Condition HasAlarmTopic, !Not [!Equals [!Ref OncallBlockedRequestsAlarmThresholdPercent, '']]]
+
 Resources:
+
+  ApplicativeThrottlingWafLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub 'aws-waf-logs-pn-applicative-throttling-${ThrottlingGroupString}'
+      RetentionInDays: !Ref LogRetentionDays
+
+  ApplicativeThrottlingWafLoggingConfiguration:
+    Type: AWS::WAFv2::LoggingConfiguration
+    Properties:
+      ResourceArn: !GetAtt ApplicativeThrottlingWebACL.Arn
+      LoggingFilter:
+        DefaultBehavior: DROP
+        Filters:
+          - Behavior: KEEP
+            Conditions:
+              - ActionCondition:
+                  Action: BLOCK
+            Requirement: MEETS_ALL
+      LogDestinationConfigs:
+        - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:aws-waf-logs-pn-applicative-throttling-${ThrottlingGroupString}'
+    DependsOn:
+      - ApplicativeThrottlingWafLogGroup
 
   ######### WEB ACL ########
   ThrottlingWebACLForALBAttach:
@@ -157,3 +245,103 @@ Resources:
             SampledRequestsEnabled: true
             CloudWatchMetricsEnabled: true
             MetricName: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}-rule-throttling-metric'
+
+  ApplicativeThrottlingBlockedRequestsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmTopic
+    Properties:
+      AlarmName: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}-BlockedRequestsAlarm'
+      AlarmDescription: "CloudWatch alarm for when the percentage of blocked requests exceeds the configured threshold"
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: "Region"
+                  Value: !Ref AWS::Region
+                - Name: "WebACL"
+                  Value: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}'
+                - Name: "Rule"
+                  Value: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}-rule-throttling-metric'
+              MetricName: "BlockedRequests"
+              Namespace: "AWS/WAFV2"
+            Period: !Ref BlockedRequestsAlarmPeriodSeconds
+            Stat: Sum
+          ReturnData: False
+        - Id: m2
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: "Region"
+                  Value: !Ref AWS::Region
+                - Name: "WebACL"
+                  Value: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}'
+                - Name: "Rule"
+                  Value: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}-rule-throttling-metric'
+              MetricName: AllowedRequests
+              Namespace: "AWS/WAFV2"
+            Period: !Ref BlockedRequestsAlarmPeriodSeconds
+            Stat: Sum
+          ReturnData: False
+        - Id: e1
+          Expression: !Sub 'IF(m1+m2>${BlockedRequestsMinTraffic} AND m1/(m1+m2)>=${BlockedRequestsAlarmThresholdPercent}/100, 1, 0)'
+          Label: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}-BlockedRequestsAlarm-Metric'
+      TreatMissingData: "notBreaching"
+      Threshold: 1
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      EvaluationPeriods: !Ref BlockedRequestsAlarmEvaluationPeriods
+      DatapointsToAlarm: !Ref BlockedRequestsAlarmDatapointsToAlarm
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+
+  OncallApplicativeThrottlingBlockedRequestsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: RequiresOncallBlockedRequestsAlarm
+    Properties:
+      AlarmName: !Sub 'oncall-pn-applicative-throttling-${ThrottlingGroupString}-BlockedRequestsAlarm'
+      AlarmDescription: "CloudWatch oncall alarm for when the percentage of blocked requests exceeds the configured threshold"
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: "Region"
+                  Value: !Ref AWS::Region
+                - Name: "WebACL"
+                  Value: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}'
+                - Name: "Rule"
+                  Value: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}-rule-throttling-metric'
+              MetricName: "BlockedRequests"
+              Namespace: "AWS/WAFV2"
+            Period: !Ref OncallBlockedRequestsAlarmPeriodSeconds
+            Stat: Sum
+          ReturnData: False
+        - Id: m2
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: "Region"
+                  Value: !Ref AWS::Region
+                - Name: "WebACL"
+                  Value: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}'
+                - Name: "Rule"
+                  Value: !Sub 'pn-applicative-throttling-${ThrottlingGroupString}-rule-throttling-metric'
+              MetricName: AllowedRequests
+              Namespace: "AWS/WAFV2"
+            Period: !Ref OncallBlockedRequestsAlarmPeriodSeconds
+            Stat: Sum
+          ReturnData: False
+        - Id: e1
+          Expression: !Sub 'IF(m1+m2>${OncallBlockedRequestsMinTraffic} AND m1/(m1+m2)>=${OncallBlockedRequestsAlarmThresholdPercent}/100, 1, 0)'
+          Label: !Sub 'oncall-pn-applicative-throttling-${ThrottlingGroupString}-BlockedRequestsAlarm-Metric'
+      TreatMissingData: "notBreaching"
+      Threshold: 1
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      EvaluationPeriods: !Ref OncallBlockedRequestsAlarmEvaluationPeriods
+      DatapointsToAlarm: !Ref OncallBlockedRequestsAlarmDatapointsToAlarm
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn

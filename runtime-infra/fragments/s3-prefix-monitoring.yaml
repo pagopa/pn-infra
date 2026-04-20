@@ -1,0 +1,115 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudWatch Metric Filters for DynamoDB append-only monitoring
+
+Parameters:
+
+  CriticalPrefix:
+    Type: String
+
+  CloudTrailLogGroupName:
+    Type: String
+
+  BucketName:
+    Type: String
+
+  EnableS3DeletionMetricFilter:
+    Type: String
+    AllowedValues: ["true","false"]
+    Default: "true"
+
+  EnableS3FailedDeletionsMetricFilter:
+    Type: String
+    AllowedValues: ["true","false"]
+    Default: "true"
+
+  EnableS3FailedAccessMetricFilter:
+    Type: String
+    AllowedValues: ["true","false"]
+    Default: "true"
+
+  SnsTopicArn:
+    Type: String
+  
+  EnableS3DeletionMetricFilterAlarm:
+    Type: String
+    AllowedValues: ["true","false"]
+    Default: "true"
+
+  EnableS3FailedDeletionsMetricFilterAlarm:
+    Type: String
+    AllowedValues: ["true","false"]
+    Default: "true"
+
+  EnableS3FailedAccessMetricFilterAlarm:
+    Type: String
+    AllowedValues: ["true","false"]
+    Default: "true"
+
+
+Conditions:
+  HasS3DeletionMetricFilter: !Equals [ !Ref EnableS3DeletionMetricFilter, "true" ]
+  HasS3FailedDeletionsMetricFilter: !Equals [ !Ref EnableS3FailedDeletionsMetricFilter, "true" ]
+  HasS3FailedAccessMetricFilter: !Equals [ !Ref EnableS3FailedAccessMetricFilter, "true" ]
+  HasSnsTopicArn: !Not [ !Equals [ !Ref SnsTopicArn, "" ] ]
+  HasS3DeletionMetricFilterAlarm: !And 
+    - !Equals [ !Ref EnableS3DeletionMetricFilterAlarm, "true" ]
+    - !Condition HasS3DeletionMetricFilter
+  HasS3FailedDeletionsMetricFilterAlarm: !And 
+    - !Equals [ !Ref EnableS3FailedDeletionsMetricFilterAlarm, "true" ]
+    - !Condition HasS3FailedDeletionsMetricFilter
+  HasS3FailedAccessMetricFilterAlarm: !And 
+    - !Equals [ !Ref EnableS3FailedAccessMetricFilterAlarm, "true" ]
+    - !Condition HasS3FailedAccessMetricFilter
+
+Resources:
+
+   ### ============================================================================
+  # Metric Filters for critical events with prefix PN_NOTIFICATION
+  ### ============================================================================
+  # 1. Monitors deletion attempts on the critical prefix
+  S3DeletionsMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref CloudTrailLogGroupName
+      FilterName: !Sub "s3-deletion-attempts-${CriticalPrefix}"
+      # Pattern per catturare sia DeleteObject che DeleteObjects sul prefisso specifico
+      FilterPattern: !Sub 
+        - '{ ($.eventName = "DeleteObject" || $.eventName = "DeleteObjects") && $.resources[0].ARN = "*${BName}*" && $.resources[1].ARN = "*${Prefix}*" }'
+        - BName: !Ref BucketName
+          Prefix: !Ref CriticalPrefix
+      MetricTransformations:
+        - MetricValue: "1"
+          MetricNamespace: "CustomSecurity/S3"
+          MetricName: !Sub "DeletionCount-${CriticalPrefix}"
+
+  # 2. S3 FAILED Deletion Attempts (AccessDenied)
+  S3FailedDeletionsMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref CloudTrailLogGroupName
+      FilterName: !Sub "s3-failed-deletion-attempts-${CriticalPrefix}"
+      FilterPattern: !Sub 
+        - '{ ($.eventName = "DeleteObject" || $.eventName = "DeleteObjects") && $.errorCode = "AccessDenied" && $.resources[0].ARN = "*${BName}*" && $.resources[1].ARN = "*${Prefix}*" }'
+        - BName: !Ref BucketName
+          Prefix: !Ref CriticalPrefix
+      MetricTransformations:
+        - MetricValue: "1"
+          MetricNamespace: "CustomSecurity/S3"
+          MetricName: !Sub "FailedDeletionCount-${CriticalPrefix}"
+
+  # 3. S3 General Failed Access (AccessDenied)
+  S3FailedAccessMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref CloudTrailLogGroupName
+      FilterName: !Sub "s3-failed-access-${CriticalPrefix}"
+      FilterPattern: !Sub 
+        - '{ $.errorCode = "AccessDenied" && $.resources[0].ARN = "*${BName}*" && $.resources[1].ARN = "*${Prefix}*" }'
+        - BName: !Ref BucketName
+          Prefix: !Ref CriticalPrefix
+      MetricTransformations:
+        - MetricValue: "1"
+          MetricNamespace: "CustomSecurity/S3"
+          MetricName: !Sub "FailedAccessCount-${CriticalPrefix}"
+
+  
