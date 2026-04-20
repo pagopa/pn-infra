@@ -114,6 +114,46 @@ jobs:
           sarif_file: 'trivy-results-runtime-infra-confinfo-highcritical.sarif'
           category: 'trivy-pr-annotation-runtime-infra-confinfo'
 
+      - name: 🔗 Print Security Tab link
+        id: security_tab_link
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          security_tab_url="https://github.com/${{ github.repository }}/security/code-scanning"
+          pr_number=""
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pr_number="${{ github.event.pull_request.number }}"
+          else
+            response=$(curl -fsSL \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" || true)
+
+            if [ -n "$response" ]; then
+              pr_number=$(printf '%s' "$response" | jq -r '.[0].number // empty')
+            fi
+          fi
+
+          if [ -n "$pr_number" ]; then
+            security_tab_url="${security_tab_url}?query=pr%3A${pr_number}"
+            echo "Related PR detected: #$pr_number"
+          else
+            echo "No related PR detected for commit ${{ github.sha }}"
+          fi
+
+          echo "Security tab: $security_tab_url"
+          echo "security_tab_url=$security_tab_url" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Security tab"
+            echo
+            if [ -n "$pr_number" ]; then
+              echo "- Related PR: #$pr_number"
+            fi
+            echo "- [Open code scanning alerts]($security_tab_url)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # --- Logica di Fallimento Condizionale (Fail on HIGH/CRITICAL) ---
 
       # Calcoliamo il conteggio totale di HIGH/CRITICAL in un unico step per il check di fail
