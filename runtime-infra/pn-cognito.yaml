@@ -60,6 +60,14 @@ Parameters:
     Description: The ARN of the Kinesis Stream for audit logs
     Default: ""
 
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic for alarms
+    Default: ""
+
+Conditions:
+  HasAlarmSNSTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '' ] ]
+
 Resources:
   CognitoLogsS3:
     Type: AWS::S3::Bucket
@@ -163,6 +171,39 @@ Resources:
         LogGroupPrefix: "/aws/lambda"
         LogGroupRetention: !Ref LogGroupRetentionInDays
         LogsKinesisSourceStreamArn: !Ref KinesisAuditStreamArn
+
+  # CloudWatch MetricFilter: detect SECURITY ALERT in Cognito trigger logs
+  SecurityAlertMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !GetAtt CognitoTriggerLogGroupStack.Outputs.LogGroupName
+      FilterPattern: "SECURITY ALERT"
+      MetricTransformations:
+        - MetricValue: 1
+          MetricNamespace: !Sub "${ProjectName}/CognitoSecurity"
+          MetricName: !Sub "${ProjectName}-cognito-security-alert"
+
+  # CloudWatch Alarm: trigger on SECURITY ALERT
+  SecurityAlertAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmSNSTopic
+    DependsOn: SecurityAlertMetricFilter
+    Properties:
+      AlarmName: !Sub "${ProjectName}-cognito-security-alert-Alarm"
+      AlarmDescription: "Alarm when a user attempts login with wrong IdP identity provider ID"
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Threshold: 1
+      MetricName: !Sub "${ProjectName}-cognito-security-alert"
+      Namespace: !Sub "${ProjectName}/CognitoSecurity"
+      Period: 60
+      Statistic: Sum
 
   UserPool:
     Type: "AWS::Cognito::UserPool"
@@ -344,8 +385,6 @@ Resources:
         - AttributeName: "email"
           KeyType: "HASH"
       BillingMode: PAY_PER_REQUEST
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: false #temporary for CF deploy
       TableName: !Sub "${ProjectName}-helpdesk-roles"
       Tags:
         - Key: "Project"
