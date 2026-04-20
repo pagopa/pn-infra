@@ -1,3 +1,5 @@
+import { hostname } from "os";
+
 export function auditLog(
   message = "",
   aud_type,
@@ -5,16 +7,20 @@ export function auditLog(
   uid
 ) {
   const logEntry = {
-    message: `[${aud_type}] - ${message}`,
+    name: "AUDIT_LOG",
+    message: `[${aud_type}] - INFO - ${message}`,
     aud_type: aud_type,
     aud_orig: aud_orig,
     uid: uid,
-    tags: ["AUDIT10Y"]
+    level_value: 20000,
+    logger_name: "authService",
+    tags: ["AUDIT10Y"],
+    hostname: hostname(),
+    pid: process.pid,
+    level: 30,
+    msg: "info",
+    time: new Date().toISOString(),
+    v: 0
   };
-  console.log(JSON.stringify(logEntry));
-  return {
-    info: () => {},
-    warn: () => {},
-    error: () => {}
-  };
+  process.stdout.write(JSON.stringify(logEntry) + "\n");
 }

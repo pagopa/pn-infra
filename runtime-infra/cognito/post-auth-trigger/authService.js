@@ -11,7 +11,7 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
     // auditLog replaces console.log to avoid ingestion errors
     
     // AUDIT LOG: BEFORE
-    auditLog(`Start syncUserRoles - sub=${userName}`, aud_type, aud_orig, userName);
+    auditLog(`BEFORE - Start syncUserRoles - sub=${userName}`, aud_type, aud_orig, userName);
 
     try {
         const dbRes = await dbClient.send(new GetItemCommand({
@@ -20,27 +20,27 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
         }));
 
         if (isDebug) {
-            auditLog(`DynamoDB response for sub=${userName}`, aud_type, aud_orig, userName);
+            console.log(`DEBUG: DynamoDB response for sub=${userName}`, JSON.stringify(dbRes.Item));
         }
 
         if (dbRes.Item && dbRes.Item.backoffice_tags) {
             const tags = dbRes.Item.backoffice_tags.S;
             const dbExpectedIdpId = dbRes.Item.expected_idpid ? dbRes.Item.expected_idpid.S : expectedIdpId;
             
-            auditLog(`Found roles for sub=${userName}: ${tags}`, aud_type, aud_orig, userName);
+            console.log(`Found roles for sub=${userName}: ${tags}`);
 
             let issuerVerified = true;
             if (dbExpectedIdpId) {
                 const identitiesStr = (event.request.userAttributes && event.request.userAttributes.identities) || "";
                 if (!identitiesStr.includes(dbExpectedIdpId)) {
-                    auditLog(`SECURITY ALERT: User with sub=${userName} attempted login with wrong IdPID`, aud_type, aud_orig, userName);
+                    console.warn(`SECURITY ALERT: User with sub=${userName} attempted login with wrong IdPID`);
                     issuerVerified = false;
                 }
             }
 
             if (issuerVerified) {
                 // 1. DATABASE UPDATE (for Amplify SDK reading from user)
-                auditLog(`Updating Cognito DB for user sub=${userName} with tags: ${tags}`, aud_type, aud_orig, userName);
+                console.log(`Updating Cognito DB for user sub=${userName} with tags: ${tags}`);
                 await cognitoClient.send(new AdminUpdateUserAttributesCommand({
                     UserPoolId: userPoolId,
                     Username: userName,
@@ -67,12 +67,12 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
                     }
                 };
                 
-                // AUDIT LOG: SUCCESS
-                auditLog(`User logged in and roles synchronized - sub=${userName} roles=${tags}`, aud_type, aud_orig, userName);
+                // AUDIT LOG: AFTER (login successful)
+                auditLog(`AFTER - User logged in and roles synchronized - sub=${userName} roles=${tags}`, aud_type, aud_orig, userName);
             }
         } else {
             // DEPROVISIONING: User not in DynamoDB (or no tags)
-            auditLog(`DEPROVISIONING: User with sub=${userName} not found in DynamoDB. Stripping all roles`, aud_type, aud_orig, userName);
+            console.warn(`DEPROVISIONING: User with sub=${userName} not found in DynamoDB. Stripping all roles`);
 
             // 1. COGNITO DATABASE CLEANUP (security)
             await cognitoClient.send(new AdminUpdateUserAttributesCommand({
@@ -99,14 +99,14 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
                 }
             };
 
-            // AUDIT LOG: FAILURE (User not in DB)
-            auditLog(`User not found in DynamoDB roles table - sub=${userName}`, aud_type, aud_orig, userName);
+            // User not in DB - no audit log, just operational log
+            console.warn(`User not found in DynamoDB roles table - sub=${userName}`);
         }
         
         return event;
     } catch (err) {
-        // AUDIT LOG: FAILURE (Critical Exception)
-        auditLog(`Exception during syncUserRoles: ${err.message}`, aud_type, aud_orig, userName);
+        // Critical exception - operational log only
+        console.error(`Exception during syncUserRoles: ${err.message}`);
 
         console.error("Error in syncUserRoles:", err);
         throw err;

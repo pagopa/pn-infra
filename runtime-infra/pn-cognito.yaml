@@ -27,17 +27,15 @@ Parameters:
   PortaleHelpdeskDomain:
     Type: String
     Description: The domain for the Portale Helpdesk
-    Default: helpdesk.dev.notifichedigitali.it #temporary for CF deploy pass by terraform
 
   CognitoDomainPrefix:
     Type: String
     Description: The prefix for the Cognito Hosted UI domain
-    Default: pn-helpdesk  #export this parameter for rollback case.
+    Default: pn-helpdesk
 
   EnvironmentType:
     Type: String
     Description: Environment name (e.g., dev, uat, prod)
-    Default: dev #temporary for CF deploy pass by terraform
 
   LogLevel:
     Type: String
@@ -338,8 +336,6 @@ Resources:
 
   UserRolesTable:
     Type: "AWS::DynamoDB::Table"
-    DeletionPolicy: Delete  #temporary for CF deploy
-    UpdateReplacePolicy: Delete  #temporary for CF deploy
     Properties:
       AttributeDefinitions:
         - AttributeName: "email"
@@ -354,6 +350,11 @@ Resources:
       Tags:
         - Key: "Project"
           Value: !Ref ProjectName
+      TableClass: 'STANDARD'
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
 
 Outputs:
 
