@@ -307,6 +307,10 @@ Parameters:
     Type: String
     Description: 'Bucket name for ESM Kinesis failure notifications'
 
+  InfraSecTopicArn:
+    Type: String
+    Description: 'Infrastructure security topic ARN'
+
 Conditions:
   IsAlbArnEmpty: !Equals [!Ref ApplicationLoadBalancerArn, "-"]
   IsAlbArnDnsEmpty: !Equals [!Ref ApplicationLoadBalancerAwsDns, "-"]
@@ -637,6 +641,8 @@ Outputs:
     Value: !Ref ConfinfoDynamoDbExportBucketName
   DataAnalysisTopicName:
     Value: !Ref DataAnalysisTopicName
+  InfraSecTopicArn:
+    Value: !Ref InfraSecTopicArn
   DeliveryMonitoringSnsTopicName:
     Value: !Ref DeliveryMonitoringSnsTopicName
   PresignedUrlTimeOfexpiration:
