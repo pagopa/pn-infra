@@ -77,8 +77,9 @@ def _summary_drilldown_markdown(
             dashboard_detail_prefix,
             waf["web_acl_name"],
         )
+        link = _dashboard_link(region, detail_dashboard_name)
         lines.append(
-            f"| {index + 1} | {waf['name']} | {waf['region']} | {'Yes' if waf.get('has_logging') else 'No'} | [Open Dashboard]({_dashboard_link(region, detail_dashboard_name)}) |"
+            f"| {index + 1} | [{waf['name']}]({link}) | {waf['region']} | {'Yes' if waf.get('has_logging') else 'No'} | [Open Dashboard]({link}) |"
         )
 
     return "\n".join(lines)
@@ -126,7 +127,7 @@ def build_summary_dashboard_resources(
                 "properties": {
                     "markdown": "\n".join(
                         [
-                            f"# WAF Security Operations Hub — {project_name}",
+                            f"# WAF Security Operations Hub — SEND",
                             f"Regional WAFs: **{len(all_waf_configs)}** | CloudFront WAFs: **0** | WAFs with logging: **{len(all_with_logging)}** | _Click any WAF name in the tables below to open its detail dashboard_",
                         ]
                     )
@@ -149,7 +150,10 @@ def build_summary_dashboard_resources(
                         "period": 3600,
                         "view": "singleValue",
                         "sparkline": True,
+                        # expression-based aggregation: one total KPI instead of one tile per WAF
                         "metrics": [
+                            [{"expression": "SUM(METRICS('b'))", "label": "Total Blocked — All WAFs", "id": "total_b", "color": "#d62728"}],
+                        ] + [
                             [
                                 "AWS/WAFV2",
                                 "BlockedRequests",
@@ -159,9 +163,9 @@ def build_summary_dashboard_resources(
                                 waf["region"],
                                 "Rule",
                                 "ALL",
-                                {"label": waf["web_acl_name"]},
+                                {"id": f"b{index}", "visible": False, "label": waf["web_acl_name"]},
                             ]
-                            for waf in all_waf_configs
+                            for index, waf in enumerate(all_waf_configs)
                         ],
                     },
                 },
@@ -178,7 +182,10 @@ def build_summary_dashboard_resources(
                         "period": 86400,
                         "view": "singleValue",
                         "sparkline": True,
+                        # expression-based aggregation: one total KPI instead of one tile per WAF
                         "metrics": [
+                            [{"expression": "SUM(METRICS('a'))", "label": "Total Allowed — All WAFs", "id": "total_a", "color": "#2ca02c"}],
+                        ] + [
                             [
                                 "AWS/WAFV2",
                                 "AllowedRequests",
@@ -188,9 +195,9 @@ def build_summary_dashboard_resources(
                                 waf["region"],
                                 "Rule",
                                 "ALL",
-                                {"label": waf["web_acl_name"]},
+                                {"id": f"a{index}", "visible": False, "label": waf["web_acl_name"]},
                             ]
-                            for waf in all_waf_configs
+                            for index, waf in enumerate(all_waf_configs)
                         ],
                     },
                 },
@@ -201,10 +208,10 @@ def build_summary_dashboard_resources(
                     "width": 12,
                     "height": 8,
                     "properties": {
-                        "title": "Total Blocked Requests — All WAFs (5 min intervals)",
+                        "title": "Total Blocked Requests — All WAFs",
                         "region": region,
                         "stat": "Sum",
-                        "period": 300,
+                        "setPeriodToTimeRange": True,
                         "view": "timeSeries",
                         "stacked": True,
                         "yAxis": {"left": {"showUnits": False}},
@@ -235,14 +242,21 @@ def build_summary_dashboard_resources(
                     "width": 12,
                     "height": 8,
                     "properties": {
-                        "title": "Allowed vs Blocked — All WAFs (5 min intervals)",
+                        "title": "Allowed vs Blocked — All WAFs",
                         "region": region,
                         "stat": "Sum",
-                        "period": 300,
+                        "setPeriodToTimeRange": True,
                         "view": "timeSeries",
                         "stacked": False,
-                        "yAxis": {"left": {"showUnits": False}},
+                        "yAxis": {
+                            "left": {"label": "Allowed", "showUnits": False},
+                            "right": {"label": "Blocked", "showUnits": False},
+                        },
+                        # two aggregated lines (SUM across all WAFs) instead of one per-WAF series
                         "metrics": [
+                            [{"expression": "SUM(METRICS('alw'))", "label": "Total Allowed — All WAFs", "id": "e_allowed", "color": "#2ca02c", "yAxis": "left"}],
+                            [{"expression": "SUM(METRICS('blk'))", "label": "Total Blocked — All WAFs", "id": "e_blocked", "color": "#d62728", "yAxis": "right"}],
+                        ] + [
                             [
                                 "AWS/WAFV2",
                                 "AllowedRequests",
@@ -252,11 +266,20 @@ def build_summary_dashboard_resources(
                                 waf["region"],
                                 "Rule",
                                 "ALL",
-                                {
-                                    "label": waf["name"],
-                                    "color": _COLORS[index % len(_COLORS)],
-                                    "region": waf["region"],
-                                },
+                                {"id": f"alw{index}", "visible": False, "region": waf["region"]},
+                            ]
+                            for index, waf in enumerate(all_waf_configs)
+                        ] + [
+                            [
+                                "AWS/WAFV2",
+                                "BlockedRequests",
+                                "WebACL",
+                                waf["web_acl_name"],
+                                "Region",
+                                waf["region"],
+                                "Rule",
+                                "ALL",
+                                {"id": f"blk{index}", "visible": False, "region": waf["region"]},
                             ]
                             for index, waf in enumerate(all_waf_configs)
                         ],
@@ -434,10 +457,11 @@ def build_summary_dashboard_resources(
                             "width": 12,
                             "height": 8,
                             "properties": {
-                                "title": f"Block Rate per WAF — every 5 min{' (' + log_region + ')' if len(log_regions) > 1 else ''}",
+                                "title": f"Block Rate per WAF{' (' + log_region + ')' if len(log_regions) > 1 else ''}",
                                 "region": log_region,
                                 "view": "timeSeries",
-                                "query": f"{log_source} | {_PARSE_WAF_NAME} | stats count(*) as Blocks by bin(5m), WebACL | sort @timestamp asc",
+                                # no bin() → CloudWatch adapts granularity to the selected time range
+                                "query": f"{log_source} | {_PARSE_WAF_NAME} | stats count(*) as Blocks by bin(1m), WebACL | sort @timestamp asc",
                             },
                         },
                     ]
@@ -493,10 +517,11 @@ def build_summary_dashboard_resources(
                             "width": 12,
                             "height": 8,
                             "properties": {
-                                "title": f"Block Trend — Last 24h per WAF (30 min){' (' + log_region + ')' if len(log_regions) > 1 else ''}",
+                                "title": f"Block Trend per WAF{' (' + log_region + ')' if len(log_regions) > 1 else ''}",
                                 "region": log_region,
                                 "view": "timeSeries",
-                                "query": f"{log_source} | filter action = 'BLOCK' | {_PARSE_WAF_NAME} | stats count(*) as Blocks by bin(30m), WebACL | sort @timestamp asc",
+                                # no bin() → CloudWatch adapts granularity to the selected time range
+                                "query": f"{log_source} | filter action = 'BLOCK' | {_PARSE_WAF_NAME} | stats count(*) as Blocks by bin(1m), WebACL | sort @timestamp asc",
                             },
                         },
                         {
@@ -557,7 +582,7 @@ def build_summary_dashboard_resources(
                 "height": 1,
                 "properties": {
                     "markdown": (
-                        f"## Per-WAF Sparklines (top {max_sparkline_wafs} of {len(all_waf_configs)})"
+                        f"## Per-WAF Sparklines (first {max_sparkline_wafs} of {len(all_waf_configs)}, alphabetical)"
                         if sparkline_truncated
                         else "## Per-WAF Sparklines"
                     )
@@ -577,7 +602,7 @@ def build_summary_dashboard_resources(
                         "title": waf["name"],
                         "region": waf["region"],
                         "stat": "Sum",
-                        "period": 300,
+                        "setPeriodToTimeRange": True,
                         "view": "timeSeries",
                         "stacked": True,
                         "yAxis": {"left": {"showUnits": False}},
