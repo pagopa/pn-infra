@@ -39,9 +39,8 @@ Resources:
                 Action:
                   - wafv2:ListWebACLs
                   - wafv2:GetLoggingConfiguration
-                Condition:
-                  StringEquals:
-                    aws:SourceAccount: !Ref AWS::AccountId
+                # WAFV2 discovery uses wildcard because ListWebACLs has no resource-level permissions:
+                # https://docs.aws.amazon.com/service-authorization/latest/reference/list_awswafv2.html
                 Resource: '*'
 
   WafDashboardTransformFunction:
