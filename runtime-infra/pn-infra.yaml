@@ -512,7 +512,15 @@ Resources:
       Parameters:
         LambdasBucketName: !Ref LambdasBucketName
         LambdasBasePath: !Ref LambdasBasePath
-  
+
+  WafDashboardTransform:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-waf-dashboard-transform.yaml"
+      Parameters:
+        LambdasBucketName: !Ref LambdasBucketName
+        LambdasBasePath: !Ref LambdasBasePath
+
   ###               FARGATE CAPACITY PROVIDER UPDATE LOWER ENVS           ###
   ###########################################################################
   FargateSpotAutomation:
