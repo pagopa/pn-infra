@@ -15,11 +15,7 @@ Resources:
   WafDashboardTransformFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName:
-        !Sub [
-          "/aws/lambda/${groupName}",
-          { groupName: !Ref WafDashboardTransformFunction }
-        ]
+      LogGroupName: !Sub "/aws/lambda/${WafDashboardTransformFunction}"
       RetentionInDays: 14
 
   WafDashboardTransformFunctionRole:
