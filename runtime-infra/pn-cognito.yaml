@@ -23,7 +23,43 @@ Parameters:
 
   LambdaS3BucketKey:
     Type: String
-    
+
+  PortaleHelpdeskDomain:
+    Type: String
+    Description: The domain for the Portale Helpdesk
+
+  CognitoDomainPrefix:
+    Type: String
+    Description: The prefix for the Cognito Hosted UI domain
+    Default: pn-helpdesk
+
+  EnvironmentType:
+    Type: String
+    Description: Environment name (e.g., dev, uat, prod)
+
+  LogLevel:
+    Type: String
+    Description: Log level for the Lambda trigger (e.g., INFO, DEBUG)
+    Default: DEBUG
+    AllowedValues:
+      - INFO
+      - DEBUG
+
+  LogGroupRetentionInDays:
+    Type: Number
+    Description: Log group retention in days
+    Default: 14
+
+  TemplateBaseUrl:
+    Type: String
+    Description: The base URL for the CloudFormation templates
+    Default: ""
+
+  KinesisAuditStreamArn:
+    Type: String
+    Description: The ARN of the Kinesis Stream for audit logs
+    Default: ""
+
 Resources:
   CognitoLogsS3:
     Type: AWS::S3::Bucket
@@ -52,6 +88,8 @@ Resources:
     Type: AWS::Lambda::Function
     Properties: 
       FunctionName: !Sub ${ProjectName}-post-auth-cognito-trigger
+      LoggingConfig:
+        LogGroup: !GetAtt CognitoTriggerLogGroupStack.Outputs.LogGroupName
       Code: 
         S3Bucket: !Ref LambdaS3Bucket
         S3Key: !Ref LambdaS3BucketKey
@@ -59,8 +97,11 @@ Resources:
       Environment:
         Variables:
           BucketName: !Ref CognitoLogsS3
+          USER_ROLES_TABLE: !Ref UserRolesTable
+          LOG_LEVEL: !Ref LogLevel
+          ENVIRONMENT_TYPE: !Ref EnvironmentType
       Handler: CognitoLogsLambda.handler
-      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-cognito-logs-role"
+      Role: !GetAtt CognitoLambdaRole.Arn
       Runtime: nodejs22.x
       Timeout: 30
 
@@ -90,7 +131,7 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:PutLogEvents
                 Resource:
-                - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-post-auth-cognito-trigger:*"
+                - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-post-auth-cognito-trigger-v2:*"
               - Sid: S3PutObject
                 Effect: Allow
                 Action: 
@@ -101,17 +142,32 @@ Resources:
                 Action:
                   - S3:ListBucket
                 Resource: !Sub "arn:aws:s3:::${ProjectName}-cognito-logs"
+              - Sid: DynamoDBRead
+                Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                Resource: !GetAtt UserRolesTable.Arn
+              - Sid: CognitoUpdateUser
+                Effect: Allow
+                Action:
+                  - cognito-idp:AdminUpdateUserAttributes
+                Resource: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*"
       RoleName: !Sub ${ProjectName}-cognito-logs-role
 
-  LambdaTriggerLogGroup:
-    Type: "AWS::Logs::LogGroup"
+  CognitoTriggerLogGroupStack:
+    Type: AWS::CloudFormation::Stack
     Properties:
-      RetentionInDays: 14
-      LogGroupName: !Sub "/aws/lambda/${CognitoTriggerLambda}"
+      TemplateURL: !Sub "${TemplateBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub "${ProjectName}-post-auth-cognito-trigger-v2"
+        LogGroupPrefix: "/aws/lambda"
+        LogGroupRetention: !Ref LogGroupRetentionInDays
+        LogsKinesisSourceStreamArn: !Ref KinesisAuditStreamArn
 
   UserPool:
     Type: "AWS::Cognito::UserPool"
     Properties:
+      UserPoolTier: ESSENTIALS
       AccountRecoverySetting:
         RecoveryMechanisms:
           - Name: admin_only
@@ -121,7 +177,11 @@ Resources:
       AutoVerifiedAttributes:
         - email
       LambdaConfig:
-        PostAuthentication: !Sub "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${CognitoTriggerLambda}"        
+        PreTokenGeneration: !GetAtt CognitoTriggerLambda.Arn
+        PostAuthentication: !GetAtt CognitoTriggerLambda.Arn
+        PreTokenGenerationConfig:
+          LambdaArn: !GetAtt CognitoTriggerLambda.Arn
+          LambdaVersion: V2_0
       Policies:
         PasswordPolicy:
           MinimumLength: 16
@@ -139,6 +199,24 @@ Resources:
       UsernameConfiguration:
         CaseSensitive: false
 
+  UserPoolDomain:
+    Type: "AWS::Cognito::UserPoolDomain"
+    Properties:
+      Domain: !Sub "${CognitoDomainPrefix}-${EnvironmentType}"
+      UserPoolId: !Ref UserPool
+
+  UserPoolIdentityProviderGoogle:
+    Type: "AWS::Cognito::UserPoolIdentityProvider"
+    Properties:
+      ProviderName: !Sub "GoogleSAML-${EnvironmentType}"
+      ProviderType: SAML
+      UserPoolId: !Ref UserPool
+      ProviderDetails:
+        MetadataFile: "{{resolve:secretsmanager:HelpdeskGoogleMetadata:SecretString}}"
+        IDPSignout: "true"
+      AttributeMapping:
+        email: "email"
+
   UserPoolClient:
     Type: "AWS::Cognito::UserPoolClient"
     Properties:
@@ -154,7 +232,23 @@ Resources:
         - ALLOW_USER_SRP_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
         - ALLOW_USER_PASSWORD_AUTH
+      AllowedOAuthFlows:
+        - code
+        - implicit
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+      CallbackURLs:
+        - !Sub "https://${PortaleHelpdeskDomain}"
+      LogoutURLs:
+        - !Sub "https://${PortaleHelpdeskDomain}"
+      SupportedIdentityProviders:
+        - COGNITO
+        - !Sub "GoogleSAML-${EnvironmentType}"
       UserPoolId: !Ref UserPool
+    DependsOn: UserPoolIdentityProviderGoogle
 
   CognitoUserManagementRole:
     Type: AWS::IAM::Role
@@ -239,6 +333,26 @@ Resources:
             Resource: !Sub "arn:aws:s3:::${CognitoLogsS3}"
             Principal: 
               AWS: !Sub "arn:aws:iam::${AWS::AccountId}:role/CognitoUserRole"
+
+  UserRolesTable:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "email"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "email"
+          KeyType: "HASH"
+      BillingMode: PAY_PER_REQUEST
+      TableName: !Sub "${ProjectName}-helpdesk-roles"
+      Tags:
+        - Key: "Project"
+          Value: !Ref ProjectName
+      TableClass: 'STANDARD'
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
 
 Outputs:
 
