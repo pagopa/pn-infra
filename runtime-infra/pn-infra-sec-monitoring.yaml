@@ -121,6 +121,7 @@ Parameters:
   ExpectedCsvHash:
     Type: String
     Description: 'Expected hash of the authorized_roles.csv file for integrity validation'
+    Default: ''
 
   AlertOnCrossAccountAccess:
     Type: String
@@ -166,6 +167,7 @@ Conditions:
   HasDynamoDBCriticalTableMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalDynamoDBTables], "" ] ]
   HasCloudtrailEventDataStoreEnabledAndIsConfinfoAccount: !And [ !Equals [!Ref CloudtrailEventDataStoreEnabled, 'true'], !Condition IsConfinfoAccount ]
   HasDynamoDBCdcKinesisFilterPattern: !Not [ !Equals [ !Ref DynamoDBCdcKinesisFilterPattern, "" ] ]
+  HasExpectedCsvHash: !Not [ !Equals [ !Ref ExpectedCsvHash, "" ] ]
   
 Resources:
 
@@ -915,6 +917,8 @@ Resources:
         MaximumConcurrency: !Ref LambdaReservedConcurrency
       FunctionResponseTypes:
         - ReportBatchItemFailures
+      Enabled: 
+        !If [HasExpectedCsvHash, true, false]
 
 Outputs:
   Version:

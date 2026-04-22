@@ -1,14 +1,3 @@
-"""
-Unauthorized Access Validator Lambda Function
-
-Validates DynamoDB and S3 access against authorized roles from CSV.
-Supports cross-account access monitoring.
-Publishes metrics using CloudWatch Embedded Metric Format (EMF).
-
-Customer: PN-CONFIDENTIAL-INFORMATION
-Resources: pn-ConfidentialObjects (DynamoDB), pn-safestorage (S3)
-"""
-
 import json
 import boto3
 import os
@@ -143,8 +132,8 @@ def load_csv_content():
 
 
 # CSV schema constants
-_REQUIRED_CSV_COLUMNS = {'ARN', 'Access', 'Resources'}
-_OPTIONAL_CSV_COLUMNS = {'Role'}
+_REQUIRED_CSV_COLUMNS = {'Role', 'ARN', 'Access', 'Resources'}
+_OPTIONAL_CSV_COLUMNS = set()
 _VALID_ACCESS_LEVELS = {'Full', 'ReadOnly', 'ReadWrite'}
 
 # EMF metric publication constants
@@ -157,12 +146,9 @@ class AuthorizedRolesRegistry:
     """Parse and manage authorized roles from CSV.
     
     Expected CSV format (semicolon-delimited):
-        ARN;Access;Resources
-        or
         Role;ARN;Access;Resources
     
-    Required columns: ARN, Access, Resources
-    Optional columns: Role (ignored if present)
+    Required columns: Role, ARN, Access, Resources
     Access must be one of: Full, ReadOnly, ReadWrite
     """
     
@@ -174,7 +160,7 @@ class AuthorizedRolesRegistry:
         """Parse and strictly validate CSV content into structured role data.
         
         Raises ValueError if:
-        - Missing any of the required columns: ARN, Access, Resources
+        - Missing any of the required columns: Role, ARN, Access, Resources
         - Contains columns other than required + optional ones
         - Any row contains an access level not in {Full, ReadOnly, ReadWrite}
         """
@@ -405,9 +391,9 @@ def lambda_handler(event, context):
                 resource_type = 's3'
                 resource_name = request_params.get('bucketName', S3_BUCKET_NAME)
                 object_key = request_params.get('key', '')
-                
-                if object_key and not object_key.startswith(f"{S3_CRITICAL_PREFIX}/"):
-                    print(f"WARNING: S3 event for non-critical prefix: {object_key} (expected: {S3_CRITICAL_PREFIX}/)")
+                #Se la chiave contiene favicon.ico ignore                   
+                if object_key and not object_key.startswith(f"{S3_CRITICAL_PREFIX}"):
+                    print(f"WARNING: S3 event for non-critical prefix: {object_key} (expected: {S3_CRITICAL_PREFIX})")
             
             is_authorized, matched_role, reason = registry.is_authorized(
                 principal_arn, 
