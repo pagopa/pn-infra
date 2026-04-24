@@ -76,9 +76,25 @@ Parameters:
     Type: String
     Description: "Preferred maintenance window (e.g., sun:03:00-sun:04:00)"
     Default: "sun:03:00-sun:04:00"
+  EnableMultiAZ:
+    Type: String
+    Description: "Enable Multi-AZ by deploying a second Reader instance"
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  AutoUpdateMinorVersion:
+    Type: String
+    Description: "Enable automatic minor version upgrade during the maintenance window"
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
 
 Conditions:
   IsDeletionProtectionTrue: !Equals [!Ref DeletionProtectionEnabled, "true"]
+  HasMultiAZ: !Equals [!Ref EnableMultiAZ, "true"]
+  HasAutoUpdateMinorVersion: !Equals [!Ref AutoUpdateMinorVersion, "true"]
 
 Resources:
   PnAuroraDbClusterParameterGroup:
@@ -145,7 +161,7 @@ Resources:
     Type: AWS::RDS::DBCluster
     Properties:
       Engine: aurora-postgresql
-      AutoMinorVersionUpgrade: false
+      AutoMinorVersionUpgrade: !If [HasAutoUpdateMinorVersion, true, false]
       EngineVersion: !Ref EngineVersion
       DatabaseName: !Ref DatabaseName
       DBClusterIdentifier: !Sub "pn-${ClusterIdentifierSuffix}-aurora-pg-cluster"
@@ -185,11 +201,32 @@ Resources:
       DBInstanceClass: db.serverless 
       PubliclyAccessible: false
       DBSubnetGroupName: !Ref PnAuroraDbSubnetGroup
+      AutoMinorVersionUpgrade: !If [HasAutoUpdateMinorVersion, true, false]
       PromotionTier: 1
       EnablePerformanceInsights: false
       Tags:
         - Key: Name
           Value: !Sub "pn-${ClusterIdentifierSuffix}-instance-1"
+        - Key: Environment
+          Value: !Ref EnvType
+
+  PnAuroraDbInstance2:
+    Type: AWS::RDS::DBInstance
+    Condition: HasMultiAZ
+    Properties:
+      DBInstanceIdentifier: !Sub "pn-${ClusterIdentifierSuffix}-instance-2"
+      DBClusterIdentifier: !Ref PnAuroraDbCluster
+      Engine: aurora-postgresql
+      EngineVersion: !Ref EngineVersion
+      DBInstanceClass: db.serverless
+      PubliclyAccessible: false
+      DBSubnetGroupName: !Ref PnAuroraDbSubnetGroup
+      AutoMinorVersionUpgrade: !If [HasAutoUpdateMinorVersion, true, false]
+      PromotionTier: 2
+      EnablePerformanceInsights: false
+      Tags:
+        - Key: Name
+          Value: !Sub "pn-${ClusterIdentifierSuffix}-instance-2"
         - Key: Environment
           Value: !Ref EnvType
 
