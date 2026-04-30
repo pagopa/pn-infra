@@ -1,0 +1,438 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Reusable private API Gateway proxy with trusted header enforcement'
+
+Transform:
+  - UpdateDeploymentTransform
+
+Parameters:
+
+  ProjectName:
+    Type: String
+    Description: Project name used for resource naming
+
+  MicroServiceUniqueName:
+    Type: String
+    Description: Microservice unique name
+
+  ServiceApiPath:
+    Type: String
+    Description: Backend service API path
+
+  ApiPathPart:
+    Type: String
+    Default: api
+    Description: First API path segment exposed by the private proxy
+
+  ApiVersionPathPart:
+    Type: String
+    Default: v1
+    Description: API version path segment exposed by the private proxy
+
+  OperationPathPart:
+    Type: String
+    Default: act
+    Description: Operation path segment exposed by the private proxy
+
+  VPCEExecuteApiId:
+    Type: String
+    Description: execute-api interface VPC endpoint id allowed to invoke the private API
+
+  NetworkLoadBalancerLink:
+    Type: String
+    Description: API Gateway VPC Link id used to reach the internal backend NLB
+
+  ApplicationLoadBalancerDomain:
+    Type: String
+    Description: Application load balancer DNS name reached through the VPC Link
+
+  PrivateApiDomainName:
+    Type: String
+    Description: Private custom domain name used to invoke this API through PrivateLink
+
+  PrivateApiCertificateArn:
+    Type: String
+    Description: ACM certificate ARN associated to the private custom domain name
+
+  TrustedHeaderSourceChannel:
+    Type: String
+    Description: Value for x-pagopa-pn-src-ch
+
+  TrustedHeaderSourceChannelDetails:
+    Type: String
+    Description: Value for x-pagopa-pn-src-ch-details
+
+  TrustedHeaderCxType:
+    Type: String
+    Description: Value for x-pagopa-pn-cx-type
+
+  TrustedHeaderCxRole:
+    Type: String
+    Description: Value for x-pagopa-pn-cx-role
+
+  TrustedHeaderCxId:
+    Type: String
+    Description: Value for x-pagopa-pn-cx-id
+
+  TrustedHeaderUid:
+    Type: String
+    Description: Value for uid and x-pagopa-pn-uid
+
+  TrustedHeaderCxGroups:
+    Type: String
+    Default: ''
+    Description: Optional value for x-pagopa-pn-cx-groups
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of SNS topic where to send API Gateway alarms
+
+  CloudwatchFilterPattern:
+    Default: ''
+    Type: String
+    Description: Filter expression for exported logs
+
+  CloudwatchLogKinesisStreamArn:
+    Default: ''
+    Type: String
+    Description: Optional Kinesis stream where API Gateway access logs are exported
+
+  ApiGwLatencyLimit:
+    Default: 5000
+    Type: Number
+    Description: Latency limit before raising alarm, in milliseconds
+
+  EnvType:
+    Type: String
+    Description: Environment type
+    AllowedValues:
+      - dev
+      - test
+      - uat
+      - hotfix
+      - prod
+
+Conditions:
+  SendLogToKinesis: !Not [!Equals [!Ref CloudwatchLogKinesisStreamArn, '']]
+  HasTrustedHeaderCxGroups: !Not [!Equals [!Ref TrustedHeaderCxGroups, '']]
+  IsProdEnvironment: !Equals [!Ref EnvType, 'prod']
+
+Resources:
+
+  PrivateRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub '${MicroServiceUniqueName}-private-proxy'
+      Description: Private API Gateway proxy with trusted header enforcement
+      DisableExecuteApiEndpoint: false
+      EndpointConfiguration:
+        Types:
+          - PRIVATE
+        VpcEndpointIds:
+          - !Ref VPCEExecuteApiId
+      Policy:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Deny
+            Principal: '*'
+            Action: execute-api:Invoke
+            Resource: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:*/*/*/*'
+            Condition:
+              StringNotEquals:
+                aws:sourceVpce: !Ref VPCEExecuteApiId
+          - Effect: Allow
+            Principal: '*'
+            Action: execute-api:Invoke
+            Resource: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:*/*/*/*'
+      Tags:
+        - Key: PN_APIGW_TYPE
+          Value: PRIVATE_PROXY
+        - Key: PN_SERVICE_PATH
+          Value: !Ref ServiceApiPath
+
+  ServicePathResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref PrivateRestApi
+      ParentId: !GetAtt PrivateRestApi.RootResourceId
+      PathPart: !Ref ServiceApiPath
+
+  ApiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref PrivateRestApi
+      ParentId: !Ref ServicePathResource
+      PathPart: !Ref ApiPathPart
+
+  ApiVersionResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref PrivateRestApi
+      ParentId: !Ref ApiResource
+      PathPart: !Ref ApiVersionPathPart
+
+  OperationResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref PrivateRestApi
+      ParentId: !Ref ApiVersionResource
+      PathPart: !Ref OperationPathPart
+
+  OperationProxyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref PrivateRestApi
+      ParentId: !Ref OperationResource
+      PathPart: '{proxy+}'
+
+  OperationProxyAnyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      OperationName: !Sub 'Private proxy to ${MicroServiceUniqueName} APIs'
+      RestApiId: !Ref PrivateRestApi
+      ResourceId: !Ref OperationProxyResource
+      HttpMethod: ANY
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        ConnectionType: VPC_LINK
+        ConnectionId: !Ref NetworkLoadBalancerLink
+        IntegrationHttpMethod: ANY
+        Type: HTTP_PROXY
+        Uri: !Sub 'http://${ApplicationLoadBalancerDomain}:8080/${ServiceApiPath}/${ApiPathPart}/${ApiVersionPathPart}/${OperationPathPart}/{proxy}'
+        RequestParameters:
+          integration.request.path.proxy: method.request.path.proxy
+          integration.request.header.x-pagopa-pn-src-ch: !Sub "'${TrustedHeaderSourceChannel}'"
+          integration.request.header.x-pagopa-pn-src-ch-details: !Sub "'${TrustedHeaderSourceChannelDetails}'"
+          integration.request.header.x-pagopa-pn-cx-type: !Sub "'${TrustedHeaderCxType}'"
+          integration.request.header.x-pagopa-pn-cx-role: !Sub "'${TrustedHeaderCxRole}'"
+          integration.request.header.x-pagopa-pn-cx-id: !Sub "'${TrustedHeaderCxId}'"
+          integration.request.header.uid: !Sub "'${TrustedHeaderUid}'"
+          integration.request.header.x-pagopa-pn-uid: !Sub "'${TrustedHeaderUid}'"
+          integration.request.header.x-pagopa-pn-cx-groups: !If
+            - HasTrustedHeaderCxGroups
+            - !Sub "'${TrustedHeaderCxGroups}'"
+            - !Ref AWS::NoValue
+        PassthroughBehavior: WHEN_NO_MATCH
+        TimeoutInMillis: 29000
+
+  GatewayResponse4XX:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      ResponseParameters:
+        gatewayresponse.header.Strict-Transport-Security: "'max-age=31536000; includeSubDomains; preload'"
+      ResponseType: DEFAULT_4XX
+      RestApiId: !Ref PrivateRestApi
+
+  GatewayResponse5XX:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      ResponseParameters:
+        gatewayresponse.header.Strict-Transport-Security: "'max-age=31536000; includeSubDomains; preload'"
+      ResponseType: DEFAULT_5XX
+      RestApiId: !Ref PrivateRestApi
+
+  PrivateRestApiDeploymentPnPlaceholderEpochSeconds:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - OperationProxyAnyMethod
+    Properties:
+      RestApiId: !Ref PrivateRestApi
+
+  PrivateRestApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref PrivateRestApi
+      StageName: unique
+      TracingEnabled: true
+      DeploymentId: !Ref PrivateRestApiDeploymentPnPlaceholderEpochSeconds
+      AccessLogSetting:
+        DestinationArn: !GetAtt PrivateApiLogGroup.Arn
+        Format: '{"requestTime":"$context.requestTime","requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","resourcePath":"$context.resourcePath","status":$context.status,"responseLatency":$context.responseLatency,"xrayTraceId":"$context.xrayTraceId","errorMessage":"$context.error.message","integrationStatus":"$context.integration.status","integrationLatency":"$context.integration.latency","sourceIp":"$context.identity.sourceIp","userAgent":"$context.identity.userAgent","vpcEndpointId":"$context.identity.vpcEndpointId"}'
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          MetricsEnabled: true
+          DataTraceEnabled: false
+          LoggingLevel: INFO
+
+  PrivateApiCustomDomain:
+    Type: AWS::ApiGateway::DomainNameV2
+    Properties:
+      DomainName: !Ref PrivateApiDomainName
+      CertificateArn: !Ref PrivateApiCertificateArn
+      EndpointConfiguration:
+        Types:
+          - PRIVATE
+      SecurityPolicy: TLS_1_2
+      Policy:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Deny
+            Principal: '*'
+            Action: execute-api:Invoke
+            Resource: execute-api:/*
+            Condition:
+              StringNotEquals:
+                aws:sourceVpce: !Ref VPCEExecuteApiId
+          - Effect: Allow
+            Principal: '*'
+            Action: execute-api:Invoke
+            Resource: execute-api:/*
+      Tags:
+        - Key: PN_APIGW_TYPE
+          Value: PRIVATE_PROXY
+        - Key: PN_SERVICE_PATH
+          Value: !Ref ServiceApiPath
+
+  PrivateApiDomainBasePathMapping:
+    Type: AWS::ApiGateway::BasePathMappingV2
+    DependsOn:
+      - PrivateRestApiStage
+    Properties:
+      DomainNameArn: !GetAtt PrivateApiCustomDomain.DomainNameArn
+      RestApiId: !Ref PrivateRestApi
+      Stage: !Ref PrivateRestApiStage
+
+  PrivateApiDomainAccessAssociation:
+    Type: AWS::ApiGateway::DomainNameAccessAssociation
+    Properties:
+      DomainNameArn: !GetAtt PrivateApiCustomDomain.DomainNameArn
+      AccessAssociationSource: !Ref VPCEExecuteApiId
+      AccessAssociationSourceType: VPCE
+
+  PrivateApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: !If [IsProdEnvironment, 180, 14]
+
+  APIGatewayApiLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'oncall-${MicroServiceUniqueName}-private-proxy-ApiGwLatencyAlarm'
+      AlarmDescription: API Gateway latency alarm for private proxy
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      InsufficientDataActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 15
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 20
+      Threshold: !Ref ApiGwLatencyLimit
+      TreatMissingData: notBreaching
+      Namespace: AWS/ApiGateway
+      MetricName: Latency
+      Period: 60
+      Dimensions:
+        - Name: ApiName
+          Value: !Sub '${MicroServiceUniqueName}-private-proxy'
+      ExtendedStatistic: p90
+
+  APIGatewayApiErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${MicroServiceUniqueName}-private-proxy-ApiGwAlarm'
+      AlarmDescription: API Gateway 4xx/5xx alarm for private proxy
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      InsufficientDataActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 5
+      Threshold: 1
+      TreatMissingData: notBreaching
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: ApiName
+                  Value: !Sub '${MicroServiceUniqueName}-private-proxy'
+              MetricName: 4XXError
+              Namespace: AWS/ApiGateway
+            Period: 60
+            Stat: Sum
+          ReturnData: false
+        - Id: m2
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: ApiName
+                  Value: !Sub '${MicroServiceUniqueName}-private-proxy'
+              MetricName: 5XXError
+              Namespace: AWS/ApiGateway
+            Period: 60
+            Stat: Sum
+          ReturnData: false
+        - Id: e1
+          Expression: IF(m1>=1 OR m2>=1, 1, 0)
+          Label: !Sub '${MicroServiceUniqueName}-private-proxy-APIGatewayErrorMetric'
+
+  SubscriptionFilter:
+    Condition: SendLogToKinesis
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      RoleArn: !GetAtt SubscriptionFilterServiceRole.Arn
+      LogGroupName: !Ref PrivateApiLogGroup
+      FilterPattern: !Ref CloudwatchFilterPattern
+      DestinationArn: !Ref CloudwatchLogKinesisStreamArn
+
+  SubscriptionFilterServiceRole:
+    Condition: SendLogToKinesis
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: logs.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: !Sub '${MicroServiceUniqueName}-private-proxy-logs-subscription-role'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - kinesis:PutRecord
+                Effect: Allow
+                Resource: !Ref CloudwatchLogKinesisStreamArn
+              - Action:
+                  - kms:Encrypt
+                  - kms:GenerateDataKey
+                  - kms:Decrypt
+                Effect: Allow
+                Resource: '*'
+
+Outputs:
+
+  PrivateApiGatewayId:
+    Description: Private API Gateway id
+    Value: !Ref PrivateRestApi
+
+  PrivateApiGatewayARN:
+    Description: Private API Gateway stage ARN
+    Value: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/${PrivateRestApi}/stages/${PrivateRestApiStage}'
+
+  PrivateApiGatewayExecutionARN:
+    Description: Private API Gateway execution ARN
+    Value: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${PrivateRestApi}/*/*/*'
+
+  PrivateApiGatewayInvokeUrl:
+    Description: Private API Gateway execute-api URL to be used through the configured VPCE
+    Value: !Sub 'https://${PrivateRestApi}-${VPCEExecuteApiId}.execute-api.${AWS::Region}.amazonaws.com/${PrivateRestApiStage}'
+
+  PrivateApiGatewayCustomDomainUrl:
+    Description: Private custom domain URL to be used through the configured PrivateLink endpoint
+    Value: !Sub 'https://${PrivateApiDomainName}'
+
+  PrivateApiGatewayCustomDomainArn:
+    Description: Private custom domain ARN
+    Value: !GetAtt PrivateApiCustomDomain.DomainNameArn

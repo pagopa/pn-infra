@@ -105,6 +105,21 @@ Parameters:
     Default: '-'
     Description: List of egress subnets
 
+  VPCEExecuteApiId:
+    Type: String
+    Default: ''
+    Description: execute-api interface VPC endpoint id for the RADD private proxy
+
+  RaddPrivateApiDnsName:
+    Type: String
+    Default: ''
+    Description: Private DNS name for the RADD private API
+
+  RaddPrivateApiCertificateArn:
+    Type: String
+    Default: ''
+    Description: ACM certificate ARN for the RADD private API custom domain
+
   LogRetention:
     Type: Number
     Default: 14
@@ -645,6 +660,12 @@ Outputs:
     Value: !Ref SafestorageLoggerLogGroupName
   VpcEgressSubnetsIds:
     Value: !If [ IsEgressDefined, !Ref VpcEgressSubnetsIds, !Ref VpcSubnets ]
+  VPCEExecuteApiId:
+    Value: !Ref VPCEExecuteApiId
+  RaddPrivateApiDnsName:
+    Value: !Ref RaddPrivateApiDnsName
+  RaddPrivateApiCertificateArn:
+    Value: !Ref RaddPrivateApiCertificateArn
 
   # Data Monitoring pass-through params
   DynamoDbExportTableNames:
