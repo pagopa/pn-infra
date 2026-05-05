@@ -51,7 +51,8 @@ function mustLog(rec){
     'pn-tokenExchangeOidcLambda',
     'pn-safestorage-logger',
     'pn-diagnostic-logger',
-    'pn-webLogoutLambda'
+    'pn-webLogoutLambda',
+    'pn-post-auth-cognito-trigger-v2'
   ]
 
   const allowedLogStreamPatterns = [

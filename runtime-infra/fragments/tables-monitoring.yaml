@@ -1,0 +1,187 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudWatch Metric Filters for DynamoDB append-only monitoring
+
+Parameters:
+
+  DynamoDBTableName:
+    Type: String
+
+  EnableAppendOnlyViolations:
+    Type: String
+    AllowedValues: ["true","false"]
+    Default: "true"
+
+  EnableTableDeletionAttempts:
+    Type: String
+    AllowedValues: ["true","false"]
+    Default: "true"
+
+  EnableBatchWriteViolations:
+    Type: String
+    AllowedValues: ["true","false"]
+    Default: "true"
+
+  CloudTrailLogGroupName:
+    Type: String
+
+  SnsTopicArn:
+    Type: String
+    Default: ""
+  
+  EnableAppendOnlyViolationsAlarm:
+    Type: String
+    AllowedValues: ["true","false"]
+    Default: "true"
+
+  EnableTableDeletionAttemptsAlarm:
+    Type: String
+    AllowedValues: ["true","false"]
+    Default: "true"
+
+  EnableBatchWriteViolationsAlarm:
+    Type: String
+    AllowedValues: ["true","false"]
+    Default: "true"
+
+# --------------------------
+# Conditions per metric
+# --------------------------
+Conditions:
+  HasAppendOnlyViolations: !Equals [ !Ref EnableAppendOnlyViolations, "true" ]
+  HasTableDeletionAttempts: !Equals [ !Ref EnableTableDeletionAttempts, "true" ]
+  HasBatchWriteViolations: !Equals [ !Ref EnableBatchWriteViolations, "true" ]
+  HasSnsTopicArn: !Not [ !Equals [ !Ref SnsTopicArn, "" ] ]
+  HasAppendOnlyViolationsAlarm: !And 
+    - !Equals [ !Ref EnableAppendOnlyViolationsAlarm, "true" ]
+    - !Condition HasAppendOnlyViolations
+  HasTableDeletionAttemptsAlarm: !And 
+    - !Equals [ !Ref EnableTableDeletionAttemptsAlarm, "true" ]
+    - !Condition HasTableDeletionAttempts
+  HasBatchWriteViolationsAlarm: !And 
+    - !Equals [ !Ref EnableBatchWriteViolationsAlarm, "true" ]
+    - !Condition HasBatchWriteViolations
+
+Resources:
+
+  # --------------------------
+  # Metric Filter: Append-Only Violations
+  # --------------------------
+  AppendOnlyViolationsMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Condition: HasAppendOnlyViolations
+    Properties:
+      FilterName: !Sub "${DynamoDBTableName}-append-only-violations"
+      LogGroupName: !Ref CloudTrailLogGroupName
+      FilterPattern: !Sub '{ ($.eventName = UpdateItem) || ($.eventName = DeleteItem) || ($.eventName = BatchWriteItem) && ($.requestParameters.tableName = "${DynamoDBTableName}") }'
+      MetricTransformations:
+        - MetricName: "AppendOnlyViolations"
+          MetricNamespace: "CustomSecurity/DynamoDB"
+          MetricValue: "1"
+          Dimensions:
+            - Key: TableName
+              Value: "$.requestParameters.tableName"
+
+  # --------------------------
+  # Metric Filter: Table Deletion Attempts
+  # --------------------------
+  TableDeletionAttemptsMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Condition: HasTableDeletionAttempts
+    Properties:
+      FilterName: !Sub "${DynamoDBTableName}-table-deletion-attempts"
+      LogGroupName: !Ref CloudTrailLogGroupName
+      FilterPattern: !Sub '{ ($.eventName = DeleteTable) && ($.requestParameters.tableName = "${DynamoDBTableName}") }'
+      MetricTransformations:
+        - MetricName: "TableDeletionAttempts"
+          MetricNamespace: "CustomSecurity/DynamoDB"
+          MetricValue: "1"
+          Dimensions:
+            - Key: TableName
+              Value: "$.requestParameters.tableName"
+
+  # --------------------------
+  # Metric Filter: BatchWriteItem Violations
+  # --------------------------
+  BatchWriteViolationsMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Condition: HasBatchWriteViolations
+    Properties:
+      FilterName: !Sub "${DynamoDBTableName}-batch-write-violations"
+      LogGroupName: !Ref CloudTrailLogGroupName
+      FilterPattern: !Sub '{ ($.eventName = BatchWriteItem) && ($.requestParameters.tableName = "${DynamoDBTableName}") }'
+      MetricTransformations:
+        - MetricName: "BatchWriteDeleteAttempts"
+          MetricNamespace: "CustomSecurity/DynamoDB"
+          MetricValue: "1"
+          Dimensions:
+            - Key: TableName
+              Value: "$.requestParameters.tableName"
+
+  # --------------------------
+  # Alarm: Append-Only Violations
+  # --------------------------
+  AppendOnlyViolationsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAppendOnlyViolationsAlarm
+    Properties:
+      AlarmName: !Sub "${DynamoDBTableName}-append-only-violations"
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 1
+      Threshold: 0
+      MetricName: AppendOnlyViolations
+      Namespace: "CustomSecurity/DynamoDB"
+      Statistic: Sum
+      Period: 300
+      TreatMissingData: notBreaching
+      Dimensions:
+      - Name: TableName
+        Value: !Ref DynamoDBTableName
+      AlarmDescription: !Sub "Append-only violation attempts on table ${DynamoDBTableName}"
+      AlarmActions: 
+        - !If [ HasSnsTopicArn, !Ref SnsTopicArn, !Ref "AWS::NoValue" ]
+
+  # --------------------------
+  # Alarm: Table Deletion Attempts
+  # --------------------------
+  TableDeletionAttemptsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasTableDeletionAttemptsAlarm
+    Properties:
+      AlarmName: !Sub "${DynamoDBTableName}-table-deletion-attempts"
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 1
+      Threshold: 0
+      MetricName: TableDeletionAttempts
+      Namespace: "CustomSecurity/DynamoDB"
+      Statistic: Sum
+      Period: 300
+      TreatMissingData: notBreaching
+      Dimensions:
+      - Name: TableName
+        Value: !Ref DynamoDBTableName
+      AlarmDescription: !Sub "Table deletion attempts detected for ${DynamoDBTableName}"
+      AlarmActions: 
+        - !If [ HasSnsTopicArn, !Ref SnsTopicArn, !Ref "AWS::NoValue" ]
+
+  # --------------------------
+  # Alarm: BatchWriteItem Violations
+  # --------------------------
+  BatchWriteViolationsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasBatchWriteViolationsAlarm
+    Properties:
+      AlarmName: !Sub "${DynamoDBTableName}-batch-write-violations"
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 1
+      Threshold: 0
+      MetricName: BatchWriteDeleteAttempts
+      Namespace: "CustomSecurity/DynamoDB"
+      Statistic: Sum
+      Period: 300
+      TreatMissingData: notBreaching
+      Dimensions:
+      - Name: TableName
+        Value: !Ref DynamoDBTableName
+      AlarmDescription: !Sub "BatchWriteItem violations detected on ${DynamoDBTableName}"
+      AlarmActions: 
+        - !If [ HasSnsTopicArn, !Ref SnsTopicArn, !Ref "AWS::NoValue" ]

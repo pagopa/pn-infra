@@ -1,70 +1,65 @@
-import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
-import md5 from 'crypto-js';
+import { S3Client } from "@aws-sdk/client-s3";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { CognitoIdentityProviderClient } from "@aws-sdk/client-cognito-identity-provider";
+import { putObjectToS3, checkIfUserExists, getMD5HashFromFile } from './utils.js';
+import { syncUserRoles } from './authService.js';
 
-export const handler = async(event) => {
-    if(event) {
-        try {
-            var s3Client = new S3Client();
-            const bucket_name = process.env.BucketName;
-            const userAttributeJson =  event.request.userAttributes;
-            const userName = event.request.userAttributes.sub;
-            const fileName = userName+'.json';
-            console.log(userAttributeJson);
-            var buf = Buffer.from(JSON.stringify(userAttributeJson));
-            var md5File = buf.toString();
-            var md5Hash = await getMD5HashFromFile(md5File);
-            if(await checkIfUserexists(s3Client ,bucket_name, fileName) === false) {
-                await putObjectToS3(s3Client, bucket_name, fileName, buf, md5Hash);
-            }
-        }
-        catch(err) {
-            console.log(err);
-        }
-    }
-    
-    return event;
-};
+const s3Client = new S3Client();
+const dbClient = new DynamoDBClient();
+const cognitoClient = new CognitoIdentityProviderClient();
 
-const putObjectToS3 = async (s3Client ,bucket, key, data, md5Hash) => {
-    var params = {
-        Bucket : bucket,
-        Key : key,
-        Body : data,
-        ContentMD5: md5Hash
-    };
-    
+export const handler = async (event) => {
+    if (!event) return event;
+    const triggerSource = event.triggerSource;
+    // Log deactivated to prevent OpenSearch ingestion errors
+    // console.log(`Cognito Trigger [${triggerSource}] Event:`, JSON.stringify(event, null, 2));
+
     try {
-        await s3Client.send(new PutObjectCommand(params));
-        console.log("Successfully written to S3");
-    }
-    catch(err) {
-        console.log("Error occured in put object: ", err);
-    }
-};
+        const bucketName = process.env.BucketName;
+        const rolesTable = process.env.USER_ROLES_TABLE;
+        const expectedIdpId = process.env.EXPECTED_IDPID;
+        const envType = process.env.ENVIRONMENT_TYPE;
+        const userAttributes = event.request.userAttributes;
+        const email = userAttributes.email;
+        const userName = userAttributes.sub;
+        const userPoolId = event.userPoolId;
 
-const checkIfUserexists = async (s3Client, bucket, key) => {
-    var params = {
-        Bucket: bucket,
-        Key: key
-    };
-    var returnValue;
-    await s3Client.send(new HeadObjectCommand(params))
-        .then((data) => { //file exists - don't write
-            returnValue = true;
-        })
-        .catch((err) => {
-            if(err.name === 'NotFound') { //File does not exist
-                returnValue = false;
-            }
-            else if(err.name === 403|| err.message === 'UnknownError') { 
-                returnValue = true;
-            }
-        });
-    return returnValue;
-};
+        // 1. SSO Login e Ruoli (su authService.js)
+        if (triggerSource === 'TokenGeneration_HostedAuth') {
+            await syncUserRoles(dbClient, cognitoClient, {
+                email,
+                roles_table: rolesTable,
+                userPoolId,
+                userName,
+                event,
+                expectedIdpId,
+                envType
+            });
+            // NOTA: Gli audit log standard (AUDIT10Y) sono emessi dentro syncUserRoles
+            return event;
+        }
 
-const getMD5HashFromFile = async (file) => {
-    var hash = md5.MD5(file);
-    var base64Hash = hash.toString(md5.enc.Base64);
-    return base64Hash;
+        // 2. Salvataggio su S3 (su CognitoLogsLambda.js)
+        if (triggerSource === 'PostAuthentication_Authentication') {
+            try {
+                const fileName = `${userName}.json`;
+                const dataStr = JSON.stringify(userAttributes);
+                const md5Hash = await getMD5HashFromFile(dataStr);
+                const exists = await checkIfUserExists(s3Client, bucketName, fileName);
+                
+                if (!exists) {
+                    console.log(`S3 Backup: Saving user attributes for ${userName}`);
+                    await putObjectToS3(s3Client, bucketName, fileName, Buffer.from(dataStr), md5Hash);
+                }
+            } catch (s3Err) {
+                console.error("S3 Backup Error:", s3Err);
+            }
+            return event;
+        }
+
+        return event;
+    } catch (err) {
+        console.error("Critical Error in Lambda Handler:", err);
+        return event;
+    }
 };
