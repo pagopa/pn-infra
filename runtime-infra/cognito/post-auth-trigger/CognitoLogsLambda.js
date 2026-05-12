@@ -39,8 +39,9 @@ export const handler = async (event) => {
             return event;
         }
 
-        // 2. Salvataggio su S3 (su CognitoLogsLambda.js)
+        // 2. Login locale (utenza Cognito diretta) + Salvataggio su S3
         if (triggerSource === 'PostAuthentication_Authentication') {
+            console.warn(`LOCAL_USER_LOGIN_DETECTED - User ${email} (sub=${userName}) logged in with local Cognito credentials`);
             try {
                 const fileName = `${userName}.json`;
                 const dataStr = JSON.stringify(userAttributes);

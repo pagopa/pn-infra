@@ -912,6 +912,24 @@ Resources:
         HasOncall: False
         HasAlarm: False
 
+  CognitoLocalUserLoginAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        MetricName: CognitoLocalUserLoginDetection
+        MetricNamespace: AdvancedMetric
+        LogGroupName: !Sub '/aws/lambda/${ProjectName}-post-auth-cognito-trigger-v2'
+        FilterPattern: 'LOCAL_USER_LOGIN_DETECTED'
+        Period: 300
+        Threshold: 1
+        EvaluationPeriods: 1
+        DatapointsToAlarm: 1
+        Statistic: Sum
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        HasOncall: False
+
 
 Outputs:
   Version:
