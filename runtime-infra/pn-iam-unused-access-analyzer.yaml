@@ -4,46 +4,11 @@ Description: >-
   Stesso template usato sia in core che in confinfo: la discriminante e' il
   parametro PnCoreAwsAccountId (vuoto = stiamo girando nel core, valorizzato =
   stiamo girando in confinfo). Stesso pattern di pn-data-monitoring.yaml.
-  - In core: si crea il bucket S3 centrale dei report, la KMS CMK, la bucket
-    policy che accetta scritture cross-account dal confinfo della stessa env,
-    la dashboard CloudWatch e l'Analyzer + Lambda esportatrice del core stesso.
-  - In confinfo: si crea solo l'Analyzer locale + la Lambda esportatrice, che
-    scrive i CSV cross-account nel bucket del core.
-
-# =============================================================================
-# NOTE DI DESIGN (non rimuovere senza confronto col team)
-# -----------------------------------------------------------------------------
-# - Hub-per-env voluto: dev/uat/hotfix/prod restano segregati per requisito
-#   PSN/audit. NON unificare in un hub globale.
-# - Codice Lambda INLINE (ZipFile) voluto: lo stack al momento NON e' nella
-#   pipeline pn-infra. Quando si industrializza, spostare il codice come
-#   artefatto versionato in LambdasBucketName / LambdasBasePath, come fanno
-#   gli altri template di pn-infra.
-# - Single-region: questo template assume una sola region per env. Access
-#   Analyzer e' regionale: se PN gira in piu' region, replicare il deploy
-#   confinfo per ogni region. Il bucket centrale puo' restare in una sola.
-# - Cfg UNICO per env (pn-iam-unused-access-analyzer-<env>-cfg.json). E' lo
-#   stesso file sia per il deploy nel core che in confinfo: i parametri
-#   PnCoreAwsAccountId / PnConfinfoAwsAccountId / CentralReportsBucketKmsKeyArn
-#   vanno valorizzati in modo speculare a seconda dell'account target. Stessa
-#   convenzione di pn-data-monitoring.yaml.
-#
-# TODO (FUTURE EVOLUTIONS, NON IN QUESTA ITERAZIONE):
-# - SNS: in futuro va aggiunto un topic SNS in CORE collegato a una rule
-#   EventBridge su source 'aws.access-analyzer' detail-type 'Access Analyzer
-#   Finding', con subscription verso webhook Slack via chatbot/lambda. Serve
-#   per l'alerting real-time sui nuovi findings ad alta severity. Per ora
-#   NON implementato: la dashboard CloudWatch + il CSV periodico bastano
-#   per la prima iterazione.
-# - DynamoDB: in futuro va aggiunto uno state-store per la Lambda
-#   esportatrice (checkpoint nextToken, finding-id gia' notificati,
-#   timestamp ultimo run riuscito) in modo da gestire i timeout della
-#   Lambda (15min) su account con tanti findings. PER SCELTA NON usiamo
-#   DynamoDB: lo state verra' salvato come oggetto JSON dedicato sullo
-#   stesso bucket S3 dei report (path '<env>/_state/<account>/checkpoint.json'),
-#   per ridurre il numero di servizi/costi e mantenere tutta l'evidence
-#   nello stesso storage WORM-ready.
-# =============================================================================
+  - In core: si crea il bucket S3 locale dei report, la dashboard CloudWatch
+    e l'Analyzer + Lambda esportatrice del core stesso.
+  - In confinfo: si crea il bucket S3 locale, l'Analyzer + Lambda esportatrice
+    e una bucket policy che consente al core della stessa env di leggere i
+    report per consultazione centralizzata.
 
 Parameters:
 
@@ -56,22 +21,21 @@ Parameters:
     Type: String
     Description: Nome ambiente (dev|uat|hotfix|prod).
     AllowedValues: [dev, uat, hotfix, prod]
+    # to remove
+    Default: dev 
 
   PnCoreAwsAccountId:
     Type: String
     Default: ''
-    Description: >-
-      Account ID dell'account CORE della stessa env. Lasciare VUOTO quando si
-      esegue il deploy nell'account core; valorizzare quando si esegue il
-      deploy in confinfo. Stessa convenzione usata in pn-data-monitoring.yaml.
+    Description: Core Account
 
   PnConfinfoAwsAccountId:
     Type: String
     Default: ''
     Description: >-
-      Account ID dell'account CONFINFO della stessa env. Da valorizzare SOLO
-      nel cfg del core: viene usato per autorizzare la Lambda esportatrice di
-      confinfo a scrivere nel bucket centrale. In confinfo lasciare vuoto.
+      Account ID del confinfo della stessa env. Serve nel deploy core per
+      costruire il nome del bucket remoto di confinfo e mostrarne i risultati
+      nella dashboard centralizzata.
 
   AnalyzerName:
     Type: String
@@ -90,48 +54,17 @@ Parameters:
     Default: rate(30 days)
     Description: Espressione di schedule EventBridge per la Lambda esportatrice.
 
-  CentralReportsBucketKmsKeyArn:
-    Type: String
-    Default: ''
-    Description: >-
-      (Solo confinfo) ARN della CMK che cifra il bucket centrale del core.
-      Necessario perche' la Lambda di confinfo possa fare kms:GenerateDataKey
-      durante l'upload. Si recupera dall'output del deploy core.
-
   LogRetentionDays:
     Type: Number
     Default: 365
     Description: Retention dei log CloudWatch della Lambda esportatrice.
 
 Conditions:
-
-  # Stessa logica di pn-data-monitoring.yaml:
-  #   - PnCoreAwsAccountId vuoto  -> stiamo eseguendo nel CORE
-  #   - PnCoreAwsAccountId valorizzato -> stiamo eseguendo nel CONFINFO
   IsConfinfoAccount: !Not [ !Equals [ !Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount:    !Equals [ !Ref PnCoreAwsAccountId, '' ]
-
-  # Vero solo quando siamo nel core E sappiamo l'account id del confinfo da
-  # autorizzare. Se non lo sappiamo ancora (primo bootstrap), il bucket si
-  # crea lo stesso ma la statement cross-account non viene aggiunta.
-  HasConfinfoAccountId: !And
-    - !Condition IsCoreAccount
-    - !Not [ !Equals [ !Ref PnConfinfoAwsAccountId, '' ] ]
+  HasConfinfoAccountId: !And [ !Condition IsCoreAccount, !Not [ !Equals [ !Ref PnConfinfoAwsAccountId, '' ] ] ]
 
 Resources:
-
-  # ===========================================================================
-  # IAM Access Analyzer (creato in OGNI account, sia core che confinfo)
-  # ---------------------------------------------------------------------------
-  # WEAKNESS #1 (costo):
-  #   ACCOUNT_UNUSED_ACCESS e' tariffato per ruolo IAM analizzato
-  #   (~0.20 USD/role/mese). Su un'org grande non e' trascurabile. Verificare
-  #   il numero di ruoli prima del rollout.
-  # WEAKNESS #2 (segregazione):
-  #   Usiamo volutamente ACCOUNT_* (NON ORGANIZATION_UNUSED_ACCESS) per
-  #   mantenere ogni env autosufficiente ed evitare contaminazione cross-env
-  #   dei findings.
-  # ===========================================================================
   UnusedAccessAnalyzer:
     Type: AWS::AccessAnalyzer::Analyzer
     Properties:
@@ -143,93 +76,9 @@ Resources:
       Tags:
         - { Key: ProjectName,     Value: !Ref ProjectName }
         - { Key: EnvironmentType, Value: !Ref EnvironmentType }
-        - { Key: ManagedBy,       Value: CloudFormation }
 
-  # ===========================================================================
-  # SOLO CORE: KMS CMK per il bucket centrale dei report
-  # ---------------------------------------------------------------------------
-  # WEAKNESS #3 (rotazione):
-  #   EnableKeyRotation = true. Se in futuro si passa a multi-region key,
-  #   rivedere i permessi a valle (Athena/QuickSight).
-  # WEAKNESS #4 (scope key policy):
-  #   Concediamo kms:Encrypt/GenerateDataKey* al root del confinfo, ristretti
-  #   da una condition sul nome del ruolo (prefisso esportatore). Sarebbe
-  #   piu' stretto specificare l'ARN esatto del ruolo, ma genera dipendenza
-  #   chicken-and-egg tra il deploy del core e la creazione del ruolo nel
-  #   confinfo. Da rivisitare quando lo stack e' stabile.
-  # ===========================================================================
-  ReportsBucketKmsKey:
-    Type: AWS::KMS::Key
-    Condition: IsCoreAccount
-    Properties:
-      Description: !Sub 'CMK per i report di ${ProjectName}-iam-unused-access (${EnvironmentType})'
-      EnableKeyRotation: true
-      KeyPolicy:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: EnableRoot
-            Effect: Allow
-            Principal: { AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root' }
-            Action: 'kms:*'
-            Resource: '*'
-          - Sid: AllowCoreLambdaEncrypt
-            Effect: Allow
-            Principal: { AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root' }
-            Action:
-              - kms:Encrypt
-              - kms:GenerateDataKey*
-              - kms:DescribeKey
-            Resource: '*'
-            Condition:
-              StringLike:
-                aws:PrincipalArn:
-                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ProjectName}-iam-unused-access-exporter-${EnvironmentType}'
-          - !If
-            - HasConfinfoAccountId
-            - Sid: AllowConfinfoLambdaEncrypt
-              Effect: Allow
-              Principal: { AWS: !Sub 'arn:${AWS::Partition}:iam::${PnConfinfoAwsAccountId}:root' }
-              Action:
-                - kms:Encrypt
-                - kms:GenerateDataKey*
-                - kms:DescribeKey
-              Resource: '*'
-              Condition:
-                StringLike:
-                  aws:PrincipalArn:
-                    - !Sub 'arn:${AWS::Partition}:iam::${PnConfinfoAwsAccountId}:role/${ProjectName}-iam-unused-access-exporter-${EnvironmentType}'
-            - !Ref AWS::NoValue
-      Tags:
-        - { Key: ProjectName,     Value: !Ref ProjectName }
-        - { Key: EnvironmentType, Value: !Ref EnvironmentType }
-
-  ReportsBucketKmsKeyAlias:
-    Type: AWS::KMS::Alias
-    Condition: IsCoreAccount
-    Properties:
-      AliasName: !Sub 'alias/${ProjectName}-iam-unused-access-${EnvironmentType}'
-      TargetKeyId: !Ref ReportsBucketKmsKey
-
-  # ===========================================================================
-  # SOLO CORE: bucket S3 centrale per i CSV (core + confinfo della stessa env)
-  # ---------------------------------------------------------------------------
-  # WEAKNESS #5 (Object Lock):
-  #   Questo bucket contiene evidence di compliance. NON abilitiamo Object
-  #   Lock per non complicare il primo deploy, ma per produzione valutare
-  #   Object Lock in modalita' COMPLIANCE con retention >= obblighi legali.
-  # WEAKNESS #6 (lifecycle):
-  #   I report > 365gg vengono cancellati. Audit/legal potrebbero richiedere
-  #   retention piu' lunga (5-7 anni). Adattare per env.
-  # WEAKNESS #7 (no replication):
-  #   Single-region. Per DR delle evidence, aggiungere CRR su un secondo
-  #   bucket/region.
-  # WEAKNESS #8 (no access logging):
-  #   Non abilitiamo S3 server access logging. Se la policy PN lo richiede,
-  #   puntare al bucket logs di pn-infra via LoggingConfiguration.
-  # ===========================================================================
-  CentralReportsBucket:
+  LocalReportsBucket:
     Type: AWS::S3::Bucket
-    Condition: IsCoreAccount
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -243,10 +92,8 @@ Resources:
         Status: Enabled
       BucketEncryption:
         ServerSideEncryptionConfiguration:
-          - BucketKeyEnabled: true
-            ServerSideEncryptionByDefault:
-              SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !GetAtt ReportsBucketKmsKey.Arn
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
@@ -266,22 +113,10 @@ Resources:
         - { Key: EnvironmentType, Value: !Ref EnvironmentType }
         - { Key: Purpose,         Value: iam-unused-access-evidence }
 
-  # ---------------------------------------------------------------------------
-  # SOLO CORE: bucket policy
-  # WEAKNESS #9 (trust cross-account):
-  #   La PutObject cross-account viene concessa al ROOT del confinfo, ristretta
-  #   da una condition sul nome del ruolo esportatore. Stesso compromesso
-  #   chicken-and-egg gia' commentato in WEAKNESS #4. Stringere all'ARN esatto
-  #   quando lo stack e' stabile.
-  # WEAKNESS #10 (SecureTransport):
-  #   La deny su HTTP (aws:SecureTransport=false) e' inclusa: verificare che
-  #   non ci siano tool interni che ancora parlano in HTTP (non dovrebbero).
-  # ---------------------------------------------------------------------------
-  CentralReportsBucketPolicy:
+  LocalReportsBucketPolicy:
     Type: AWS::S3::BucketPolicy
-    Condition: IsCoreAccount
     Properties:
-      Bucket: !Ref CentralReportsBucket
+      Bucket: !Ref LocalReportsBucket
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -290,61 +125,29 @@ Resources:
             Principal: '*'
             Action: 's3:*'
             Resource:
-              - !GetAtt CentralReportsBucket.Arn
-              - !Sub '${CentralReportsBucket.Arn}/*'
+              - !GetAtt LocalReportsBucket.Arn
+              - !Sub '${LocalReportsBucket.Arn}/*'
             Condition:
               Bool: { 'aws:SecureTransport': 'false' }
-          - Sid: DenyUnencryptedObjectUploads
-            Effect: Deny
-            Principal: '*'
-            Action: 's3:PutObject'
-            Resource: !Sub '${CentralReportsBucket.Arn}/*'
-            Condition:
-              StringNotEquals:
-                's3:x-amz-server-side-encryption': 'aws:kms'
           - !If
-            - HasConfinfoAccountId
-            - Sid: AllowConfinfoExporterPutObject
+            - IsConfinfoAccount
+            - Sid: AllowCoreReadFromConfinfoBucket
               Effect: Allow
-              Principal: { AWS: !Sub 'arn:${AWS::Partition}:iam::${PnConfinfoAwsAccountId}:root' }
+              Principal: { AWS: !Sub 'arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root' }
               Action:
-                - s3:PutObject
-                - s3:AbortMultipartUpload
-              Resource: !Sub '${CentralReportsBucket.Arn}/*'
+                - s3:GetObject
+                - s3:GetObjectVersion
+                - s3:ListBucket
+              Resource:
+                - !GetAtt LocalReportsBucket.Arn
+                - !Sub '${LocalReportsBucket.Arn}/*'
               Condition:
                 StringLike:
                   aws:PrincipalArn:
-                    - !Sub 'arn:${AWS::Partition}:iam::${PnConfinfoAwsAccountId}:role/${ProjectName}-iam-unused-access-exporter-${EnvironmentType}'
-                StringEquals:
-                  's3:x-amz-server-side-encryption': 'aws:kms'
-                  's3:x-amz-server-side-encryption-aws-kms-key-id': !GetAtt ReportsBucketKmsKey.Arn
+                    - !Sub 'arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/*'
+                    - !Sub 'arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root'
             - !Ref AWS::NoValue
-          - Sid: AllowCoreAccountReadFullList
-            Effect: Allow
-            Principal: { AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root' }
-            Action:
-              - s3:GetObject
-              - s3:GetObjectVersion
-              - s3:ListBucket
-            Resource:
-              - !GetAtt CentralReportsBucket.Arn
-              - !Sub '${CentralReportsBucket.Arn}/*'
 
-  # ===========================================================================
-  # IAM role per la Lambda esportatrice (creato sia in core che in confinfo)
-  # ---------------------------------------------------------------------------
-  # WEAKNESS #11 (wildcard):
-  #   Le API access-analyzer:List*/Get* su findings non supportano resource
-  #   level permissions: Resource:'*' e' imposto dal servizio. Stessa
-  #   limitazione gia' segnalata nel Terraform originale (CKV_AWS_355 skip).
-  # WEAKNESS #12 (no SCP guard):
-  #   Lo stesso ruolo puo' essere abusato per enumerare IAM. Non c'e' SCP
-  #   org-wide che blocchi mutazioni IAM da questo ruolo. Se PN ha una
-  #   guardrail org-level, agganciarla a questo path/tag.
-  # WEAKNESS #13 (log encryption):
-  #   Il log group della Lambda non e' cifrato con CMK. I log contengono ARN
-  #   e nomi di ruolo. Se considerati sensibili, agganciare una KMS key.
-  # ===========================================================================
   ExporterLambdaRole:
     Type: AWS::IAM::Role
     Properties:
@@ -373,10 +176,8 @@ Resources:
                 Action:
                   - access-analyzer:ListAnalyzers
                   - access-analyzer:GetAnalyzer
-                  - access-analyzer:ListFindings
-                  - access-analyzer:ListFindingsV2
-                  - access-analyzer:GetFinding
-                  - access-analyzer:GetFindingV2
+                  - access-analyzer:ListFindings*
+                  - access-analyzer:GetFinding*
                 Resource: '*'
         - PolicyName: s3-write-reports
           PolicyDocument:
@@ -386,28 +187,7 @@ Resources:
                 Action:
                   - s3:PutObject
                   - s3:AbortMultipartUpload
-                Resource:
-                  # In core scrive nel bucket creato qui; in confinfo scrive nel
-                  # bucket del core, il cui nome e' deterministico:
-                  # pn-iam-unused-access-reports-<env>-<core_account_id>
-                  !If
-                    - IsCoreAccount
-                    - !Sub '${CentralReportsBucket.Arn}/*'
-                    - !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnCoreAwsAccountId}/*'
-        - PolicyName: kms-encrypt-reports
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - kms:Encrypt
-                  - kms:GenerateDataKey*
-                  - kms:DescribeKey
-                Resource:
-                  !If
-                    - IsCoreAccount
-                    - !GetAtt ReportsBucketKmsKey.Arn
-                    - !Ref CentralReportsBucketKmsKeyArn
+                Resource: !Sub '${LocalReportsBucket.Arn}/*'
       Tags:
         - { Key: ProjectName,     Value: !Ref ProjectName }
         - { Key: EnvironmentType, Value: !Ref EnvironmentType }
@@ -418,22 +198,6 @@ Resources:
       LogGroupName: !Sub '/aws/lambda/${ProjectName}-iam-unused-access-exporter-${EnvironmentType}'
       RetentionInDays: !Ref LogRetentionDays
 
-  # ===========================================================================
-  # Lambda esportatrice (codice inline)
-  # ---------------------------------------------------------------------------
-  # WEAKNESS #14 (inline code):
-  #   Inline ZipFile va bene per la prima iterazione ma NON da' build
-  #   riproducibili, signing, o DLQ in caso di errore di init. Da spostare
-  #   ad artefatto S3 quando lo stack entra in pipeline.
-  # WEAKNESS #15 (no DLQ):
-  #   Non configuriamo DeadLetterConfig. EventBridge ha le sue retry, ma le
-  #   eccezioni interne alla Lambda dopo le retry vengono perse.
-  # WEAKNESS #16 (no per-finding alerting):
-  #   Questa Lambda produce solo un CSV periodico. NON allerta sui NUOVI
-  #   findings ad alta severity. Per il real-time, aggiungere una rule
-  #   EventBridge su source 'aws.access-analyzer' detail-type
-  #   'Access Analyzer Finding' -> SNS. Fuori scope per questa iterazione.
-  # ===========================================================================
   ExporterLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -447,16 +211,7 @@ Resources:
       Environment:
         Variables:
           ANALYZER_ARN: !GetAtt UnusedAccessAnalyzer.Arn
-          REPORTS_BUCKET:
-            !If
-              - IsCoreAccount
-              - !Ref CentralReportsBucket
-              - !Sub '${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnCoreAwsAccountId}'
-          REPORTS_KMS_KEY_ID:
-            !If
-              - IsCoreAccount
-              - !GetAtt ReportsBucketKmsKey.Arn
-              - !Ref CentralReportsBucketKmsKeyArn
+          REPORTS_BUCKET: !Ref LocalReportsBucket
           ENV_NAME: !Ref EnvironmentType
           ACCOUNT_ROLE: !If [IsCoreAccount, 'core', 'confinfo']
       Code:
@@ -468,7 +223,7 @@ Resources:
           ACCOUNT_UNUSED_ACCESS, aggiunge righe a un CSV in memoria, poi
           carica il CSV su REPORTS_BUCKET nel path
           <env>/<core|confinfo>/<account_id>/<yyyy-mm-dd>/findings-HHMMSS.csv
-          con SSE-KMS usando REPORTS_KMS_KEY_ID.
+          lasciando a S3 la cifratura server-side di default (SSE-S3).
 
           Volutamente minimale: niente DynamoDB di state tracking, niente SNS,
           niente recommendations. Vedere WEAKNESS #14 per quando arricchire.
@@ -488,7 +243,6 @@ Resources:
 
           ANALYZER_ARN  = os.environ["ANALYZER_ARN"]
           BUCKET        = os.environ["REPORTS_BUCKET"]
-          KMS_KEY_ID    = os.environ["REPORTS_KMS_KEY_ID"]
           ENV_NAME      = os.environ["ENV_NAME"]
           ACCOUNT_ROLE  = os.environ["ACCOUNT_ROLE"]  # 'core' | 'confinfo'
 
@@ -545,8 +299,6 @@ Resources:
                   Key=key,
                   Body=buf.getvalue().encode("utf-8"),
                   ContentType="text/csv",
-                  ServerSideEncryption="aws:kms",
-                  SSEKMSKeyId=KMS_KEY_ID,
               )
 
               log.info(json.dumps({"msg": "export completed", "account_id": account_id,
@@ -557,9 +309,6 @@ Resources:
         - { Key: ProjectName,     Value: !Ref ProjectName }
         - { Key: EnvironmentType, Value: !Ref EnvironmentType }
 
-  # ===========================================================================
-  # Schedule EventBridge
-  # ===========================================================================
   ExporterSchedule:
     Type: AWS::Events::Rule
     Properties:
@@ -579,54 +328,221 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt ExporterSchedule.Arn
 
-  # ===========================================================================
-  # SOLO CORE: dashboard CloudWatch
-  # ---------------------------------------------------------------------------
-  # La dashboard mostra invocazioni/errori della Lambda esportatrice del core e
-  # un widget Logs Insights sul log group locale. Per vedere anche i log della
-  # Lambda confinfo serve cross-account observability via OAM (vedi
-  # pn-oam-monitoring). In alternativa, parsare i CSV dal bucket centrale.
-  # WEAKNESS #17 (no metriche confinfo by default):
-  #   Senza OAM, la dashboard mostra solo il core. La visualizzazione
-  #   cross-account e' lasciata a un follow-up.
-  # ===========================================================================
-  CentralDashboard:
+  ConfinfoResultsWidgetRole:
+    Type: AWS::IAM::Role
+    Condition: HasConfinfoAccountId
+    Properties:
+      RoleName: !Sub '${ProjectName}-iam-unused-access-confinfo-widget-${EnvironmentType}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-iam-unused-access-confinfo-widget-${EnvironmentType}:*'
+        - PolicyName: read-confinfo-reports
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}/*'
+
+  ConfinfoResultsWidgetLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: HasConfinfoAccountId
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-iam-unused-access-confinfo-widget-${EnvironmentType}'
+      RetentionInDays: !Ref LogRetentionDays
+
+  ConfinfoResultsWidget:
+    Type: AWS::Lambda::Function
+    Condition: HasConfinfoAccountId
+    Properties:
+      FunctionName: !Sub '${ProjectName}-iam-unused-access-confinfo-widget-${EnvironmentType}'
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt ConfinfoResultsWidgetRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      Environment:
+        Variables:
+          CONFINFO_BUCKET: !Sub '${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}'
+          CONFINFO_PREFIX: !Sub '${EnvironmentType}/confinfo/'
+      Code:
+        ZipFile: |
+          import csv
+          import html
+          import io
+          import os
+
+          import boto3
+
+          s3 = boto3.client("s3")
+
+          def _describe():
+              return {
+                  "markdown": "Confinfo latest findings widget. Mostra il CSV piu' recente scritto nel bucket confinfo e visualizza le prime 20 righe utili."
+              }
+
+          def _render_message(message):
+              return f'<div class="cwdb-no-default-styles"></div><p>{html.escape(message)}</p>'
+
+          def handler(event, context):
+              if event.get("describe"):
+                  return _describe()
+
+              bucket = os.environ.get("CONFINFO_BUCKET", "")
+              prefix = os.environ.get("CONFINFO_PREFIX", "")
+              if not bucket:
+                  return _render_message("Bucket confinfo non configurato")
+
+              response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=200)
+              objects = response.get("Contents", [])
+              csv_objects = [obj for obj in objects if obj["Key"].endswith(".csv")]
+              if not csv_objects:
+                  return _render_message(f"Nessun report CSV trovato in s3://{bucket}/{prefix}")
+
+              latest = max(csv_objects, key=lambda obj: obj["LastModified"])
+              obj = s3.get_object(Bucket=bucket, Key=latest["Key"])
+              body = obj["Body"].read().decode("utf-8")
+              reader = csv.DictReader(io.StringIO(body))
+
+              rows = []
+              for idx, row in enumerate(reader):
+                  if idx >= 20:
+                      break
+                  rows.append(
+                      "<tr>"
+                      f"<td>{html.escape(row.get('finding_id', ''))}</td>"
+                      f"<td>{html.escape(row.get('resource', ''))}</td>"
+                      f"<td>{html.escape(row.get('status', ''))}</td>"
+                      f"<td>{html.escape(str(row.get('unused_action_count', '')))}</td>"
+                      "</tr>"
+                  )
+
+              header = (
+                  '<div class="cwdb-no-default-styles"></div>'
+                  '<style>'
+                  'table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px}'
+                  'th,td{padding:6px;border-bottom:1px solid #ddd;text-align:left;white-space:nowrap}'
+                  'th{background:#eef3f7}'
+                  '</style>'
+                  f'<p><b>Bucket:</b> {html.escape(bucket)}<br/>'
+                  f'<b>Ultimo report:</b> {html.escape(latest["Key"])}<br/>'
+                  f'<b>Ultima modifica:</b> {latest["LastModified"].isoformat()}</p>'
+              )
+
+              if not rows:
+                  return header + '<p>Nessun finding nel report piu\' recente.</p>'
+
+              table = (
+                  '<table><thead><tr><th>Finding</th><th>Resource</th><th>Status</th><th>Unused Actions</th></tr></thead>'
+                  f'<tbody>{"".join(rows)}</tbody></table>'
+              )
+              return header + table
+
+  ConfinfoResultsWidgetInvokePermission:
+    Type: AWS::Lambda::Permission
+    Condition: HasConfinfoAccountId
+    Properties:
+      FunctionName: !Ref ConfinfoResultsWidget
+      Action: lambda:InvokeFunction
+      Principal: cloudwatch.amazonaws.com
+
+  CoreDashboard:
     Type: AWS::CloudWatch::Dashboard
     Condition: IsCoreAccount
     Properties:
       DashboardName: !Sub '${ProjectName}-iam-unused-access-${EnvironmentType}'
-      DashboardBody: !Sub |
-        {
-          "widgets": [
+      DashboardBody: !If
+        - HasConfinfoAccountId
+        - !Sub |
             {
-              "type": "text", "x": 0, "y": 0, "width": 24, "height": 2,
-              "properties": {
-                "markdown": "# IAM Unused Access - ${EnvironmentType}\n\n**Account core:** ${AWS::AccountId} | **Bucket:** ${CentralReportsBucket}\n\nI report sono scritti in `s3://${CentralReportsBucket}/<env>/<core|confinfo>/<account_id>/<data>/`."
-              }
-            },
-            {
-              "type": "metric", "x": 0, "y": 2, "width": 12, "height": 6,
-              "properties": {
-                "title": "Lambda esportatrice - invocazioni / errori (core)",
-                "region": "${AWS::Region}",
-                "metrics": [
-                  [ "AWS/Lambda", "Invocations", "FunctionName", "${ExporterLambda}", { "stat": "Sum" } ],
-                  [ ".",          "Errors",      ".",            ".",                 { "stat": "Sum" } ]
-                ],
-                "view": "timeSeries", "stacked": false, "period": 86400
-              }
-            },
-            {
-              "type": "log", "x": 12, "y": 2, "width": 12, "height": 6,
-              "properties": {
-                "title": "Ultime esecuzioni esportatore (core)",
-                "region": "${AWS::Region}",
-                "query": "SOURCE '${ExporterLambdaLogGroup}' | fields @timestamp, @message | filter @message like /export completed/ | sort @timestamp desc | limit 50",
-                "view": "table"
-              }
+              "widgets": [
+                {
+                  "type": "text", "x": 0, "y": 0, "width": 24, "height": 2,
+                  "properties": {
+                    "markdown": "# IAM Unused Access - ${EnvironmentType}\n\n**Account core:** ${AWS::AccountId} | **Bucket locale core:** ${LocalReportsBucket}\n\nOgni account scrive nel proprio bucket locale. In basso vedi il report piu' recente letto dal bucket di confinfo."
+                  }
+                },
+                {
+                  "type": "metric", "x": 0, "y": 2, "width": 12, "height": 6,
+                  "properties": {
+                    "title": "Lambda esportatrice - invocazioni / errori (core)",
+                    "region": "${AWS::Region}",
+                    "metrics": [
+                      [ "AWS/Lambda", "Invocations", "FunctionName", "${ExporterLambda}", { "stat": "Sum" } ],
+                      [ ".",          "Errors",      ".",            ".",                 { "stat": "Sum" } ]
+                    ],
+                    "view": "timeSeries", "stacked": false, "period": 86400
+                  }
+                },
+                {
+                  "type": "log", "x": 12, "y": 2, "width": 12, "height": 6,
+                  "properties": {
+                    "title": "Ultime esecuzioni esportatore (core)",
+                    "region": "${AWS::Region}",
+                    "query": "SOURCE '${ExporterLambdaLogGroup}' | fields @timestamp, @message | filter @message like /export completed/ | sort @timestamp desc | limit 50",
+                    "view": "table"
+                  }
+                },
+                {
+                  "type": "custom", "x": 0, "y": 8, "width": 24, "height": 8,
+                  "properties": {
+                    "title": "Ultimi finding confinfo",
+                    "endpoint": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-iam-unused-access-confinfo-widget-${EnvironmentType}"
+                  }
+                }
+              ]
             }
-          ]
-        }
+        - !Sub |
+            {
+              "widgets": [
+                {
+                  "type": "text", "x": 0, "y": 0, "width": 24, "height": 2,
+                  "properties": {
+                    "markdown": "# IAM Unused Access - ${EnvironmentType}\n\n**Account core:** ${AWS::AccountId} | **Bucket locale core:** ${LocalReportsBucket}\n\nDashboard core attiva. Per vedere anche i risultati di confinfo valorizza PnConfinfoAwsAccountId nel deploy core."
+                  }
+                },
+                {
+                  "type": "metric", "x": 0, "y": 2, "width": 12, "height": 6,
+                  "properties": {
+                    "title": "Lambda esportatrice - invocazioni / errori (core)",
+                    "region": "${AWS::Region}",
+                    "metrics": [
+                      [ "AWS/Lambda", "Invocations", "FunctionName", "${ExporterLambda}", { "stat": "Sum" } ],
+                      [ ".",          "Errors",      ".",            ".",                 { "stat": "Sum" } ]
+                    ],
+                    "view": "timeSeries", "stacked": false, "period": 86400
+                  }
+                },
+                {
+                  "type": "log", "x": 12, "y": 2, "width": 12, "height": 6,
+                  "properties": {
+                    "title": "Ultime esecuzioni esportatore (core)",
+                    "region": "${AWS::Region}",
+                    "query": "SOURCE '${ExporterLambdaLogGroup}' | fields @timestamp, @message | filter @message like /export completed/ | sort @timestamp desc | limit 50",
+                    "view": "table"
+                  }
+                }
+              ]
+            }
 
 Outputs:
 
@@ -648,21 +564,13 @@ Outputs:
     Export:
       Name: !Sub '${AWS::StackName}-ExporterLambdaRoleArn'
 
-  CentralReportsBucketName:
-    Condition: IsCoreAccount
-    Description: Nome del bucket centrale dei report (in confinfo non serve passarlo, viene derivato)
-    Value: !Ref CentralReportsBucket
+  LocalReportsBucketName:
+    Description: Nome del bucket locale dei report dell'account corrente
+    Value: !Ref LocalReportsBucket
     Export:
-      Name: !Sub '${AWS::StackName}-CentralReportsBucketName'
+      Name: !Sub '${AWS::StackName}-LocalReportsBucketName'
 
-  CentralReportsBucketKmsKeyArn:
-    Condition: IsCoreAccount
-    Description: ARN della CMK del bucket centrale (passarlo al cfg confinfo come CentralReportsBucketKmsKeyArn)
-    Value: !GetAtt ReportsBucketKmsKey.Arn
-    Export:
-      Name: !Sub '${AWS::StackName}-CentralReportsBucketKmsKeyArn'
-
-  CentralDashboardName:
+  CoreDashboardName:
     Condition: IsCoreAccount
     Description: Nome della dashboard CloudWatch
-    Value: !Ref CentralDashboard
+    Value: !Ref CoreDashboard
