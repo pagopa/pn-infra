@@ -1,18 +1,9 @@
 {
   "Parameters": {
-    "ProjectName": "pn",
-    "EnvironmentType": "dev",
-
-    "// PnCoreAwsAccountId":  "Lasciare VUOTO quando si esegue il deploy nell'account CORE. Valorizzare con l'account ID di CORE quando si esegue il deploy nell'account CONFINFO, cosi' il bucket locale di CONFINFO concede lettura al CORE. Stessa convenzione di pn-data-monitoring-dev-cfg.json.",
-    "PnCoreAwsAccountId": "REPLACE_WITH_DEV_CORE_ACCOUNT_ID_OR_LEAVE_EMPTY_IN_CORE",
-
-    "// PnConfinfoAwsAccountId": "Da valorizzare SOLO nel deploy CORE perche' la dashboard in core possa leggere il bucket di CONFINFO e mostrarne i risultati. In CONFINFO lasciare vuoto.",
-    "PnConfinfoAwsAccountId": "REPLACE_WITH_DEV_CONFINFO_ACCOUNT_ID_OR_LEAVE_EMPTY_IN_CONFINFO",
-
-    "AnalyzerName": "pn-unused-access-analyzer",
     "TrackingPeriodDays": "90",
-    "ScheduleExpression": "rate(30 days)",
-
-    "LogRetentionDays": "365"
+    "ScheduleExpression": "cron(0 2 ? * MON *)",
+    "EnableExporterSchedule": "ENABLED",
+    "LogRetentionDays": "14",
+    "S3lifecyclepolicyReportInDays": "180"
   }
 }
