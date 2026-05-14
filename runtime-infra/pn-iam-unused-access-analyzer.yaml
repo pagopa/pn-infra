@@ -4,11 +4,10 @@ Description: >-
   Stesso template usato sia in core che in confinfo: la discriminante e' il
   parametro PnCoreAwsAccountId (vuoto = stiamo girando nel core, valorizzato =
   stiamo girando in confinfo). Stesso pattern di pn-data-monitoring.yaml.
-  - In core: si crea il bucket S3 locale dei report, la dashboard CloudWatch
+  - In core: si crea il bucket S3 centrale dei report, la dashboard CloudWatch
     e l'Analyzer + Lambda esportatrice del core stesso.
-  - In confinfo: si crea il bucket S3 locale, l'Analyzer + Lambda esportatrice
-    e una bucket policy che consente al core della stessa env di leggere i
-    report per consultazione centralizzata.
+  - In confinfo: si crea l'Analyzer + Lambda esportatrice e la Lambda scrive
+    i CSV cross-account nel bucket centrale del core.
 
 Parameters:
 
@@ -34,8 +33,8 @@ Parameters:
     Default: ''
     Description: >-
       Account ID del confinfo della stessa env. Serve nel deploy core per
-      costruire il nome del bucket remoto di confinfo e mostrarne i risultati
-      nella dashboard centralizzata.
+      autorizzare la Lambda esportatrice di confinfo a scrivere nel bucket
+      centrale del core.
 
   AnalyzerName:
     Type: String
@@ -54,13 +53,20 @@ Parameters:
     Default: rate(30 days)
     Description: Espressione di schedule EventBridge per la Lambda esportatrice.
 
+  ResolveRoleTagsInExporter:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: >-
+      Se true, la Lambda exporter arricchisce il CSV con il tag IAM Microservice
+      (colonna microservice_tag). Se false, imposta microservice_tag=no-tag.
+
   LogRetentionDays:
     Type: Number
     Default: 365
     Description: Retention dei log CloudWatch della Lambda esportatrice.
 
 Conditions:
-  IsConfinfoAccount: !Not [ !Equals [ !Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount:    !Equals [ !Ref PnCoreAwsAccountId, '' ]
   HasConfinfoAccountId: !And [ !Condition IsCoreAccount, !Not [ !Equals [ !Ref PnConfinfoAwsAccountId, '' ] ] ]
 
@@ -79,6 +85,7 @@ Resources:
 
   LocalReportsBucket:
     Type: AWS::S3::Bucket
+    Condition: IsCoreAccount
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -115,6 +122,7 @@ Resources:
 
   LocalReportsBucketPolicy:
     Type: AWS::S3::BucketPolicy
+    Condition: IsCoreAccount
     Properties:
       Bucket: !Ref LocalReportsBucket
       PolicyDocument:
@@ -130,22 +138,18 @@ Resources:
             Condition:
               Bool: { 'aws:SecureTransport': 'false' }
           - !If
-            - IsConfinfoAccount
-            - Sid: AllowCoreReadFromConfinfoBucket
+            - HasConfinfoAccountId
+            - Sid: AllowConfinfoExporterPutObject
               Effect: Allow
-              Principal: { AWS: !Sub 'arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root' }
+              Principal: { AWS: !Sub 'arn:${AWS::Partition}:iam::${PnConfinfoAwsAccountId}:root' }
               Action:
-                - s3:GetObject
-                - s3:GetObjectVersion
-                - s3:ListBucket
-              Resource:
-                - !GetAtt LocalReportsBucket.Arn
-                - !Sub '${LocalReportsBucket.Arn}/*'
+                - s3:PutObject
+                - s3:AbortMultipartUpload
+              Resource: !Sub '${LocalReportsBucket.Arn}/*'
               Condition:
                 StringLike:
                   aws:PrincipalArn:
-                    - !Sub 'arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/*'
-                    - !Sub 'arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root'
+                    - !Sub 'arn:${AWS::Partition}:iam::${PnConfinfoAwsAccountId}:role/${ProjectName}-iam-unused-access-exporter-${EnvironmentType}'
             - !Ref AWS::NoValue
 
   ExporterLambdaRole:
@@ -187,7 +191,18 @@ Resources:
                 Action:
                   - s3:PutObject
                   - s3:AbortMultipartUpload
-                Resource: !Sub '${LocalReportsBucket.Arn}/*'
+                Resource: !If
+                  - IsCoreAccount
+                  - !Sub '${LocalReportsBucket.Arn}/*'
+                  - !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnCoreAwsAccountId}/*'
+        - PolicyName: iam-role-tags-read
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:ListRoleTags
+                Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/*'
       Tags:
         - { Key: ProjectName,     Value: !Ref ProjectName }
         - { Key: EnvironmentType, Value: !Ref EnvironmentType }
@@ -211,9 +226,13 @@ Resources:
       Environment:
         Variables:
           ANALYZER_ARN: !GetAtt UnusedAccessAnalyzer.Arn
-          REPORTS_BUCKET: !Ref LocalReportsBucket
+          REPORTS_BUCKET: !If
+            - IsCoreAccount
+            - !Ref LocalReportsBucket
+            - !Sub '${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnCoreAwsAccountId}'
           ENV_NAME: !Ref EnvironmentType
           ACCOUNT_ROLE: !If [IsCoreAccount, 'core', 'confinfo']
+          RESOLVE_ROLE_TAGS: !Ref ResolveRoleTagsInExporter
       Code:
         ZipFile: |
           """
@@ -233,6 +252,7 @@ Resources:
           import json
           import logging
           import os
+          import re
           from datetime import datetime, timezone
 
           import boto3
@@ -245,16 +265,20 @@ Resources:
           BUCKET        = os.environ["REPORTS_BUCKET"]
           ENV_NAME      = os.environ["ENV_NAME"]
           ACCOUNT_ROLE  = os.environ["ACCOUNT_ROLE"]  # 'core' | 'confinfo'
+          RESOLVE_ROLE_TAGS = os.environ.get("RESOLVE_ROLE_TAGS", "true").lower() == "true"
 
           aa  = boto3.client("accessanalyzer", config=Config(retries={"max_attempts": 10, "mode": "adaptive"}))
           s3  = boto3.client("s3")
           sts = boto3.client("sts")
+          iam = boto3.client("iam")
 
           CSV_HEADER = [
               "finding_id", "finding_type", "resource", "resource_type",
               "status", "created_at", "updated_at", "analyzed_at",
-              "unused_action_count", "details_json"
+              "unused_action_count", "unused_actions", "microservice_tag", "details_json"
           ]
+
+          ACTION_PATTERN = re.compile(r"^[a-z0-9-]+:[A-Za-z0-9*]+$")
 
           def _iter_findings():
               token = None
@@ -263,11 +287,84 @@ Resources:
                   if token:
                       kwargs["nextToken"] = token
                   resp = aa.list_findings_v2(**kwargs)
-                  for f in resp.get("findings", []):
-                      yield f
+                  for finding in resp.get("findings", []):
+                      yield finding
                   token = resp.get("nextToken")
                   if not token:
                       return
+
+          def _get_finding_details(finding_id):
+              try:
+                  resp = aa.get_finding_v2(analyzerArn=ANALYZER_ARN, id=finding_id)
+                  details = resp.get("findingDetails")
+                  return details if isinstance(details, list) else []
+              except Exception as exc:
+                  log.warning(json.dumps({"msg": "get_finding_v2 failed", "finding_id": finding_id, "error": str(exc)}))
+                  return []
+
+          def _collect_actions(node, output):
+              if isinstance(node, dict):
+                  for value in node.values():
+                      _collect_actions(value, output)
+                  return
+              if isinstance(node, list):
+                  for item in node:
+                      _collect_actions(item, output)
+                  return
+              if isinstance(node, str) and ACTION_PATTERN.match(node):
+                  output.add(node)
+
+          def _extract_unused_actions(details):
+              actions = set()
+              if isinstance(details, list):
+                  for item in details:
+                      if not isinstance(item, dict):
+                          continue
+                      upd = item.get("unusedPermissionDetails")
+                      if not isinstance(upd, dict):
+                          continue
+                      for action_item in upd.get("actions", []):
+                          if isinstance(action_item, dict):
+                              action_name = action_item.get("action")
+                              if isinstance(action_name, str) and action_name:
+                                  actions.add(action_name)
+              _collect_actions(details, actions)
+              return sorted(actions)
+
+          def _parse_role_name(resource):
+              value = str(resource or "")
+              marker = ":role/"
+              if marker in value:
+                  role_part = value.split(marker, 1)[1]
+                  return role_part.strip("/").split("/")[-1]
+              return ""
+
+          def _resolve_microservice_tag(resource, cache):
+              if not RESOLVE_ROLE_TAGS:
+                  return "no-tag"
+
+              role_name = _parse_role_name(resource)
+              if not role_name:
+                  return "no-tag"
+
+              if role_name in cache:
+                  return cache[role_name]
+
+              microservice = ""
+              try:
+                  response = iam.list_role_tags(RoleName=role_name)
+                  for tag in response.get("Tags", []):
+                      if str(tag.get("Key", "")).lower() == "microservice":
+                          microservice = str(tag.get("Value") or "").strip()
+                          break
+              except Exception as exc:
+                  log.warning(json.dumps({"msg": "list_role_tags failed", "role_name": role_name, "error": str(exc)}))
+
+              if not microservice:
+                  microservice = "no-tag"
+
+              cache[role_name] = microservice
+              return microservice
 
           def lambda_handler(event, context):
               account_id = sts.get_caller_identity()["Account"]
@@ -279,7 +376,19 @@ Resources:
               writer.writerow(CSV_HEADER)
 
               count = 0
+              role_tag_cache = {}
               for f in _iter_findings():
+                  details = _get_finding_details(f.get("id"))
+                  unused_actions = _extract_unused_actions(details)
+                  microservice_tag = _resolve_microservice_tag(f.get("resource"), role_tag_cache)
+                  unused_action_count = ""
+                  if unused_actions:
+                      unused_action_count = len(unused_actions)
+
+                  enriched = dict(f)
+                  if details:
+                      enriched["findingDetails"] = details
+
                   writer.writerow([
                       f.get("id"),
                       f.get("findingType"),
@@ -289,8 +398,10 @@ Resources:
                       f.get("createdAt").isoformat() if f.get("createdAt") else "",
                       f.get("updatedAt").isoformat() if f.get("updatedAt") else "",
                       f.get("analyzedAt").isoformat() if f.get("analyzedAt") else "",
-                      (f.get("findingDetails") or {}).get("unusedAction", {}).get("totalUnusedActionsCount", ""),
-                      json.dumps(f, default=str, separators=(",", ":")),
+                      unused_action_count,
+                      ";".join(unused_actions),
+                      microservice_tag,
+                      json.dumps(enriched, default=str, separators=(",", ":")),
                   ])
                   count += 1
 
@@ -328,11 +439,11 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt ExporterSchedule.Arn
 
-  ConfinfoResultsWidgetRole:
+  CoreResultsWidgetRole:
     Type: AWS::IAM::Role
-    Condition: HasConfinfoAccountId
+    Condition: IsCoreAccount
     Properties:
-      RoleName: !Sub '${ProjectName}-iam-unused-access-confinfo-widget-${EnvironmentType}'
+      RoleName: !Sub '${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -348,120 +459,231 @@ Resources:
                 Action:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-iam-unused-access-confinfo-widget-${EnvironmentType}:*'
-        - PolicyName: read-confinfo-reports
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}:*'
+        - PolicyName: read-core-reports
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
                   - s3:ListBucket
-                Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}'
+                Resource: !GetAtt LocalReportsBucket.Arn
               - Effect: Allow
                 Action:
                   - s3:GetObject
                   - s3:GetObjectVersion
-                Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}/*'
+                Resource: !Sub '${LocalReportsBucket.Arn}/*'
 
-  ConfinfoResultsWidgetLogGroup:
+  CoreResultsWidgetLogGroup:
     Type: AWS::Logs::LogGroup
-    Condition: HasConfinfoAccountId
+    Condition: IsCoreAccount
     Properties:
-      LogGroupName: !Sub '/aws/lambda/${ProjectName}-iam-unused-access-confinfo-widget-${EnvironmentType}'
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}'
       RetentionInDays: !Ref LogRetentionDays
 
-  ConfinfoResultsWidget:
+  CoreResultsWidget:
     Type: AWS::Lambda::Function
-    Condition: HasConfinfoAccountId
+    Condition: IsCoreAccount
     Properties:
-      FunctionName: !Sub '${ProjectName}-iam-unused-access-confinfo-widget-${EnvironmentType}'
+      FunctionName: !Sub '${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}'
       Runtime: python3.11
       Handler: index.handler
-      Role: !GetAtt ConfinfoResultsWidgetRole.Arn
+      Role: !GetAtt CoreResultsWidgetRole.Arn
       Timeout: 60
       MemorySize: 256
       Environment:
         Variables:
-          CONFINFO_BUCKET: !Sub '${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}'
-          CONFINFO_PREFIX: !Sub '${EnvironmentType}/confinfo/'
+          DEFAULT_BUCKET: !Ref LocalReportsBucket
+          DEFAULT_PREFIX: !Sub '${EnvironmentType}/core/'
       Code:
         ZipFile: |
+          import collections
           import csv
           import html
           import io
+          import math
           import os
+          import sys
 
           import boto3
 
           s3 = boto3.client("s3")
 
+          # Allow parsing CSV rows with very large details_json fields.
+          csv.field_size_limit(sys.maxsize)
+
           def _describe():
-              return {
-                  "markdown": "Confinfo latest findings widget. Mostra il CSV piu' recente scritto nel bucket confinfo e visualizza le prime 20 righe utili."
-              }
+            return {
+              "markdown": "Widget IAM unused access: tabella completa o grafici a torta (summary/microservice) sul CSV piu' recente."
+            }
 
           def _render_message(message):
-              return f'<div class="cwdb-no-default-styles"></div><p>{html.escape(message)}</p>'
+            return f'<div class="cwdb-no-default-styles"></div><p>{html.escape(message)}</p>'
+
+          def _format_unused_actions(raw_actions):
+            if not raw_actions:
+              return "-"
+            actions = [a.strip() for a in str(raw_actions).split(";") if a.strip()]
+            if not actions:
+              return "-"
+            return ", ".join(actions)
+
+          def _to_int(value, default_value):
+            try:
+              return int(value)
+            except Exception:
+              return default_value
+
+          def _find_latest_csv(bucket, prefix):
+            token = None
+            latest = None
+            while True:
+              kwargs = {"Bucket": bucket, "Prefix": prefix, "MaxKeys": 1000}
+              if token:
+                kwargs["ContinuationToken"] = token
+              response = s3.list_objects_v2(**kwargs)
+              for obj in response.get("Contents", []):
+                if not obj["Key"].endswith(".csv"):
+                  continue
+                if latest is None or obj["LastModified"] > latest["LastModified"]:
+                  latest = obj
+              if not response.get("IsTruncated"):
+                return latest
+              token = response.get("NextContinuationToken")
+
+          def _render_pie_card(title, counts):
+            filtered = [(k, v) for k, v in counts.items() if v > 0]
+            if not filtered:
+              return _render_message(f"Nessun dato disponibile per {title}")
+
+            total = sum(v for _, v in filtered)
+            colors = ["#0ea5e9", "#f59e0b", "#22c55e", "#ef4444", "#8b5cf6", "#14b8a6", "#f97316", "#64748b"]
+            radius = 70
+            stroke = 38
+            cx = 90
+            cy = 90
+            circumference = 2 * math.pi * radius
+
+            circles = []
+            legend = []
+            offset = 0.0
+            for idx, (label, value) in enumerate(filtered):
+              color = colors[idx % len(colors)]
+              fraction = value / total
+              segment = circumference * fraction
+              circles.append(
+                f'<circle cx="{cx}" cy="{cy}" r="{radius}" fill="none" stroke="{color}" stroke-width="{stroke}" '
+                f'stroke-dasharray="{segment:.2f} {circumference - segment:.2f}" stroke-dashoffset="{-offset:.2f}" '
+                f'transform="rotate(-90 {cx} {cy})" />'
+              )
+              percent = (fraction * 100.0)
+              legend.append(
+                f'<div style="display:flex;align-items:center;gap:8px;margin:4px 0">'
+                f'<span style="display:inline-block;width:10px;height:10px;background:{color};border-radius:999px"></span>'
+                f'<span>{html.escape(str(label))}: <b>{value}</b> ({percent:.1f}%)</span>'
+                f'</div>'
+              )
+              offset += segment
+
+            return (
+              '<div class="cwdb-no-default-styles"></div>'
+              '<div style="font-family:Arial,sans-serif;font-size:12px">'
+              f'<p style="margin:0 0 8px 0"><b>{html.escape(title)}</b> (totale: {total})</p>'
+              '<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">'
+              '<svg width="190" height="190" viewBox="0 0 190 190" role="img" aria-label="pie-chart">'
+              f'<circle cx="{cx}" cy="{cy}" r="{radius}" fill="none" stroke="#e5e7eb" stroke-width="{stroke}" />'
+              f'{"".join(circles)}'
+              '</svg>'
+              f'<div>{"".join(legend)}</div>'
+              '</div>'
+              '</div>'
+            )
 
           def handler(event, context):
-              if event.get("describe"):
-                  return _describe()
+            if event.get("describe"):
+              return _describe()
 
-              bucket = os.environ.get("CONFINFO_BUCKET", "")
-              prefix = os.environ.get("CONFINFO_PREFIX", "")
-              if not bucket:
-                  return _render_message("Bucket confinfo non configurato")
+            params = event.get("params") or {}
+            bucket = params.get("bucket") or event.get("bucket") or os.environ.get("DEFAULT_BUCKET", "")
+            prefix = params.get("prefix") or event.get("prefix") or os.environ.get("DEFAULT_PREFIX", "")
+            label = params.get("label") or event.get("label") or prefix or "n/a"
+            view = (params.get("view") or event.get("view") or "table").strip().lower()
+            microservice_limit = int(params.get("microserviceLimit") or event.get("microserviceLimit") or 8)
+            if not bucket:
+              return _render_message("Bucket non configurato")
 
-              response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=200)
-              objects = response.get("Contents", [])
-              csv_objects = [obj for obj in objects if obj["Key"].endswith(".csv")]
-              if not csv_objects:
-                  return _render_message(f"Nessun report CSV trovato in s3://{bucket}/{prefix}")
+            latest = _find_latest_csv(bucket, prefix)
+            if not latest:
+              return _render_message(f"Nessun report CSV trovato in s3://{bucket}/{prefix}")
 
-              latest = max(csv_objects, key=lambda obj: obj["LastModified"])
-              obj = s3.get_object(Bucket=bucket, Key=latest["Key"])
-              body = obj["Body"].read().decode("utf-8")
-              reader = csv.DictReader(io.StringIO(body))
+            obj = s3.get_object(Bucket=bucket, Key=latest["Key"])
+            body = obj["Body"].read().decode("utf-8")
+            data_rows = list(csv.DictReader(io.StringIO(body)))
 
-              rows = []
-              for idx, row in enumerate(reader):
-                  if idx >= 20:
-                      break
-                  rows.append(
-                      "<tr>"
-                      f"<td>{html.escape(row.get('finding_id', ''))}</td>"
-                      f"<td>{html.escape(row.get('resource', ''))}</td>"
-                      f"<td>{html.escape(row.get('status', ''))}</td>"
-                      f"<td>{html.escape(str(row.get('unused_action_count', '')))}</td>"
-                      "</tr>"
-                  )
+            if view == "summary":
+              counts = collections.OrderedDict()
+              counts["Ruoli completamente inutilizzati (UnusedIAMRole)"] = sum(1 for r in data_rows if r.get("finding_type") == "UnusedIAMRole")
+              counts["Ruoli usati con permessi inutilizzati (UnusedPermission)"] = sum(1 for r in data_rows if r.get("finding_type") == "UnusedPermission")
+              return _render_pie_card(f"Distribuzione finding - {label}", counts)
 
-              header = (
-                  '<div class="cwdb-no-default-styles"></div>'
-                  '<style>'
-                  'table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px}'
-                  'th,td{padding:6px;border-bottom:1px solid #ddd;text-align:left;white-space:nowrap}'
-                  'th{background:#eef3f7}'
-                  '</style>'
-                  f'<p><b>Bucket:</b> {html.escape(bucket)}<br/>'
-                  f'<b>Ultimo report:</b> {html.escape(latest["Key"])}<br/>'
-                  f'<b>Ultima modifica:</b> {latest["LastModified"].isoformat()}</p>'
+            if view == "microservice":
+              ms_counter = collections.Counter()
+              for row in data_rows:
+                microservice = str(row.get("microservice_tag") or "").strip() or "no-tag"
+                ms_counter[microservice] += 1
+
+              if not ms_counter:
+                return _render_message(f"Nessun ruolo IAM associabile a microservizi per {label}")
+
+              top = ms_counter.most_common(max(microservice_limit, 1))
+              others = sum(v for _, v in ms_counter.items()) - sum(v for _, v in top)
+              pie_counts = collections.OrderedDict(top)
+              if others > 0:
+                pie_counts["Altri"] = others
+
+              return _render_pie_card(f"Finding per microservizio (tag Microservice) - {label}", pie_counts)
+
+            rows = []
+            for row in data_rows:
+              rows.append(
+                "<tr>"
+                f"<td>{html.escape(row.get('finding_id', ''))}</td>"
+                f"<td>{html.escape(row.get('resource', ''))}</td>"
+                f"<td>{html.escape(row.get('status', ''))}</td>"
+                f"<td>{html.escape(str(row.get('unused_action_count', '')))}</td>"
+                f"<td>{html.escape(_format_unused_actions(row.get('unused_actions', '')))}</td>"
+                "</tr>"
               )
 
-              if not rows:
-                  return header + '<p>Nessun finding nel report piu\' recente.</p>'
+            header = (
+              '<div class="cwdb-no-default-styles"></div>'
+              '<style>'
+              'table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px}'
+              'th,td{padding:6px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}'
+              'td{word-break:break-word}'
+              'th{background:#eef3f7}'
+              '</style>'
+              f'<p><b>Scope:</b> {html.escape(str(label))}<br/>'
+              f'<b>Bucket:</b> {html.escape(bucket)}<br/>'
+              f'<b>Ultimo report:</b> {html.escape(latest["Key"])}<br/>'
+              f'<b>Ultima modifica:</b> {latest["LastModified"].isoformat()}<br/>'
+              f'<b>Righe:</b> {len(rows)}</p>'
+            )
 
-              table = (
-                  '<table><thead><tr><th>Finding</th><th>Resource</th><th>Status</th><th>Unused Actions</th></tr></thead>'
-                  f'<tbody>{"".join(rows)}</tbody></table>'
-              )
-              return header + table
+            if not rows:
+              return header + '<p>Nessun finding nel report piu\' recente.</p>'
 
-  ConfinfoResultsWidgetInvokePermission:
+            table = (
+              '<table><thead><tr><th>Finding</th><th>Resource</th><th>Status</th><th>Unused Count</th><th>Unused Actions</th></tr></thead>'
+              f'<tbody>{"".join(rows)}</tbody></table>'
+            )
+            return header + table
+
+  CoreResultsWidgetInvokePermission:
     Type: AWS::Lambda::Permission
-    Condition: HasConfinfoAccountId
+    Condition: IsCoreAccount
     Properties:
-      FunctionName: !Ref ConfinfoResultsWidget
+      FunctionName: !Ref CoreResultsWidget
       Action: lambda:InvokeFunction
       Principal: cloudwatch.amazonaws.com
 
@@ -470,58 +692,97 @@ Resources:
     Condition: IsCoreAccount
     Properties:
       DashboardName: !Sub '${ProjectName}-iam-unused-access-${EnvironmentType}'
-      DashboardBody: !If
-        - HasConfinfoAccountId
-        - !Sub |
+      DashboardBody: !Sub |
             {
+              "start": "-P7D",
+              "periodOverride": "inherit",
               "widgets": [
                 {
                   "type": "text", "x": 0, "y": 0, "width": 24, "height": 2,
                   "properties": {
-                    "markdown": "# IAM Unused Access - ${EnvironmentType}\n\n**Account core:** ${AWS::AccountId} | **Bucket locale core:** ${LocalReportsBucket}\n\nOgni account scrive nel proprio bucket locale. In basso vedi il report piu' recente letto dal bucket di confinfo."
+                    "markdown": "# IAM Unused Access - ${EnvironmentType}\n\n**Account core:** ${AWS::AccountId} | **Bucket centrale:** ${LocalReportsBucket}\n\nCore e confinfo scrivono entrambi nel bucket centrale del core. In basso vedi i report piu' recenti per core e confinfo."
                   }
                 },
                 {
-                  "type": "metric", "x": 0, "y": 2, "width": 12, "height": 6,
+                  "type": "custom", "x": 0, "y": 2, "width": 12, "height": 8,
                   "properties": {
-                    "title": "Lambda esportatrice - invocazioni / errori (core)",
-                    "region": "${AWS::Region}",
-                    "metrics": [
-                      [ "AWS/Lambda", "Invocations", "FunctionName", "${ExporterLambda}", { "stat": "Sum" } ],
-                      [ ".",          "Errors",      ".",            ".",                 { "stat": "Sum" } ]
-                    ],
-                    "view": "timeSeries", "stacked": false, "period": 86400
+                    "title": "Core - ruoli inutilizzati vs permessi inutilizzati",
+                    "endpoint": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}",
+                    "params": {
+                      "view": "summary",
+                      "label": "core",
+                      "bucket": "${LocalReportsBucket}",
+                      "prefix": "${EnvironmentType}/core/"
+                    }
                   }
                 },
                 {
-                  "type": "log", "x": 12, "y": 2, "width": 12, "height": 6,
+                  "type": "custom", "x": 12, "y": 2, "width": 12, "height": 8,
                   "properties": {
-                    "title": "Ultime esecuzioni esportatore (core)",
-                    "region": "${AWS::Region}",
-                    "query": "SOURCE '${ExporterLambdaLogGroup}' | fields @timestamp, @message | filter @message like /export completed/ | sort @timestamp desc | limit 50",
-                    "view": "table"
+                    "title": "Core - finding per microservizio",
+                    "endpoint": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}",
+                    "params": {
+                      "view": "microservice",
+                      "microserviceLimit": 8,
+                      "label": "core",
+                      "bucket": "${LocalReportsBucket}",
+                      "prefix": "${EnvironmentType}/core/"
+                    }
                   }
                 },
                 {
-                  "type": "custom", "x": 0, "y": 8, "width": 24, "height": 8,
+                  "type": "custom", "x": 0, "y": 10, "width": 12, "height": 8,
+                  "properties": {
+                    "title": "Confinfo - ruoli inutilizzati vs permessi inutilizzati",
+                    "endpoint": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}",
+                    "params": {
+                      "view": "summary",
+                      "label": "confinfo",
+                      "bucket": "${LocalReportsBucket}",
+                      "prefix": "${EnvironmentType}/confinfo/"
+                    }
+                  }
+                },
+                {
+                  "type": "custom", "x": 12, "y": 10, "width": 12, "height": 8,
+                  "properties": {
+                    "title": "Confinfo - finding per microservizio",
+                    "endpoint": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}",
+                    "params": {
+                      "view": "microservice",
+                      "microserviceLimit": 8,
+                      "label": "confinfo",
+                      "bucket": "${LocalReportsBucket}",
+                      "prefix": "${EnvironmentType}/confinfo/"
+                    }
+                  }
+                },
+                {
+                  "type": "custom", "x": 0, "y": 18, "width": 24, "height": 8,
+                  "properties": {
+                    "title": "Ultimi finding core",
+                    "endpoint": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}",
+                    "params": {
+                      "label": "core",
+                      "bucket": "${LocalReportsBucket}",
+                      "prefix": "${EnvironmentType}/core/"
+                    }
+                  }
+                },
+                {
+                  "type": "custom", "x": 0, "y": 26, "width": 24, "height": 8,
                   "properties": {
                     "title": "Ultimi finding confinfo",
-                    "endpoint": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-iam-unused-access-confinfo-widget-${EnvironmentType}"
-                  }
-                }
-              ]
-            }
-        - !Sub |
-            {
-              "widgets": [
-                {
-                  "type": "text", "x": 0, "y": 0, "width": 24, "height": 2,
-                  "properties": {
-                    "markdown": "# IAM Unused Access - ${EnvironmentType}\n\n**Account core:** ${AWS::AccountId} | **Bucket locale core:** ${LocalReportsBucket}\n\nDashboard core attiva. Per vedere anche i risultati di confinfo valorizza PnConfinfoAwsAccountId nel deploy core."
+                    "endpoint": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}",
+                    "params": {
+                      "label": "confinfo",
+                      "bucket": "${LocalReportsBucket}",
+                      "prefix": "${EnvironmentType}/confinfo/"
+                    }
                   }
                 },
                 {
-                  "type": "metric", "x": 0, "y": 2, "width": 12, "height": 6,
+                  "type": "metric", "x": 0, "y": 34, "width": 12, "height": 6,
                   "properties": {
                     "title": "Lambda esportatrice - invocazioni / errori (core)",
                     "region": "${AWS::Region}",
@@ -533,7 +794,7 @@ Resources:
                   }
                 },
                 {
-                  "type": "log", "x": 12, "y": 2, "width": 12, "height": 6,
+                  "type": "log", "x": 12, "y": 34, "width": 12, "height": 6,
                   "properties": {
                     "title": "Ultime esecuzioni esportatore (core)",
                     "region": "${AWS::Region}",
@@ -565,6 +826,7 @@ Outputs:
       Name: !Sub '${AWS::StackName}-ExporterLambdaRoleArn'
 
   LocalReportsBucketName:
+    Condition: IsCoreAccount
     Description: Nome del bucket locale dei report dell'account corrente
     Value: !Ref LocalReportsBucket
     Export:
