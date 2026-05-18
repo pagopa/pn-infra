@@ -110,11 +110,6 @@ Parameters:
     Default: ''
     Description: Dedicated ALB listener ARN for the RADD PrivateLink Lambda proxy
 
-  RaddPrivateProxyEndpointServiceId:
-    Type: String
-    Default: ''
-    Description: RADD endpoint service id used by the RADD private proxy to validate technical VPCE Host headers
-
   LogRetention:
     Type: Number
     Default: 14
@@ -657,8 +652,6 @@ Outputs:
     Value: !If [ IsEgressDefined, !Ref VpcEgressSubnetsIds, !Ref VpcSubnets ]
   RaddPrivateProxyAlbListenerArn:
     Value: !Ref RaddPrivateProxyAlbListenerArn
-  RaddPrivateProxyEndpointServiceId:
-    Value: !Ref RaddPrivateProxyEndpointServiceId
 
   # Data Monitoring pass-through params
   DynamoDbExportTableNames:
