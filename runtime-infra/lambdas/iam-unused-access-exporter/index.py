@@ -25,11 +25,13 @@ BUCKET        = os.environ["REPORTS_BUCKET"]
 ENV_NAME      = os.environ["ENV_NAME"]
 ACCOUNT_ROLE  = os.environ["ACCOUNT_ROLE"]  # 'core' | 'confinfo'
 RESOLVE_ROLE_TAGS = os.environ.get("RESOLVE_ROLE_TAGS", "true").lower() == "true"
+SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN", "")
 
 aa  = boto3.client("accessanalyzer", config=Config(retries={"max_attempts": 10, "mode": "adaptive"}))
 s3  = boto3.client("s3")
 sts = boto3.client("sts")
 iam = boto3.client("iam")
+sns = boto3.client("sns")
 
 CSV_HEADER = [
     "finding_id", "finding_type", "resource", "resource_type",
@@ -170,6 +172,30 @@ def lambda_handler(event, context):
         Body=buf.getvalue().encode("utf-8"),
         ContentType="text/csv",
     )
+
+    if count > 0 and SNS_TOPIC_ARN:
+        dashboard_name = f"pn-iam-unused-access-{ENV_NAME}"
+        region = os.environ.get("AWS_REGION", "eu-south-1")
+        dashboard_url = (
+            f"https://{region}.console.aws.amazon.com/cloudwatch/home"
+            f"?region={region}#dashboards/dashboard/{dashboard_name}"
+        )
+        subject = f"[{ENV_NAME}/{ACCOUNT_ROLE}] IAM unused access: {count} finding rilevati"
+        message = (
+            f"Sono stati rilevati {count} finding IAM unused access "
+            f"per l'account {account_id} ({ACCOUNT_ROLE}) in ambiente {ENV_NAME}.\n\n"
+            f"Consultare la dashboard CloudWatch per i dettagli:\n{dashboard_url}\n\n"
+            f"Report CSV: s3://{BUCKET}/{key}"
+        )
+        try:
+            sns.publish(
+                TopicArn=SNS_TOPIC_ARN,
+                Subject=subject[:100],
+                Message=message,
+            )
+            log.info(json.dumps({"msg": "sns alert sent", "topic": SNS_TOPIC_ARN, "findings": count}))
+        except Exception as exc:
+            log.warning(json.dumps({"msg": "sns publish failed", "error": str(exc)}))
 
     log.info(json.dumps({"msg": "export completed", "account_id": account_id,
                          "account_role": ACCOUNT_ROLE, "env": ENV_NAME,

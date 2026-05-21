@@ -71,6 +71,10 @@ Parameters:
     Description: S3 key prefix for Lambda deployment packages
     Default: ''
 
+  InfraIamAccessTopicArn:
+    Type: String
+    Description: SNS topic ARN for IAM unused access alerts
+
 Conditions:
   IsCoreAccount:    !Equals [ !Ref PnCoreAwsAccountId, '' ]
   HasConfinfoAccountId: !And [ !Condition IsCoreAccount, !Not [ !Equals [ !Ref PnConfinfoAwsAccountId, '' ] ] ]
@@ -215,6 +219,14 @@ Resources:
                 Action:
                   - iam:ListRoleTags
                 Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/*'
+        - PolicyName: sns-publish-iam-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref InfraIamAccessTopicArn
       Tags:
         - { Key: ProjectName,     Value: !Ref ProjectName }
         - { Key: EnvironmentType, Value: !Ref EnvironmentType }
@@ -245,6 +257,7 @@ Resources:
           ENV_NAME: !Ref EnvironmentType
           ACCOUNT_ROLE: !If [IsCoreAccount, 'core', 'confinfo']
           RESOLVE_ROLE_TAGS: !Ref ResolveRoleTagsInExporter
+          SNS_TOPIC_ARN: !Ref InfraIamAccessTopicArn
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/iam-unused-access-exporter.zip
