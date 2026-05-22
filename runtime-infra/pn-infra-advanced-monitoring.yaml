@@ -550,6 +550,56 @@ Parameters:
     Type: Number
     Default: 1
 
+  CognitoLocalUserLoginAlarmPeriodFilterPattern:
+    Type: String
+    Default: '{ $.level = "ERROR" }'
+
+  CognitoLocalUserLoginAlarmPeriod:
+    Type: Number
+    Default: 300
+
+  CognitoLocalUserLoginAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  CognitoLocalUserLoginAlarmEvaluationPeriods:
+    Type: Number
+    Default: 1
+
+  CognitoLocalUserLoginAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  CognitoLocalUserLoginAlarmEnableOncall:
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+    
+  CognitoLocalUserLoginAlarmEnableAlarm:
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
+  OncallCognitoLocalUserLoginAlarmPeriod:
+    Type: Number
+    Default: 300
+
+  OncallCognitoLocalUserLoginAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  OncallCognitoLocalUserLoginAlarmEvaluationPeriods:
+    Type: Number
+    Default: 1
+
+  OncallCognitoLocalUserLoginAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
 Mappings:
   DownstreamAlarms:
     EMD:
@@ -585,9 +635,6 @@ Mappings:
     PDND:
       LogGroup: /aws/ecs/pn-national-registries
       Metric: pn-national-registries-PDND-downstream-detection
-    InfoCamere:
-      LogGroup: /aws/ecs/pn-national-registries
-      Metric: pn-national-registries-InfoCamere-downstream-detection
 
 Resources:
 
@@ -921,15 +968,22 @@ Resources:
         MetricName: CognitoLocalUserLoginDetection
         MetricNamespace: AdvancedMetric
         LogGroupName: !Sub '/aws/lambda/${ProjectName}-post-auth-cognito-trigger-v2'
-        FilterPattern: 'LOCAL_USER_LOGIN_DETECTED'
-        Period: 300
-        Threshold: 1
-        EvaluationPeriods: 1
-        DatapointsToAlarm: 1
+        FilterPattern: !Ref CognitoLocalUserLoginAlarmPeriodFilterPattern
+        Period: !Ref CognitoLocalUserLoginAlarmPeriod
+        Threshold: !Ref CognitoLocalUserLoginAlarmThreshold
+        EvaluationPeriods: !Ref CognitoLocalUserLoginAlarmEvaluationPeriods
+        DatapointsToAlarm: !Ref CognitoLocalUserLoginAlarmPeriodDatapointsToAlarm
         Statistic: Sum
         ComparisonOperator: GreaterThanOrEqualToThreshold
-        HasOncall: False
-
+        HasOncall: !Ref CognitoLocalUserLoginAlarmEnableOncall
+        OncallPeriod: !Ref OncallCognitoLocalUserLoginAlarmPeriod
+        OncallThreshold: !Ref OncallCognitoLocalUserLoginAlarmThreshold
+        OncallEvaluationPeriods: !Ref OncallCognitoLocalUserLoginAlarmEvaluationPeriods
+        OncallDatapointsToAlarm: !Ref OncallCognitoLocalUserLoginAlarmPeriodDatapointsToAlarm
+        OncallComparisonOperator: GreaterThanOrEqualToThreshold
+        OncallStatistic: Sum
+        HasAlarm: !Ref CognitoLocalUserLoginAlarmEnableAlarm
+  
 
 Outputs:
   Version:
