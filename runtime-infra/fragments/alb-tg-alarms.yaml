@@ -1,0 +1,873 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudWatch alarms for ALB target group metrics"
+
+Parameters:
+  AlarmSNSTopicArn:
+    Type: String
+    Description: SNS topic ARN for alarm notifications
+
+  MetricPrefix:
+    Type: String
+    Description: Prefix for alarm names
+
+  ApplicationLoadBalancerArn:
+    Type: String
+    Description: ALB ARN
+
+  TargetGroupName:
+    Type: String
+    Description: Target group full name in targetgroup/* format
+
+  TargetType:
+    Type: String
+    AllowedValues:
+      - ecs
+      - lambda
+    Description: Target group target type
+
+  Target4xxPeriod:
+    Type: Number
+    Default: 60
+
+  Target4xxThreshold:
+    Type: Number
+    Default: 1
+
+  Target4xxEvaluationPeriods:
+    Type: Number
+    Default: 5
+
+  Target4xxDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  Target4xxStatistic:
+    Type: String
+    Default: Sum
+
+  HasTarget4xxAlarm:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  HasTarget4xxOncall:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  OncallTarget4xxPeriod:
+    Type: Number
+    Default: 300
+
+  OncallTarget4xxThreshold:
+    Type: Number
+    Default: 1
+
+  OncallTarget4xxEvaluationPeriods:
+    Type: Number
+    Default: 1
+
+  OncallTarget4xxDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  OncallTarget4xxStatistic:
+    Type: String
+    Default: Sum
+
+  Target5xxPeriod:
+    Type: Number
+    Default: 60
+
+  Target5xxThreshold:
+    Type: Number
+    Default: 1
+
+  Target5xxEvaluationPeriods:
+    Type: Number
+    Default: 5
+
+  Target5xxDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  Target5xxStatistic:
+    Type: String
+    Default: Sum
+
+  HasTarget5xxAlarm:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  HasTarget5xxOncall:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  OncallTarget5xxPeriod:
+    Type: Number
+    Default: 300
+
+  OncallTarget5xxThreshold:
+    Type: Number
+    Default: 1
+
+  OncallTarget5xxEvaluationPeriods:
+    Type: Number
+    Default: 1
+
+  OncallTarget5xxDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  OncallTarget5xxStatistic:
+    Type: String
+    Default: Sum
+
+  TargetResponseTimePeriod:
+    Type: Number
+    Default: 300
+
+  TargetResponseTimeThreshold:
+    Type: Number
+    Default: 5
+
+  TargetResponseTimeEvaluationPeriods:
+    Type: Number
+    Default: 3
+
+  TargetResponseTimeDatapointsToAlarm:
+    Type: Number
+    Default: 2
+
+  TargetResponseTimeStatistic:
+    Type: String
+    Default: p95
+
+  HasTargetResponseTimeAlarm:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  HasTargetResponseTimeOncall:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  OncallTargetResponseTimePeriod:
+    Type: Number
+    Default: 300
+
+  OncallTargetResponseTimeThreshold:
+    Type: Number
+    Default: 5
+
+  OncallTargetResponseTimeEvaluationPeriods:
+    Type: Number
+    Default: 3
+
+  OncallTargetResponseTimeDatapointsToAlarm:
+    Type: Number
+    Default: 2
+
+  OncallTargetResponseTimeStatistic:
+    Type: String
+    Default: p95
+
+  MinTrafficThreshold:
+    Type: Number
+    Default: 10
+
+  HasTarget4xxRateAlarm:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  Target4xxRateThreshold:
+    Type: Number
+    Default: 0.1
+
+  Target4xxRateEvaluationPeriods:
+    Type: Number
+    Default: 1
+
+  Target4xxRateDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  Target4xxRatePeriod:
+    Type: Number
+    Default: 300
+
+  HasTarget4xxRateOncall:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  OncallTarget4xxRateThreshold:
+    Type: Number
+    Default: 0.1
+
+  OncallTarget4xxRateEvaluationPeriods:
+    Type: Number
+    Default: 1
+
+  OncallTarget4xxRateDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  OncallTarget4xxRatePeriod:
+    Type: Number
+    Default: 300
+
+  HasTarget5xxRateAlarm:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  Target5xxRateThreshold:
+    Type: Number
+    Default: 0.1
+
+  Target5xxRateEvaluationPeriods:
+    Type: Number
+    Default: 1
+
+  Target5xxRateDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  Target5xxRatePeriod:
+    Type: Number
+    Default: 300
+
+  HasTarget5xxRateOncall:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  OncallTarget5xxRateThreshold:
+    Type: Number
+    Default: 0.1
+
+  OncallTarget5xxRateEvaluationPeriods:
+    Type: Number
+    Default: 1
+
+  OncallTarget5xxRateDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  OncallTarget5xxRatePeriod:
+    Type: Number
+    Default: 300
+
+  HasLambdaInternalErrorAlarm:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  LambdaInternalErrorThreshold:
+    Type: Number
+    Default: 1
+
+  LambdaInternalErrorEvaluationPeriods:
+    Type: Number
+    Default: 5
+
+  LambdaInternalErrorDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  LambdaInternalErrorPeriod:
+    Type: Number
+    Default: 60
+
+  HasLambdaInternalErrorOncall:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  OncallLambdaInternalErrorThreshold:
+    Type: Number
+    Default: 1
+
+  OncallLambdaInternalErrorEvaluationPeriods:
+    Type: Number
+    Default: 5
+
+  OncallLambdaInternalErrorDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  OncallLambdaInternalErrorPeriod:
+    Type: Number
+    Default: 60
+
+  HasLambdaUserErrorAlarm:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  LambdaUserErrorThreshold:
+    Type: Number
+    Default: 1
+
+  LambdaUserErrorEvaluationPeriods:
+    Type: Number
+    Default: 5
+
+  LambdaUserErrorDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  LambdaUserErrorPeriod:
+    Type: Number
+    Default: 60
+
+  HasLambdaUserErrorOncall:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  OncallLambdaUserErrorThreshold:
+    Type: Number
+    Default: 1
+
+  OncallLambdaUserErrorEvaluationPeriods:
+    Type: Number
+    Default: 5
+
+  OncallLambdaUserErrorDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  OncallLambdaUserErrorPeriod:
+    Type: Number
+    Default: 60
+
+Conditions:
+  IsLambdaTarget: !Equals [!Ref TargetType, 'lambda']
+  IsEcsTarget: !Equals [!Ref TargetType, 'ecs']
+  HasTarget4xxAlarmCondition: !Equals [!Ref HasTarget4xxAlarm, 'true']
+  HasTarget4xxOncallCondition: !Equals [!Ref HasTarget4xxOncall, 'true']
+  HasTarget5xxAlarmCondition: !Equals [!Ref HasTarget5xxAlarm, 'true']
+  HasTarget5xxOncallCondition: !Equals [!Ref HasTarget5xxOncall, 'true']
+  HasTargetResponseTimeAlarmCondition: !Equals [!Ref HasTargetResponseTimeAlarm, 'true']
+  HasTargetResponseTimeOncallCondition: !Equals [!Ref HasTargetResponseTimeOncall, 'true']
+  HasTarget4xxRateAlarmCondition: !And
+    - !Condition IsEcsTarget
+    - !Equals [!Ref HasTarget4xxRateAlarm, 'true']
+  HasTarget4xxRateOncallCondition: !And
+    - !Condition IsEcsTarget
+    - !Equals [!Ref HasTarget4xxRateOncall, 'true']
+  HasTarget5xxRateAlarmCondition: !And
+    - !Condition IsEcsTarget
+    - !Equals [!Ref HasTarget5xxRateAlarm, 'true']
+  HasTarget5xxRateOncallCondition: !And
+    - !Condition IsEcsTarget
+    - !Equals [!Ref HasTarget5xxRateOncall, 'true']
+  HasLambdaInternalErrorAlarmCondition: !And
+    - !Condition IsLambdaTarget
+    - !Equals [!Ref HasLambdaInternalErrorAlarm, 'true']
+  HasLambdaInternalErrorOncallCondition: !And
+    - !Condition IsLambdaTarget
+    - !Equals [!Ref HasLambdaInternalErrorOncall, 'true']
+  HasLambdaUserErrorAlarmCondition: !And
+    - !Condition IsLambdaTarget
+    - !Equals [!Ref HasLambdaUserErrorAlarm, 'true']
+  HasLambdaUserErrorOncallCondition: !And
+    - !Condition IsLambdaTarget
+    - !Equals [!Ref HasLambdaUserErrorOncall, 'true']
+
+Resources:
+  Target4xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasTarget4xxAlarmCondition
+    Properties:
+      AlarmName: !Sub "${MetricPrefix}-target-4xx-alarm"
+      AlarmDescription: !Sub "CloudWatch alarm on ${MetricPrefix} target 4xx count."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref Target4xxDatapointsToAlarm
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref Target4xxEvaluationPeriods
+      Threshold: !Ref Target4xxThreshold
+      Namespace: AWS/ApplicationELB
+      MetricName: HTTPCode_Target_4XX_Count
+      Period: !Ref Target4xxPeriod
+      Statistic: !Ref Target4xxStatistic
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+        - Name: TargetGroup
+          Value: !Ref TargetGroupName
+
+  OncallTarget4xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasTarget4xxOncallCondition
+    Properties:
+      AlarmName: !Sub "oncall-${MetricPrefix}-target-4xx-alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on ${MetricPrefix} target 4xx count."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref OncallTarget4xxDatapointsToAlarm
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref OncallTarget4xxEvaluationPeriods
+      Threshold: !Ref OncallTarget4xxThreshold
+      Namespace: AWS/ApplicationELB
+      MetricName: HTTPCode_Target_4XX_Count
+      Period: !Ref OncallTarget4xxPeriod
+      Statistic: !Ref OncallTarget4xxStatistic
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+        - Name: TargetGroup
+          Value: !Ref TargetGroupName
+
+  Target5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasTarget5xxAlarmCondition
+    Properties:
+      AlarmName: !Sub "${MetricPrefix}-target-5xx-alarm"
+      AlarmDescription: !Sub "CloudWatch alarm on ${MetricPrefix} target 5xx count."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref Target5xxDatapointsToAlarm
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref Target5xxEvaluationPeriods
+      Threshold: !Ref Target5xxThreshold
+      Namespace: AWS/ApplicationELB
+      MetricName: HTTPCode_Target_5XX_Count
+      Period: !Ref Target5xxPeriod
+      Statistic: !Ref Target5xxStatistic
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+        - Name: TargetGroup
+          Value: !Ref TargetGroupName
+
+  OncallTarget5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasTarget5xxOncallCondition
+    Properties:
+      AlarmName: !Sub "oncall-${MetricPrefix}-target-5xx-alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on ${MetricPrefix} target 5xx count."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref OncallTarget5xxDatapointsToAlarm
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref OncallTarget5xxEvaluationPeriods
+      Threshold: !Ref OncallTarget5xxThreshold
+      Namespace: AWS/ApplicationELB
+      MetricName: HTTPCode_Target_5XX_Count
+      Period: !Ref OncallTarget5xxPeriod
+      Statistic: !Ref OncallTarget5xxStatistic
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+        - Name: TargetGroup
+          Value: !Ref TargetGroupName
+
+  TargetResponseTimeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasTargetResponseTimeAlarmCondition
+    Properties:
+      AlarmName: !Sub "${MetricPrefix}-target-response-time-alarm"
+      AlarmDescription: !Sub "CloudWatch alarm on ${MetricPrefix} target response time."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref TargetResponseTimeDatapointsToAlarm
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref TargetResponseTimeEvaluationPeriods
+      Threshold: !Ref TargetResponseTimeThreshold
+      Namespace: AWS/ApplicationELB
+      MetricName: TargetResponseTime
+      Period: !Ref TargetResponseTimePeriod
+      ExtendedStatistic: !Ref TargetResponseTimeStatistic
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+        - Name: TargetGroup
+          Value: !Ref TargetGroupName
+
+  OncallTargetResponseTimeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasTargetResponseTimeOncallCondition
+    Properties:
+      AlarmName: !Sub "oncall-${MetricPrefix}-target-response-time-alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on ${MetricPrefix} target response time."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref OncallTargetResponseTimeDatapointsToAlarm
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref OncallTargetResponseTimeEvaluationPeriods
+      Threshold: !Ref OncallTargetResponseTimeThreshold
+      Namespace: AWS/ApplicationELB
+      MetricName: TargetResponseTime
+      Period: !Ref OncallTargetResponseTimePeriod
+      ExtendedStatistic: !Ref OncallTargetResponseTimeStatistic
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+        - Name: TargetGroup
+          Value: !Ref TargetGroupName
+
+  Target4xxRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasTarget4xxRateAlarmCondition
+    Properties:
+      AlarmName: !Sub "${MetricPrefix}-target-4xx-rate-alarm"
+      AlarmDescription: !Sub "CloudWatch alarm on ${MetricPrefix} target 4xx rate."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref Target4xxRateDatapointsToAlarm
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref Target4xxRateEvaluationPeriods
+      Threshold: 1
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Namespace: AWS/ApplicationELB
+              MetricName: HTTPCode_Target_4XX_Count
+              Dimensions:
+                - Name: LoadBalancer
+                  Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+                - Name: TargetGroup
+                  Value: !Ref TargetGroupName
+            Period: !Ref Target4xxRatePeriod
+            Stat: Sum
+          ReturnData: false
+        - Id: m3
+          MetricStat:
+            Metric:
+              Namespace: AWS/ApplicationELB
+              MetricName: RequestCountPerTarget
+              Dimensions:
+                - Name: TargetGroup
+                  Value: !Ref TargetGroupName
+            Period: !Ref Target4xxRatePeriod
+            Stat: Sum
+          ReturnData: false
+        - Id: e1
+          Expression: !Sub "IF(m3>=${MinTrafficThreshold} AND m1/m3>=${Target4xxRateThreshold}, 1, 0)"
+          Label: !Sub "${MetricPrefix}-target-4xx-rate"
+
+  OncallTarget4xxRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasTarget4xxRateOncallCondition
+    Properties:
+      AlarmName: !Sub "oncall-${MetricPrefix}-target-4xx-rate-alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on ${MetricPrefix} target 4xx rate."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref OncallTarget4xxRateDatapointsToAlarm
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref OncallTarget4xxRateEvaluationPeriods
+      Threshold: 1
+      Metrics:
+        - Id: m1
+          MetricStat:
+            Metric:
+              Namespace: AWS/ApplicationELB
+              MetricName: HTTPCode_Target_4XX_Count
+              Dimensions:
+                - Name: LoadBalancer
+                  Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+                - Name: TargetGroup
+                  Value: !Ref TargetGroupName
+            Period: !Ref OncallTarget4xxRatePeriod
+            Stat: Sum
+          ReturnData: false
+        - Id: m3
+          MetricStat:
+            Metric:
+              Namespace: AWS/ApplicationELB
+              MetricName: RequestCountPerTarget
+              Dimensions:
+                - Name: TargetGroup
+                  Value: !Ref TargetGroupName
+            Period: !Ref OncallTarget4xxRatePeriod
+            Stat: Sum
+          ReturnData: false
+        - Id: e1
+          Expression: !Sub "IF(m3>=${MinTrafficThreshold} AND m1/m3>=${OncallTarget4xxRateThreshold}, 1, 0)"
+          Label: !Sub "${MetricPrefix}-target-4xx-rate-oncall"
+
+  Target5xxRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasTarget5xxRateAlarmCondition
+    Properties:
+      AlarmName: !Sub "${MetricPrefix}-target-5xx-rate-alarm"
+      AlarmDescription: !Sub "CloudWatch alarm on ${MetricPrefix} target 5xx rate."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref Target5xxRateDatapointsToAlarm
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref Target5xxRateEvaluationPeriods
+      Threshold: 1
+      Metrics:
+        - Id: m2
+          MetricStat:
+            Metric:
+              Namespace: AWS/ApplicationELB
+              MetricName: HTTPCode_Target_5XX_Count
+              Dimensions:
+                - Name: LoadBalancer
+                  Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+                - Name: TargetGroup
+                  Value: !Ref TargetGroupName
+            Period: !Ref Target5xxRatePeriod
+            Stat: Sum
+          ReturnData: false
+        - Id: m3
+          MetricStat:
+            Metric:
+              Namespace: AWS/ApplicationELB
+              MetricName: RequestCountPerTarget
+              Dimensions:
+                - Name: TargetGroup
+                  Value: !Ref TargetGroupName
+            Period: !Ref Target5xxRatePeriod
+            Stat: Sum
+          ReturnData: false
+        - Id: e1
+          Expression: !Sub "IF(m3>=${MinTrafficThreshold} AND m2/m3>=${Target5xxRateThreshold}, 1, 0)"
+          Label: !Sub "${MetricPrefix}-target-5xx-rate"
+
+  OncallTarget5xxRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasTarget5xxRateOncallCondition
+    Properties:
+      AlarmName: !Sub "oncall-${MetricPrefix}-target-5xx-rate-alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on ${MetricPrefix} target 5xx rate."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref OncallTarget5xxRateDatapointsToAlarm
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref OncallTarget5xxRateEvaluationPeriods
+      Threshold: 1
+      Metrics:
+        - Id: m2
+          MetricStat:
+            Metric:
+              Namespace: AWS/ApplicationELB
+              MetricName: HTTPCode_Target_5XX_Count
+              Dimensions:
+                - Name: LoadBalancer
+                  Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+                - Name: TargetGroup
+                  Value: !Ref TargetGroupName
+            Period: !Ref OncallTarget5xxRatePeriod
+            Stat: Sum
+          ReturnData: false
+        - Id: m3
+          MetricStat:
+            Metric:
+              Namespace: AWS/ApplicationELB
+              MetricName: RequestCountPerTarget
+              Dimensions:
+                - Name: TargetGroup
+                  Value: !Ref TargetGroupName
+            Period: !Ref OncallTarget5xxRatePeriod
+            Stat: Sum
+          ReturnData: false
+        - Id: e1
+          Expression: !Sub "IF(m3>=${MinTrafficThreshold} AND m2/m3>=${OncallTarget5xxRateThreshold}, 1, 0)"
+          Label: !Sub "${MetricPrefix}-target-5xx-rate-oncall"
+
+  LambdaInternalErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasLambdaInternalErrorAlarmCondition
+    Properties:
+      AlarmName: !Sub "${MetricPrefix}-lambda-internal-error-alarm"
+      AlarmDescription: !Sub "CloudWatch alarm on ${MetricPrefix} lambda internal error count."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref LambdaInternalErrorDatapointsToAlarm
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref LambdaInternalErrorEvaluationPeriods
+      Threshold: !Ref LambdaInternalErrorThreshold
+      Namespace: AWS/ApplicationELB
+      MetricName: LambdaInternalError
+      Period: !Ref LambdaInternalErrorPeriod
+      Statistic: Sum
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+        - Name: TargetGroup
+          Value: !Ref TargetGroupName
+
+  OncallLambdaInternalErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasLambdaInternalErrorOncallCondition
+    Properties:
+      AlarmName: !Sub "oncall-${MetricPrefix}-lambda-internal-error-alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on ${MetricPrefix} lambda internal error count."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref OncallLambdaInternalErrorDatapointsToAlarm
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref OncallLambdaInternalErrorEvaluationPeriods
+      Threshold: !Ref OncallLambdaInternalErrorThreshold
+      Namespace: AWS/ApplicationELB
+      MetricName: LambdaInternalError
+      Period: !Ref OncallLambdaInternalErrorPeriod
+      Statistic: Sum
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+        - Name: TargetGroup
+          Value: !Ref TargetGroupName
+
+  LambdaUserErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasLambdaUserErrorAlarmCondition
+    Properties:
+      AlarmName: !Sub "${MetricPrefix}-lambda-user-error-alarm"
+      AlarmDescription: !Sub "CloudWatch alarm on ${MetricPrefix} lambda user error count."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref LambdaUserErrorDatapointsToAlarm
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref LambdaUserErrorEvaluationPeriods
+      Threshold: !Ref LambdaUserErrorThreshold
+      Namespace: AWS/ApplicationELB
+      MetricName: LambdaUserError
+      Period: !Ref LambdaUserErrorPeriod
+      Statistic: Sum
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+        - Name: TargetGroup
+          Value: !Ref TargetGroupName
+
+  OncallLambdaUserErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasLambdaUserErrorOncallCondition
+    Properties:
+      AlarmName: !Sub "oncall-${MetricPrefix}-lambda-user-error-alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on ${MetricPrefix} lambda user error count."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref OncallLambdaUserErrorDatapointsToAlarm
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: !Ref OncallLambdaUserErrorEvaluationPeriods
+      Threshold: !Ref OncallLambdaUserErrorThreshold
+      Namespace: AWS/ApplicationELB
+      MetricName: LambdaUserError
+      Period: !Ref OncallLambdaUserErrorPeriod
+      Statistic: Sum
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+        - Name: TargetGroup
+          Value: !Ref TargetGroupName
+
+Outputs:
+  Target4xxAlarmArn:
+    Condition: HasTarget4xxAlarmCondition
+    Description: Target 4xx alarm ARN
+    Value: !GetAtt Target4xxAlarm.Arn
+
+  Target5xxAlarmArn:
+    Condition: HasTarget5xxAlarmCondition
+    Description: Target 5xx alarm ARN
+    Value: !GetAtt Target5xxAlarm.Arn
+
+  TargetResponseTimeAlarmArn:
+    Condition: HasTargetResponseTimeAlarmCondition
+    Description: Target response time alarm ARN
+    Value: !GetAtt TargetResponseTimeAlarm.Arn
+
+  Target4xxRateAlarmArn:
+    Condition: HasTarget4xxRateAlarmCondition
+    Description: Target 4xx rate alarm ARN
+    Value: !GetAtt Target4xxRateAlarm.Arn
+
+  Target5xxRateAlarmArn:
+    Condition: HasTarget5xxRateAlarmCondition
+    Description: Target 5xx rate alarm ARN
+    Value: !GetAtt Target5xxRateAlarm.Arn
+
+  LambdaInternalErrorAlarmArn:
+    Condition: HasLambdaInternalErrorAlarmCondition
+    Description: Lambda internal error alarm ARN
+    Value: !GetAtt LambdaInternalErrorAlarm.Arn
+
+  LambdaUserErrorAlarmArn:
+    Condition: HasLambdaUserErrorAlarmCondition
+    Description: Lambda user error alarm ARN
+    Value: !GetAtt LambdaUserErrorAlarm.Arn
