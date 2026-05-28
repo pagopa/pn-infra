@@ -154,18 +154,6 @@ Parameters:
     Type: String
     Description: 'SNS topic ARN for security alerts (overrides InfraSecTopicName if provided)'
 
-  S3AccessMonitorStateRule:
-    Type: String
-    AllowedValues: ['ENABLED', 'DISABLED']
-    Default: 'ENABLED'
-    Description: 'Whether to enable the S3 access monitoring EventBridge rule (requires CloudTrail Event Data Store)'
-
-  DynamoDbAccessMonitorStateRule:
-    Type: String
-    AllowedValues: ['ENABLED', 'DISABLED']
-    Default: 'ENABLED'
-    Description: 'Whether to enable the DynamoDB access monitoring EventBridge rule (requires CloudTrail Event Data Store)'
-
 Conditions:
   HasCloudTrailLogsEnabled: !Equals [!Ref EnableCloudTrailLogs, 'true']
   HasMonitoringS3Enabled: !Equals [!Ref S3MonitoringEnabled, 'true']
@@ -728,9 +716,6 @@ Resources:
                 Action:
                   - sns:Publish
                 Resource: !Ref InfraSecTopicArn
-                Condition:
-                  StringLike:
-                    sns:ResourceName: !Sub "${InfraSecTopicName}"
 
 
   #===========================================================================
@@ -742,7 +727,6 @@ Resources:
     Properties:
       Name: !Sub "${ProjectName}-infra-sec-dynamodb-access-monitoring"
       Description: "Monitor all DynamoDB access to Critical DynamoDB tables (CloudTrail filters to data events only)"
-      State: !Ref DynamoDbAccessMonitorStateRule
       EventPattern:
         source:
           - aws.dynamodb
@@ -770,7 +754,6 @@ Resources:
     Properties:
       Name: !Sub "${ProjectName}-infra-sec-s3-access-monitoring"
       Description: "Monitor S3 access to safestorage bucket (CloudTrail filters to critical prefix only)"
-      State: !Ref S3AccessMonitorStateRule
       EventPattern:
         source:
           - aws.s3
