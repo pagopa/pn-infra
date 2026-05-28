@@ -716,9 +716,6 @@ Resources:
                 Action:
                   - sns:Publish
                 Resource: !Ref InfraSecTopicArn
-                Condition:
-                  StringLike:
-                    sns:ResourceName: !Sub "${InfraSecTopicName}"
 
 
   #===========================================================================
@@ -739,14 +736,9 @@ Resources:
           eventSource:
             - dynamodb.amazonaws.com
           eventName:
-            - GetItem
-            - PutItem
             - UpdateItem
             - DeleteItem
-            - BatchGetItem
             - BatchWriteItem
-            - Query
-            - Scan
           requestParameters:
             tableName: !Ref DynamoDBAccessValidatorTables
       Targets:
