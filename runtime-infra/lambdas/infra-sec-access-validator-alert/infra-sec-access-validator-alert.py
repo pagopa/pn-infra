@@ -393,7 +393,7 @@ def lambda_handler(event, context):
                 object_key = request_params.get('key', '')
                 #Se la chiave contiene favicon.ico ignore                   
                 if object_key and not object_key.startswith(f"{S3_CRITICAL_PREFIX}"):
-                    pass
+                    continue
                     #print(f"WARNING: S3 event for non-critical prefix: {object_key} (expected: {S3_CRITICAL_PREFIX})")
             
             is_authorized, matched_role, reason = registry.is_authorized(
