@@ -533,6 +533,18 @@ Resources:
               - 'sns:Publish'
             Resource:
               - !Ref InfraSecTopic
+          - !If 
+            - HasConfidentialInfoAccountId
+            - Sid: AllowPublishFromPnConfinfoAccount
+              Effect: Allow
+              Action:
+              - 'sns:Publish'
+              Principal:
+                AWS: 
+                  - !Sub arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root
+              Resource:
+                - !Ref InfraSecTopic
+            - !Ref AWS::NoValue
       Topics:
         - !Ref InfraSecTopic
 
@@ -543,7 +555,7 @@ Resources:
       Protocol: email
       Endpoint: '{{resolve:ssm:/notification/infra/email}}'
       TopicArn: !Ref InfraSecTopic
-        
+
 Outputs:
   LogsBucketKmsKeyArn:
     Value: 
