@@ -113,12 +113,19 @@ def handler(event, context):
   if not bucket:
     return _render_message("Bucket non configurato")
 
-  latest = _find_latest_csv(bucket, prefix)
+  try:
+    latest = _find_latest_csv(bucket, prefix)
+  except Exception as e:
+    return _render_message(f"Impossibile accedere al bucket {bucket}: {e}")
+
   if not latest:
     return _render_message(f"Nessun report CSV trovato in s3://{bucket}/{prefix}")
 
-  obj = s3.get_object(Bucket=bucket, Key=latest["Key"])
-  body = obj["Body"].read().decode("utf-8")
+  try:
+    obj = s3.get_object(Bucket=bucket, Key=latest["Key"])
+    body = obj["Body"].read().decode("utf-8")
+  except Exception as e:
+    return _render_message(f"Impossibile leggere il report da s3://{bucket}/{latest['Key']}: {e}")
   data_rows = list(csv.DictReader(io.StringIO(body)))
 
   if view == "summary":

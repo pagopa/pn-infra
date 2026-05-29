@@ -18,7 +18,7 @@ Parameters:
     Default: ''
     Description: Core account ID
 
-  PnConfinfoAwsAccountId:
+  ConfidentialInfoAccountId:
     Type: String
     Default: ''
     Description: Confinfo account ID
@@ -79,9 +79,14 @@ Parameters:
     Type: String
     Description: Slack channel email address for IAM unused access notifications
 
+  LambdaRuntime:
+    Type: String
+    Default: python3.14
+    Description: Python runtime version for Lambda functions
+
 Conditions:
   IsCoreAccount:    !Equals [ !Ref PnCoreAwsAccountId, '' ]
-  HasConfinfoAccountId: !And [ !Condition IsCoreAccount, !Not [ !Equals [ !Ref PnConfinfoAwsAccountId, '' ] ] ]
+  HasConfinfoAccountId: !And [ !Condition IsCoreAccount, !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ] ]
 
 Resources:
   UnusedAccessAnalyzer:
@@ -243,7 +248,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub '${ProjectName}-iam-unused-access-exporter-${EnvironmentType}'
-      Runtime: python3.11
+      Runtime: !Ref LambdaRuntime
       Handler: index.lambda_handler
       Role: !GetAtt ExporterLambdaRole.Arn
       Timeout: 900
@@ -333,12 +338,12 @@ Resources:
                 - Effect: Allow
                   Action:
                     - s3:ListBucket
-                  Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}'
+                  Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${ConfidentialInfoAccountId}'
                 - Effect: Allow
                   Action:
                     - s3:GetObject
                     - s3:GetObjectVersion
-                  Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}/*'
+                  Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${ConfidentialInfoAccountId}/*'
           - !Ref AWS::NoValue
 
   CoreResultsWidgetLogGroup:
@@ -353,7 +358,7 @@ Resources:
     Condition: IsCoreAccount
     Properties:
       FunctionName: !Sub '${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}'
-      Runtime: python3.11
+      Runtime: !Ref LambdaRuntime
       Handler: index.handler
       Role: !GetAtt CoreResultsWidgetRole.Arn
       Timeout: 60
@@ -364,7 +369,7 @@ Resources:
           DEFAULT_PREFIX: !Sub '${EnvironmentType}/core/'
           CONFINFO_BUCKET: !If
             - HasConfinfoAccountId
-            - !Sub '${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}'
+            - !Sub '${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${ConfidentialInfoAccountId}'
             - ''
           CONFINFO_PREFIX: !Sub '${EnvironmentType}/confinfo/'
       Code:
@@ -430,7 +435,7 @@ Resources:
                     "params": {
                       "view": "summary",
                       "label": "confinfo",
-                      "bucket": "${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}",
+                      "bucket": "${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${ConfidentialInfoAccountId}",
                       "prefix": "${EnvironmentType}/confinfo/"
                     }
                   }
@@ -444,7 +449,7 @@ Resources:
                       "view": "microservice",
                       "microserviceLimit": 8,
                       "label": "confinfo",
-                      "bucket": "${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}",
+                      "bucket": "${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${ConfidentialInfoAccountId}",
                       "prefix": "${EnvironmentType}/confinfo/"
                     }
                   }
@@ -468,7 +473,7 @@ Resources:
                     "endpoint": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}",
                     "params": {
                       "label": "confinfo",
-                      "bucket": "${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}",
+                      "bucket": "${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${ConfidentialInfoAccountId}",
                       "prefix": "${EnvironmentType}/confinfo/"
                     }
                   }
