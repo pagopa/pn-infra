@@ -106,19 +106,16 @@ Resources:
       AnalyzerConfiguration:
         UnusedAccessConfiguration:
           UnusedAccessAge: !Ref TrackingPeriodDays
+      ArchiveRules: !If
+        - HasArchiveRulePatterns
+        - - RuleName: exclude-admin-roles
+            Filter:
+              - Property: resource
+                Contains: !Ref ArchiveRuleExcludeRolePatterns
+        - !Ref AWS::NoValue
       Tags:
         - { Key: ProjectName,     Value: !Ref ProjectName }
         - { Key: EnvironmentType, Value: !Ref EnvironmentType }
-
-  ExcludeAdminRolesArchiveRule:
-    Type: AWS::AccessAnalyzer::ArchiveRule
-    Condition: HasArchiveRulePatterns
-    Properties:
-      AnalyzerName: !Ref UnusedAccessAnalyzer
-      RuleName: exclude-admin-roles
-      Filter:
-        - Property: resource
-          Contains: !Ref ArchiveRuleExcludeRolePatterns
 
   LocalReportsBucket:
     Type: AWS::S3::Bucket
