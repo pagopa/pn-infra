@@ -104,6 +104,11 @@ Parameters:
     Default: pn-infra-sec-topic
     Description: Name of the SNS topic used for infrastructure security monitoring notifications
 
+  InfraIamAccessTopicName:
+    Type: String
+    Default: 'pn-InfraIamAccessTopic'
+    Description: Name of the SNS topic used for IAM unused access notifications
+
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
   
@@ -529,6 +534,30 @@ Resources:
       Topics:
         - !Ref InfraSecTopic
 
+  InfraIamAccessTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Ref InfraIamAccessTopicName
+
+  CanPublishInfraIamAccessTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowServices
+            Effect: Allow
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+                - "cloudwatch.amazonaws.com"
+            Action:
+              - 'sns:Publish'
+            Resource:
+              - !Ref InfraIamAccessTopic
+      Topics:
+        - !Ref InfraIamAccessTopic
+
 Outputs:
   LogsBucketKmsKeyArn:
     Value: 
@@ -625,3 +654,7 @@ Outputs:
   InfraSecTopicArn:
     Value: !Ref InfraSecTopic
     Description: 'Infrastructure security topic ARN'
+
+  InfraIamAccessTopicArn:
+    Value: !Ref InfraIamAccessTopic
+    Description: 'IAM unused access topic ARN'
