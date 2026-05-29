@@ -137,6 +137,7 @@ def lambda_handler(event, context):
     writer.writerow(CSV_HEADER)
 
     count = 0
+    finding_type_counts = {}
     role_tag_cache = {}
     for f in _iter_findings():
         details = _get_finding_details(f.get("id"))
@@ -145,6 +146,9 @@ def lambda_handler(event, context):
         unused_action_count = ""
         if unused_actions:
             unused_action_count = len(unused_actions)
+
+        finding_type = f.get("findingType", "Unknown")
+        finding_type_counts[finding_type] = finding_type_counts.get(finding_type, 0) + 1
 
         enriched = dict(f)
         if details:
@@ -180,10 +184,17 @@ def lambda_handler(event, context):
             f"https://{region}.console.aws.amazon.com/cloudwatch/home"
             f"?region={region}#dashboards/dashboard/{dashboard_name}"
         )
-        subject = f"[{ENV_NAME}/{ACCOUNT_ROLE}] IAM unused access: {count} finding rilevati"
+        account_label = f"{ACCOUNT_ROLE}-{ENV_NAME}"
+        breakdown_lines = "\n".join(
+            f"  - {ftype}: {fcount}" for ftype, fcount in sorted(finding_type_counts.items())
+        )
+        subject = f"[{account_label}] IAM unused access: {count} finding rilevati"
         message = (
-            f"Sono stati rilevati {count} finding IAM unused access "
-            f"per l'account {account_id} ({ACCOUNT_ROLE}) in ambiente {ENV_NAME}.\n\n"
+            f"Account: {account_id} ({account_label})\n"
+            f"Ambiente: {ENV_NAME}\n"
+            f"Ruolo account: {ACCOUNT_ROLE}\n\n"
+            f"Sono stati rilevati {count} finding IAM unused access.\n\n"
+            f"Dettaglio per tipologia:\n{breakdown_lines}\n\n"
             f"Consultare la dashboard CloudWatch per i dettagli:\n{dashboard_url}\n\n"
             f"Report CSV: s3://{BUCKET}/{key}"
         )

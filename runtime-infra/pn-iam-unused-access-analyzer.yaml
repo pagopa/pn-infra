@@ -75,6 +75,10 @@ Parameters:
     Type: String
     Description: SNS topic ARN for IAM unused access alerts
 
+  SlackNotificationEmail:
+    Type: String
+    Description: Slack channel email address for IAM unused access notifications
+
 Conditions:
   IsCoreAccount:    !Equals [ !Ref PnCoreAwsAccountId, '' ]
   HasConfinfoAccountId: !And [ !Condition IsCoreAccount, !Not [ !Equals [ !Ref PnConfinfoAwsAccountId, '' ] ] ]
@@ -94,7 +98,6 @@ Resources:
 
   LocalReportsBucket:
     Type: AWS::S3::Bucket
-    Condition: IsCoreAccount
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -138,7 +141,6 @@ Resources:
 
   LocalReportsBucketPolicy:
     Type: AWS::S3::BucketPolicy
-    Condition: IsCoreAccount
     Properties:
       Bucket: !Ref LocalReportsBucket
       PolicyDocument:
@@ -154,19 +156,22 @@ Resources:
             Condition:
               Bool: { 'aws:SecureTransport': 'false' }
           - !If
-            - HasConfinfoAccountId
-            - Sid: AllowConfinfoExporterPutObject
+            - IsCoreAccount
+            - !Ref AWS::NoValue
+            - Sid: AllowCoreWidgetReadAccess
               Effect: Allow
-              Principal: { AWS: !Sub 'arn:${AWS::Partition}:iam::${PnConfinfoAwsAccountId}:root' }
+              Principal: { AWS: !Sub 'arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root' }
               Action:
-                - s3:PutObject
-                - s3:AbortMultipartUpload
-              Resource: !Sub '${LocalReportsBucket.Arn}/*'
+                - s3:GetObject
+                - s3:GetObjectVersion
+                - s3:ListBucket
+              Resource:
+                - !GetAtt LocalReportsBucket.Arn
+                - !Sub '${LocalReportsBucket.Arn}/*'
               Condition:
                 StringLike:
                   aws:PrincipalArn:
-                    - !Sub 'arn:${AWS::Partition}:iam::${PnConfinfoAwsAccountId}:role/${ProjectName}-iam-unused-access-exporter-${EnvironmentType}'
-            - !Ref AWS::NoValue
+                    - !Sub 'arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}'
 
   ExporterLambdaRole:
     Type: AWS::IAM::Role
@@ -207,10 +212,7 @@ Resources:
                 Action:
                   - s3:PutObject
                   - s3:AbortMultipartUpload
-                Resource: !If
-                  - IsCoreAccount
-                  - !Sub '${LocalReportsBucket.Arn}/*'
-                  - !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnCoreAwsAccountId}/*'
+                Resource: !Sub '${LocalReportsBucket.Arn}/*'
         - PolicyName: iam-role-tags-read
           PolicyDocument:
             Version: '2012-10-17'
@@ -250,10 +252,7 @@ Resources:
       Environment:
         Variables:
           ANALYZER_ARN: !GetAtt UnusedAccessAnalyzer.Arn
-          REPORTS_BUCKET: !If
-            - IsCoreAccount
-            - !Ref LocalReportsBucket
-            - !Sub '${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnCoreAwsAccountId}'
+          REPORTS_BUCKET: !Ref LocalReportsBucket
           ENV_NAME: !Ref EnvironmentType
           ACCOUNT_ROLE: !If [IsCoreAccount, 'core', 'confinfo']
           RESOLVE_ROLE_TAGS: !Ref ResolveRoleTagsInExporter
@@ -283,6 +282,13 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt ExporterSchedule.Arn
+
+  SlackTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Ref SlackNotificationEmail
+      TopicArn: !Ref InfraIamAccessTopicArn
 
   CoreResultsWidgetRole:
     Type: AWS::IAM::Role
@@ -318,6 +324,22 @@ Resources:
                   - s3:GetObject
                   - s3:GetObjectVersion
                 Resource: !Sub '${LocalReportsBucket.Arn}/*'
+        - !If
+          - HasConfinfoAccountId
+          - PolicyName: read-confinfo-reports
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - s3:ListBucket
+                  Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}'
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                    - s3:GetObjectVersion
+                  Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}/*'
+          - !Ref AWS::NoValue
 
   CoreResultsWidgetLogGroup:
     Type: AWS::Logs::LogGroup
@@ -340,6 +362,11 @@ Resources:
         Variables:
           DEFAULT_BUCKET: !Ref LocalReportsBucket
           DEFAULT_PREFIX: !Sub '${EnvironmentType}/core/'
+          CONFINFO_BUCKET: !If
+            - HasConfinfoAccountId
+            - !Sub '${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}'
+            - ''
+          CONFINFO_PREFIX: !Sub '${EnvironmentType}/confinfo/'
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/iam-unused-access-core-widget.zip
@@ -365,7 +392,7 @@ Resources:
                 {
                   "type": "text", "x": 0, "y": 0, "width": 24, "height": 2,
                   "properties": {
-                    "markdown": "# IAM Unused Access - ${EnvironmentType}\n\n**Account core:** ${AWS::AccountId} | **Bucket centrale:** ${LocalReportsBucket}\n\nCore e confinfo scrivono entrambi nel bucket centrale del core. In basso vedi i report piu' recenti per core e confinfo."
+                    "markdown": "# IAM Unused Access - ${EnvironmentType}\n\n**Account core:** ${AWS::AccountId} | **Bucket core:** ${LocalReportsBucket}\n\nOgni account scrive nel proprio bucket. La dashboard legge da entrambi."
                   }
                 },
                 {
@@ -403,7 +430,7 @@ Resources:
                     "params": {
                       "view": "summary",
                       "label": "confinfo",
-                      "bucket": "${LocalReportsBucket}",
+                      "bucket": "${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}",
                       "prefix": "${EnvironmentType}/confinfo/"
                     }
                   }
@@ -417,7 +444,7 @@ Resources:
                       "view": "microservice",
                       "microserviceLimit": 8,
                       "label": "confinfo",
-                      "bucket": "${LocalReportsBucket}",
+                      "bucket": "${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}",
                       "prefix": "${EnvironmentType}/confinfo/"
                     }
                   }
@@ -441,7 +468,7 @@ Resources:
                     "endpoint": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}",
                     "params": {
                       "label": "confinfo",
-                      "bucket": "${LocalReportsBucket}",
+                      "bucket": "${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${PnConfinfoAwsAccountId}",
                       "prefix": "${EnvironmentType}/confinfo/"
                     }
                   }
@@ -491,7 +518,6 @@ Outputs:
       Name: !Sub '${AWS::StackName}-ExporterLambdaRoleArn'
 
   LocalReportsBucketName:
-    Condition: IsCoreAccount
     Description: Name of the local reports bucket for the current account
     Value: !Ref LocalReportsBucket
     Export:
