@@ -148,7 +148,6 @@ Parameters:
   InfraSecTopicName:
     Type: String
     Description: 'SNS topic name for security alerts'
-    Default: "pn-InfraSecTopic"
 
   InfraSecTopicArn:
     Type: String
@@ -199,7 +198,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !Ref InfraSecTopicArn
+                Resource: !If [IsConfinfoAccount, !Sub "arn:aws:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}", !Ref InfraSecTopicArn]
               - Effect: Allow
                 Action:
                   - kinesis:GetRecords
@@ -235,7 +234,7 @@ Resources:
         S3Key: !Sub ${LambdasBasePath}/infra-sec-monitoring-dynamo-alert.zip
       Environment:
         Variables:
-          SNS_TOPIC_ARN: !Ref InfraSecTopicArn
+          SNS_TOPIC_ARN: !If [IsConfinfoAccount, !Sub "arn:aws:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}", !Ref InfraSecTopicArn]
           TABLE_CONFIG: !Ref DynamoAlertLambdaTableConfig
           ENVIRONMENT: !Ref EnvironmentType
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
@@ -361,7 +360,7 @@ Resources:
           eventName: ["DeleteTable"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If [IsConfinfoAccount, !Sub "arn:aws:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}", !Ref InfraSecTopicArn]
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -388,7 +387,7 @@ Resources:
               pointInTimeRecoveryEnabled: [false]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If [IsConfinfoAccount, !Sub "arn:aws:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}", !Ref InfraSecTopicArn]
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -411,7 +410,7 @@ Resources:
             deletionProtectionEnabled: [false]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If [IsConfinfoAccount, !Sub "arn:aws:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}", !Ref InfraSecTopicArn]
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -444,7 +443,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If [IsConfinfoAccount, !Sub "arn:aws:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}", !Ref InfraSecTopicArn]
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -470,7 +469,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If [IsConfinfoAccount, !Sub "arn:aws:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}", !Ref InfraSecTopicArn]
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -499,7 +498,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If [IsConfinfoAccount, !Sub "arn:aws:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}", !Ref InfraSecTopicArn]
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -525,7 +524,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If [IsConfinfoAccount, !Sub "arn:aws:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}", !Ref InfraSecTopicArn]
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -552,7 +551,7 @@ Resources:
             bucketName: [!Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"]
       Targets:
         - Id: SendToSNS
-          Arn: !Ref InfraSecTopicArn
+          Arn: !If [IsConfinfoAccount, !Sub "arn:aws:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}", !Ref InfraSecTopicArn]
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -685,7 +684,7 @@ Resources:
         S3Key: !Sub ${LambdasBasePath}/infra-sec-url-access-analyzer-alert.zip
       Environment:
         Variables:
-          SNS_TOPIC_ARN: !Ref InfraSecTopicArn
+          SNS_TOPIC_ARN: !Sub 
           TABLE_CONFIG: !Ref DynamoAlertLambdaTableConfig
           ENVIRONMENT: !Ref EnvironmentType
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
@@ -715,7 +714,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !Ref InfraSecTopicArn
+                Resource: !If [IsConfinfoAccount, !Sub "arn:aws:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}", !Ref InfraSecTopicArn]
 
 
   #===========================================================================
@@ -853,7 +852,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !Ref InfraSecTopicArn
+                Resource: !If [IsConfinfoAccount, !Sub "arn:aws:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}", !Ref InfraSecTopicArn]
               - Effect: Allow
                 Action:
                   - sqs:ReceiveMessage
@@ -887,7 +886,7 @@ Resources:
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
       Environment:
         Variables:
-          SNS_TOPIC_ARN: !Ref InfraSecTopicArn
+          SNS_TOPIC_ARN: !If [IsConfinfoAccount, !Sub "arn:aws:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}", !Ref InfraSecTopicArn]
           DYNAMODB_TABLE_NAMES: !Join [",", !Ref DynamoDBAccessValidatorTables]
           S3_BUCKET_NAME: !Sub "pn-safestorage-${AWS::Region}-${AWS::AccountId}"
           AUTHORIZED_ROLES_CSV: "" 

@@ -99,6 +99,11 @@ Parameters:
     Default: 14
     Description: Number of days of Default Retention ObjectLock
 
+  InfraSecTopicName:
+    Type: String
+    Description: 'Infrastructure security topic name'
+    Default: 'pn-InfraSecTopic'
+
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
   
@@ -581,6 +586,6 @@ Outputs:
   LogRetention:
     Value: !Ref LogRetention
 
-  InfraSecTopicArn:
-    Value: !Ref InfraSecTopic
-    Description: 'Infrastructure security topic ARN'
+  InfraSecTopicName:
+    Value: !Ref InfraSecTopicName
+    Description: 'Infrastructure security topic name'
