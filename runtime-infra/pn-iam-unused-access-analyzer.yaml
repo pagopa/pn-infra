@@ -84,9 +84,18 @@ Parameters:
     Default: python3.14
     Description: Python runtime version for Lambda functions
 
+  ArchiveRuleExcludeRolePatterns:
+    Type: CommaDelimitedList
+    Default: ''
+    Description: >-
+      Comma-separated substrings to match in resource ARN.
+      Findings whose resource ARN contains any of these patterns
+      are automatically archived (e.g. SendExtAdmin,AWSReservedSSO).
+
 Conditions:
   IsCoreAccount:    !Equals [ !Ref PnCoreAwsAccountId, '' ]
   HasConfinfoAccountId: !And [ !Condition IsCoreAccount, !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ] ]
+  HasArchiveRulePatterns: !Not [ !Equals [ !Select [ 0, !Ref ArchiveRuleExcludeRolePatterns ], '' ] ]
 
 Resources:
   UnusedAccessAnalyzer:
@@ -100,6 +109,16 @@ Resources:
       Tags:
         - { Key: ProjectName,     Value: !Ref ProjectName }
         - { Key: EnvironmentType, Value: !Ref EnvironmentType }
+
+  ExcludeAdminRolesArchiveRule:
+    Type: AWS::AccessAnalyzer::ArchiveRule
+    Condition: HasArchiveRulePatterns
+    Properties:
+      AnalyzerName: !Ref UnusedAccessAnalyzer
+      RuleName: exclude-admin-roles
+      Filter:
+        - Property: resource
+          Contains: !Ref ArchiveRuleExcludeRolePatterns
 
   LocalReportsBucket:
     Type: AWS::S3::Bucket
@@ -476,27 +495,6 @@ Resources:
                       "bucket": "${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${ConfidentialInfoAccountId}",
                       "prefix": "${EnvironmentType}/confinfo/"
                     }
-                  }
-                },
-                {
-                  "type": "metric", "x": 0, "y": 34, "width": 12, "height": 6,
-                  "properties": {
-                    "title": "Lambda esportatrice - invocazioni / errori (core)",
-                    "region": "${AWS::Region}",
-                    "metrics": [
-                      [ "AWS/Lambda", "Invocations", "FunctionName", "${ExporterLambda}", { "stat": "Sum" } ],
-                      [ ".",          "Errors",      ".",            ".",                 { "stat": "Sum" } ]
-                    ],
-                    "view": "timeSeries", "stacked": false, "period": 86400
-                  }
-                },
-                {
-                  "type": "log", "x": 12, "y": 34, "width": 12, "height": 6,
-                  "properties": {
-                    "title": "Ultime esecuzioni esportatore (core)",
-                    "region": "${AWS::Region}",
-                    "query": "SOURCE '${ExporterLambdaLogGroup}' | fields @timestamp, @message | filter @message like /export completed/ | sort @timestamp desc | limit 50",
-                    "view": "table"
                   }
                 }
               ]
