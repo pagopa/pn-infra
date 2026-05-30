@@ -41,10 +41,25 @@ CSV_HEADER = [
 
 ACTION_PATTERN = re.compile(r"^[a-z0-9-]+:[A-Za-z0-9*]+$")
 
+def _apply_archive_rules():
+    """Apply all archive rules to existing findings so they get archived before export."""
+    try:
+        rules = aa.list_archive_rules(analyzerName=ANALYZER_ARN.rsplit("/", 1)[-1])
+        for rule in rules.get("archiveRules", []):
+            rule_name = rule["ruleName"]
+            log.info(json.dumps({"msg": "applying archive rule", "rule": rule_name}))
+            aa.apply_archive_rule(analyzerArn=ANALYZER_ARN, ruleName=rule_name)
+    except Exception as exc:
+        log.warning(json.dumps({"msg": "apply_archive_rules failed", "error": str(exc)}))
+
 def _iter_findings():
     token = None
     while True:
-        kwargs = {"analyzerArn": ANALYZER_ARN, "maxResults": 100}
+        kwargs = {
+            "analyzerArn": ANALYZER_ARN,
+            "maxResults": 100,
+            "filter": {"status": {"eq": ["ACTIVE"]}},
+        }
         if token:
             kwargs["nextToken"] = token
         resp = aa.list_findings_v2(**kwargs)
@@ -131,6 +146,8 @@ def lambda_handler(event, context):
     account_id = sts.get_caller_identity()["Account"]
     now = datetime.now(timezone.utc)
     key = f"{ENV_NAME}/{ACCOUNT_ROLE}/{account_id}/{now:%Y-%m-%d}/findings-{now:%H%M%S}.csv"
+
+    _apply_archive_rules()
 
     buf = io.StringIO()
     writer = csv.writer(buf)
