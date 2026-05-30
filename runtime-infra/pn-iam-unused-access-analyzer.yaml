@@ -280,6 +280,10 @@ Resources:
           ACCOUNT_ROLE: !If [IsCoreAccount, 'core', 'confinfo']
           RESOLVE_ROLE_TAGS: !Ref ResolveRoleTagsInExporter
           SNS_TOPIC_ARN: !Ref InfraIamAccessTopicArn
+          EXCLUDE_RESOURCE_PATTERNS: !If
+            - HasArchiveRulePatterns
+            - !Join [ ',', !Ref ArchiveRuleExcludeRolePatterns ]
+            - ''
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/iam-unused-access-exporter.zip

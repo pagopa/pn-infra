@@ -26,6 +26,9 @@ ENV_NAME      = os.environ["ENV_NAME"]
 ACCOUNT_ROLE  = os.environ["ACCOUNT_ROLE"]  # 'core' | 'confinfo'
 RESOLVE_ROLE_TAGS = os.environ.get("RESOLVE_ROLE_TAGS", "true").lower() == "true"
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN", "")
+EXCLUDE_RESOURCE_PATTERNS = [
+    p.strip() for p in os.environ.get("EXCLUDE_RESOURCE_PATTERNS", "").split(",") if p.strip()
+]
 
 aa  = boto3.client("accessanalyzer", config=Config(retries={"max_attempts": 10, "mode": "adaptive"}))
 s3  = boto3.client("s3")
@@ -154,9 +157,14 @@ def lambda_handler(event, context):
     writer.writerow(CSV_HEADER)
 
     count = 0
+    skipped = 0
     finding_type_counts = {}
     role_tag_cache = {}
     for f in _iter_findings():
+        resource = f.get("resource", "")
+        if EXCLUDE_RESOURCE_PATTERNS and any(p in resource for p in EXCLUDE_RESOURCE_PATTERNS):
+            skipped += 1
+            continue
         details = _get_finding_details(f.get("id"))
         unused_actions = _extract_unused_actions(details)
         microservice_tag = _resolve_microservice_tag(f.get("resource"), role_tag_cache)
@@ -227,5 +235,5 @@ def lambda_handler(event, context):
 
     log.info(json.dumps({"msg": "export completed", "account_id": account_id,
                          "account_role": ACCOUNT_ROLE, "env": ENV_NAME,
-                         "key": key, "rows": count}))
-    return {"status": "ok", "rows": count, "key": key}
+                         "key": key, "rows": count, "skipped": skipped}))
+    return {"status": "ok", "rows": count, "skipped": skipped, "key": key}
