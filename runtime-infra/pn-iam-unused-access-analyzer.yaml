@@ -92,6 +92,13 @@ Parameters:
       Findings whose resource ARN contains any of these patterns
       are automatically archived (e.g. SendExtAdmin,AWSReservedSSO).
 
+  ExcludeTagKey:
+    Type: String
+    Default: ''
+    Description: >-
+      Tag key to check on IAM roles. If a role has this tag,
+      its findings are programmatically archived.
+
 Conditions:
   IsCoreAccount:    !Equals [ !Ref PnCoreAwsAccountId, '' ]
   HasConfinfoAccountId: !And [ !Condition IsCoreAccount, !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ] ]
@@ -226,6 +233,7 @@ Resources:
                   - access-analyzer:GetFinding*
                   - access-analyzer:ListArchiveRules
                   - access-analyzer:ApplyArchiveRule
+                  - access-analyzer:UpdateFindings
                 Resource: '*'
         - PolicyName: s3-write-reports
           PolicyDocument:
@@ -280,10 +288,7 @@ Resources:
           ACCOUNT_ROLE: !If [IsCoreAccount, 'core', 'confinfo']
           RESOLVE_ROLE_TAGS: !Ref ResolveRoleTagsInExporter
           SNS_TOPIC_ARN: !Ref InfraIamAccessTopicArn
-          EXCLUDE_RESOURCE_PATTERNS: !If
-            - HasArchiveRulePatterns
-            - !Join [ ',', !Ref ArchiveRuleExcludeRolePatterns ]
-            - ''
+          EXCLUDE_TAG_KEY: !Ref ExcludeTagKey
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/iam-unused-access-exporter.zip

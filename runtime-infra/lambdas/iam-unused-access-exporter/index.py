@@ -26,9 +26,7 @@ ENV_NAME      = os.environ["ENV_NAME"]
 ACCOUNT_ROLE  = os.environ["ACCOUNT_ROLE"]  # 'core' | 'confinfo'
 RESOLVE_ROLE_TAGS = os.environ.get("RESOLVE_ROLE_TAGS", "true").lower() == "true"
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN", "")
-EXCLUDE_RESOURCE_PATTERNS = [
-    p.strip() for p in os.environ.get("EXCLUDE_RESOURCE_PATTERNS", "").split(",") if p.strip()
-]
+EXCLUDE_TAG_KEY = os.environ.get("EXCLUDE_TAG_KEY", "")
 
 aa  = boto3.client("accessanalyzer", config=Config(retries={"max_attempts": 10, "mode": "adaptive"}))
 s3  = boto3.client("s3")
@@ -145,6 +143,39 @@ def _resolve_microservice_tag(resource, cache):
     cache[role_name] = microservice
     return microservice
 
+def _has_exclude_tag(role_name, cache):
+    """Check if a role has the exclude tag. Uses a shared cache with prefix to avoid collisions."""
+    cache_key = f"__exclude__{role_name}"
+    if cache_key in cache:
+        return cache[cache_key]
+
+    result = False
+    try:
+        response = iam.list_role_tags(RoleName=role_name)
+        for tag in response.get("Tags", []):
+            if str(tag.get("Key", "")) == EXCLUDE_TAG_KEY and str(tag.get("Value", "")).lower() == "true":
+                result = True
+                break
+    except Exception as exc:
+        log.warning(json.dumps({"msg": "list_role_tags failed (exclude check)", "role_name": role_name, "error": str(exc)}))
+
+    cache[cache_key] = result
+    return result
+
+def _archive_findings(finding_ids):
+    """Archive findings by setting their status to ARCHIVED."""
+    for i in range(0, len(finding_ids), 100):
+        batch = finding_ids[i:i+100]
+        for fid in batch:
+            try:
+                aa.update_findings(
+                    analyzerArn=ANALYZER_ARN,
+                    ids=[fid],
+                    status="ARCHIVED"
+                )
+            except Exception as exc:
+                log.warning(json.dumps({"msg": "update_findings failed", "finding_id": fid, "error": str(exc)}))
+
 def lambda_handler(event, context):
     account_id = sts.get_caller_identity()["Account"]
     now = datetime.now(timezone.utc)
@@ -157,14 +188,19 @@ def lambda_handler(event, context):
     writer.writerow(CSV_HEADER)
 
     count = 0
-    skipped = 0
+    archived_by_tag = 0
     finding_type_counts = {}
     role_tag_cache = {}
+    findings_to_archive = []
     for f in _iter_findings():
         resource = f.get("resource", "")
-        if EXCLUDE_RESOURCE_PATTERNS and any(p in resource for p in EXCLUDE_RESOURCE_PATTERNS):
-            skipped += 1
-            continue
+        # Check if resource has the exclude tag — if so, archive it
+        if EXCLUDE_TAG_KEY:
+            role_name = _parse_role_name(resource)
+            if role_name and _has_exclude_tag(role_name, role_tag_cache):
+                findings_to_archive.append(f.get("id"))
+                archived_by_tag += 1
+                continue
         details = _get_finding_details(f.get("id"))
         unused_actions = _extract_unused_actions(details)
         microservice_tag = _resolve_microservice_tag(f.get("resource"), role_tag_cache)
@@ -194,6 +230,11 @@ def lambda_handler(event, context):
             json.dumps(enriched, default=str, separators=(",", ":")),
         ])
         count += 1
+
+    # Archive findings that matched the exclude tag
+    if findings_to_archive:
+        log.info(json.dumps({"msg": "archiving findings by tag", "count": len(findings_to_archive)}))
+        _archive_findings(findings_to_archive)
 
     s3.put_object(
         Bucket=BUCKET,
@@ -235,5 +276,5 @@ def lambda_handler(event, context):
 
     log.info(json.dumps({"msg": "export completed", "account_id": account_id,
                          "account_role": ACCOUNT_ROLE, "env": ENV_NAME,
-                         "key": key, "rows": count, "skipped": skipped}))
-    return {"status": "ok", "rows": count, "skipped": skipped, "key": key}
+                         "key": key, "rows": count, "archived_by_tag": archived_by_tag}))
+    return {"status": "ok", "rows": count, "archived_by_tag": archived_by_tag, "key": key}
