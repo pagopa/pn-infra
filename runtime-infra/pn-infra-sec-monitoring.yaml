@@ -113,6 +113,10 @@ Parameters:
     Type: String
     Description: 'ARN of SNS topic for alarms'
 
+  AlarmSNSTopicName:
+    Type: String
+    Description: 'Name of SNS topic for alarms (used if AlarmSNSTopicArn is not provided)'
+
   LambdaReservedConcurrency:
     Type: Number
     Default: 10
@@ -780,7 +784,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub "${ProjectName}-infra-sec-events-queue"
-        AlarmSNSTopicName: !Ref AlarmSNSTopicArn
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
         HasDLQ: "true"
         QueueHasAlarm: "true"
         MaxReceiveCount: 3
