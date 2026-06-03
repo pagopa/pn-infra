@@ -113,6 +113,10 @@ Parameters:
     Type: String
     Description: 'ARN of SNS topic for alarms'
 
+  AlarmSNSTopicName:
+    Type: String
+    Description: 'Name of SNS topic for alarms (used if AlarmSNSTopicArn is not provided)'
+
   LambdaReservedConcurrency:
     Type: Number
     Default: 10
@@ -144,11 +148,6 @@ Parameters:
     Type: String
     Default: ''
     Description: 'JSON array of DynamoDB table names to filter CDC events for (e.g., ["table1", "table2"])'
-
-  InfraSecTopicName:
-    Type: String
-    Description: 'SNS topic name for security alerts'
-    Default: "pn-InfraSecTopic"
 
   InfraSecTopicArn:
     Type: String
@@ -685,7 +684,7 @@ Resources:
         S3Key: !Sub ${LambdasBasePath}/infra-sec-url-access-analyzer-alert.zip
       Environment:
         Variables:
-          SNS_TOPIC_ARN: !Ref InfraSecTopicArn
+          SNS_TOPIC_ARN: !Sub 
           TABLE_CONFIG: !Ref DynamoAlertLambdaTableConfig
           ENVIRONMENT: !Ref EnvironmentType
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
@@ -716,9 +715,6 @@ Resources:
                 Action:
                   - sns:Publish
                 Resource: !Ref InfraSecTopicArn
-                Condition:
-                  StringLike:
-                    sns:ResourceName: !Sub "${InfraSecTopicName}"
 
 
   #===========================================================================
@@ -739,14 +735,9 @@ Resources:
           eventSource:
             - dynamodb.amazonaws.com
           eventName:
-            - GetItem
-            - PutItem
             - UpdateItem
             - DeleteItem
-            - BatchGetItem
             - BatchWriteItem
-            - Query
-            - Scan
           requestParameters:
             tableName: !Ref DynamoDBAccessValidatorTables
       Targets:
@@ -793,7 +784,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub "${ProjectName}-infra-sec-events-queue"
-        AlarmSNSTopicName: !Ref AlarmSNSTopicArn
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
         HasDLQ: "true"
         QueueHasAlarm: "true"
         MaxReceiveCount: 3
