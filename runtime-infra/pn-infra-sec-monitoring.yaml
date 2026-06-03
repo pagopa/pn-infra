@@ -113,6 +113,10 @@ Parameters:
     Type: String
     Description: 'ARN of SNS topic for alarms'
 
+  AlarmSNSTopicName:
+    Type: String
+    Description: 'Name of SNS topic for alarms (used if AlarmSNSTopicArn is not provided)'
+
   LambdaReservedConcurrency:
     Type: Number
     Default: 10
@@ -145,26 +149,9 @@ Parameters:
     Default: ''
     Description: 'JSON array of DynamoDB table names to filter CDC events for (e.g., ["table1", "table2"])'
 
-  InfraSecTopicName:
-    Type: String
-    Description: 'SNS topic name for security alerts'
-    Default: "pn-InfraSecTopic"
-
   InfraSecTopicArn:
     Type: String
     Description: 'SNS topic ARN for security alerts (overrides InfraSecTopicName if provided)'
-
-  S3AccessMonitorStateRule:
-    Type: String
-    AllowedValues: ['ENABLED', 'DISABLED']
-    Default: 'ENABLED'
-    Description: 'Whether to enable the S3 access monitoring EventBridge rule (requires CloudTrail Event Data Store)'
-
-  DynamoDbAccessMonitorStateRule:
-    Type: String
-    AllowedValues: ['ENABLED', 'DISABLED']
-    Default: 'ENABLED'
-    Description: 'Whether to enable the DynamoDB access monitoring EventBridge rule (requires CloudTrail Event Data Store)'
 
 Conditions:
   HasCloudTrailLogsEnabled: !Equals [!Ref EnableCloudTrailLogs, 'true']
@@ -697,7 +684,7 @@ Resources:
         S3Key: !Sub ${LambdasBasePath}/infra-sec-url-access-analyzer-alert.zip
       Environment:
         Variables:
-          SNS_TOPIC_ARN: !Ref InfraSecTopicArn
+          SNS_TOPIC_ARN: !Sub 
           TABLE_CONFIG: !Ref DynamoAlertLambdaTableConfig
           ENVIRONMENT: !Ref EnvironmentType
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
@@ -728,9 +715,6 @@ Resources:
                 Action:
                   - sns:Publish
                 Resource: !Ref InfraSecTopicArn
-                Condition:
-                  StringLike:
-                    sns:ResourceName: !Sub "${InfraSecTopicName}"
 
 
   #===========================================================================
@@ -742,7 +726,6 @@ Resources:
     Properties:
       Name: !Sub "${ProjectName}-infra-sec-dynamodb-access-monitoring"
       Description: "Monitor all DynamoDB access to Critical DynamoDB tables (CloudTrail filters to data events only)"
-      State: !Ref DynamoDbAccessMonitorStateRule
       EventPattern:
         source:
           - aws.dynamodb
@@ -770,7 +753,6 @@ Resources:
     Properties:
       Name: !Sub "${ProjectName}-infra-sec-s3-access-monitoring"
       Description: "Monitor S3 access to safestorage bucket (CloudTrail filters to critical prefix only)"
-      State: !Ref S3AccessMonitorStateRule
       EventPattern:
         source:
           - aws.s3
@@ -802,7 +784,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub "${ProjectName}-infra-sec-events-queue"
-        AlarmSNSTopicName: !Ref AlarmSNSTopicArn
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
         HasDLQ: "true"
         QueueHasAlarm: "true"
         MaxReceiveCount: 3
