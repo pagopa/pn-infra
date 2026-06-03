@@ -81,6 +81,11 @@ def lambda_handler(event, context):
             "error_code": error_code,
         }
 
+        ##if object_key is favicon.ico skip processing (common noise in access logs)
+        if object_key and object_key.endswith("favicon.ico"):
+            #print("Skipping favicon.ico access")
+            return {"statusCode": 200, "body": "Skipped favicon.ico access"}
+        
         print("Access log:", json.dumps(log_entry))
 
         # Process access
@@ -178,8 +183,6 @@ def publish_emf_metrics(log_entry):
     """
 
     timestamp_ms = int(datetime.utcnow().timestamp() * 1000)
-
-    base_dimensions = ["BucketName"]
 
     metrics = []
 
