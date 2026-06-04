@@ -27,6 +27,7 @@ ACCOUNT_ROLE  = os.environ["ACCOUNT_ROLE"]  # 'core' | 'confinfo'
 RESOLVE_ROLE_TAGS = os.environ.get("RESOLVE_ROLE_TAGS", "true").lower() == "true"
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN", "")
 EXCLUDE_TAG_KEY = os.environ.get("EXCLUDE_TAG_KEY", "")
+ARCHIVE_RULE_PATTERNS = [p.strip() for p in os.environ.get("ARCHIVE_RULE_PATTERNS", "").split(",") if p.strip()]
 
 aa  = boto3.client("accessanalyzer", config=Config(retries={"max_attempts": 10, "mode": "adaptive"}))
 s3  = boto3.client("s3")
@@ -42,11 +43,52 @@ CSV_HEADER = [
 
 ACTION_PATTERN = re.compile(r"^[a-z0-9-]+:[A-Za-z0-9*]+$")
 
-def _apply_archive_rules():
-    """Apply all archive rules to existing findings so they get archived before export."""
+ARCHIVE_RULE_PREFIX = "auto-exclude-"
+
+def _sync_archive_rules():
+    """Create one archive rule per pattern, remove obsolete ones, then apply all."""
+    analyzer_name = ANALYZER_ARN.rsplit("/", 1)[-1]
+
+    # List existing auto-managed rules
     try:
-        rules = aa.list_archive_rules(analyzerName=ANALYZER_ARN.rsplit("/", 1)[-1])
-        for rule in rules.get("archiveRules", []):
+        existing = aa.list_archive_rules(analyzerName=analyzer_name)
+        existing_rules = {r["ruleName"]: r for r in existing.get("archiveRules", [])}
+    except Exception as exc:
+        log.warning(json.dumps({"msg": "list_archive_rules failed", "error": str(exc)}))
+        return
+
+    # Desired rules: one per pattern
+    desired_rules = {}
+    for pattern in ARCHIVE_RULE_PATTERNS:
+        rule_name = f"{ARCHIVE_RULE_PREFIX}{pattern}"
+        desired_rules[rule_name] = pattern
+
+    # Create missing rules
+    for rule_name, pattern in desired_rules.items():
+        if rule_name not in existing_rules:
+            try:
+                aa.create_archive_rule(
+                    analyzerName=analyzer_name,
+                    ruleName=rule_name,
+                    filter={"resource": {"contains": [pattern]}},
+                )
+                log.info(json.dumps({"msg": "created archive rule", "rule": rule_name, "pattern": pattern}))
+            except Exception as exc:
+                log.warning(json.dumps({"msg": "create_archive_rule failed", "rule": rule_name, "error": str(exc)}))
+
+    # Delete obsolete auto-managed rules
+    for rule_name in existing_rules:
+        if rule_name.startswith(ARCHIVE_RULE_PREFIX) and rule_name not in desired_rules:
+            try:
+                aa.delete_archive_rule(analyzerName=analyzer_name, ruleName=rule_name)
+                log.info(json.dumps({"msg": "deleted obsolete archive rule", "rule": rule_name}))
+            except Exception as exc:
+                log.warning(json.dumps({"msg": "delete_archive_rule failed", "rule": rule_name, "error": str(exc)}))
+
+    # Apply all rules (including manually created ones)
+    try:
+        all_rules = aa.list_archive_rules(analyzerName=analyzer_name)
+        for rule in all_rules.get("archiveRules", []):
             rule_name = rule["ruleName"]
             log.info(json.dumps({"msg": "applying archive rule", "rule": rule_name}))
             aa.apply_archive_rule(analyzerArn=ANALYZER_ARN, ruleName=rule_name)
@@ -167,7 +209,7 @@ def lambda_handler(event, context):
     now = datetime.now(timezone.utc)
     key = f"{ENV_NAME}/{ACCOUNT_ROLE}/{account_id}/{now:%Y-%m-%d}/{account_id}-findings-{now:%H%M%S}.csv"
 
-    _apply_archive_rules()
+    _sync_archive_rules()
 
     buf = io.StringIO()
     writer = csv.writer(buf)

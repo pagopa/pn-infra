@@ -104,7 +104,6 @@ Parameters:
 Conditions:
   IsCoreAccount: !Equals [ !Ref PnCoreAwsAccountId, '' ]
   IsConfinfoAccount: !Not [ !Equals [ !Ref PnCoreAwsAccountId, '' ] ]
-  HasArchiveRulePatterns: !Or [ !And [ !Condition IsCoreAccount, !Not [ !Equals [ !Select [ 0, !Ref ArchiveRuleExcludeRolePatternsCore ], '' ] ] ], !And [ !Condition IsConfinfoAccount, !Not [ !Equals [ !Select [ 0, !Ref ArchiveRuleExcludeRolePatternsConfinfo ], '' ] ] ] ]
 
 Resources:
   UnusedAccessAnalyzer:
@@ -115,16 +114,6 @@ Resources:
       AnalyzerConfiguration:
         UnusedAccessConfiguration:
           UnusedAccessAge: !Ref TrackingPeriodDays
-      ArchiveRules: !If
-        - HasArchiveRulePatterns
-        - - RuleName: role-to-archive
-            Filter:
-              - Property: resource
-                Contains: !If
-                  - IsCoreAccount
-                  - !Ref ArchiveRuleExcludeRolePatternsCore
-                  - !Ref ArchiveRuleExcludeRolePatternsConfinfo
-        - !Ref AWS::NoValue
       Tags:
         - { Key: ProjectName,     Value: !Ref ProjectName }
         - { Key: EnvironmentType, Value: !Ref EnvironmentType }
@@ -238,6 +227,8 @@ Resources:
                   - access-analyzer:GetFinding*
                   - access-analyzer:ListArchiveRules
                   - access-analyzer:ApplyArchiveRule
+                  - access-analyzer:CreateArchiveRule
+                  - access-analyzer:DeleteArchiveRule
                 Resource: '*'
         - PolicyName: s3-write-reports
           PolicyDocument:
@@ -293,6 +284,12 @@ Resources:
           RESOLVE_ROLE_TAGS: !Ref ResolveRoleTagsInExporter
           SNS_TOPIC_ARN: !Ref InfraIAMAccessAnalyzerTopicArn
           EXCLUDE_TAG_KEY: !Ref ExcludeTagKey
+          ARCHIVE_RULE_PATTERNS: !Join
+            - ','
+            - !If
+              - IsCoreAccount
+              - !Ref ArchiveRuleExcludeRolePatternsCore
+              - !Ref ArchiveRuleExcludeRolePatternsConfinfo
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/iam-unused-access-exporter.zip
