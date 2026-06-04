@@ -104,7 +104,7 @@ Parameters:
 Conditions:
   IsCoreAccount: !Equals [ !Ref PnCoreAwsAccountId, '' ]
   IsConfinfoAccount: !Not [ !Equals [ !Ref PnCoreAwsAccountId, '' ] ]
-  HasArchiveRulePatterns: !Not [ !Equals [ !Select [ 0, !If [ IsCoreAccount, !Ref ArchiveRuleExcludeRolePatternsCore, !Ref ArchiveRuleExcludeRolePatternsConfinfo ] ], '' ] ]
+  HasArchiveRulePatterns: !Or [ !And [ !Condition IsCoreAccount, !Not [ !Equals [ !Select [ 0, !Ref ArchiveRuleExcludeRolePatternsCore ], '' ] ] ], !And [ !Condition IsConfinfoAccount, !Not [ !Equals [ !Select [ 0, !Ref ArchiveRuleExcludeRolePatternsConfinfo ], '' ] ] ] ]
 
 Resources:
   UnusedAccessAnalyzer:
