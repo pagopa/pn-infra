@@ -784,9 +784,9 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub "${ProjectName}-infra-sec-events-queue"
-        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+        #DLQ alarm disabled for now to avoid alert fatigue, can be enabled later if needed
+        #AlarmSNSTopicName: !Ref AlarmSNSTopicName
         HasDLQ: "true"
-        QueueHasAlarm: "true"
         MaxReceiveCount: 3
 
   PnInfraSecEventsQueuePolicy:
