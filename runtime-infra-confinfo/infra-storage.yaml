@@ -101,8 +101,8 @@ Parameters:
 
   InfraSecTopicName:
     Type: String
-    Default: pn-infra-sec-topic
-    Description: Name of the SNS topic used for infrastructure security monitoring notifications
+    Description: 'Infrastructure security topic name'
+    Default: 'pn-InfraSecTopic'
 
   InfraIamAccessTopicName:
     Type: String
@@ -496,43 +496,7 @@ Resources:
               ArnLike:
                 "aws:SourceArn": !Sub "arn:${AWS::Partition}:s3:*:*:${ProjectName}-logs-bucket-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}"
               StringEquals:
-                "aws:SourceAccount": !Ref AWS::AccountId
-
-  InfraSecTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Ref InfraSecTopicName
-      
-  CanPublishInfraSecTopicPolicy:
-    Type: AWS::SNS::TopicPolicy
-    Properties:
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Sid: AllowServices
-            Effect: Allow
-            Principal:
-              Service:
-                - "events.amazonaws.com"
-                - "cloudwatch.amazonaws.com"
-            Action:
-              - 'sns:Publish'
-            Resource:
-              - !Ref InfraSecTopic
-          - !If 
-            - HasPnCoreAwsAccountId
-            - Sid: AllowPublishFromPnCore
-              Effect: Allow
-              Action:
-              - 'sns:Publish'
-              Principal:
-                AWS: 
-                  - !Sub arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root
-              Resource:
-                - !Ref InfraSecTopic
-            - !Ref AWS::NoValue
-      Topics:
-        - !Ref InfraSecTopic
+                "aws:SourceAccount": !Ref AWS::AccountId      
 
   InfraIamAccessTopic:
     Type: AWS::SNS::Topic
@@ -651,10 +615,10 @@ Outputs:
   LogRetention:
     Value: !Ref LogRetention
 
-  InfraSecTopicArn:
-    Value: !Ref InfraSecTopic
-    Description: 'Infrastructure security topic ARN'
-
   InfraIamAccessTopicArn:
     Value: !Ref InfraIamAccessTopic
     Description: 'IAM unused access topic ARN'
+
+  InfraSecTopicName:
+    Value: !Ref InfraSecTopicName
+    Description: 'Infrastructure security topic name'
