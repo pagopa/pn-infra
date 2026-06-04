@@ -84,13 +84,15 @@ Parameters:
     Default: python3.14
     Description: Python runtime version for Lambda functions
 
-  ArchiveRuleExcludeRolePatterns:
+  ArchiveRuleExcludeRolePatternsCore:
     Type: CommaDelimitedList
     Default: ''
-    Description: >-
-      Comma-separated substrings to match in resource ARN.
-      Findings whose resource ARN contains any of these patterns
-      are automatically archived (e.g. SendExtAdmin,AWSReservedSSO).
+    Description: Findings to Exclude (archive) Core Account
+
+  ArchiveRuleExcludeRolePatternsConfinfo:
+    Type: CommaDelimitedList
+    Default: ''
+    Description: Findings to Exclude (archive) Confinfo Account
 
   ExcludeTagKey:
     Type: String
@@ -100,9 +102,9 @@ Parameters:
       its findings are programmatically archived.
 
 Conditions:
-  IsCoreAccount:    !Equals [ !Ref PnCoreAwsAccountId, '' ]
-  HasConfinfoAccountId: !And [ !Condition IsCoreAccount, !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ] ]
-  HasArchiveRulePatterns: !Not [ !Equals [ !Select [ 0, !Ref ArchiveRuleExcludeRolePatterns ], '' ] ]
+  IsCoreAccount: !Equals [ !Ref PnCoreAwsAccountId, '' ]
+  IsConfinfoAccount: !Not [ !Equals [ !Ref PnCoreAwsAccountId, '' ] ]
+  HasArchiveRulePatterns: !Not [ !Equals [ !Select [ 0, !If [ IsCoreAccount, !Ref ArchiveRuleExcludeRolePatternsCore, !Ref ArchiveRuleExcludeRolePatternsConfinfo ] ], '' ] ]
 
 Resources:
   UnusedAccessAnalyzer:
@@ -115,10 +117,13 @@ Resources:
           UnusedAccessAge: !Ref TrackingPeriodDays
       ArchiveRules: !If
         - HasArchiveRulePatterns
-        - - RuleName: exclude-admin-roles
+        - - RuleName: role-to-archive
             Filter:
               - Property: resource
-                Contains: !Ref ArchiveRuleExcludeRolePatterns
+                Contains: !If
+                  - IsCoreAccount
+                  - !Ref ArchiveRuleExcludeRolePatternsCore
+                  - !Ref ArchiveRuleExcludeRolePatternsConfinfo
         - !Ref AWS::NoValue
       Tags:
         - { Key: ProjectName,     Value: !Ref ProjectName }
@@ -285,7 +290,7 @@ Resources:
           ANALYZER_ARN: !GetAtt UnusedAccessAnalyzer.Arn
           REPORTS_BUCKET: !Ref LocalReportsBucket
           ENV_NAME: !Ref EnvironmentType
-          ACCOUNT_ROLE: !If [IsCoreAccount, 'core', 'confinfo']
+          ACCOUNT_ROLE: !If [IsConfinfoAccount, 'confinfo', 'core']
           RESOLVE_ROLE_TAGS: !Ref ResolveRoleTagsInExporter
           SNS_TOPIC_ARN: !Ref InfraIamAccessTopicArn
           EXCLUDE_TAG_KEY: !Ref ExcludeTagKey
@@ -356,22 +361,19 @@ Resources:
                   - s3:GetObject
                   - s3:GetObjectVersion
                 Resource: !Sub '${LocalReportsBucket.Arn}/*'
-        - !If
-          - HasConfinfoAccountId
-          - PolicyName: read-confinfo-reports
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - s3:ListBucket
-                  Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${ConfidentialInfoAccountId}'
-                - Effect: Allow
-                  Action:
-                    - s3:GetObject
-                    - s3:GetObjectVersion
-                  Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${ConfidentialInfoAccountId}/*'
-          - !Ref AWS::NoValue
+        - PolicyName: read-confinfo-reports
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${ConfidentialInfoAccountId}'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${ConfidentialInfoAccountId}/*'
 
   CoreResultsWidgetLogGroup:
     Type: AWS::Logs::LogGroup
@@ -394,10 +396,7 @@ Resources:
         Variables:
           DEFAULT_BUCKET: !Ref LocalReportsBucket
           DEFAULT_PREFIX: !Sub '${EnvironmentType}/core/'
-          CONFINFO_BUCKET: !If
-            - HasConfinfoAccountId
-            - !Sub '${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${ConfidentialInfoAccountId}'
-            - ''
+          CONFINFO_BUCKET: !Sub '${ProjectName}-iam-unused-access-reports-${EnvironmentType}-${ConfidentialInfoAccountId}'
           CONFINFO_PREFIX: !Sub '${EnvironmentType}/confinfo/'
       Code:
         S3Bucket: !Ref LambdasBucketName
