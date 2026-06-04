@@ -109,7 +109,7 @@ def handler(event, context):
   prefix = params.get("prefix") or event.get("prefix") or os.environ.get("DEFAULT_PREFIX", "")
   label = params.get("label") or event.get("label") or prefix or "n/a"
   view = (params.get("view") or event.get("view") or "table").strip().lower()
-  microservice_limit = int(params.get("microserviceLimit") or event.get("microserviceLimit") or 8)
+  microservice_limit = _to_int(params.get("microserviceLimit") or event.get("microserviceLimit"), 8)
   if not bucket:
     return _render_message("Bucket non configurato")
 

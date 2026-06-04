@@ -191,9 +191,10 @@ Resources:
                 - !GetAtt LocalReportsBucket.Arn
                 - !Sub '${LocalReportsBucket.Arn}/*'
               Condition:
-                StringLike:
+                ArnLike:
                   aws:PrincipalArn:
                     - !Sub 'arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}'
+                    - !Sub 'arn:${AWS::Partition}:sts::${PnCoreAwsAccountId}:assumed-role/${ProjectName}-iam-unused-access-core-widget-${EnvironmentType}/*'
 
   ExporterLambdaRole:
     Type: AWS::IAM::Role
@@ -238,7 +239,11 @@ Resources:
                 Action:
                   - s3:PutObject
                   - s3:AbortMultipartUpload
-                Resource: !Sub '${LocalReportsBucket.Arn}/*'
+                Resource: !Sub
+                  - '${BucketArn}/${Env}/${Role}/*'
+                  - BucketArn: !GetAtt LocalReportsBucket.Arn
+                    Env: !Ref EnvironmentType
+                    Role: !If [IsConfinfoAccount, confinfo, core]
         - PolicyName: iam-role-tags-read
           PolicyDocument:
             Version: '2012-10-17'

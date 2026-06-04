@@ -207,7 +207,8 @@ def _has_exclude_tag(role_name, cache):
 def lambda_handler(event, context):
     account_id = sts.get_caller_identity()["Account"]
     now = datetime.now(timezone.utc)
-    key = f"{ENV_NAME}/{ACCOUNT_ROLE}/{account_id}/{now:%Y-%m-%d}/{account_id}-findings-{now:%H%M%S}.csv"
+    request_id = (context.aws_request_id if context else "local")
+    key = f"{ENV_NAME}/{ACCOUNT_ROLE}/{account_id}/{now:%Y-%m-%d}/{account_id}-findings-{now:%H%M%S}-{request_id}.csv"
 
     _sync_archive_rules()
 
