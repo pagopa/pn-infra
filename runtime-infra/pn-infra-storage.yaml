@@ -113,10 +113,10 @@ Parameters:
     Default: ''
     Description: AWS AccountId of the confidential info account in same environment
 
-  InfraIamAccessTopicName:
+  InfraIAMAccessAnalyzerTopicName:
     Type: String
     Description: 'SNS topic name for IAM unused access alerts'
-    Default: 'pn-InfraIamAccessTopic'
+    Default: 'pn-InfraIAMAccessAnalyzerTopic'
 
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
@@ -561,19 +561,19 @@ Resources:
       Endpoint: '{{resolve:ssm:/notification/infra/email}}'
       TopicArn: !Ref InfraSecTopic
 
-  InfraIamAccessTopic:
+  InfraIAMAccessAnalyzerTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: !Ref InfraIamAccessTopicName
+      TopicName: !Ref InfraIAMAccessAnalyzerTopicName
 
-  InfraIamAccessTopicSubscription:
+  InfraIAMAccessAnalyzerTopicSubscription:
     Type: AWS::SNS::Subscription
     Properties:
       Protocol: email
       Endpoint: '{{resolve:ssm:/notification/infra/email}}'
-      TopicArn: !Ref InfraIamAccessTopic
+      TopicArn: !Ref InfraIAMAccessAnalyzerTopic
 
-  CanPublishInfraIamAccessTopicPolicy:
+  CanPublishInfraIAMAccessAnalyzerTopicPolicy:
     Type: AWS::SNS::TopicPolicy
     Properties:
       PolicyDocument:
@@ -588,9 +588,9 @@ Resources:
             Action:
               - 'sns:Publish'
             Resource:
-              - !Ref InfraIamAccessTopic
+              - !Ref InfraIAMAccessAnalyzerTopic
       Topics:
-        - !Ref InfraIamAccessTopic
+        - !Ref InfraIAMAccessAnalyzerTopic
 
   InfraIamAccessConfidentialTopicSubscription:
     Type: AWS::SNS::Subscription
@@ -598,7 +598,7 @@ Resources:
     Properties:
       Protocol: email
       Endpoint: '{{resolve:ssm:/notification/infra/email}}'
-      TopicArn: !Ref InfraIamAccessTopic
+      TopicArn: !Ref InfraIAMAccessAnalyzerTopic
 
 Outputs:
   LogsBucketKmsKeyArn:
@@ -623,8 +623,8 @@ Outputs:
     Value: !GetAtt CdcKinesisStream.Arn
     Description: 'Kinesis source stream name ARN'
 
-  InfraIamAccessTopicArn:
-    Value: !Ref InfraIamAccessTopic
+  InfraIAMAccessAnalyzerTopicArn:
+    Value: !Ref InfraIAMAccessAnalyzerTopic
     Description: 'SNS topic ARN for IAM unused access alerts'
 
   CdcKinesisStreamKeyArn:

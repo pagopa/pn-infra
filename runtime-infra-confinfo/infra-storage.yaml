@@ -104,9 +104,9 @@ Parameters:
     Description: 'Infrastructure security topic name'
     Default: 'pn-InfraSecTopic'
 
-  InfraIamAccessTopicName:
+  InfraIAMAccessAnalyzerTopicName:
     Type: String
-    Default: 'pn-InfraIamAccessTopic'
+    Default: 'pn-InfraIAMAccessAnalyzerTopic'
     Description: Name of the SNS topic used for IAM unused access notifications
 
 Conditions:
@@ -498,12 +498,12 @@ Resources:
               StringEquals:
                 "aws:SourceAccount": !Ref AWS::AccountId      
 
-  InfraIamAccessTopic:
+  InfraIAMAccessAnalyzerTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: !Ref InfraIamAccessTopicName
+      TopicName: !Ref InfraIAMAccessAnalyzerTopicName
 
-  CanPublishInfraIamAccessTopicPolicy:
+  CanPublishInfraIAMAccessAnalyzerTopicPolicy:
     Type: AWS::SNS::TopicPolicy
     Properties:
       PolicyDocument:
@@ -518,9 +518,9 @@ Resources:
             Action:
               - 'sns:Publish'
             Resource:
-              - !Ref InfraIamAccessTopic
+              - !Ref InfraIAMAccessAnalyzerTopic
       Topics:
-        - !Ref InfraIamAccessTopic
+        - !Ref InfraIAMAccessAnalyzerTopic
 
 Outputs:
   LogsBucketKmsKeyArn:
@@ -615,8 +615,8 @@ Outputs:
   LogRetention:
     Value: !Ref LogRetention
 
-  InfraIamAccessTopicArn:
-    Value: !Ref InfraIamAccessTopic
+  InfraIAMAccessAnalyzerTopicArn:
+    Value: !Ref InfraIAMAccessAnalyzerTopic
     Description: 'IAM unused access topic ARN'
 
   InfraSecTopicName:

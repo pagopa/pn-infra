@@ -162,20 +162,6 @@ def _has_exclude_tag(role_name, cache):
     cache[cache_key] = result
     return result
 
-def _archive_findings(finding_ids):
-    """Archive findings by setting their status to ARCHIVED."""
-    for i in range(0, len(finding_ids), 100):
-        batch = finding_ids[i:i+100]
-        for fid in batch:
-            try:
-                aa.update_findings(
-                    analyzerArn=ANALYZER_ARN,
-                    ids=[fid],
-                    status="ARCHIVED"
-                )
-            except Exception as exc:
-                log.warning(json.dumps({"msg": "update_findings failed", "finding_id": fid, "error": str(exc)}))
-
 def lambda_handler(event, context):
     account_id = sts.get_caller_identity()["Account"]
     now = datetime.now(timezone.utc)
@@ -188,18 +174,16 @@ def lambda_handler(event, context):
     writer.writerow(CSV_HEADER)
 
     count = 0
-    archived_by_tag = 0
+    skipped_by_tag = 0
     finding_type_counts = {}
     role_tag_cache = {}
-    findings_to_archive = []
     for f in _iter_findings():
         resource = f.get("resource", "")
-        # Check if resource has the exclude tag — if so, archive it
+        # Check if resource has the exclude tag — if so, skip from CSV
         if EXCLUDE_TAG_KEY:
             role_name = _parse_role_name(resource)
             if role_name and _has_exclude_tag(role_name, role_tag_cache):
-                findings_to_archive.append(f.get("id"))
-                archived_by_tag += 1
+                skipped_by_tag += 1
                 continue
         details = _get_finding_details(f.get("id"))
         unused_actions = _extract_unused_actions(details)
@@ -230,11 +214,6 @@ def lambda_handler(event, context):
             json.dumps(enriched, default=str, separators=(",", ":")),
         ])
         count += 1
-
-    # Archive findings that matched the exclude tag
-    if findings_to_archive:
-        log.info(json.dumps({"msg": "archiving findings by tag", "count": len(findings_to_archive)}))
-        _archive_findings(findings_to_archive)
 
     s3.put_object(
         Bucket=BUCKET,
@@ -276,5 +255,5 @@ def lambda_handler(event, context):
 
     log.info(json.dumps({"msg": "export completed", "account_id": account_id,
                          "account_role": ACCOUNT_ROLE, "env": ENV_NAME,
-                         "key": key, "rows": count, "archived_by_tag": archived_by_tag}))
-    return {"status": "ok", "rows": count, "archived_by_tag": archived_by_tag, "key": key}
+                         "key": key, "rows": count, "skipped_by_tag": skipped_by_tag}))
+    return {"status": "ok", "rows": count, "skipped_by_tag": skipped_by_tag, "key": key}

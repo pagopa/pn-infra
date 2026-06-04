@@ -71,7 +71,7 @@ Parameters:
     Description: S3 key prefix for Lambda deployment packages
     Default: ''
 
-  InfraIamAccessTopicArn:
+  InfraIAMAccessAnalyzerTopicArn:
     Type: String
     Description: SNS topic ARN for IAM unused access alerts
 
@@ -238,7 +238,6 @@ Resources:
                   - access-analyzer:GetFinding*
                   - access-analyzer:ListArchiveRules
                   - access-analyzer:ApplyArchiveRule
-                  - access-analyzer:UpdateFindings
                 Resource: '*'
         - PolicyName: s3-write-reports
           PolicyDocument:
@@ -264,7 +263,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !Ref InfraIamAccessTopicArn
+                Resource: !Ref InfraIAMAccessAnalyzerTopicArn
       Tags:
         - { Key: ProjectName,     Value: !Ref ProjectName }
         - { Key: EnvironmentType, Value: !Ref EnvironmentType }
@@ -292,7 +291,7 @@ Resources:
           ENV_NAME: !Ref EnvironmentType
           ACCOUNT_ROLE: !If [IsConfinfoAccount, 'confinfo', 'core']
           RESOLVE_ROLE_TAGS: !Ref ResolveRoleTagsInExporter
-          SNS_TOPIC_ARN: !Ref InfraIamAccessTopicArn
+          SNS_TOPIC_ARN: !Ref InfraIAMAccessAnalyzerTopicArn
           EXCLUDE_TAG_KEY: !Ref ExcludeTagKey
       Code:
         S3Bucket: !Ref LambdasBucketName
@@ -325,7 +324,7 @@ Resources:
     Properties:
       Protocol: email
       Endpoint: !Ref SlackNotificationEmail
-      TopicArn: !Ref InfraIamAccessTopicArn
+      TopicArn: !Ref InfraIAMAccessAnalyzerTopicArn
 
   CoreResultsWidgetRole:
     Type: AWS::IAM::Role
