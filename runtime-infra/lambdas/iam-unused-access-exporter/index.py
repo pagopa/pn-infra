@@ -179,7 +179,7 @@ def _archive_findings(finding_ids):
 def lambda_handler(event, context):
     account_id = sts.get_caller_identity()["Account"]
     now = datetime.now(timezone.utc)
-    key = f"{ENV_NAME}/{ACCOUNT_ROLE}/{account_id}/{now:%Y-%m-%d}/findings-{now:%H%M%S}.csv"
+    key = f"{ENV_NAME}/{ACCOUNT_ROLE}/{account_id}/{now:%Y-%m-%d}/{account_id}-findings-{now:%H%M%S}.csv"
 
     _apply_archive_rules()
 
