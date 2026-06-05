@@ -199,7 +199,7 @@ def generate_partitions(args, view_name, cache_name, output_location):
         for day in days:
             should_process, reason = should_process_partition(year, month, day, now)
             if not should_process:
-                logger.warning(f"Skipping {year}-{month}-{day} ({reason}) - Today's data will be processed by UpdateCdcJsonViewsLambda after midnight")
+                logger.warning(f"Skipping {year}-{month}-{day} ({reason})")
                 continue
                 
             params = base_params.copy()
@@ -287,7 +287,7 @@ def print_summary(results, start_time, args, months, days):
     
     if show_today_message:
         print(f"\nNOTE: In order of avoiding incomplete parquet partitions, data for today ({current_year}-{current_month}-{current_day})")
-        print(f" will be skipped and processed by UpdateCdcJsonViewsLambda scheduled after midnight.")
+        print(" will be skipped.")
     
     return 0 if failures == 0 else 1
 

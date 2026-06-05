@@ -23,7 +23,7 @@ Note: The `requirements.txt` file only contains `boto3`.
 
 - This script works **ONLY** on pn-core AWS accounts  
 - It is **NOT** designed for AWS Confinfo accounts  
-- Current day data is always skipped and will be processed by `UpdateCdcJsonViewsLambda` after midnight  
+- Current day data is always skipped  
 
 ## Usage
 
@@ -76,4 +76,4 @@ python update_cdc_cache.py --envName dev --table pn_userattributes --year 2024
 - If processing the current month: the current day will be skipped  
 - If trying to process only the current day: it will be skipped entirely  
 
-The current day's data will always be processed by `UpdateCdcJsonViewsLambda` after midnight to ensure data completeness.
+The current day's data is skipped to avoid incomplete Parquet partitions.
