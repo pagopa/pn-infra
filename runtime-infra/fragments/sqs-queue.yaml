@@ -112,6 +112,16 @@ Parameters:
       - 'true'
       - 'false'
 
+  MessageQueueThreshold:
+    Type: Number
+    Default: 1
+    Description: 'The threshold for the number of visible messages in the queue to trigger the alarm'
+
+  MessageDLQThreshold:
+    Type: Number
+    Default: 1
+    Description: 'The threshold for the number of visible messages in the DLQ to trigger the alarm'
+
 Conditions:
   DlqHasDefaultName: !Equals [ !Ref DeadLetterQueueName, '-' ]
   DlqHasAlarm: !Not [ !Equals [ !Ref AlarmSNSTopicName, '-' ] ]
@@ -231,7 +241,7 @@ Resources:
           Value: !If [ IsNotFifo, !Sub '${Queue.QueueName}', !Sub '${QueueFifo.QueueName}' ]
       Statistic: "Sum"
       Period: 60  
-      Threshold: 1
+      Threshold: !Ref MessageQueueThreshold
       ComparisonOperator: "GreaterThanOrEqualToThreshold" 
       EvaluationPeriods: 1       
       AlarmActions:
@@ -278,7 +288,7 @@ Resources:
           Value: !If [ IsNotFifo, !Sub '${DeadLetterQueue.QueueName}', !Sub '${DeadLetterQueueFifo.QueueName}' ]
       Statistic: "Sum"
       Period: 60  
-      Threshold: 1
+      Threshold: !Ref MessageDLQThreshold
       TreatMissingData: "notBreaching"
       ComparisonOperator: "GreaterThanOrEqualToThreshold" 
       EvaluationPeriods: 1       
