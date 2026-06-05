@@ -356,7 +356,7 @@ def lambda_handler(event, context):
     Main handler function.
     Processes CloudTrail events from EventBridge via SQS and validates access.
     """
-    print(f"Processing event: {json.dumps(event)}")
+    #print(f"Processing event: {json.dumps(event)}")
     
     failed_items = []
     
@@ -393,7 +393,8 @@ def lambda_handler(event, context):
                 object_key = request_params.get('key', '')
                 #Se la chiave contiene favicon.ico ignore                   
                 if object_key and not object_key.startswith(f"{S3_CRITICAL_PREFIX}"):
-                    print(f"WARNING: S3 event for non-critical prefix: {object_key} (expected: {S3_CRITICAL_PREFIX})")
+                    continue
+                    #print(f"WARNING: S3 event for non-critical prefix: {object_key} (expected: {S3_CRITICAL_PREFIX})")
             
             is_authorized, matched_role, reason = registry.is_authorized(
                 principal_arn, 
@@ -405,9 +406,10 @@ def lambda_handler(event, context):
             publish_emf_metric('AccessAttempts', 1, resource_type, event_name)
             
             if is_authorized:
-                print(f"AUTHORIZED: {reason}")
-                publish_emf_metric('AuthorizedAccess', 1, resource_type, event_name)
-                log_access(detail, 'AUTHORIZED', matched_role, reason)
+                pass
+                #print(f"AUTHORIZED: {reason}")
+                #publish_emf_metric('AuthorizedAccess', 1, resource_type, event_name)
+                #log_access(detail, 'AUTHORIZED', matched_role, reason)
             else:
                 print(f"UNAUTHORIZED: {reason} | Access attempt: {principal_arn} (Account: {account_id}) -> {resource_type}:{resource_name}{f'/{object_key}' if object_key else ''} ({event_name})")
                 publish_emf_metric('UnauthorizedAccess', 1, resource_type, event_name)
