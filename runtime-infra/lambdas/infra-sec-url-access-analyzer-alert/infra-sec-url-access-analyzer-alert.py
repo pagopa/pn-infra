@@ -81,10 +81,10 @@ def lambda_handler(event, context):
             "error_code": error_code,
         }
 
-        ##if object_key is favicon.ico skip processing (common noise in access logs)
-        if object_key and object_key.endswith("favicon.ico"):
+        ##if object_key is not start with PN_ favicon.ico skip processing (common noise in access logs)
+        if object_key and not object_key.startswith("PN_"):
             #print("Skipping favicon.ico access")
-            return {"statusCode": 200, "body": "Skipped favicon.ico access"}
+            return {"statusCode": 200, "body": "Skipped non-PN_ object access"}
         
         print("Access log:", json.dumps(log_entry))
 
@@ -171,11 +171,6 @@ def is_suspicious_access(log_entry):
         return True
 
     return False
-
-
-# --------------------------------------------------------------------------
-# EMF METRICS (REPLACES ALL PutMetricData)
-# --------------------------------------------------------------------------
 
 def publish_emf_metrics(log_entry):
     """
