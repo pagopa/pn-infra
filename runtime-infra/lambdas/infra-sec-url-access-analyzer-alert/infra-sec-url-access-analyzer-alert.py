@@ -84,7 +84,7 @@ def lambda_handler(event, context):
         ##if object_key is not start with PN_ favicon.ico skip processing (common noise in access logs)
         if object_key and not object_key.startswith("PN_"):
             #print("Skipping favicon.ico access")
-            return {"statusCode": 200, "body": "Skipped favicon.ico access"}
+            return {"statusCode": 200, "body": "Skipped non-PN_ object access"}
         
         print("Access log:", json.dumps(log_entry))
 
