@@ -160,7 +160,7 @@ Resources:
               - Type: MetadataExtraction
                 Parameters:
                 - ParameterName: MetadataExtractionQuery
-                  ParameterValue: '{ TABLE_NAME : .tableName }'
+                  ParameterValue: '{ TABLE_NAME : (if .dynamodb.NewImage.communicationType.S == "INFORMAL" then (.tableName + "_INFORMAL") else .tableName end) }'
                 - ParameterName: JsonParsingEngine
                   ParameterValue: JQ-1.6
             - Enabled: false
