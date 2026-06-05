@@ -153,6 +153,11 @@ Parameters:
     Type: String
     Description: 'SNS topic ARN for security alerts (overrides InfraSecTopicName if provided)'
 
+  InfraSecUrlTreshold:
+    Type: String
+    Description: 'Threshold for URL access alerts (e.g., number of events or specific pattern)' 
+    Default: '5'
+
 Conditions:
   HasCloudTrailLogsEnabled: !Equals [!Ref EnableCloudTrailLogs, 'true']
   HasMonitoringS3Enabled: !Equals [!Ref S3MonitoringEnabled, 'true']
@@ -229,6 +234,8 @@ Resources:
       Role: !GetAtt InfraSecMonitoringDynamoAlertLambdaRole.Arn
       Timeout: 20
       MemorySize: 128
+      LoggingConfig:
+        LogFormat: JSON
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/infra-sec-monitoring-dynamo-alert.zip
@@ -679,14 +686,16 @@ Resources:
       Role: !GetAtt InfraSecMonitoringUrlAccessAnalyzerAlertLambdaRole.Arn
       Timeout: 20
       MemorySize: 128
+      LoggingConfig:
+        LogFormat: JSON
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/infra-sec-url-access-analyzer-alert.zip
       Environment:
         Variables:
-          SNS_TOPIC_ARN: !Sub 
-          TABLE_CONFIG: !Ref DynamoAlertLambdaTableConfig
+          SNS_TOPIC_ARN: !Ref InfraSecTopicArn
           ENVIRONMENT: !Ref EnvironmentType
+          ALERT_THRESHOLD: !Ref InfraSecUrlTreshold
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
 
   InfraSecMonitoringUrlAccessAnalyzerAlertLambdaRole:
@@ -883,6 +892,8 @@ Resources:
       Runtime: python3.14
       Timeout: 20
       MemorySize: 256
+      LoggingConfig:
+        LogFormat: JSON
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
       Environment:
         Variables:
