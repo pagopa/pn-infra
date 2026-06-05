@@ -113,11 +113,6 @@ Parameters:
     Default: ''
     Description: AWS AccountId of the confidential info account in same environment
 
-  InfraIAMAccessAnalyzerTopicName:
-    Type: String
-    Description: 'SNS topic name for IAM unused access alerts'
-    Default: 'pn-InfraIAMAccessAnalyzerTopic'
-
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
   
@@ -560,45 +555,6 @@ Resources:
       Protocol: email
       Endpoint: '{{resolve:ssm:/notification/infra/email}}'
       TopicArn: !Ref InfraSecTopic
-
-  InfraIAMAccessAnalyzerTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Ref InfraIAMAccessAnalyzerTopicName
-
-  InfraIAMAccessAnalyzerTopicSubscription:
-    Type: AWS::SNS::Subscription
-    Properties:
-      Protocol: email
-      Endpoint: '{{resolve:ssm:/notification/infra/email}}'
-      TopicArn: !Ref InfraIAMAccessAnalyzerTopic
-
-  CanPublishInfraIAMAccessAnalyzerTopicPolicy:
-    Type: AWS::SNS::TopicPolicy
-    Properties:
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Sid: AllowServices
-            Effect: Allow
-            Principal:
-              Service:
-                - "events.amazonaws.com"
-                - "cloudwatch.amazonaws.com"
-            Action:
-              - 'sns:Publish'
-            Resource:
-              - !Ref InfraIAMAccessAnalyzerTopic
-      Topics:
-        - !Ref InfraIAMAccessAnalyzerTopic
-
-  InfraIamAccessConfidentialTopicSubscription:
-    Type: AWS::SNS::Subscription
-    Condition: HasConfidentialInfoAccountId
-    Properties:
-      Protocol: email
-      Endpoint: '{{resolve:ssm:/notification/infra/email}}'
-      TopicArn: !Ref InfraIAMAccessAnalyzerTopic
 
 Outputs:
   LogsBucketKmsKeyArn:

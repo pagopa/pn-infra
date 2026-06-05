@@ -54,7 +54,7 @@ Parameters:
 
   LogRetentionDays:
     Type: Number
-    Default: 365
+    Default: 14
     Description: CloudWatch log retention for the exporter Lambda.
 
   S3lifecyclepolicyReportInDays:
@@ -71,13 +71,10 @@ Parameters:
     Description: S3 key prefix for Lambda deployment packages
     Default: ''
 
-  InfraIAMAccessAnalyzerTopicArn:
+  InfraSecTopicName:
     Type: String
-    Description: SNS topic ARN for IAM unused access alerts
-
-  SlackNotificationEmail:
-    Type: String
-    Description: Slack channel email address for IAM unused access notifications
+    Default: 'pn-InfraSecTopic'
+    Description: Name of the infrastructure security SNS topic (on core account)
 
   LambdaRuntime:
     Type: String
@@ -97,9 +94,7 @@ Parameters:
   ExcludeTagKey:
     Type: String
     Default: ''
-    Description: >-
-      Tag key to check on IAM roles. If a role has this tag,
-      its findings are programmatically archived.
+    Description: Tag key to check on IAM roles. If a role has this tag, its findings are programmatically archived.
 
 Conditions:
   IsCoreAccount: !Equals [ !Ref PnCoreAwsAccountId, '' ]
@@ -114,9 +109,6 @@ Resources:
       AnalyzerConfiguration:
         UnusedAccessConfiguration:
           UnusedAccessAge: !Ref TrackingPeriodDays
-      Tags:
-        - { Key: ProjectName,     Value: !Ref ProjectName }
-        - { Key: EnvironmentType, Value: !Ref EnvironmentType }
 
   LocalReportsBucket:
     Type: AWS::S3::Bucket
@@ -156,10 +148,6 @@ Resources:
             ExpirationInDays: !Ref S3lifecyclepolicyReportInDays
             NoncurrentVersionExpiration:
               NoncurrentDays: !Ref S3lifecyclepolicyReportInDays
-      Tags:
-        - { Key: ProjectName,     Value: !Ref ProjectName }
-        - { Key: EnvironmentType, Value: !Ref EnvironmentType }
-        - { Key: Purpose,         Value: iam-unused-access-evidence }
 
   LocalReportsBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -259,10 +247,10 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !Ref InfraIAMAccessAnalyzerTopicArn
-      Tags:
-        - { Key: ProjectName,     Value: !Ref ProjectName }
-        - { Key: EnvironmentType, Value: !Ref EnvironmentType }
+                Resource: !Sub
+                  - 'arn:${AWS::Partition}:sns:${AWS::Region}:${TopicAccount}:${TopicName}'
+                  - TopicAccount: !If [IsCoreAccount, !Ref 'AWS::AccountId', !Ref PnCoreAwsAccountId]
+                    TopicName: !Ref InfraSecTopicName
 
   ExporterLambdaLogGroup:
     Type: AWS::Logs::LogGroup
@@ -287,7 +275,10 @@ Resources:
           ENV_NAME: !Ref EnvironmentType
           ACCOUNT_ROLE: !If [IsConfinfoAccount, 'confinfo', 'core']
           RESOLVE_ROLE_TAGS: !Ref ResolveRoleTagsInExporter
-          SNS_TOPIC_ARN: !Ref InfraIAMAccessAnalyzerTopicArn
+          SNS_TOPIC_ARN: !Sub
+            - 'arn:${AWS::Partition}:sns:${AWS::Region}:${TopicAccount}:${TopicName}'
+            - TopicAccount: !If [IsCoreAccount, !Ref 'AWS::AccountId', !Ref PnCoreAwsAccountId]
+              TopicName: !Ref InfraSecTopicName
           EXCLUDE_TAG_KEY: !Ref ExcludeTagKey
           ARCHIVE_RULE_PATTERNS: !Join
             - ','
@@ -298,35 +289,41 @@ Resources:
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/iam-unused-access-exporter.zip
-      Tags:
-        - { Key: ProjectName,     Value: !Ref ProjectName }
-        - { Key: EnvironmentType, Value: !Ref EnvironmentType }
+
+  ExporterScheduleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-iam-unused-access-scheduler-${EnvironmentType}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: scheduler.amazonaws.com }
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: invoke-exporter
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt ExporterLambda.Arn
 
   ExporterSchedule:
-    Type: AWS::Events::Rule
+    Type: AWS::Scheduler::Schedule
     Properties:
       Name: !Sub '${ProjectName}-iam-unused-access-exporter-${EnvironmentType}'
       Description: Periodic execution rule for the IAM Access Analyzer exporter Lambda
       ScheduleExpression: !Ref ScheduleExpression
       State: !Ref EnableExporterSchedule
-      Targets:
-        - Id: exporter
-          Arn: !GetAtt ExporterLambda.Arn
-
-  ExporterSchedulePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref ExporterLambda
-      Action: lambda:InvokeFunction
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt ExporterSchedule.Arn
-
-  SlackTopicSubscription:
-    Type: AWS::SNS::Subscription
-    Properties:
-      Protocol: email
-      Endpoint: !Ref SlackNotificationEmail
-      TopicArn: !Ref InfraIAMAccessAnalyzerTopicArn
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt ExporterLambda.Arn
+        RoleArn: !GetAtt ExporterScheduleRole.Arn
 
   CoreResultsWidgetRole:
     Type: AWS::IAM::Role
@@ -410,6 +407,7 @@ Resources:
       FunctionName: !Ref CoreResultsWidget
       Action: lambda:InvokeFunction
       Principal: cloudwatch.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
 
   CoreDashboard:
     Type: AWS::CloudWatch::Dashboard
