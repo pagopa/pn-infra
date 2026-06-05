@@ -27,6 +27,10 @@ Parameters:
   LambdasBasePath:
     Type: String
     Description: S3 key prefix for Lambda deployment packages
+  EnableCdcJsonCacheUpdate:
+    Type: String
+    Default: "false"
+    Description: Set to true to create the nightly CDC JSON cache update Lambda and schedule
   DataLakeCountGitConfigUrl:
     Type: String
     Default: ''
@@ -52,6 +56,9 @@ Parameters:
     Type: String
     Default: 'rate(1 minute)'
     Description: Schedule rate for Reporting Alerts Scheduler reconciliation loop. Default is 1 minute.
+
+Conditions:
+  HasCdcJsonCacheUpdate: !Equals [ "true", !Ref EnableCdcJsonCacheUpdate ]
 
 Resources:
   GlueServiceRole:
@@ -176,6 +183,7 @@ Resources:
   # Console example: Use test event with payload {"date": "2025-02-15"}
   # Default: yesterday's date (UTC) if "date" is not specified
   UpdateCdcJsonViewsLambda:
+    Condition: HasCdcJsonCacheUpdate
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub '${ProjectName}-AthenaUpdateCdcJsonCache'
@@ -316,8 +324,9 @@ Resources:
               except Exception as e:
                   logging.error(f"Unexpected error in lambda execution: {str(e)}")
                   raise
-                      
+                       
   UpdateCdcJsonViewsLambdaAlarms:
+    Condition: HasCdcJsonCacheUpdate
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
@@ -326,6 +335,7 @@ Resources:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   UpdateCdcJsonViewsLambdaRole:
+    Condition: HasCdcJsonCacheUpdate
     Type: AWS::IAM::Role
     Properties:
       RoleName: pn-athena-update-cdc-json-cache-lambda-role
@@ -414,6 +424,7 @@ Resources:
                   - !Ref LogsBucketKmsKeyArn
 
   UpdateCdcJsonViewsScheduleBridgeRule:
+    Condition: HasCdcJsonCacheUpdate
     Type: AWS::Scheduler::Schedule
     Properties: 
       Description: Schedule json views cache update everyday at 01:00 Europe/Rome
@@ -445,9 +456,11 @@ Resources:
                 Action:
                   - "lambda:InvokeFunction"
                 Effect: Allow
-                Resource: 
-                  - !GetAtt UpdateCdcJsonViewsLambda.Arn
-                  - !GetAtt DataLakeCountExport.Arn
+                Resource: !If
+                  - HasCdcJsonCacheUpdate
+                  - - !GetAtt UpdateCdcJsonViewsLambda.Arn
+                    - !GetAtt DataLakeCountExport.Arn
+                  - - !GetAtt DataLakeCountExport.Arn
 
   AsseverationGlueTable:
     Type: AWS::Glue::Table
