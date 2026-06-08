@@ -1,0 +1,328 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Runtime PrivateLink routing for a dedicated ALB listener with optional Lambda proxy/enforcer
+
+Transform:
+  - UpdateDeploymentTransform
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Project name prefix used to construct the Lambda function name
+
+  ChannelId:
+    Type: String
+    Description: Channel identifier slug used to construct the Lambda function name (e.g. service-desk, address-manager, ec)
+
+  LambdasBucketName:
+    Type: String
+    Description: S3 bucket containing the Lambda deployment package
+
+  LambdasBasePath:
+    Type: String
+    Description: Base path within the bucket where Lambda artifacts are stored
+
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: Base URL of the bucket containing nested fragments
+
+  Runtime:
+    Type: String
+    Default: nodejs24.x
+    Description: Lambda runtime
+
+  MemorySize:
+    Type: Number
+    Default: 512
+    Description: Lambda memory size
+
+  Timeout:
+    Type: Number
+    Default: 10
+    Description: Lambda timeout in seconds
+
+  ProvisionedConcurrency:
+    Type: Number
+    Default: 1
+    Description: Provisioned concurrency for the live alias; 0 disables it
+
+  LogRetention:
+    Type: Number
+    Default: 14
+    Description: CloudWatch log retention in days for the proxy function
+
+  VpcId:
+    Type: String
+    Description: VPC id where the Lambda runs
+
+  Subnets:
+    Type: String
+    Description: Comma separated private subnet ids where the Lambda runs
+
+  AlbSecurityGroup:
+    Type: String
+    Description: Application Load Balancer security group id
+
+  PrivateLinkProxyEnabled:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable the proxy/enforcer variant for the PrivateLink route
+
+  PrivateLinkListenerArn:
+    Type: String
+    Description: Dedicated ALB listener ARN for the PrivateLink channel
+
+  PrivateLinkRulePriority:
+    Type: Number
+    Description: Listener rule priority for the PrivateLink route
+
+  PrivateLinkMappedPaths:
+    Type: String
+    Description: Comma separated path patterns published on the dedicated listener
+
+  ApplicationTargetGroupArn:
+    Type: String
+    Description: Application target group ARN used when Lambda proxy is disabled
+
+  ApplicationLoadBalancerDomain:
+    Type: String
+    Description: ALB domain used to derive the backend base URL for the Lambda proxy
+
+  ExternalProtocol:
+    Type: String
+    Default: https
+    AllowedValues:
+      - https
+      - http
+    Description: External protocol used to build x-pagopa-pn-base-url
+
+  ExternalPort:
+    Type: String
+    Default: '8443'
+    Description: External port used to build x-pagopa-pn-base-url
+
+  TrustedHeaders:
+    Type: String
+    Default: ''
+    Description: Escaped JSON object containing trusted headers enforced by the private channel proxy
+
+  RequestPayloadLoggingEnabled:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable full inbound request payload logging
+
+  ResponsePayloadLoggingEnabled:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable full outbound response payload logging
+
+  BackendRequestTimeoutMillis:
+    Type: Number
+    Default: 2000
+    Description: Backend request timeout in milliseconds
+
+  BackendRetryDelayMillis:
+    Type: Number
+    Default: 500
+    Description: Delay between backend retry attempts in milliseconds
+
+  BackendRetryMaxAttempts:
+    Type: Number
+    Default: 3
+    Description: Maximum backend request attempts, including the first call
+
+  AlarmSNSTopicArn:
+    Type: String
+    Default: '-'
+    Description: SNS topic ARN for alarms
+
+Conditions:
+  HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
+  HasProvisionedConcurrency: !Not [ !Equals [ !Ref ProvisionedConcurrency, 0 ] ]
+  IsPrivateLinkProxyEnabled: !Equals [ !Ref PrivateLinkProxyEnabled, 'true' ]
+  UseDirectPrivateLinkRouting: !Not [ !Condition IsPrivateLinkProxyEnabled ]
+  UsePrivateLinkProxyAlarms: !And
+    - !Condition IsPrivateLinkProxyEnabled
+    - !Condition HasAlarmTopic
+
+Resources:
+  DirectPrivateLinkListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Condition: UseDirectPrivateLinkRouting
+    Properties:
+      ListenerArn: !Ref PrivateLinkListenerArn
+      Priority: !Ref PrivateLinkRulePriority
+      Conditions:
+        - Field: path-pattern
+          PathPatternConfig:
+            Values: !Split [ ',', !Ref PrivateLinkMappedPaths ]
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref ApplicationTargetGroupArn
+          Order: 1
+
+  PrivateLinkProxyLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: IsPrivateLinkProxyEnabled
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-${ChannelId}-private-link-proxy'
+      RetentionInDays: !Ref LogRetention
+
+  PrivateLinkProxySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: IsPrivateLinkProxyEnabled
+    Properties:
+      GroupDescription: !Sub '${ProjectName}-${ChannelId}-private-link-proxy-sg'
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          DestinationSecurityGroupId: !Ref AlbSecurityGroup
+
+  PrivateLinkProxyExecutionRole:
+    Type: AWS::IAM::Role
+    Condition: IsPrivateLinkProxyEnabled
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
+
+  PrivateLinkProxyFunction:
+    Type: AWS::Lambda::Function
+    Condition: IsPrivateLinkProxyEnabled
+    DependsOn:
+      - PrivateLinkProxyLogGroup
+    Properties:
+      FunctionName: !Sub '${ProjectName}-${ChannelId}-private-link-proxy'
+      Runtime: !Ref Runtime
+      Handler: index.handler
+      Role: !GetAtt PrivateLinkProxyExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub '${LambdasBasePath}/private-channel-proxy.zip'
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt PrivateLinkProxySecurityGroup.GroupId
+        SubnetIds: !Split [ ',', !Ref Subnets ]
+      MemorySize: !Ref MemorySize
+      Timeout: !Ref Timeout
+      TracingConfig:
+        Mode: Active
+      Environment:
+        Variables:
+          PRIVATE_CHANNEL_PROXY_ALLOWED_PATH_PATTERNS: !Ref PrivateLinkMappedPaths
+          PRIVATE_CHANNEL_PROXY_BACKEND_BASE_URL: !Sub 'http://${ApplicationLoadBalancerDomain}:8080'
+          PRIVATE_CHANNEL_PROXY_BACKEND_REQUEST_TIMEOUT_MILLIS: !Ref BackendRequestTimeoutMillis
+          PRIVATE_CHANNEL_PROXY_BACKEND_RETRY_DELAY_MILLIS: !Ref BackendRetryDelayMillis
+          PRIVATE_CHANNEL_PROXY_BACKEND_RETRY_MAX_ATTEMPTS: !Ref BackendRetryMaxAttempts
+          PRIVATE_CHANNEL_PROXY_EXTERNAL_PROTOCOL: !Ref ExternalProtocol
+          PRIVATE_CHANNEL_PROXY_EXTERNAL_PORT: !Ref ExternalPort
+          PRIVATE_CHANNEL_PROXY_REQUEST_PAYLOAD_LOGGING_ENABLED: !Ref RequestPayloadLoggingEnabled
+          PRIVATE_CHANNEL_PROXY_RESPONSE_PAYLOAD_LOGGING_ENABLED: !Ref ResponsePayloadLoggingEnabled
+          PRIVATE_CHANNEL_PROXY_TRUSTED_HEADERS: !Ref TrustedHeaders
+
+  PrivateLinkProxyVersionPnPlaceholderEpochSeconds:
+    Type: AWS::Lambda::Version
+    Condition: IsPrivateLinkProxyEnabled
+    Properties:
+      FunctionName: !Ref PrivateLinkProxyFunction
+
+  PrivateLinkProxyAlias:
+    Type: AWS::Lambda::Alias
+    Condition: IsPrivateLinkProxyEnabled
+    Properties:
+      FunctionName: !Ref PrivateLinkProxyFunction
+      FunctionVersion: !GetAtt PrivateLinkProxyVersionPnPlaceholderEpochSeconds.Version
+      Name: live
+      ProvisionedConcurrencyConfig: !If
+        - HasProvisionedConcurrency
+        - ProvisionedConcurrentExecutions: !Ref ProvisionedConcurrency
+        - !Ref AWS::NoValue
+
+  PrivateLinkProxyInvokePermission:
+    Type: AWS::Lambda::Permission
+    Condition: IsPrivateLinkProxyEnabled
+    Properties:
+      FunctionName: !Ref PrivateLinkProxyAlias
+      Action: lambda:InvokeFunction
+      Principal: elasticloadbalancing.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub 'arn:${AWS::Partition}:elasticloadbalancing:${AWS::Region}:${AWS::AccountId}:targetgroup/*'
+
+  PrivateLinkProxyTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Condition: IsPrivateLinkProxyEnabled
+    DependsOn:
+      - PrivateLinkProxyInvokePermission
+    Properties:
+      TargetType: lambda
+      Targets:
+        - Id: !Ref PrivateLinkProxyAlias
+      HealthCheckEnabled: false
+      TargetGroupAttributes:
+        - Key: lambda.multi_value_headers.enabled
+          Value: 'true'
+
+  PrivateLinkProxyListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Condition: IsPrivateLinkProxyEnabled
+    DependsOn:
+      - PrivateLinkProxyInvokePermission
+    Properties:
+      ListenerArn: !Ref PrivateLinkListenerArn
+      Priority: !Ref PrivateLinkRulePriority
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref PrivateLinkProxyTargetGroup
+          Order: 1
+      Conditions:
+        - Field: path-pattern
+          PathPatternConfig:
+            Values: !Split [ ',', !Ref PrivateLinkMappedPaths ]
+
+  PrivateLinkProxyAlarms:
+    Type: AWS::CloudFormation::Stack
+    Condition: UsePrivateLinkProxyAlarms
+    Properties:
+      TemplateURL: !Sub '${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml'
+      Parameters:
+        FunctionName: !Sub '${ProjectName}-${ChannelId}-private-link-proxy'
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+Outputs:
+  ProxyFunctionName:
+    Value: !If
+      - IsPrivateLinkProxyEnabled
+      - !Ref PrivateLinkProxyFunction
+      - ''
+
+  ProxyAlias:
+    Value: !If
+      - IsPrivateLinkProxyEnabled
+      - !Ref PrivateLinkProxyAlias
+      - ''
+
+  TargetGroupArn:
+    Value: !If
+      - IsPrivateLinkProxyEnabled
+      - !Ref PrivateLinkProxyTargetGroup
+      - !Ref ApplicationTargetGroupArn
