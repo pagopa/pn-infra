@@ -408,6 +408,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: cloudwatch.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub 'arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:dashboard/${ProjectName}-iam-unused-access-${EnvironmentType}'
 
   CoreDashboard:
     Type: AWS::CloudWatch::Dashboard
