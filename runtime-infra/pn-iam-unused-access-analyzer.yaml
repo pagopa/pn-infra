@@ -71,10 +71,9 @@ Parameters:
     Description: S3 key prefix for Lambda deployment packages
     Default: ''
 
-  InfraSecTopicName:
+  InfraSecTopicArn:
     Type: String
-    Default: 'pn-InfraSecTopic'
-    Description: Name of the infrastructure security SNS topic (on core account)
+    Description: 'SNS topic ARN for security alerts'
 
   LambdaRuntime:
     Type: String
@@ -247,10 +246,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: !Sub
-                  - 'arn:${AWS::Partition}:sns:${AWS::Region}:${TopicAccount}:${TopicName}'
-                  - TopicAccount: !If [IsCoreAccount, !Ref 'AWS::AccountId', !Ref PnCoreAwsAccountId]
-                    TopicName: !Ref InfraSecTopicName
+                Resource: !Ref InfraSecTopicArn
 
   ExporterLambdaLogGroup:
     Type: AWS::Logs::LogGroup
@@ -275,10 +271,7 @@ Resources:
           ENV_NAME: !Ref EnvironmentType
           ACCOUNT_ROLE: !If [IsConfinfoAccount, 'confinfo', 'core']
           RESOLVE_ROLE_TAGS: !Ref ResolveRoleTagsInExporter
-          SNS_TOPIC_ARN: !Sub
-            - 'arn:${AWS::Partition}:sns:${AWS::Region}:${TopicAccount}:${TopicName}'
-            - TopicAccount: !If [IsCoreAccount, !Ref 'AWS::AccountId', !Ref PnCoreAwsAccountId]
-              TopicName: !Ref InfraSecTopicName
+          SNS_TOPIC_ARN: !Ref InfraSecTopicArn
           EXCLUDE_TAG_KEY: !Ref ExcludeTagKey
           ARCHIVE_RULE_PATTERNS: !Join
             - ','
