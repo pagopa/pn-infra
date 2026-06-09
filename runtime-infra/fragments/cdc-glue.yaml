@@ -46,6 +46,10 @@ Parameters:
     Description: Set to false to disable view generation
     Type: String
     Default: "true"
+  GenerateCdcParsedCache:
+    Description: Set to true to enable parsed Parquet cache and unified view generation
+    Type: String
+    Default: "false"
   GlueCrawlerSchedule:
     Type: String
     Default: ''
@@ -61,6 +65,9 @@ Conditions:
       - !Ref GlueCrawlerSchedule
       - ''
   HasCdcView: !Equals [ "true", !Ref GenerateCdcView ]
+  HasCdcParsedCache: !And
+    - !Condition HasCdcView
+    - !Equals [ "true", !Ref GenerateCdcParsedCache ]
   HasNewImagePart2: !Not
     - !Equals
       - !Ref DynamoDBNewImageStructurePart2
@@ -170,7 +177,7 @@ Resources:
         - !Ref AWS::NoValue
       Tags:
         !If
-          - HasCdcView
+          - HasCdcParsedCache
           - !If
             - UseConfinfoLogsBucket
             - PnHasView: "false"
@@ -225,7 +232,7 @@ Resources:
               Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
   
   GlueParquetTable:
-    Condition: HasCdcView
+    Condition: HasCdcParsedCache
     Type: AWS::Glue::Table
     Properties:
       CatalogId: !Ref AWS::AccountId
@@ -274,7 +281,7 @@ Resources:
                 CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
                 CdcRecordFilter: !Ref CdcRecordFilter
                 OutputType: 'StorageDescriptor-Columns-noParsedPartition'
-                Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
+                Enabled: !Ref GenerateCdcParsedCache # Enable or disable heavy transformation computation if not needed
           Location: !Sub s3://${ProjectName}-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}/cdcTos3_parsed/TABLE_NAME_${DynamoTableName}/
           InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat
@@ -284,7 +291,7 @@ Resources:
           StoredAsSubDirectories: false
 
   CdcGlueMaterializedView:
-    Condition: HasCdcView
+    Condition: HasCdcParsedCache
     Type: AWS::Glue::Table
     Properties:
       CatalogId: !Ref AWS::AccountId
@@ -309,7 +316,7 @@ Resources:
                 CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
                 CdcRecordFilter: !Ref CdcRecordFilter
                 OutputType: 'StorageDescriptor-Columns'
-                Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
+                Enabled: !Ref GenerateCdcParsedCache # Enable or disable heavy transformation computation if not needed
           Location: ""
           SerdeInfo: {}
         ViewExpandedText: "/* Presto View */"
@@ -326,7 +333,7 @@ Resources:
               CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
               CdcRecordFilter: !Ref CdcRecordFilter
               OutputType: 'ViewOriginalText-unionAll'
-              Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
+              Enabled: !Ref GenerateCdcParsedCache # Enable or disable heavy transformation computation if not needed
   
 
 Outputs:
@@ -341,9 +348,10 @@ Outputs:
       - "-"
   GlueViewName:
     Description: Name of the created Glue View
-    Value: 
-      Fn::If:
+    Value: !If
+      - HasCdcParsedCache
+      - !Sub '${GlueTableName}_unified_view'
+      - !If
         - HasCdcView
-        - !Sub '${GlueTableName}_unified_view'
+        - !Sub '${GlueTableName}_json_view'
         - "-"
-

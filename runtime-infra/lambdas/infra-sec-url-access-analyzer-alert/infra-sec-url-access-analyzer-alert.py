@@ -81,6 +81,11 @@ def lambda_handler(event, context):
             "error_code": error_code,
         }
 
+        ##if object_key is not start with PN_ favicon.ico skip processing (common noise in access logs)
+        if object_key and not object_key.startswith("PN_"):
+            #print("Skipping favicon.ico access")
+            return {"statusCode": 200, "body": "Skipped non-PN_ object access"}
+        
         print("Access log:", json.dumps(log_entry))
 
         # Process access
@@ -167,19 +172,12 @@ def is_suspicious_access(log_entry):
 
     return False
 
-
-# --------------------------------------------------------------------------
-# EMF METRICS (REPLACES ALL PutMetricData)
-# --------------------------------------------------------------------------
-
 def publish_emf_metrics(log_entry):
     """
     Emit metrics via EMF to stdout (CloudWatch will parse them).
     """
 
     timestamp_ms = int(datetime.utcnow().timestamp() * 1000)
-
-    base_dimensions = ["BucketName"]
 
     metrics = []
 

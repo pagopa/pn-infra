@@ -113,6 +113,10 @@ Parameters:
     Type: String
     Description: 'ARN of SNS topic for alarms'
 
+  AlarmSNSTopicName:
+    Type: String
+    Description: 'Name of SNS topic for alarms (used if AlarmSNSTopicArn is not provided)'
+
   LambdaReservedConcurrency:
     Type: Number
     Default: 10
@@ -145,14 +149,14 @@ Parameters:
     Default: ''
     Description: 'JSON array of DynamoDB table names to filter CDC events for (e.g., ["table1", "table2"])'
 
-  InfraSecTopicName:
-    Type: String
-    Description: 'SNS topic name for security alerts'
-    Default: "pn-InfraSecTopic"
-
   InfraSecTopicArn:
     Type: String
     Description: 'SNS topic ARN for security alerts (overrides InfraSecTopicName if provided)'
+
+  InfraSecUrlTreshold:
+    Type: String
+    Description: 'Threshold for URL access alerts (e.g., number of events or specific pattern)' 
+    Default: '5'
 
 Conditions:
   HasCloudTrailLogsEnabled: !Equals [!Ref EnableCloudTrailLogs, 'true']
@@ -230,6 +234,8 @@ Resources:
       Role: !GetAtt InfraSecMonitoringDynamoAlertLambdaRole.Arn
       Timeout: 20
       MemorySize: 128
+      LoggingConfig:
+        LogFormat: JSON
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/infra-sec-monitoring-dynamo-alert.zip
@@ -680,14 +686,16 @@ Resources:
       Role: !GetAtt InfraSecMonitoringUrlAccessAnalyzerAlertLambdaRole.Arn
       Timeout: 20
       MemorySize: 128
+      LoggingConfig:
+        LogFormat: JSON
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/infra-sec-url-access-analyzer-alert.zip
       Environment:
         Variables:
           SNS_TOPIC_ARN: !Ref InfraSecTopicArn
-          TABLE_CONFIG: !Ref DynamoAlertLambdaTableConfig
           ENVIRONMENT: !Ref EnvironmentType
+          ALERT_THRESHOLD: !Ref InfraSecUrlTreshold
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
 
   InfraSecMonitoringUrlAccessAnalyzerAlertLambdaRole:
@@ -716,9 +724,6 @@ Resources:
                 Action:
                   - sns:Publish
                 Resource: !Ref InfraSecTopicArn
-                Condition:
-                  StringLike:
-                    sns:ResourceName: !Sub "${InfraSecTopicName}"
 
 
   #===========================================================================
@@ -739,14 +744,9 @@ Resources:
           eventSource:
             - dynamodb.amazonaws.com
           eventName:
-            - GetItem
-            - PutItem
             - UpdateItem
             - DeleteItem
-            - BatchGetItem
             - BatchWriteItem
-            - Query
-            - Scan
           requestParameters:
             tableName: !Ref DynamoDBAccessValidatorTables
       Targets:
@@ -793,9 +793,9 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
         QueueName: !Sub "${ProjectName}-infra-sec-events-queue"
-        AlarmSNSTopicName: !Ref AlarmSNSTopicArn
+        #DLQ alarm disabled for now to avoid alert fatigue, can be enabled later if needed
+        #AlarmSNSTopicName: !Ref AlarmSNSTopicName
         HasDLQ: "true"
-        QueueHasAlarm: "true"
         MaxReceiveCount: 3
 
   PnInfraSecEventsQueuePolicy:
@@ -892,6 +892,8 @@ Resources:
       Runtime: python3.14
       Timeout: 20
       MemorySize: 256
+      LoggingConfig:
+        LogFormat: JSON
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
       Environment:
         Variables:

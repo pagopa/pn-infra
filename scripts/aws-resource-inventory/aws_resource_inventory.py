@@ -32,7 +32,9 @@ EXCLUDED_RESOURCE_TYPES: set[str] = {
     "ecs:task",
     "glue:session",
     "ssm:session",
-    "cloudformation:stack"
+    "cloudformation:stack",
+    "backup:recovery-point",
+    "ssm:opsitem"
 }
 
 # ---------------------------------------------------------------------------
