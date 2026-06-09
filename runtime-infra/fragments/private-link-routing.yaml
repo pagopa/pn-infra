@@ -148,7 +148,6 @@ Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
   HasProvisionedConcurrency: !Not [ !Equals [ !Ref ProvisionedConcurrency, 0 ] ]
   IsPrivateLinkProxyEnabled: !Equals [ !Ref PrivateLinkProxyEnabled, 'true' ]
-  UseDirectPrivateLinkRouting: !Not [ !Condition IsPrivateLinkProxyEnabled ]
   UsePrivateLinkProxyAlarms: !And
     - !Condition IsPrivateLinkProxyEnabled
     - !Condition HasAlarmTopic
@@ -156,7 +155,6 @@ Conditions:
 Resources:
   DirectPrivateLinkListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    Condition: UseDirectPrivateLinkRouting
     Properties:
       ListenerArn: !Ref PrivateLinkListenerArn
       Priority: !Ref PrivateLinkRulePriority
@@ -166,7 +164,10 @@ Resources:
             Values: !Split [ ',', !Ref PrivateLinkMappedPaths ]
       Actions:
         - Type: forward
-          TargetGroupArn: !Ref ApplicationTargetGroupArn
+          TargetGroupArn: !If
+            - IsPrivateLinkProxyEnabled
+            - !Ref PrivateLinkProxyTargetGroup
+            - !Ref ApplicationTargetGroupArn
           Order: 1
 
   PrivateLinkProxyLogGroup:
@@ -281,23 +282,6 @@ Resources:
       TargetGroupAttributes:
         - Key: lambda.multi_value_headers.enabled
           Value: 'true'
-
-  PrivateLinkProxyListenerRule:
-    Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    Condition: IsPrivateLinkProxyEnabled
-    DependsOn:
-      - PrivateLinkProxyInvokePermission
-    Properties:
-      ListenerArn: !Ref PrivateLinkListenerArn
-      Priority: !Ref PrivateLinkRulePriority
-      Actions:
-        - Type: forward
-          TargetGroupArn: !Ref PrivateLinkProxyTargetGroup
-          Order: 1
-      Conditions:
-        - Field: path-pattern
-          PathPatternConfig:
-            Values: !Split [ ',', !Ref PrivateLinkMappedPaths ]
 
   PrivateLinkProxyAlarms:
     Type: AWS::CloudFormation::Stack
