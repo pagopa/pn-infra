@@ -310,3 +310,9 @@ Outputs:
       - IsPrivateLinkProxyEnabled
       - !Ref PrivateLinkProxyTargetGroup
       - !Ref ApplicationTargetGroupArn
+
+  ProxyTargetGroupFullName:
+    Value: !If
+      - IsPrivateLinkProxyEnabled
+      - !GetAtt PrivateLinkProxyTargetGroup.TargetGroupFullName
+      - ''

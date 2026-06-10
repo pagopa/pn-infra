@@ -12,7 +12,13 @@ Parameters:
 
   ApplicationLoadBalancerArn:
     Type: String
-    Description: ALB ARN
+    Default: ''
+    Description: ALB ARN used to derive the LoadBalancer metric dimension when ApplicationLoadBalancerMetricsDimensionName is not provided
+
+  ApplicationLoadBalancerMetricsDimensionName:
+    Type: String
+    Default: ''
+    Description: ALB metric dimension name in app/* format
 
   TargetGroupName:
     Type: String
@@ -376,6 +382,7 @@ Parameters:
     Default: 60
 
 Conditions:
+  HasApplicationLoadBalancerMetricsDimensionName: !Not [!Equals [!Ref ApplicationLoadBalancerMetricsDimensionName, '']]
   IsLambdaTarget: !Equals [!Ref TargetType, 'lambda']
   IsEcsTarget: !Equals [!Ref TargetType, 'ecs']
   HasTarget4xxAlarmCondition: !Equals [!Ref HasTarget4xxAlarm, 'true']
@@ -431,7 +438,10 @@ Resources:
       Statistic: !Ref Target4xxStatistic
       Dimensions:
         - Name: LoadBalancer
-          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+          Value: !If
+            - HasApplicationLoadBalancerMetricsDimensionName
+            - !Ref ApplicationLoadBalancerMetricsDimensionName
+            - !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
         - Name: TargetGroup
           Value: !Ref TargetGroupName
 
@@ -456,7 +466,10 @@ Resources:
       Statistic: !Ref OncallTarget4xxStatistic
       Dimensions:
         - Name: LoadBalancer
-          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+          Value: !If
+            - HasApplicationLoadBalancerMetricsDimensionName
+            - !Ref ApplicationLoadBalancerMetricsDimensionName
+            - !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
         - Name: TargetGroup
           Value: !Ref TargetGroupName
 
@@ -481,7 +494,10 @@ Resources:
       Statistic: !Ref Target5xxStatistic
       Dimensions:
         - Name: LoadBalancer
-          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+          Value: !If
+            - HasApplicationLoadBalancerMetricsDimensionName
+            - !Ref ApplicationLoadBalancerMetricsDimensionName
+            - !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
         - Name: TargetGroup
           Value: !Ref TargetGroupName
 
@@ -506,7 +522,10 @@ Resources:
       Statistic: !Ref OncallTarget5xxStatistic
       Dimensions:
         - Name: LoadBalancer
-          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+          Value: !If
+            - HasApplicationLoadBalancerMetricsDimensionName
+            - !Ref ApplicationLoadBalancerMetricsDimensionName
+            - !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
         - Name: TargetGroup
           Value: !Ref TargetGroupName
 
@@ -531,7 +550,10 @@ Resources:
       ExtendedStatistic: !Ref TargetResponseTimeStatistic
       Dimensions:
         - Name: LoadBalancer
-          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+          Value: !If
+            - HasApplicationLoadBalancerMetricsDimensionName
+            - !Ref ApplicationLoadBalancerMetricsDimensionName
+            - !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
         - Name: TargetGroup
           Value: !Ref TargetGroupName
 
@@ -556,7 +578,10 @@ Resources:
       ExtendedStatistic: !Ref OncallTargetResponseTimeStatistic
       Dimensions:
         - Name: LoadBalancer
-          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+          Value: !If
+            - HasApplicationLoadBalancerMetricsDimensionName
+            - !Ref ApplicationLoadBalancerMetricsDimensionName
+            - !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
         - Name: TargetGroup
           Value: !Ref TargetGroupName
 
@@ -583,7 +608,10 @@ Resources:
               MetricName: HTTPCode_Target_4XX_Count
               Dimensions:
                 - Name: LoadBalancer
-                  Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+                  Value: !If
+                    - HasApplicationLoadBalancerMetricsDimensionName
+                    - !Ref ApplicationLoadBalancerMetricsDimensionName
+                    - !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
                 - Name: TargetGroup
                   Value: !Ref TargetGroupName
             Period: !Ref Target4xxRatePeriod
@@ -627,7 +655,10 @@ Resources:
               MetricName: HTTPCode_Target_4XX_Count
               Dimensions:
                 - Name: LoadBalancer
-                  Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+                  Value: !If
+                    - HasApplicationLoadBalancerMetricsDimensionName
+                    - !Ref ApplicationLoadBalancerMetricsDimensionName
+                    - !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
                 - Name: TargetGroup
                   Value: !Ref TargetGroupName
             Period: !Ref OncallTarget4xxRatePeriod
@@ -671,7 +702,10 @@ Resources:
               MetricName: HTTPCode_Target_5XX_Count
               Dimensions:
                 - Name: LoadBalancer
-                  Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+                  Value: !If
+                    - HasApplicationLoadBalancerMetricsDimensionName
+                    - !Ref ApplicationLoadBalancerMetricsDimensionName
+                    - !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
                 - Name: TargetGroup
                   Value: !Ref TargetGroupName
             Period: !Ref Target5xxRatePeriod
@@ -715,7 +749,10 @@ Resources:
               MetricName: HTTPCode_Target_5XX_Count
               Dimensions:
                 - Name: LoadBalancer
-                  Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+                  Value: !If
+                    - HasApplicationLoadBalancerMetricsDimensionName
+                    - !Ref ApplicationLoadBalancerMetricsDimensionName
+                    - !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
                 - Name: TargetGroup
                   Value: !Ref TargetGroupName
             Period: !Ref OncallTarget5xxRatePeriod
@@ -757,7 +794,10 @@ Resources:
       Statistic: Sum
       Dimensions:
         - Name: LoadBalancer
-          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+          Value: !If
+            - HasApplicationLoadBalancerMetricsDimensionName
+            - !Ref ApplicationLoadBalancerMetricsDimensionName
+            - !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
         - Name: TargetGroup
           Value: !Ref TargetGroupName
 
@@ -782,7 +822,10 @@ Resources:
       Statistic: Sum
       Dimensions:
         - Name: LoadBalancer
-          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+          Value: !If
+            - HasApplicationLoadBalancerMetricsDimensionName
+            - !Ref ApplicationLoadBalancerMetricsDimensionName
+            - !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
         - Name: TargetGroup
           Value: !Ref TargetGroupName
 
@@ -807,7 +850,10 @@ Resources:
       Statistic: Sum
       Dimensions:
         - Name: LoadBalancer
-          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+          Value: !If
+            - HasApplicationLoadBalancerMetricsDimensionName
+            - !Ref ApplicationLoadBalancerMetricsDimensionName
+            - !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
         - Name: TargetGroup
           Value: !Ref TargetGroupName
 
@@ -832,7 +878,10 @@ Resources:
       Statistic: Sum
       Dimensions:
         - Name: LoadBalancer
-          Value: !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
+          Value: !If
+            - HasApplicationLoadBalancerMetricsDimensionName
+            - !Ref ApplicationLoadBalancerMetricsDimensionName
+            - !Select [1, !Split ["loadbalancer/", !Ref ApplicationLoadBalancerArn]]
         - Name: TargetGroup
           Value: !Ref TargetGroupName
 
