@@ -7,6 +7,7 @@ const {
   buildQueryString,
   buildRequestBody,
   collectHeaders,
+  decodeQueryComponent,
   filterResponseHeaders,
   isTextualResponse
 } = require("../src/app/http");
@@ -71,6 +72,34 @@ test("builds query string and request body from ALB event", () => {
   assert.equal(buildRequestBody({ body: "plain" }, "POST"), "plain");
   assert.equal(buildRequestBody({ body: "plain" }, "GET"), undefined);
   assert.deepEqual(buildRequestBody({ body: Buffer.from("plain").toString("base64"), isBase64Encoded: true }, "POST"), Buffer.from("plain"));
+});
+
+test("encodes query string keys and values safely", () => {
+  assert.equal(
+    buildQueryString({
+      queryStringParameters: {
+        "a b": "hello world",
+        filter: "x&y=z"
+      }
+    }),
+    "?a+b=hello+world&filter=x%26y%3Dz"
+  );
+});
+
+test("decodes ALB query string components before forwarding them", () => {
+  assert.equal(decodeQueryComponent("hello+world"), "hello world");
+  assert.equal(decodeQueryComponent("x%26y%3Dz"), "x&y=z");
+  assert.equal(decodeQueryComponent("a%2Bb"), "a+b");
+
+  assert.equal(
+    buildQueryString({
+      multiValueQueryStringParameters: {
+        "a+b": ["hello+world"],
+        filter: ["x%26y%3Dz", "a%2Bb"]
+      }
+    }),
+    "?a+b=hello+world&filter=x%26y%3Dz&filter=a%2Bb"
+  );
 });
 
 test("builds ALB responses with multi-value headers", () => {

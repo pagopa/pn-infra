@@ -9,6 +9,35 @@ function parseCsv(rawValue) {
     .filter(Boolean);
 }
 
+function validateAllowedPathPattern(allowedPathPattern) {
+  if (allowedPathPattern === "*") {
+    return allowedPathPattern;
+  }
+
+  if (!allowedPathPattern.startsWith("/")) {
+    throw new Error("Allowed path pattern must start with / or be *");
+  }
+
+  if (allowedPathPattern.includes("?")) {
+    throw new Error("Allowed path pattern cannot contain ?");
+  }
+
+  const wildcardCount = [...allowedPathPattern].filter((char) => char === "*").length;
+  if (wildcardCount === 0) {
+    return allowedPathPattern;
+  }
+
+  if (wildcardCount === 1 && allowedPathPattern.endsWith("/*")) {
+    return allowedPathPattern;
+  }
+
+  throw new Error("Allowed path patterns support only exact paths or /* suffix wildcards");
+}
+
+function parseAllowedPathPatterns(rawValue) {
+  return parseCsv(rawValue).map((allowedPathPattern) => validateAllowedPathPattern(allowedPathPattern));
+}
+
 function parseTrustedHeaders(rawTrustedHeaders) {
   if (!rawTrustedHeaders) {
     return {};
@@ -91,7 +120,7 @@ function parseRuntimeConfig(env) {
   }
 
   return {
-    allowedPathPatterns: parseCsv(env.PRIVATE_CHANNEL_PROXY_ALLOWED_PATH_PATTERNS),
+    allowedPathPatterns: parseAllowedPathPatterns(env.PRIVATE_CHANNEL_PROXY_ALLOWED_PATH_PATTERNS),
     backendBaseUrl: backendBaseUrl.replace(/\/$/, ""),
     backendRequestTimeoutMillis: parseNonNegativeIntegerFlag(
       env.PRIVATE_CHANNEL_PROXY_BACKEND_REQUEST_TIMEOUT_MILLIS,
@@ -119,11 +148,13 @@ function parseRuntimeConfig(env) {
 }
 
 module.exports = {
+  parseAllowedPathPatterns,
   parseBaseUrlPort,
   parseBaseUrlProtocol,
   parseBooleanFlag,
   parseCsv,
   parseNonNegativeIntegerFlag,
   parseRuntimeConfig,
-  parseTrustedHeaders
+  parseTrustedHeaders,
+  validateAllowedPathPattern
 };

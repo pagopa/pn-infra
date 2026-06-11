@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const { test } = require("node:test");
 
 const { createHandler } = require("../index");
+const { isAllowedPath, selectInboundHeadersForLog } = require("../src/app/eventHandler");
 
 const traceId = "Root=1-67891233-abcdef012345678912345678;Parent=53995c3f42cd8ad8;Sampled=1";
 
@@ -75,6 +76,83 @@ test("forwards requests with trusted header enforcement and runtime trace propag
   assert.equal(response.statusCode, 201);
   assert.deepEqual(response.multiValueHeaders["content-type"], ["application/json"]);
   assert.deepEqual(response.multiValueHeaders["x-amzn-trace-id"], [traceId]);
+});
+
+test("encodes forwarded query string parameters", async () => {
+  let capturedUrl;
+  const handler = createHandler({
+    env: baseEnv,
+    fetchImpl: async (url) => {
+      capturedUrl = url;
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json"
+        }
+      });
+    }
+  });
+
+  await handler(buildEvent({
+    queryStringParameters: {
+      "a b": "hello world",
+      filter: "x&y=z"
+    }
+  }));
+
+  assert.equal(capturedUrl, "http://backend.internal:8080/bar/resource?a+b=hello+world&filter=x%26y%3Dz");
+});
+
+test("decodes ALB encoded query string parameters before forwarding them", async () => {
+  let capturedUrl;
+  const handler = createHandler({
+    env: baseEnv,
+    fetchImpl: async (url) => {
+      capturedUrl = url;
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json"
+        }
+      });
+    }
+  });
+
+  await handler(buildEvent({
+    multiValueQueryStringParameters: {
+      filter: ["x%26y%3Dz", "a%2Bb"]
+    }
+  }));
+
+  assert.equal(capturedUrl, "http://backend.internal:8080/bar/resource?filter=x%26y%3Dz&filter=a%2Bb");
+});
+
+test("selects only technical inbound headers for standard logs", () => {
+  assert.deepEqual(
+    selectInboundHeadersForLog({
+      host: "example.internal",
+      "x-forwarded-for": "10.0.0.1",
+      "x-forwarded-port": "443",
+      "x-forwarded-proto": "https",
+      "x-pagopa-pn-base-url": "https://caller.example",
+      "x-pagopa-pn-src-ch": "CALLER_SRC_CH",
+      "x-pagopa-pn-src-ch-details": "CALLER_DETAILS"
+    }),
+    {
+      host: "example.internal",
+      "x-forwarded-for": "10.0.0.1",
+      "x-forwarded-port": "443",
+      "x-forwarded-proto": "https"
+    }
+  );
+});
+
+test("matches only exact paths, global wildcard and slash-star suffix patterns", () => {
+  assert.equal(isAllowedPath("/bar/resource", ["/bar/*"]), true);
+  assert.equal(isAllowedPath("/bar", ["/bar/*"]), false);
+  assert.equal(isAllowedPath("/bar", ["/bar"]), true);
+  assert.equal(isAllowedPath("/bar/resource", ["/bar*"]), false);
+  assert.equal(isAllowedPath("/anything", ["*"]), true);
 });
 
 test("rejects paths outside the configured multi-path allowlist", async () => {
@@ -190,6 +268,19 @@ test("returns bad gateway when backend forwarding fails", async () => {
   assert.equal(response.statusCode, 502);
   assert.deepEqual(response.multiValueHeaders["x-amzn-trace-id"], [traceId]);
   assert.deepEqual(JSON.parse(response.body), { message: "Backend forward failed" });
+});
+
+test("rejects unsupported allowed path patterns during handler creation", () => {
+  assert.throws(
+    () => createHandler({
+      env: {
+        ...baseEnv,
+        PRIVATE_CHANNEL_PROXY_ALLOWED_PATH_PATTERNS: "/bar*"
+      },
+      fetchImpl: async () => new Response(JSON.stringify({ ok: true }))
+    }),
+    /Allowed path patterns support only exact paths or \/\* suffix wildcards/
+  );
 });
 
 test("retries retryable backend responses before returning successful response", async () => {

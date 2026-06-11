@@ -79,4 +79,24 @@ test("rejects invalid runtime configuration", () => {
     }),
     /External port is out of range/
   );
+
+  assert.throws(
+    () => parseRuntimeConfig({
+      PRIVATE_CHANNEL_PROXY_ALLOWED_PATH_PATTERNS: "/foo*",
+      PRIVATE_CHANNEL_PROXY_BACKEND_BASE_URL: "http://backend.internal:8080",
+      PRIVATE_CHANNEL_PROXY_EXTERNAL_PROTOCOL: "https",
+      PRIVATE_CHANNEL_PROXY_EXTERNAL_PORT: "443"
+    }),
+    /Allowed path patterns support only exact paths or \/\* suffix wildcards/
+  );
+
+  assert.throws(
+    () => parseRuntimeConfig({
+      PRIVATE_CHANNEL_PROXY_ALLOWED_PATH_PATTERNS: "foo/bar",
+      PRIVATE_CHANNEL_PROXY_BACKEND_BASE_URL: "http://backend.internal:8080",
+      PRIVATE_CHANNEL_PROXY_EXTERNAL_PROTOCOL: "https",
+      PRIVATE_CHANNEL_PROXY_EXTERNAL_PORT: "443"
+    }),
+    /Allowed path pattern must start with \/ or be \*/
+  );
 });

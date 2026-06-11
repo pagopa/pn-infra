@@ -72,26 +72,40 @@ function buildForwardHeaders(incomingHeaders, config, baseUrl) {
   return forwardHeaders;
 }
 
+function appendQueryParameter(searchParams, name, value) {
+  if (value === undefined || value === null) {
+    return;
+  }
+
+  searchParams.append(decodeQueryComponent(name), decodeQueryComponent(value));
+}
+
+function decodeQueryComponent(rawValue) {
+  const value = String(rawValue);
+
+  try {
+    return decodeURIComponent(value.replace(/\+/g, " "));
+  } catch (err) {
+    return value;
+  }
+}
+
 function buildQueryString(event) {
-  const params = [];
+  const searchParams = new URLSearchParams();
 
   if (event.multiValueQueryStringParameters) {
     for (const [name, values] of Object.entries(event.multiValueQueryStringParameters)) {
       for (const value of values || []) {
-        if (value !== undefined && value !== null) {
-          params.push(`${String(name)}=${String(value)}`);
-        }
+        appendQueryParameter(searchParams, name, value);
       }
     }
   } else if (event.queryStringParameters) {
     for (const [name, value] of Object.entries(event.queryStringParameters)) {
-      if (value !== undefined && value !== null) {
-        params.push(`${String(name)}=${String(value)}`);
-      }
+      appendQueryParameter(searchParams, name, value);
     }
   }
 
-  const serialized = params.join("&");
+  const serialized = searchParams.toString();
   return serialized ? `?${serialized}` : "";
 }
 
@@ -167,6 +181,7 @@ module.exports = {
   buildQueryString,
   buildRequestBody,
   collectHeaders,
+  decodeQueryComponent,
   filterResponseHeaders,
   isTextualResponse
 };

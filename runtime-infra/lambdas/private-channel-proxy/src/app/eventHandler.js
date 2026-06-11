@@ -9,6 +9,12 @@ const {
   isTextualResponse
 } = require("./http");
 
+const INBOUND_HEADER_LOG_NAMES = [
+  "host",
+  "x-forwarded-for",
+  "x-forwarded-port",
+  "x-forwarded-proto"
+];
 const LAMBDA_TRACE_ENV_NAME = "_X_AMZN_TRACE_ID";
 const TRACE_HEADER_NAME = "x-amzn-trace-id";
 const RETRYABLE_BACKEND_STATUS_CODES = new Set([500, 502, 503, 504]);
@@ -52,7 +58,7 @@ function matchesAllowedPathPattern(path, allowedPathPattern) {
     return true;
   }
 
-  if (allowedPathPattern.endsWith("*")) {
+  if (allowedPathPattern.endsWith("/*")) {
     return path.startsWith(allowedPathPattern.slice(0, -1));
   }
 
@@ -122,13 +128,20 @@ function deriveBaseUrlFromHost(hostHeader, config) {
 function logError(message, err, meta = {}) {
   console.error(message, {
     ...meta,
-    message: err.message,
-    stack: err.stack
+    errorMessage: err?.message || String(err),
+    errorName: err?.name || null,
+    errorStack: err?.stack || null
   });
 }
 
 function sleep(delayMillis) {
   return new Promise((resolve) => setTimeout(resolve, delayMillis));
+}
+
+async function waitBeforeRetry(delayMillis) {
+  if (delayMillis > 0) {
+    await sleep(delayMillis);
+  }
 }
 
 function isRetryableBackendResponse(statusCode) {
@@ -143,10 +156,55 @@ function isRetryableBackendError(err) {
   return err?.name === "AbortError" || RETRYABLE_BACKEND_ERROR_CODES.has(extractRetryableBackendErrorCode(err));
 }
 
+function selectInboundHeadersForLog(incomingHeaders) {
+  return INBOUND_HEADER_LOG_NAMES.reduce((acc, name) => {
+    if (incomingHeaders[name] !== undefined) {
+      acc[name] = incomingHeaders[name];
+    }
+    return acc;
+  }, {});
+}
+
+function logScheduledRetry({ method, path, attempt, maxAttempts, statusCode, err }) {
+  const retryMeta = {
+    method,
+    path,
+    attempt,
+    maxAttempts
+  };
+
+  if (statusCode !== undefined) {
+    retryMeta.statusCode = statusCode;
+  }
+
+  if (err) {
+    retryMeta.errorCode = extractRetryableBackendErrorCode(err);
+    retryMeta.errorName = err.name;
+    retryMeta.errorMessage = err.message;
+  }
+
+  console.warn("Private channel proxy backend retry scheduled", retryMeta);
+}
+
+async function cancelRetryableResponseBody(backendResponse, { method, path, attempt }) {
+  try {
+    await backendResponse.body?.cancel?.();
+  } catch (cancelErr) {
+    console.warn("Private channel proxy failed to cancel retryable backend response body", {
+      method,
+      path,
+      attempt,
+      statusCode: backendResponse.status,
+      errorMessage: cancelErr.message
+    });
+  }
+}
+
 async function forwardBackendRequest({ fetchImpl, backendUrl, method, headers, body, config, path }) {
+  const maxAttempts = config.backendRetryMaxAttempts;
   let lastError;
 
-  for (let attempt = 1; attempt <= config.backendRetryMaxAttempts; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => abortController.abort(), config.backendRequestTimeoutMillis);
 
@@ -157,32 +215,17 @@ async function forwardBackendRequest({ fetchImpl, backendUrl, method, headers, b
         body,
         signal: abortController.signal
       });
-      clearTimeout(timeoutId);
 
-      if (attempt < config.backendRetryMaxAttempts && isRetryableBackendResponse(backendResponse.status)) {
-        try {
-          await backendResponse.body?.cancel?.();
-        } catch (cancelErr) {
-          console.warn("Private channel proxy failed to cancel retryable backend response body", {
-            method,
-            path,
-            attempt,
-            statusCode: backendResponse.status,
-            message: cancelErr.message
-          });
-        }
-
-        console.warn("Private channel proxy backend retry scheduled", {
+      if (attempt < maxAttempts && isRetryableBackendResponse(backendResponse.status)) {
+        await cancelRetryableResponseBody(backendResponse, { method, path, attempt });
+        logScheduledRetry({
           method,
           path,
           attempt,
-          maxAttempts: config.backendRetryMaxAttempts,
+          maxAttempts,
           statusCode: backendResponse.status
         });
-
-        if (config.backendRetryDelayMillis > 0) {
-          await sleep(config.backendRetryDelayMillis);
-        }
+        await waitBeforeRetry(config.backendRetryDelayMillis);
         continue;
       }
 
@@ -191,27 +234,23 @@ async function forwardBackendRequest({ fetchImpl, backendUrl, method, headers, b
         backendResponse
       };
     } catch (err) {
-      clearTimeout(timeoutId);
       lastError = err;
 
-      if (attempt < config.backendRetryMaxAttempts && isRetryableBackendError(err)) {
-        console.warn("Private channel proxy backend retry scheduled", {
+      if (attempt < maxAttempts && isRetryableBackendError(err)) {
+        logScheduledRetry({
           method,
           path,
           attempt,
-          maxAttempts: config.backendRetryMaxAttempts,
-          errorCode: extractRetryableBackendErrorCode(err),
-          errorName: err.name,
-          message: err.message
+          maxAttempts,
+          err
         });
-
-        if (config.backendRetryDelayMillis > 0) {
-          await sleep(config.backendRetryDelayMillis);
-        }
+        await waitBeforeRetry(config.backendRetryDelayMillis);
         continue;
       }
 
       throw err;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -244,12 +283,7 @@ function createHandler({ fetchImpl = globalThis.fetch, env = process.env } = {})
     console.log("Private channel proxy inbound headers", {
       method,
       path,
-      headers: {
-        host: incomingHeaders.host,
-        "x-forwarded-for": incomingHeaders["x-forwarded-for"],
-        "x-forwarded-port": incomingHeaders["x-forwarded-port"],
-        "x-forwarded-proto": incomingHeaders["x-forwarded-proto"]
-      }
+      headers: selectInboundHeadersForLog(incomingHeaders)
     });
 
     if (config.requestPayloadLoggingEnabled) {
@@ -376,5 +410,6 @@ module.exports = {
   isAllowedPath,
   isRetryableBackendError,
   isRetryableBackendResponse,
+  selectInboundHeadersForLog,
   validatePathForForward
 };
