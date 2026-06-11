@@ -6,7 +6,7 @@ Parameters:
     Type: String
     Description: SNS topic ARN for alarm notifications
 
-  MetricPrefix:
+  AlarmPrefix:
     Type: String
     Description: Prefix for alarm names
 
@@ -26,6 +26,7 @@ Parameters:
 
   TargetType:
     Type: String
+    Default: lambda
     AllowedValues:
       - ecs
       - lambda
@@ -291,7 +292,7 @@ Parameters:
 
   HasLambdaInternalErrorAlarm:
     Type: String
-    Default: 'false'
+    Default: 'true'
     AllowedValues:
       - 'true'
       - 'false'
@@ -337,7 +338,7 @@ Parameters:
 
   HasLambdaUserErrorAlarm:
     Type: String
-    Default: 'false'
+    Default: 'true'
     AllowedValues:
       - 'true'
       - 'false'
@@ -421,8 +422,8 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Condition: HasTarget4xxAlarmCondition
     Properties:
-      AlarmName: !Sub "${MetricPrefix}-target-4xx-alarm"
-      AlarmDescription: !Sub "CloudWatch alarm on ${MetricPrefix} target 4xx count."
+      AlarmName: !Sub "${AlarmPrefix}-private-link-proxy-target-4xx-alarm"
+      AlarmDescription: !Sub "CloudWatch alarm on ${AlarmPrefix}-private-link-proxy target 4xx count."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -449,8 +450,8 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Condition: HasTarget4xxOncallCondition
     Properties:
-      AlarmName: !Sub "oncall-${MetricPrefix}-target-4xx-alarm"
-      AlarmDescription: !Sub "CloudWatch oncall alarm on ${MetricPrefix} target 4xx count."
+      AlarmName: !Sub "oncall-${AlarmPrefix}-private-link-proxy-target-4xx-alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on ${AlarmPrefix}-private-link-proxy target 4xx count."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -477,8 +478,8 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Condition: HasTarget5xxAlarmCondition
     Properties:
-      AlarmName: !Sub "${MetricPrefix}-target-5xx-alarm"
-      AlarmDescription: !Sub "CloudWatch alarm on ${MetricPrefix} target 5xx count."
+      AlarmName: !Sub "${AlarmPrefix}-private-link-proxy-target-5xx-alarm"
+      AlarmDescription: !Sub "CloudWatch alarm on ${AlarmPrefix}-private-link-proxy target 5xx count."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -505,8 +506,8 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Condition: HasTarget5xxOncallCondition
     Properties:
-      AlarmName: !Sub "oncall-${MetricPrefix}-target-5xx-alarm"
-      AlarmDescription: !Sub "CloudWatch oncall alarm on ${MetricPrefix} target 5xx count."
+      AlarmName: !Sub "oncall-${AlarmPrefix}-private-link-proxy-target-5xx-alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on ${AlarmPrefix}-private-link-proxy target 5xx count."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -533,8 +534,8 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Condition: HasTargetResponseTimeAlarmCondition
     Properties:
-      AlarmName: !Sub "${MetricPrefix}-target-response-time-alarm"
-      AlarmDescription: !Sub "CloudWatch alarm on ${MetricPrefix} target response time."
+      AlarmName: !Sub "${AlarmPrefix}-private-link-proxy-target-response-time-alarm"
+      AlarmDescription: !Sub "CloudWatch alarm on ${AlarmPrefix}-private-link-proxy target response time."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -561,8 +562,8 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Condition: HasTargetResponseTimeOncallCondition
     Properties:
-      AlarmName: !Sub "oncall-${MetricPrefix}-target-response-time-alarm"
-      AlarmDescription: !Sub "CloudWatch oncall alarm on ${MetricPrefix} target response time."
+      AlarmName: !Sub "oncall-${AlarmPrefix}-private-link-proxy-target-response-time-alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on ${AlarmPrefix}-private-link-proxy target response time."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -589,8 +590,8 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Condition: HasTarget4xxRateAlarmCondition
     Properties:
-      AlarmName: !Sub "${MetricPrefix}-target-4xx-rate-alarm"
-      AlarmDescription: !Sub "CloudWatch alarm on ${MetricPrefix} target 4xx rate."
+      AlarmName: !Sub "${AlarmPrefix}-private-link-proxy-target-4xx-rate-alarm"
+      AlarmDescription: !Sub "CloudWatch alarm on ${AlarmPrefix}-private-link-proxy target 4xx rate."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -630,14 +631,14 @@ Resources:
           ReturnData: false
         - Id: e1
           Expression: !Sub "IF(m3>=${MinTrafficThreshold} AND m1/m3>=${Target4xxRateThreshold}, 1, 0)"
-          Label: !Sub "${MetricPrefix}-target-4xx-rate"
+          Label: !Sub "${AlarmPrefix}-private-link-proxy-target-4xx-rate"
 
   OncallTarget4xxRateAlarm:
     Type: AWS::CloudWatch::Alarm
     Condition: HasTarget4xxRateOncallCondition
     Properties:
-      AlarmName: !Sub "oncall-${MetricPrefix}-target-4xx-rate-alarm"
-      AlarmDescription: !Sub "CloudWatch oncall alarm on ${MetricPrefix} target 4xx rate."
+      AlarmName: !Sub "oncall-${AlarmPrefix}-private-link-proxy-target-4xx-rate-alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on ${AlarmPrefix}-private-link-proxy target 4xx rate."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -677,14 +678,14 @@ Resources:
           ReturnData: false
         - Id: e1
           Expression: !Sub "IF(m3>=${MinTrafficThreshold} AND m1/m3>=${OncallTarget4xxRateThreshold}, 1, 0)"
-          Label: !Sub "${MetricPrefix}-target-4xx-rate-oncall"
+          Label: !Sub "${AlarmPrefix}-private-link-proxy-target-4xx-rate-oncall"
 
   Target5xxRateAlarm:
     Type: AWS::CloudWatch::Alarm
     Condition: HasTarget5xxRateAlarmCondition
     Properties:
-      AlarmName: !Sub "${MetricPrefix}-target-5xx-rate-alarm"
-      AlarmDescription: !Sub "CloudWatch alarm on ${MetricPrefix} target 5xx rate."
+      AlarmName: !Sub "${AlarmPrefix}-private-link-proxy-target-5xx-rate-alarm"
+      AlarmDescription: !Sub "CloudWatch alarm on ${AlarmPrefix}-private-link-proxy target 5xx rate."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -724,14 +725,14 @@ Resources:
           ReturnData: false
         - Id: e1
           Expression: !Sub "IF(m3>=${MinTrafficThreshold} AND m2/m3>=${Target5xxRateThreshold}, 1, 0)"
-          Label: !Sub "${MetricPrefix}-target-5xx-rate"
+          Label: !Sub "${AlarmPrefix}-private-link-proxy-target-5xx-rate"
 
   OncallTarget5xxRateAlarm:
     Type: AWS::CloudWatch::Alarm
     Condition: HasTarget5xxRateOncallCondition
     Properties:
-      AlarmName: !Sub "oncall-${MetricPrefix}-target-5xx-rate-alarm"
-      AlarmDescription: !Sub "CloudWatch oncall alarm on ${MetricPrefix} target 5xx rate."
+      AlarmName: !Sub "oncall-${AlarmPrefix}-private-link-proxy-target-5xx-rate-alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on ${AlarmPrefix}-private-link-proxy target 5xx rate."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -771,14 +772,14 @@ Resources:
           ReturnData: false
         - Id: e1
           Expression: !Sub "IF(m3>=${MinTrafficThreshold} AND m2/m3>=${OncallTarget5xxRateThreshold}, 1, 0)"
-          Label: !Sub "${MetricPrefix}-target-5xx-rate-oncall"
+          Label: !Sub "${AlarmPrefix}-private-link-proxy-target-5xx-rate-oncall"
 
   LambdaInternalErrorAlarm:
     Type: AWS::CloudWatch::Alarm
     Condition: HasLambdaInternalErrorAlarmCondition
     Properties:
-      AlarmName: !Sub "${MetricPrefix}-lambda-internal-error-alarm"
-      AlarmDescription: !Sub "CloudWatch alarm on ${MetricPrefix} lambda internal error count."
+      AlarmName: !Sub "${AlarmPrefix}-private-link-proxy-lambda-internal-error-alarm"
+      AlarmDescription: !Sub "CloudWatch alarm on ${AlarmPrefix}-private-link-proxy lambda internal error count."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -805,8 +806,8 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Condition: HasLambdaInternalErrorOncallCondition
     Properties:
-      AlarmName: !Sub "oncall-${MetricPrefix}-lambda-internal-error-alarm"
-      AlarmDescription: !Sub "CloudWatch oncall alarm on ${MetricPrefix} lambda internal error count."
+      AlarmName: !Sub "oncall-${AlarmPrefix}-private-link-proxy-lambda-internal-error-alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on ${AlarmPrefix}-private-link-proxy lambda internal error count."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -833,8 +834,8 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Condition: HasLambdaUserErrorAlarmCondition
     Properties:
-      AlarmName: !Sub "${MetricPrefix}-lambda-user-error-alarm"
-      AlarmDescription: !Sub "CloudWatch alarm on ${MetricPrefix} lambda user error count."
+      AlarmName: !Sub "${AlarmPrefix}-private-link-proxy-lambda-user-error-alarm"
+      AlarmDescription: !Sub "CloudWatch alarm on ${AlarmPrefix}-private-link-proxy lambda user error count."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -861,8 +862,8 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Condition: HasLambdaUserErrorOncallCondition
     Properties:
-      AlarmName: !Sub "oncall-${MetricPrefix}-lambda-user-error-alarm"
-      AlarmDescription: !Sub "CloudWatch oncall alarm on ${MetricPrefix} lambda user error count."
+      AlarmName: !Sub "oncall-${AlarmPrefix}-private-link-proxy-lambda-user-error-alarm"
+      AlarmDescription: !Sub "CloudWatch oncall alarm on ${AlarmPrefix}-private-link-proxy lambda user error count."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
