@@ -1,8 +1,7 @@
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
 
-const { createHandler } = require("../index");
-const { isAllowedPath, selectInboundHeadersForLog } = require("../src/app/eventHandler");
+const { createHandler, isAllowedPath, selectInboundHeadersForLog } = require("../src/app/eventHandler");
 
 const traceId = "Root=1-67891233-abcdef012345678912345678;Parent=53995c3f42cd8ad8;Sampled=1";
 

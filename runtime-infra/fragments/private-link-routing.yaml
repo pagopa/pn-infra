@@ -51,6 +51,11 @@ Parameters:
     Default: 14
     Description: CloudWatch log retention in days for the proxy function
 
+  LogsKinesisSourceStreamArn:
+    Type: String
+    Default: ''
+    Description: Optional Kinesis stream ARN used by the log group fragment to export proxy logs
+
   VpcId:
     Type: String
     Description: VPC id where the Lambda runs
@@ -145,6 +150,14 @@ Parameters:
     Default: '-'
     Description: SNS topic ARN for alarms
 
+  PrivateLinkProxyLambdaAlarmsEnabled:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable baseline Lambda log and invocation alarms for the private channel proxy
+
 Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
   HasProvisionedConcurrency: !Not [ !Equals [ !Ref ProvisionedConcurrency, 0 ] ]
@@ -152,6 +165,7 @@ Conditions:
   UsePrivateLinkProxyAlarms: !And
     - !Condition IsPrivateLinkProxyEnabled
     - !Condition HasAlarmTopic
+    - !Equals [ !Ref PrivateLinkProxyLambdaAlarmsEnabled, 'true' ]
 
 Resources:
   DirectPrivateLinkListenerRule:
@@ -172,13 +186,17 @@ Resources:
           Order: 1
 
   PrivateLinkProxyLogGroup:
-    Type: AWS::Logs::LogGroup
+    Type: AWS::CloudFormation::Stack
     Condition: IsPrivateLinkProxyEnabled
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      LogGroupName: !Sub '/aws/lambda/${ProjectName}-${ChannelId}-private-link-proxy'
-      RetentionInDays: !Ref LogRetention
+      TemplateURL: !Sub '${TemplateBucketBaseUrl}/fragments/log-group.yaml'
+      Parameters:
+        LogGroupName: !Sub '${ProjectName}-${ChannelId}-private-link-proxy'
+        LogGroupPrefix: '/aws/lambda'
+        LogGroupRetention: !Ref LogRetention
+        LogsKinesisSourceStreamArn: !Ref LogsKinesisSourceStreamArn
 
   PrivateLinkProxySecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -208,7 +226,6 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
-        - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
 
   PrivateLinkProxyFunction:
     Type: AWS::Lambda::Function
@@ -229,8 +246,6 @@ Resources:
         SubnetIds: !Split [ ',', !Ref Subnets ]
       MemorySize: !Ref MemorySize
       Timeout: !Ref Timeout
-      TracingConfig:
-        Mode: Active
       Environment:
         Variables:
           PRIVATE_CHANNEL_PROXY_ALLOWED_PATH_PATTERNS: !Ref PrivateLinkMappedPaths
