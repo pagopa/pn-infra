@@ -135,6 +135,11 @@ Parameters:
     Type: String
   LogsKinesisStreamKeyArn:
     Type: String
+
+  ConsNormPrivateLinkListenerArn:
+    Type: String
+    Default: ''
+    Description: Dedicated ALB listener ARN for the ConsNorm PrivateLink channel
   SandboxSafeStorageBaseUrl:
     Type: String
   SafeStorageFileAccessLogsBucketName:
@@ -1455,6 +1460,8 @@ Outputs:
   
   VpcEgressSubnetsIds:
     Value: !If [ IsEgressDefined, !Ref VpcEgressSubnetsIds, !Ref VpcSubnets ]
+  ConsNormPrivateLinkListenerArn:
+    Value: !Ref ConsNormPrivateLinkListenerArn
   
   EcsDefaultSecurityGroup:
     Value: !Ref EcsDefaultSecurityGroup
