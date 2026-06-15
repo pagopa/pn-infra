@@ -48,10 +48,12 @@ Parameters:
 
   PreprocessingStreamNamePrefix:
     Type: String
+    Default: ""
     Description: Prefix dedicated to the preprocessing POC Firehose
 
   PreprocessingS3RootPrefix:
     Type: String
+    Default: ""
     Description: Root S3 prefix used to isolate CDC preprocessing test data from active paths
   
   PreprocessingTargetTableName:
@@ -61,11 +63,18 @@ Parameters:
 
   LambdasBucketName:
     Type: String
+    Default: ""
     Description: Bucket containing Lambda artifacts
 
   LambdasBasePath:
     Type: String
+    Default: ""
     Description: S3 object key prefix for Lambda artifacts
+  
+  EnvironmentType:
+    Type: String
+    Default: ""
+    Description: Environment type
 
 Conditions:
   ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
@@ -253,6 +262,7 @@ Resources:
       Environment:
         Variables:
           TARGET_TABLE_NAME: !Ref PreprocessingTargetTableName
+          ENVIRONMENT: !Ref EnvironmentType
       Role: !GetAtt PreprocessingFilterLambdaRole.Arn
 
   PreprocessingLogsKinesisDeliveryStreamPartitioned:
