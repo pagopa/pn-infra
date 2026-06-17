@@ -470,6 +470,41 @@ Resources:
             InputTemplate: !Sub '"ALERT: Cognito Local User Created - Environment: ${EnvironmentType} - User Pool: <userPoolId> - Created Username: <createdUsername> - Operation: <eventName> - User: <user> (ARN: <userArn>) - Source IP: <sourceIP> - Time: <time> - Region: <region> - ACTION REQUIRED: Verify authorization. Only SSO logins are allowed; local user creation must be investigated. CloudTrail Event ID: <eventID>"'
 
   # ============================================================================
+  # EventBridge rule to monitor Cognito local user login (non-SSO)
+  # ============================================================================
+  CognitoLocalUserLoginRule:
+    Type: AWS::Events::Rule
+    Condition: HasMonitoringCognitoEnabledAndIsCoreAccount
+    Properties:
+      Name: !Sub "${ProjectName}-infra-sec-cognito-local-user-login"
+      Description: "Alert on Cognito local user login with credentials (SSO federated logins are allowed)"
+      State: ENABLED
+      EventPattern:
+        source: ["aws.cognito-idp"]
+        detail-type: ["AWS API Call via CloudTrail"]
+        detail:
+          eventSource: ["cognito-idp.amazonaws.com"]
+          eventName: ["InitiateAuth", "AdminInitiateAuth"]
+          requestParameters:
+            authFlow: ["USER_SRP_AUTH", "USER_PASSWORD_AUTH", "ADMIN_USER_PASSWORD_AUTH", "ADMIN_NO_SRP_AUTH"]
+      Targets:
+        - Id: SendToSNS
+          Arn: !Ref InfraSecTopicArn
+          InputTransformer:
+            InputPathsMap:
+              time: "$.time"
+              user: "$.detail.userIdentity.principalId"
+              userArn: "$.detail.userIdentity.arn"
+              sourceIP: "$.detail.sourceIPAddress"
+              eventName: "$.detail.eventName"
+              authFlow: "$.detail.requestParameters.authFlow"
+              userPoolId: "$.detail.requestParameters.userPoolId"
+              clientId: "$.detail.requestParameters.clientId"
+              region: "$.detail.awsRegion"
+              eventID: "$.detail.eventID"
+            InputTemplate: !Sub '"ALERT: Cognito Local User Login - Environment: ${EnvironmentType} - User Pool: <userPoolId> - Client: <clientId> - Auth Flow: <authFlow> - Operation: <eventName> - User: <user> (ARN: <userArn>) - Source IP: <sourceIP> - Time: <time> - Region: <region> - ACTION REQUIRED: Verify authorization. Only SSO logins are allowed; local user login must be investigated. CloudTrail Event ID: <eventID>"'
+
+  # ============================================================================
   # EventBridge rule to monitor S3 critical buckets
   # ============================================================================
   S3BucketPolicyChangeRule:
