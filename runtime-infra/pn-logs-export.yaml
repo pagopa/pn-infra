@@ -138,6 +138,11 @@ Parameters:
     Type: Number
     Default: 25
     
+  PreprocessingStreamNamePrefix:
+    Type: String
+    Default: ""
+    Description: Stream name prefix for preprocessing Firehose, used to isolate it from active streams
+    
   PreprocessingEnabled:
     Type: String
     Default: "false"
@@ -148,12 +153,12 @@ Parameters:
   
   PreprocessingS3RootPrefix:
     Type: String
-    Default: "poc/cdc-preproc"
+    Default: ""
     Description: Root S3 prefix used to isolate CDC preprocessing test data from active paths
   
   PreprocessingTargetTableName:
     Type: String
-    Default: "pn-UserAttributes"
+    Default: ""
     Description: CDC tableName to keep in preprocessing Firehose
 
 
@@ -183,10 +188,10 @@ Resources:
         LogsBucketName: !Ref LogsBucketName
         LogsExporterRoleArn: !Ref LogsExporterRoleArn
         StreamNamePrefix: 'cdcTos3'
-        PreprocessingStreamNamePrefix: 'cdc-preproc-poc'
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         StreamContent: DYNAMO_CDC
-    
+        
+        PreprocessingStreamNamePrefix: !Ref PreprocessingStreamNamePrefix
         LambdasBucketName: !Ref LambdasBucketName
         LambdasBasePath: !Ref LambdasBasePath
         PreprocessingEnabled: !Ref PreprocessingEnabled
