@@ -168,12 +168,12 @@ Conditions:
   HasCloudTrailLogsEnabled: !Equals [!Ref EnableCloudTrailLogs, 'true']
   HasMonitoringS3Enabled: !Equals [!Ref S3MonitoringEnabled, 'true']
   HasMonitoringDynamoDBEnabled: !Equals [!Ref DynamoDBMonitoringEnabled, 'true']
-  HasMonitoringCognitoEnabled: !Equals [!Ref CognitoMonitoringEnabled, 'true']
   IsMultiRegionTrailCondition: !Equals [!Ref MultiRegionTrail, 'true']
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
   HasCloudTrailLogsEnabledAndIsConfinfoAccount: !And [ !Equals [!Ref EnableCloudTrailLogs, 'true'], !Condition IsConfinfoAccount ]
   HasCloudTrailLogsEnabledAndIsCoreAccount: !And [ !Equals [!Ref EnableCloudTrailLogs, 'true'], !Condition IsCoreAccount ]
+  HasMonitoringCognitoEnabledAndIsCoreAccount: !And [ !Equals [!Ref CognitoMonitoringEnabled, 'true'], !Condition IsCoreAccount ]
   HasS3CriticalPrefixMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalS3Prefixes], "" ] ]
   HasDynamoDBCriticalTableMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalDynamoDBTables], "" ] ]
   HasCloudtrailEventDataStoreEnabledAndIsConfinfoAccount: !And [ !Equals [!Ref CloudtrailEventDataStoreEnabled, 'true'], !Condition IsConfinfoAccount ]
@@ -442,7 +442,7 @@ Resources:
   # ============================================================================
   CognitoLocalUserCreationRule:
     Type: AWS::Events::Rule
-    Condition: HasMonitoringCognitoEnabled
+    Condition: HasMonitoringCognitoEnabledAndIsCoreAccount
     Properties:
       Name: !Sub "${ProjectName}-infra-sec-cognito-local-user-creation"
       Description: "Alert on Cognito local user creation via console or AWS CLI (SSO federated logins are allowed)"
