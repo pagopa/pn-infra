@@ -57,6 +57,12 @@ Parameters:
     Default: 'true'
     Description: 'Monitor DynamoDB critical table events?'
 
+  CognitoMonitoringEnabled:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: 'Monitor Cognito local user creation events (console/CLI)?'
+
   PITRExcludedTables:
     Type: CommaDelimitedList
     Description: 'DynamoDB tables to exclude from PITR disabled alerts'
@@ -162,6 +168,7 @@ Conditions:
   HasCloudTrailLogsEnabled: !Equals [!Ref EnableCloudTrailLogs, 'true']
   HasMonitoringS3Enabled: !Equals [!Ref S3MonitoringEnabled, 'true']
   HasMonitoringDynamoDBEnabled: !Equals [!Ref DynamoDBMonitoringEnabled, 'true']
+  HasMonitoringCognitoEnabled: !Equals [!Ref CognitoMonitoringEnabled, 'true']
   IsMultiRegionTrailCondition: !Equals [!Ref MultiRegionTrail, 'true']
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
@@ -429,6 +436,38 @@ Resources:
               region: $.detail.awsRegion
             InputTemplate: !Sub |
               "CRITICAL: DynamoDB Deletion Protection Disabled - Environment: ${EnvironmentType} - Table: <tableName> - User: <user> (ARN: <userArn>) - Source IP: <sourceIP> - Time: <time> - Region: <region> - ACTION REQUIRED: Re-enable immediately with: aws dynamodb update-table --table-name <tableName> --deletion-protection-enabled - CloudTrail Event ID: <eventID>"
+
+  # ============================================================================
+  # EventBridge rule to monitor Cognito local user creation (console/CLI)
+  # ============================================================================
+  CognitoLocalUserCreationRule:
+    Type: AWS::Events::Rule
+    Condition: HasMonitoringCognitoEnabled
+    Properties:
+      Name: !Sub "${ProjectName}-infra-sec-cognito-local-user-creation"
+      Description: "Alert on Cognito local user creation via console or AWS CLI (SSO federated logins are allowed)"
+      State: ENABLED
+      EventPattern:
+        source: ["aws.cognito-idp"]
+        detail-type: ["AWS API Call via CloudTrail"]
+        detail:
+          eventSource: ["cognito-idp.amazonaws.com"]
+          eventName: ["AdminCreateUser", "SignUp"]
+      Targets:
+        - Id: SendToSNS
+          Arn: !Ref InfraSecTopicArn
+          InputTransformer:
+            InputPathsMap:
+              time: "$.time"
+              user: "$.detail.userIdentity.principalId"
+              userArn: "$.detail.userIdentity.arn"
+              sourceIP: "$.detail.sourceIPAddress"
+              eventName: "$.detail.eventName"
+              userPoolId: "$.detail.requestParameters.userPoolId"
+              createdUsername: "$.detail.requestParameters.username"
+              region: "$.detail.awsRegion"
+              eventID: "$.detail.eventID"
+            InputTemplate: !Sub '"ALERT: Cognito Local User Created - Environment: ${EnvironmentType} - User Pool: <userPoolId> - Created Username: <createdUsername> - Operation: <eventName> - User: <user> (ARN: <userArn>) - Source IP: <sourceIP> - Time: <time> - Region: <region> - ACTION REQUIRED: Verify authorization. Only SSO logins are allowed; local user creation must be investigated. CloudTrail Event ID: <eventID>"'
 
   # ============================================================================
   # EventBridge rule to monitor S3 critical buckets
