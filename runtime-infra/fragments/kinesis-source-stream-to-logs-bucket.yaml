@@ -70,11 +70,6 @@ Parameters:
     Type: String
     Default: ""
     Description: S3 object key prefix for Lambda artifacts
-  
-  EnvironmentType:
-    Type: String
-    Default: ""
-    Description: Environment type
 
 Conditions:
   ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
@@ -262,7 +257,6 @@ Resources:
       Environment:
         Variables:
           TARGET_TABLE_NAME: !Ref PreprocessingTargetTableName
-          ENVIRONMENT: !Ref EnvironmentType
       Role: !GetAtt PreprocessingFilterLambdaRole.Arn
 
   PreprocessingLogsKinesisDeliveryStreamPartitioned:
