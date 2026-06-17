@@ -502,7 +502,7 @@ Resources:
               clientId: "$.detail.requestParameters.clientId"
               region: "$.detail.awsRegion"
               eventID: "$.detail.eventID"
-            InputTemplate: !Sub '"ALERT: Cognito Local User Login - Environment: ${EnvironmentType} - User Pool: <userPoolId> - Client: <clientId> - Auth Flow: <authFlow> - Operation: <eventName> - User: <user> (ARN: <userArn>) - Source IP: <sourceIP> - Time: <time> - Region: <region> - ACTION REQUIRED: Verify authorization. Only SSO logins are allowed; local user login must be investigated. CloudTrail Event ID: <eventID>"'
+            InputTemplate: !Sub '"ALERT: Cognito Local User Login - Environment: ${EnvironmentType} - User Pool: <userPoolId> - Client: <clientId> - Auth Flow: <authFlow> - Operation: <eventName> - User: <user> (ARN: <userArn>) - Source IP: <sourceIP> - Time: <time> - Region: <region> - ACTION REQUIRED: Verify authorization. Only SSO logins are allowed; local user login must be investigated. To identify the involved user, check the post-auth Lambda logs in CloudWatch log group /aws/lambda/${ProjectName}-post-auth-cognito-trigger-v2 and search for the string LOCAL_USER_LOGIN_DETECTED. CloudTrail Event ID: <eventID>"'
 
   # ============================================================================
   # EventBridge rule to monitor S3 critical buckets
