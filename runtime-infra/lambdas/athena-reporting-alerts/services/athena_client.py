@@ -6,7 +6,7 @@ from config import logger, ATHENA_RESULTS_BUCKET
 athena = boto3.client('athena')
 
 
-def execute_athena_query(query, database, workgroup, timeout=300):
+def execute_athena_query(query, database, workgroup, timeout):
     """
     Execute Athena query and wait for completion
     Returns list of result rows as dictionaries
