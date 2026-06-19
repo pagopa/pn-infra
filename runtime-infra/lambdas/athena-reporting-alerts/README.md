@@ -37,6 +37,7 @@ EventBridge Schedule → Lambda → Athena Query → CSV Export → SNS → Slac
 - `ATHENA_WORKGROUP`: Athena workgroup (required)
 - `SNS_TOPIC_ARN`: SNS topic ARN for Slack notifications (required)
 - `MAX_WORKERS`: Parallel execution limit (default: 10)
+- `ATHENA_QUERY_TIMEOUT_SECONDS`: Athena query polling timeout in seconds (default: 600)
 
 ## CSV Export Structure
 
