@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: 'CloudWatch alarm on CodeBuild project failed builds'
+
+Parameters:
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic for alarms
+
+  CodeBuildProjectName:
+    Type: String
+    Description: Name of the CodeBuild project to monitor
+
+  AlarmEnabled:
+    Type: String
+    Default: "true"
+    Description: Enable or disable the CodeBuild failed build alarm
+    AllowedValues:
+      - "true"
+      - "false"
+
+  DataPointsToAlarm:
+    Type: Number
+    Default: 1
+    Description: Number of breaching data points required to trigger the alarm
+
+  EvaluationPeriods:
+    Type: Number
+    Default: 1
+    Description: Number of periods over which data is evaluated
+
+  Period:
+    Type: Number
+    Default: 300
+    Description: Length in seconds of each evaluation period
+
+  Threshold:
+    Type: Number
+    Default: 1
+    Description: Number of failed builds that triggers the alarm
+
+Conditions:
+  IsAlarmEnabled: !Equals [!Ref AlarmEnabled, "true"]
+
+Resources:
+
+  CodeBuildFailedBuildAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsAlarmEnabled
+    Properties:
+      AlarmName: !Sub "${CodeBuildProjectName}-FailedBuild-Alarm"
+      AlarmDescription: !Sub "CloudWatch alarm raised when CodeBuild project ${CodeBuildProjectName} has one or more failed builds."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      DatapointsToAlarm: !Ref DataPointsToAlarm
+      EvaluationPeriods: !Ref EvaluationPeriods
+      Threshold: !Ref Threshold
+      MetricName: FailedBuilds
+      Namespace: AWS/CodeBuild
+      Period: !Ref Period
+      Statistic: Sum
+      Dimensions:
+        - Name: ProjectName
+          Value: !Ref CodeBuildProjectName
+
+Outputs:
+  CodeBuildFailedBuildAlarmArn:
+    Condition: IsAlarmEnabled
+    Description: 'CodeBuild failed build alarm ARN'
+    Value: !GetAtt CodeBuildFailedBuildAlarm.Arn

@@ -105,6 +105,16 @@ Parameters:
     Default: '-'
     Description: List of egress subnets
 
+  RaddPrivateProxyAlbListenerArn:
+    Type: String
+    Default: ''
+    Description: Dedicated ALB listener ARN for the RADD PrivateLink Lambda proxy
+
+  ServiceDeskPrivateLinkAlbListenerArn:
+    Type: String
+    Default: ''
+    Description: Dedicated ALB listener ARN for the Service Desk PrivateLink channel
+
   LogRetention:
     Type: Number
     Default: 14
@@ -645,6 +655,10 @@ Outputs:
     Value: !Ref SafestorageLoggerLogGroupName
   VpcEgressSubnetsIds:
     Value: !If [ IsEgressDefined, !Ref VpcEgressSubnetsIds, !Ref VpcSubnets ]
+  RaddPrivateProxyAlbListenerArn:
+    Value: !Ref RaddPrivateProxyAlbListenerArn
+  ServiceDeskPrivateLinkAlbListenerArn:
+    Value: !Ref ServiceDeskPrivateLinkAlbListenerArn
 
   # Data Monitoring pass-through params
   DynamoDbExportTableNames:

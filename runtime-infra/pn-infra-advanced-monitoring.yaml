@@ -894,6 +894,7 @@ Resources:
         Statistic: Sum
         ComparisonOperator: GreaterThanOrEqualToThreshold
         HasOncall: False
+        HasAlarm: False
 
   PnDeliveryLollipopWarningMetricAlarm:
     Type: AWS::CloudFormation::Stack
@@ -912,6 +913,22 @@ Resources:
         HasOncall: False
         HasAlarm: False
 
+  PnExternalRegistriesLollipopWarningMetricAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        MetricName: LollipopAuthCheck
+        MetricNamespace: AdvancedMetric
+        LogGroupName: '/aws/ecs/pn-external-registries'
+        FilterPattern: 'Tracciatura eventi di validazione incongruenti'
+        OncallStatistic: Sum
+        OncallComparisonOperator: GreaterThanOrEqualToThreshold
+        Statistic: Sum
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        HasOncall: False
+        HasAlarm: False        
 
 Outputs:
   Version:
