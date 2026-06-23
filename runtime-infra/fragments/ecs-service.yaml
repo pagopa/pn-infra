@@ -1238,6 +1238,11 @@ Resources:
               Value: 10000
             - Name: 'OTEL_METRICS_EXPORTER'
               Value: 'none'
+            # OTel Java agent >= 2.0 enables the OTLP logs exporter by default; logs are shipped
+            # via CloudWatch (logback JSON on stdout), not OTLP, so disable it to avoid the agent
+            # trying to reach the collector on localhost:4318 (ConnectException: Connection refused).
+            - Name: 'OTEL_LOGS_EXPORTER'
+              Value: 'none'
             - 'Fn::If':
               - HasOtelXRayDisable
               - Name: 'OTEL_TRACES_EXPORTER'
