@@ -66,7 +66,7 @@ Parameters:
   ContainerARMImageInjectorURI:
     Type: String
     Description: Container image URI for Open telemetry
-    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.33.0
+    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v2.28.1
 
   ContainerARMCloudWatchAgentURI:
     Type: String
@@ -76,7 +76,7 @@ Parameters:
   ContainerImageInjectorURI:
     Type: String
     Description: Container image URI for Open telemetry
-    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.32.0
+    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v2.28.1
 
   ContainerCloudWatchAgentURI:
     Type: String
@@ -792,8 +792,8 @@ Mappings:
       ARM: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:v1.30-arm64
       AMD: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:1.30
     sidecarInjector:
-      ARM: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.33.0
-      AMD: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.32.0
+      ARM: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v2.28.1
+      AMD: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v2.28.1
 
 Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
@@ -1237,6 +1237,11 @@ Resources:
             - Name: 'OTEL_IMR_EXPORT_INTERVAL'
               Value: 10000
             - Name: 'OTEL_METRICS_EXPORTER'
+              Value: 'none'
+            # OTel Java agent >= 2.0 enables the OTLP logs exporter by default; logs are shipped
+            # via CloudWatch (logback JSON on stdout), not OTLP, so disable it to avoid the agent
+            # trying to reach the collector on localhost:4318 (ConnectException: Connection refused).
+            - Name: 'OTEL_LOGS_EXPORTER'
               Value: 'none'
             - 'Fn::If':
               - HasOtelXRayDisable
