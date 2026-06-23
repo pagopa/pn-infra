@@ -4,7 +4,7 @@
 
 CICD_PROFILE=cicd
 AWS_REGION=eu-central-1
-TAG=v1.33.0
+TAG=v2.28.1
 REPOSITORY=aws-otel-agent-injector ## ECR repository to host the container image - needs to be created before run this script
 IMAGE=$REPOSITORY:$TAG
 CICD_ACCOUNT=$(aws sts get-caller-identity --profile $CICD_PROFILE --query 'Account' | jq -r .)
