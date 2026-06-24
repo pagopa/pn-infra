@@ -52,6 +52,10 @@ Parameters:
     Type: String
     Default: 'rate(1 minute)'
     Description: Schedule rate for Reporting Alerts Scheduler reconciliation loop. Default is 1 minute.
+  AthenaReportingAlertsQueryTimeoutSeconds:
+    Type: String
+    Default: '600'
+    Description: Timeout in seconds for Athena reporting and alerts query execution polling.
 
 Resources:
   GlueServiceRole:
@@ -601,6 +605,7 @@ Resources:
           ATHENA_WORKGROUP: !Ref AthenaWorkGroup
           SNS_TOPIC_ARN: !Ref AthenaReportingAlertsTopic
           MAX_WORKERS: "10"
+          ATHENA_QUERY_TIMEOUT_SECONDS: !Ref AthenaReportingAlertsQueryTimeoutSeconds
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/athena-reporting-alerts.zip

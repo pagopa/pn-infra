@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.error import HTTPError
 
 import os
-from config import logger, setup_logger, CONFIG_GIT_URL, ATHENA_DATABASE, ATHENA_WORKGROUP
+from config import logger, setup_logger, CONFIG_GIT_URL, ATHENA_DATABASE, ATHENA_WORKGROUP, ATHENA_QUERY_TIMEOUT_SECONDS
 from services.athena_client import execute_athena_query
 from services.s3_client import export_results_to_csv
 from services.slack_client import send_slack_notification
@@ -229,7 +229,8 @@ def lambda_handler(event, context):
     results = execute_athena_query(
         query=query_sql,
         database=ATHENA_DATABASE,
-        workgroup=ATHENA_WORKGROUP
+        workgroup=ATHENA_WORKGROUP,
+        timeout=ATHENA_QUERY_TIMEOUT_SECONDS
     )
     
     logger.info(f"Query returned {len(results)} records")
