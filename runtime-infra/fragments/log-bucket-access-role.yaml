@@ -245,6 +245,12 @@ Resources:
             Condition:
               StringEquals:
                 "kms:ViaService": !Sub s3.${AWS::Region}.amazonaws.com
+          - Action:
+              - "lambda:InvokeFunction"
+              - "lambda:getFunctionConfiguration"
+            Effect: "Allow"
+            Resource:
+              - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:pn-cdc-preproc-poc-filter-user-attributes*'
 
 
 Outputs:

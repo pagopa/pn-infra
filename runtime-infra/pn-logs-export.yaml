@@ -137,6 +137,30 @@ Parameters:
   LogIngestionReservedConcurrentExecution:
     Type: Number
     Default: 25
+    
+  PreprocessingStreamNamePrefix:
+    Type: String
+    Default: ""
+    Description: Stream name prefix for preprocessing Firehose, used to isolate it from active streams
+    
+  PreprocessingEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Enable preprocessing Firehose for CDC records
+  
+  PreprocessingS3RootPrefix:
+    Type: String
+    Default: ""
+    Description: Root S3 prefix used to isolate CDC preprocessing test data from active paths
+  
+  PreprocessingTargetTableName:
+    Type: String
+    Default: ""
+    Description: CDC tableName to keep in preprocessing Firehose
+
 
 Conditions:
   HasOpenSearchExport: !Not [ !Equals [ !Ref OpenSearchClusterEndpoint, "" ] ]
@@ -166,6 +190,14 @@ Resources:
         StreamNamePrefix: 'cdcTos3'
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         StreamContent: DYNAMO_CDC
+        
+        PreprocessingStreamNamePrefix: !Ref PreprocessingStreamNamePrefix
+        LambdasBucketName: !Ref LambdasBucketName
+        LambdasBasePath: !Ref LambdasBasePath
+        PreprocessingEnabled: !Ref PreprocessingEnabled
+        PreprocessingS3RootPrefix: !Ref PreprocessingS3RootPrefix
+        PreprocessingTargetTableName: !Ref PreprocessingTargetTableName
+
 
   ###             Export CloudWatch Logs to Log saving bucket             ###
   ###########################################################################
