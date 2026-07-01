@@ -18,11 +18,6 @@ Parameters:
   BucketSuffix:
     Type: String
     Description: Suffix to the log bucket name
-  
-  SafeStorageAccountId:
-    Type: String
-    Default: '-'
-    Description: Safestorage Account ID
 
   CdcStreamRetentionHours:
     Type: Number
@@ -110,20 +105,18 @@ Parameters:
   
   ConfidentialInfoAccountId:
     Type: String
-    Default: ''
+    Default: '-'
     Description: AWS AccountId of the confidential info account in same environment
 
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
-  
-  HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
 
-  ActivateSafeStorageCondition: !And [ !Condition MakeBucketCondition, !Condition HasStorageStorageAccountId]
+  ActivateSafeStorageCondition: !And [ !Condition MakeBucketCondition, !Condition HasConfidentialInfoAccountId]
 
   CdcOnDemandDisabled: !Not [!Equals [!Ref CdcStreamMode, ON_DEMAND]]
   LogsOnDemandDisabled: !Not [!Equals [!Ref LogsStreamMode, ON_DEMAND]]
 
-  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
+  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '-' ] ]
 
 Resources:
   
@@ -270,7 +263,7 @@ Resources:
               Condition:
                 ArnLike: 
                   aws:SourceArn: 
-                    - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                    - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${ConfidentialInfoAccountId}:trail/*"
                     - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/*"
             - !Ref AWS::NoValue
 
@@ -592,8 +585,8 @@ Outputs:
   AlarmSNSTopicName:
     Value: !Ref AlarmSNSTopicName
   
-  SafeStorageAccountId:
-    Value: !Ref SafeStorageAccountId
+  ConfidentialInfoAccountId:
+    Value: !Ref ConfidentialInfoAccountId
 
   Version:
     Value: !Ref Version
