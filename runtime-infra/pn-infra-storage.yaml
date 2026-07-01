@@ -105,7 +105,7 @@ Parameters:
   
   ConfidentialInfoAccountId:
     Type: String
-    Default: ''
+    Default: '-'
     Description: AWS AccountId of the confidential info account in same environment
 
 Conditions:
@@ -116,7 +116,7 @@ Conditions:
   CdcOnDemandDisabled: !Not [!Equals [!Ref CdcStreamMode, ON_DEMAND]]
   LogsOnDemandDisabled: !Not [!Equals [!Ref LogsStreamMode, ON_DEMAND]]
 
-  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
+  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '-' ] ]
 
 Resources:
   
