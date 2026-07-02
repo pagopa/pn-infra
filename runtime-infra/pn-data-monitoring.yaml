@@ -184,6 +184,27 @@ Parameters:
         - "true"
         - "false"
 
+  CriticalMonitoringNotificationTaxonomyCodes:
+    Type: String
+    Description: Comma separated taxonomy codes monitored by critical monitoring notification analyzer
+    Default: "050501P,050501N"
+
+  CriticalMonitoringNotificationAnalyzerMappingEnabled:
+    Type: String
+    Description: Enable or Disable the Event Source Mapping for the PnCriticalMonitoringNotificationAnalyzer Lambda Function
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+
+  CriticalMonitoringNotificationSchedulerState:
+    Type: String
+    Description: State of Critical Monitoring schedulers (ENABLED or DISABLED)
+    Default: 'ENABLED'
+    AllowedValues:
+      - 'ENABLED'
+      - 'DISABLED'
+
   AlarmSNSTopicArn:
     Type: String
 
@@ -228,7 +249,8 @@ Conditions:
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
   HasCronExpressionLambdaPnSupportSqsInCoreAccount: !And [!Not [!Equals [!Ref LambdaPnSupportExportSqsCronExpression, '']], !Equals [!Ref PnCoreAwsAccountId, '']]
   HasQuickSightDataImportLambdaScheduleStateEnabled: !And [ !Condition IsCoreAccount, !Equals [!Ref QuickSightDataImportLambdaScheduleState, 'ENABLED' ] ]
-
+  HasCriticalMonitoringSchedulerStateEnabled: !And [ !Condition IsCoreAccount, !Equals [!Ref CriticalMonitoringNotificationSchedulerState, 'ENABLED' ] ]
+  
 Resources:
   
   # s3 bucket with name BucketName
@@ -1295,12 +1317,26 @@ Resources:
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
+  CriticalMonitoringNotificationEventsQueue:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-critical-monitoring-notification-events'
+        VisibilityTimeout: 900 # max time for Lambda to process the message
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
   AnalogRecipientEventsQueuePolicy:
     Type: AWS::SQS::QueuePolicy
     Condition: IsCoreAccount
     Properties:
       Queues:
         - !GetAtt AnalogRecipientEventsQueue.Outputs.QueueURL
+        - !GetAtt CriticalMonitoringNotificationEventsQueue.Outputs.QueueURL
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -1308,7 +1344,9 @@ Resources:
             Principal:
               Service: events.amazonaws.com
             Action: sqs:SendMessage
-            Resource: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+            Resource: 
+              - !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+              - !GetAtt CriticalMonitoringNotificationEventsQueue.Outputs.QueueARN
             Condition:
               ArnEquals:
                 aws:SourceArn: !GetAtt PnCoreEventBusToAnalogRecipientEventsQueue.Arn
@@ -1328,6 +1366,11 @@ Resources:
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-AnalogRecipientEvents'
           Arn: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+          InputPath: $.detail
+        ##Condition this targer to only be created if the CriticalMonitoringNotificationEventsQueue is created
+        - Condition: IsCoreAccount
+          Id: !Sub '${ProjectName}-CoreEventBus-CriticalMonitoringNotificationEvents'
+          Arn: !GetAtt CriticalMonitoringNotificationEventsQueue.Outputs.QueueARN
           InputPath: $.detail
 
   SafeStorageErrorEventsQueue:
@@ -1382,7 +1425,7 @@ Resources:
     Type: AWS::Lambda::Function
     Condition: IsCoreAccount
     Properties:
-      Runtime: nodejs22.x
+      Runtime: nodejs24.x
       Timeout: 60
       MemorySize: 128
       Handler: index.handler
@@ -1475,6 +1518,164 @@ Resources:
       Enabled: !Ref AnalogRecipientsAnalyzerMappingEnabled
       EventSourceArn: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
       FunctionName: !Ref PnAnalogRecipientsAnalyzerLambda
+
+  PnCriticalMonitoringNotificationAnalyzerLambda:
+    Type: AWS::Lambda::Function
+    Condition: IsCoreAccount
+    Properties:
+      Runtime: nodejs24.x
+      Timeout: 60
+      MemorySize: 128
+      ReservedConcurrentExecutions: 1
+      Handler: index.handler
+      FunctionName: pn-critical-monitoring-notification-analyzer-lambda
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/pn-critical-monitoring-notification-analyzer.zip
+      Environment:
+        Variables:
+          MONITORING_BUCKET_NAME: !Ref DataMonitoringBucket
+          TAXONOMY_CODES: !Ref CriticalMonitoringNotificationTaxonomyCodes
+          WHITELISTED_PA: '{{resolve:ssm:/pn-infra-monitoring/critical-monitoring-notification/whitelisted-pa}}'
+          SNS_TOPIC_ARN: !Ref DeliveryMonitoringTopic
+      Role:
+        Fn::GetAtt:
+          - PnCriticalMonitoringNotificationAnalyzerLambdaRole
+          - Arn 
+
+  PnCriticalMonitoringNotificationAnalyzerLambdaRole:
+    Type: AWS::IAM::Role
+    Condition: IsCoreAccount
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: PnCriticalMonitoringNotificationAnalyzerLambdaPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/critical-monitoring/*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream  
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/pn-critical-monitoring-notification-analyzer-lambda:*
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref DeliveryMonitoringTopic 
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                Resource: 
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-Notification
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-Timelines
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: 
+                  - !GetAtt CriticalMonitoringNotificationEventsQueue.Outputs.QueueARN
+
+
+  PnCriticalMonitoringNotificationAnalyzerLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Ref PnCriticalMonitoringNotificationAnalyzerLambda
+        LogGroupRetention: 14
+        LogGroupPrefix: /aws/lambda
+
+  PnCriticalMonitoringNotificationAnalyzerLambdaAlarms:
+    Condition: IsCoreAccount
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref PnCriticalMonitoringNotificationAnalyzerLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        FilterPattern: "ERROR"
+
+  PnCriticalMonitoringNotificationAnalyzerLambdaEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Condition: IsCoreAccount
+    Properties:
+      BatchSize: 10
+      Enabled: !Ref CriticalMonitoringNotificationAnalyzerMappingEnabled
+      EventSourceArn: !GetAtt CriticalMonitoringNotificationEventsQueue.Outputs.QueueARN
+      FunctionName: !Ref PnCriticalMonitoringNotificationAnalyzerLambda
+
+  PnCriticalMonitoringNotificationSchedulerRole:
+    Type: AWS::IAM::Role
+    Condition: IsCoreAccount
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeCriticalMonitoringLambda
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt PnCriticalMonitoringNotificationAnalyzerLambda.Arn
+
+  PnCriticalMonitoringNotificationScheduler1230:
+    Type: AWS::Scheduler::Schedule
+    Condition: HasCriticalMonitoringSchedulerStateEnabled
+    Properties:
+      Name: !Sub '${ProjectName}-critical-monitoring-1230-${EnvironmentType}'
+      Description: Run critical monitoring notification analyzer at 12:30 (Europe/Rome) on working days
+      ScheduleExpression: 'cron(30 12 ? * MON-FRI *)'
+      ScheduleExpressionTimezone: Europe/Rome
+      State: !Ref CriticalMonitoringNotificationSchedulerState
+      FlexibleTimeWindow:
+        Mode: OFF
+      Target:
+        Arn: !GetAtt PnCriticalMonitoringNotificationAnalyzerLambda.Arn
+        RoleArn: !GetAtt PnCriticalMonitoringNotificationSchedulerRole.Arn
+
+  PnCriticalMonitoringNotificationScheduler1730:
+    Type: AWS::Scheduler::Schedule
+    Condition: HasCriticalMonitoringSchedulerStateEnabled
+    Properties:
+      Name: !Sub '${ProjectName}-critical-monitoring-1730-${EnvironmentType}'
+      Description: Run critical monitoring notification analyzer at 17:30 (Europe/Rome) on working days
+      ScheduleExpression: 'cron(30 17 ? * MON-FRI *)'
+      ScheduleExpressionTimezone: Europe/Rome
+      State: !Ref CriticalMonitoringNotificationSchedulerState
+      FlexibleTimeWindow:
+        Mode: OFF
+      Target:
+        Arn: !GetAtt PnCriticalMonitoringNotificationAnalyzerLambda.Arn
+        RoleArn: !GetAtt PnCriticalMonitoringNotificationSchedulerRole.Arn
 
 Outputs:
   DataMonitoringBucketName:
