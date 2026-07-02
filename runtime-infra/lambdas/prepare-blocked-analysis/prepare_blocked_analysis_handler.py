@@ -22,6 +22,10 @@ def lambda_handler(event, context):
     repo_zip_url = os.environ['RepoZipUrl']
     cloudwatch_namespace = os.environ['CloudWatchNamespace']
     
+    # Weekly report configuration (SNS/email alerting)
+    delivery_monitoring_topic_arn = os.environ.get('DeliveryMonitoringSnsTopicArn', '')
+    environment_type = os.environ.get('EnvironmentType', '')
+    
     # CloudWatch metric names
     metric_name_total_open_case = os.environ['MetricNameTotalOpenCases']
     metric_name_resolved_case = os.environ['MetricNameResolvedInLastRun']
@@ -174,6 +178,10 @@ def lambda_handler(event, context):
         else:
             print("ERROR: statistics.json not found on S3, cannot publish CloudWatch metrics")
         
+        # Send weekly report (Mondays only) via SNS/email
+        send_weekly_report(result_dir, region, delivery_monitoring_topic_arn,
+                           environment_type, event)
+        
         return {
             'statusCode': 200,
             'body': 'PrepareBlockedAnalysis completed successfully'
@@ -187,6 +195,8 @@ def lambda_handler(event, context):
         if e.returncode == 2:
             print("Script reached timeout but saved progress")
             
+            result_dir = "/tmp/prepare_blocked_results_timeout"
+            
             # Try to download and publish metrics even after timeout
             try:
                 print("Attempting to download results from S3 after timeout...")
@@ -194,7 +204,6 @@ def lambda_handler(event, context):
                 bucket_name = s3_result_bucket.replace('s3://', '').split('/')[0]
                 s3_prefix = '/'.join(s3_result_bucket.replace('s3://', '').split('/')[1:]).rstrip('/')
                 
-                result_dir = "/tmp/prepare_blocked_results_timeout"
                 os.makedirs(result_dir, exist_ok=True)
                 
                 # Try to download statistics.json and prepare_analog_domicile_latest.json
@@ -220,6 +229,10 @@ def lambda_handler(event, context):
                     print("ERROR: statistics.json not available after timeout, cannot publish metrics")
             except Exception as metrics_error:
                 print(f"ERROR: Failed to download and publish metrics after timeout: {metrics_error}")
+            
+            # Send weekly report (Mondays only) via SNS/email even after timeout
+            send_weekly_report(result_dir, region, delivery_monitoring_topic_arn,
+                               environment_type, event)
             
             return {
                 'statusCode': 200,
@@ -328,3 +341,74 @@ def publish_metrics_to_cloudwatch(result_dir, cloudwatch, region, namespace,
         
     except Exception as e:
         print(f"ERROR: Failed to publish metrics to CloudWatch: {e}")
+
+
+def send_weekly_report(result_dir, region, topic_arn, environment_type='', event=None):
+    """
+    Invia un report settimanale (di lunedi') via SNS/email con i casi PREPARE
+    ancora aperti e non risolti.
+
+    Il report contiene solo l'elenco degli elementi impattati: nessun CSV e
+    nessun link a S3. La lambda gira ogni giorno, quindi il report viene inviato
+    solo di lunedi'. Viene comunque inviato anche quando non ci sono casi aperti,
+    indicandolo esplicitamente, per confermare che il monitoraggio e' attivo.
+
+    Il giorno puo' essere forzato via event ('force_weekly_report': true) per test.
+    """
+    event = event or {}
+    try:
+        # La lambda gira ogni giorno: inviare il report solo di lunedi' (weekday 0)
+        force = event.get('force_weekly_report', False)
+        today = datetime.utcnow()
+        if not force and today.weekday() != 0:
+            print(f"Weekly report skipped: today is {today.strftime('%A')}, report is sent only on Mondays")
+            return
+
+        if not topic_arn:
+            print("WARNING: DeliveryMonitoringSnsTopicArn not set, skipping weekly report email")
+            return
+
+        # Carica i casi ancora aperti dall'analisi piu' recente
+        open_cases = []
+        analysis_file = os.path.join(result_dir, 'prepare_analog_domicile_latest.json')
+        if os.path.exists(analysis_file):
+            with open(analysis_file, 'r', encoding='utf-8') as f:
+                analysis_data = json.load(f)
+            open_cases = analysis_data.get('analysis', [])
+        else:
+            print("WARNING: prepare_analog_domicile_latest.json not found, weekly report will report 0 open cases")
+
+        env_suffix = f" [{environment_type}]" if environment_type else ""
+        report_date = today.strftime('%Y-%m-%d')
+
+        if open_cases:
+            subject = f"[SEND]{env_suffix} Report settimanale PREPARE bloccate - {len(open_cases)} casi aperti"
+            lines = [
+                f"Report settimanale monitoraggio PREPARE bloccate - {report_date}",
+                "",
+                f"Casi aperti e non risolti: {len(open_cases)}",
+                "",
+                "Elementi impattati:",
+            ]
+            for case in open_cases:
+                lines.append(
+                    f"- IUN: {case.get('iun', 'N/A')} | "
+                    f"timelineElementId: {case.get('timelineElementId', 'N/A')} | "
+                    f"timestamp: {case.get('timestamp', 'N/A')}"
+                )
+        else:
+            subject = f"[SEND]{env_suffix} Report settimanale PREPARE bloccate - nessun caso aperto"
+            lines = [
+                f"Report settimanale monitoraggio PREPARE bloccate - {report_date}",
+                "",
+                "Nessun caso aperto - monitoraggio attivo.",
+            ]
+
+        message = "\n".join(lines)
+
+        # SNS impone un massimo di 100 caratteri per il Subject
+        sns = boto3.client('sns', region_name=region)
+        sns.publish(TopicArn=topic_arn, Subject=subject[:100], Message=message)
+        print(f"Weekly report sent to SNS topic {topic_arn} ({len(open_cases)} open cases)")
+    except Exception as e:
+        print(f"ERROR: Failed to send weekly report: {e}")

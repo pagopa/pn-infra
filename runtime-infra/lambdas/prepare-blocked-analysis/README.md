@@ -27,6 +27,19 @@ EventBridge Schedule → Lambda → Download Repo → Execute Script → Athena 
 - `S3ResultBucket`: S3 path for result files (required)
 - `AthenaResultsBucket`: Athena query results bucket (required)
 - `RepoZipUrl`: GitHub ZIP URL for pn-troubleshooting repository (required)
+- `CloudWatchNamespace`: CloudWatch namespace for published metrics
+- `MetricNameTotalOpenCases` / `MetricNameResolvedInLastRun` / `MetricNameNewInLastRun` / `MetricNameAffectedPrepare`: CloudWatch metric names
+- `DeliveryMonitoringSnsTopicArn`: SNS topic ARN used to send the weekly email report (optional; if empty the report is skipped)
+- `EnvironmentType`: environment name, used only in the weekly report subject (optional)
+
+## Weekly report (email alerting)
+
+Every Monday the handler publishes a weekly report to the `DeliveryMonitoringSnsTopicArn`
+SNS topic (subscribed to the `DeliveryMonitoringSlackEmail` channel) listing the still
+open/unresolved PREPARE cases. No CSV and no S3 links are included. The Lambda runs daily,
+but the report is sent only on Mondays (`weekday == 0`, UTC); it can be forced for testing
+with the event flag `{"force_weekly_report": true}`. The email is sent even when there are
+no open cases, stating it explicitly, so it also confirms the monitoring is active.
 
 ## Execution Flow
 
