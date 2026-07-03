@@ -1607,6 +1607,8 @@ Resources:
 
   PnCriticalMonitoringNotificationAnalyzerLambdaAlarms:
     Condition: IsCoreAccount
+    DependsOn:
+      - PnCriticalMonitoringNotificationAnalyzerLambdaLogGroup
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
