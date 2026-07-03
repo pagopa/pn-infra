@@ -20,6 +20,7 @@ const SNS_TOPIC_ARN = process.env.SNS_TOPIC_ARN;
 const HEADER_CSV = "RequestId, CodiceOggetto, Recapitista, CAP\n";
 const PENDING_PREFIX = "critical-monitoring/to_send/";
 const TAXONOMY_CODES = process.env.TAXONOMY_CODES ? process.env.TAXONOMY_CODES.split(",").map(code => code.trim()) : [];
+const WHITELISTED_PA = process.env.WHITELISTED_PA ? process.env.WHITELISTED_PA.split(",").map(pa => pa.trim()) : [];
 
 function isSqsEvent(event) {
   return Array.isArray(event?.Records) && event.Records.length > 0 && event.Records[0].eventSource === "aws:sqs";
@@ -95,6 +96,12 @@ async function processRecord(record) {
   const analogMailInfo = retrieveInfoFromDetails(recordBody.analogMail);
 
   const notification = await retrieveElementFromDynamoDB(PN_NOTIFICATION_TABLE_NAME, "iun", analogMailInfo.iun);
+
+  if (WHITELISTED_PA.length > 0 && !WHITELISTED_PA.includes(notification.pa)) {
+    console.log(`Notification pa ${notification ? notification.pa : 'undefined'} is not in the whitelisted list, skipping.`);
+    return;
+  } 
+  
   if (!TAXONOMY_CODES.includes(notification.taxonomyCode)) {
     console.log(`Notification taxonomyCode ${notification ? notification.taxonomyCode : 'undefined'} is not in the monitored list, skipping.`);
     return;

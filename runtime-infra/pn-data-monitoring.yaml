@@ -1367,7 +1367,6 @@ Resources:
         - Id: !Sub '${ProjectName}-CoreEventBus-AnalogRecipientEvents'
           Arn: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
           InputPath: $.detail
-        ##Condition this targer to only be created if the CriticalMonitoringNotificationEventsQueue is created
         - Condition: IsCoreAccount
           Id: !Sub '${ProjectName}-CoreEventBus-CriticalMonitoringNotificationEvents'
           Arn: !GetAtt CriticalMonitoringNotificationEventsQueue.Outputs.QueueARN
