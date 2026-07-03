@@ -12,13 +12,14 @@ const {
   retrieveInfoFromDetails,
   prepareAggregationMessageToSns,
 } = require("./lib/utils");
+const { randomUUID } = require("crypto");
 
 const PN_NOTIFICATION_TABLE_NAME = 'pn-Notification';
 const TIMELINE_DB_TABLE_NAME = 'pn-Timelines';
 const S3_BUCKET_NAME = process.env.MONITORING_BUCKET_NAME;
 const SNS_TOPIC_ARN = process.env.SNS_TOPIC_ARN;
-const HEADER_CSV = "RequestId, CodiceOggetto, Recapitista, CAP\n";
 const PENDING_PREFIX = "critical-monitoring/to_send/";
+const AGGREGATE_PREFIX = "critical-monitoring/aggregate/";
 const TAXONOMY_CODES = process.env.TAXONOMY_CODES ? process.env.TAXONOMY_CODES.split(",").map(code => code.trim()) : [];
 const WHITELISTED_PA = process.env.WHITELISTED_PA ? process.env.WHITELISTED_PA.split(",").map(pa => pa.trim()) : [];
 
@@ -48,22 +49,38 @@ function getRomeIsoTimestamp(referenceDate = new Date()) {
   return formatter.format(referenceDate).replace(" ", "T");
 }
 
-function extractCsvDataRows(csvContent) {
-  const lines = csvContent
+function getRomePathParts(referenceDate = new Date()) {
+  const formatter = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Rome",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+  });
+
+  const [datePart, hourPart] = formatter.format(referenceDate).split(" ");
+  const [year, month, day] = datePart.split("-");
+
+  return { year, month, day, hour: hourPart };
+}
+
+function extractJsonLines(content) {
+  const lines = content
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
 
-  if (lines.length === 0) {
-    return [];
-  }
-
-  const normalizedHeader = HEADER_CSV.trim();
-  if (lines[0] === normalizedHeader) {
-    return lines.slice(1);
-  }
-
-  return lines;
+  return lines
+    .map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch (error) {
+        console.warn("Skipping invalid JSONL line", line);
+        return undefined;
+      }
+    })
+    .filter(Boolean);
 }
 
 async function retrieveElementFromDynamoDB(tableName, keyName, keyValue, sKeyName, sKeyValue) {
@@ -78,7 +95,7 @@ async function retrieveElementFromDynamoDB(tableName, keyName, keyValue, sKeyNam
 }
 
 async function exportDataToS3(data, key) {
-  console.log(`Uploading CSV report to S3 bucket: ${S3_BUCKET_NAME}, key: ${key}`);
+  console.log(`Uploading JSONL report to S3 bucket: ${S3_BUCKET_NAME}, key: ${key}`);
   try {
     await uploadFileToS3(S3_BUCKET_NAME, key, data);
     console.log(`Data successfully uploaded to S3 at ${key}`);
@@ -110,21 +127,26 @@ async function processRecord(record) {
   const timelines = await retrieveElementFromDynamoDB(TIMELINE_DB_TABLE_NAME, "iun", analogMailInfo.iun, "timelineElementId", analogMailInfo.requestIdWithoutPCRETRY);
   analogMailInfo.zip = timelines.details.physicalAddress.zip;
 
-  return `${analogMailInfo.requestId}, ${analogMailInfo.registeredLetterCode}, ${analogMailInfo.courier}, ${analogMailInfo.zip}`;
+  return {
+    requestId: analogMailInfo.requestId,
+    codiceOggetto: analogMailInfo.registeredLetterCode,
+    recapitista: analogMailInfo.courier,
+    cap: analogMailInfo.zip,
+  };
 }
 
-function buildPartialCsvKey() {
-  const timestamp = getRomeIsoTimestamp();
-  return `${PENDING_PREFIX}to_send_${timestamp}_batch.csv`;
+function buildPartialJsonKey() {
+  const { year, month, day, hour } = getRomePathParts();
+  return `${PENDING_PREFIX}${year}/${month}/${day}/${hour}/${randomUUID()}.json`;
 }
 
-function buildAggregatedCsvKey() {
-  const timestamp = getRomeIsoTimestamp();
-  return `critical-monitoring/aggregate/${timestamp}.csv`;
+function buildAggregatedJsonKey() {
+  const { year, month, day, hour } = getRomePathParts();
+  return `${AGGREGATE_PREFIX}${year}/${month}/${day}/${hour}/${randomUUID()}.json`;
 }
 
 async function handleSqsEvent(event) {
-  let csvContent = HEADER_CSV;
+  const rows = [];
   let foundRecords = false;
   const batchItemFailures = [];
 
@@ -140,16 +162,17 @@ async function handleSqsEvent(event) {
 
     if (result) {
       foundRecords = true;
-      csvContent += `${result}\n`;
+      rows.push(result);
     }
   }
 
   if (foundRecords) {
-    const s3Key = buildPartialCsvKey();
+    const s3Key = buildPartialJsonKey();
+    const jsonlContent = rows.map((row) => JSON.stringify(row)).join("\n") + "\n";
     try {
-      await exportDataToS3(csvContent, s3Key);
+      await exportDataToS3(jsonlContent, s3Key);
     } catch (error) {
-      console.error("Error uploading partial CSV report to S3", error);
+      console.error("Error uploading partial JSONL report to S3", error);
       batchItemFailures.splice(0, batchItemFailures.length);
       for (const record of event.Records) {
         batchItemFailures.push({ itemIdentifier: record.messageId });
@@ -176,16 +199,16 @@ async function handleScheduledEvent() {
     if (!object.Key) {
       continue;
     }
-    const csvContent = await downloadFileFromS3(S3_BUCKET_NAME, object.Key);
-    allRows.push(...extractCsvDataRows(csvContent));
+    const fileContent = await downloadFileFromS3(S3_BUCKET_NAME, object.Key);
+    allRows.push(...extractJsonLines(fileContent));
   }
 
-  const aggregatedCsvContent = allRows.length > 0
-    ? `${HEADER_CSV}${allRows.join("\n")}\n`
-    : HEADER_CSV;
-  const aggregatedKey = buildAggregatedCsvKey();
+  const aggregatedJsonlContent = allRows.length > 0
+    ? `${allRows.map((row) => JSON.stringify(row)).join("\n")}\n`
+    : "";
+  const aggregatedKey = buildAggregatedJsonKey();
 
-  await exportDataToS3(aggregatedCsvContent, aggregatedKey);
+  await exportDataToS3(aggregatedJsonlContent, aggregatedKey);
   await deleteObjectsFromS3(
     S3_BUCKET_NAME,
     pendingObjects.map((object) => object.Key).filter(Boolean)

@@ -1621,7 +1621,8 @@ Resources:
     Type: AWS::Lambda::EventSourceMapping
     Condition: IsCoreAccount
     Properties:
-      BatchSize: 10
+      BatchSize: 100
+      MaximumBatchingWindowInSeconds: 300
       Enabled: !Ref CriticalMonitoringNotificationAnalyzerMappingEnabled
       EventSourceArn: !GetAtt CriticalMonitoringNotificationEventsQueue.Outputs.QueueARN
       FunctionName: !Ref PnCriticalMonitoringNotificationAnalyzerLambda
