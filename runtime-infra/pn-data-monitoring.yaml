@@ -1355,7 +1355,7 @@ Resources:
     Type: AWS::Events::Rule
     Condition: IsCoreAccount
     Properties: 
-      Description: Route Analog Recipient Events (CON080) to pn-analog-recipient-events-queue
+      Description: Route Analog Recipient Events (CON080) to analog monitoring queues
       EventBusName: !Ref EventBusToAnalogRecipientEventsQueueName
       EventPattern:
         detail-type: [ "ExternalChannelOutcomeEvent" ]
@@ -1367,8 +1367,7 @@ Resources:
         - Id: !Sub '${ProjectName}-CoreEventBus-AnalogRecipientEvents'
           Arn: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
           InputPath: $.detail
-        - Condition: IsCoreAccount
-          Id: !Sub '${ProjectName}-CoreEventBus-CriticalMonitoringNotificationEvents'
+        - Id: !Sub '${ProjectName}-CoreEventBus-CriticalMonitoringNotificationEvents'
           Arn: !GetAtt CriticalMonitoringNotificationEventsQueue.Outputs.QueueARN
           InputPath: $.detail
 
@@ -1656,7 +1655,7 @@ Resources:
       ScheduleExpressionTimezone: Europe/Rome
       State: !Ref CriticalMonitoringNotificationSchedulerState
       FlexibleTimeWindow:
-        Mode: OFF
+        Mode: "OFF"
       Target:
         Arn: !GetAtt PnCriticalMonitoringNotificationAnalyzerLambda.Arn
         RoleArn: !GetAtt PnCriticalMonitoringNotificationSchedulerRole.Arn
@@ -1671,7 +1670,7 @@ Resources:
       ScheduleExpressionTimezone: Europe/Rome
       State: !Ref CriticalMonitoringNotificationSchedulerState
       FlexibleTimeWindow:
-        Mode: OFF
+        Mode: "OFF"
       Target:
         Arn: !GetAtt PnCriticalMonitoringNotificationAnalyzerLambda.Arn
         RoleArn: !GetAtt PnCriticalMonitoringNotificationSchedulerRole.Arn
