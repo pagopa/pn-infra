@@ -144,6 +144,19 @@ Parameters:
     Description: Metric name for affected PREPARE count
     Default: 'AffectedPrepareBlockedAnalysis'
 
+  LambdaPrepareBlockedWeeklyReportCronExpression:
+    Type: String
+    Description: Cron expression (Europe/Rome timezone) for the weekly PrepareBlocked report email (e.g. Monday 10:00 Italy)
+    Default: 'cron(0 10 ? * MON *)'
+
+  LambdaPrepareBlockedWeeklyReportEnableCronExpression:
+    Type: String
+    Description: Enable/disable state for the weekly report scheduled rule
+    Default: 'DISABLED'
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+
   TemplateBucketBaseUrl:
     Type: String
     Description: URL to load infrastructure model fragments from
@@ -1106,29 +1119,65 @@ Resources:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         FilterPattern: "ERROR"
 
-  # EventBridge rule to trigger PrepareBlockedAnalysis Lambda
-  LambdaPrepareBlockedAnalysisScheduleRule:
+  # IAM role assumed by EventBridge Scheduler to invoke the PrepareBlockedAnalysis Lambda
+  LambdaPrepareBlockedSchedulerRole:
     Condition: IsCoreAccount
-    Type: AWS::Events::Rule
+    Type: AWS::IAM::Role
     Properties:
-      Description: "Scheduled rule to trigger PrepareBlockedAnalysis Lambda UTC"
+      RoleName: !Sub pn-prepare-blocked-scheduler-role-${EnvironmentType}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: InvokePrepareBlockedAnalysisLambda
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt LambdaPrepareBlockedAnalysis.Arn
+
+  # EventBridge Scheduler to trigger PrepareBlockedAnalysis Lambda (timezone-aware)
+  LambdaPrepareBlockedAnalysisSchedule:
+    Condition: IsCoreAccount
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub pn-prepare-blocked-analysis-${EnvironmentType}
+      Description: "Schedule to trigger PrepareBlockedAnalysis Lambda (Europe/Rome)"
       ScheduleExpression: !Ref LambdaPrepareBlockedAnalysisCronExpression
+      ScheduleExpressionTimezone: Europe/Rome
       State: !Ref LambdaPrepareBlockedAnalysisEnableCronExpression
-      Targets:
-        - Arn: !GetAtt LambdaPrepareBlockedAnalysis.Arn
-          Id: LambdaPrepareBlockedAnalysisTarget
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt LambdaPrepareBlockedAnalysis.Arn
+        RoleArn: !GetAtt LambdaPrepareBlockedSchedulerRole.Arn
 
-  LambdaPrepareBlockedAnalysisPermission:
+  # EventBridge Scheduler to send the weekly report email (report-only invocation, timezone-aware)
+  LambdaPrepareBlockedWeeklyReportSchedule:
     Condition: IsCoreAccount
-    Type: AWS::Lambda::Permission
+    Type: AWS::Scheduler::Schedule
     Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref LambdaPrepareBlockedAnalysis
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt LambdaPrepareBlockedAnalysisScheduleRule.Arn
-      SourceAccount: !Ref AWS::AccountId
+      Name: !Sub pn-prepare-blocked-weekly-report-${EnvironmentType}
+      Description: "Schedule to send the PrepareBlocked weekly report email (report-only, Europe/Rome)"
+      ScheduleExpression: !Ref LambdaPrepareBlockedWeeklyReportCronExpression
+      ScheduleExpressionTimezone: Europe/Rome
+      State: !Ref LambdaPrepareBlockedWeeklyReportEnableCronExpression
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt LambdaPrepareBlockedAnalysis.Arn
+        RoleArn: !GetAtt LambdaPrepareBlockedSchedulerRole.Arn
+        Input: '{"report_only": true}'
 
-  # CloudWatch Dashboard for PrepareBlockedAnalysis
+
   PrepareBloccateDashboard:
     Condition: IsCoreAccount
     Type: AWS::CloudWatch::Dashboard
