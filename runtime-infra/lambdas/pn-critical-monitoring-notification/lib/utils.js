@@ -14,6 +14,7 @@ function retrieveInfoFromDetails(event) {
     requestIdWithoutPCRETRY: retrieveRequestIdWithoutPCRETRY(event.requestId),
     registeredLetterCode: event.registeredLetterCode,
     iun: retrieveIunFromRequestId(event.requestId),
+    timestamp: event.clientRequestTimeStamp
   }
 }
 
