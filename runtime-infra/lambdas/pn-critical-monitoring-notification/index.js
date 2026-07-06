@@ -1,52 +1,18 @@
 const { queryRequest } = require("./lib/dynamo");
-const {
-  uploadFileToS3,
-  listObjectsByPrefix,
-  downloadFileFromS3,
-  deleteObjectsFromS3,
-  generatePresignedUrl,
-} = require("./lib/s3");
-const { publishMessageToSns } = require("./lib/sns");
+const { uploadFileToS3 } = require("./lib/s3");
 const { unmarshall } = require("@aws-sdk/util-dynamodb");
-const {
-  retrieveInfoFromDetails,
-  prepareAggregationMessageToSns,
-} = require("./lib/utils");
+const { retrieveInfoFromDetails } = require("./lib/utils");
 const { randomUUID } = require("crypto");
 
-const PN_NOTIFICATION_TABLE_NAME = 'pn-Notification';
+const PN_NOTIFICATION_TABLE_NAME = 'pn-Notifications';
 const TIMELINE_DB_TABLE_NAME = 'pn-Timelines';
 const S3_BUCKET_NAME = process.env.MONITORING_BUCKET_NAME;
-const SNS_TOPIC_ARN = process.env.SNS_TOPIC_ARN;
-const PENDING_PREFIX = "critical-monitoring/to_send/";
-const AGGREGATE_PREFIX = "critical-monitoring/aggregate/";
+const PENDING_PREFIX = "critical-monitoring/";
 const TAXONOMY_CODES = process.env.TAXONOMY_CODES ? process.env.TAXONOMY_CODES.split(",").map(code => code.trim()) : [];
 const WHITELISTED_PA = process.env.WHITELISTED_PA ? process.env.WHITELISTED_PA.split(",").map(pa => pa.trim()) : [];
 
 function isSqsEvent(event) {
   return Array.isArray(event?.Records) && event.Records.length > 0 && event.Records[0].eventSource === "aws:sqs";
-}
-
-function isScheduledEvent(event) {
-  return (
-    event?.["detail-type"] === "Scheduled Event" &&
-    (event?.source === "aws.events" || event?.source === "aws.scheduler")
-  );
-}
-
-function getRomeIsoTimestamp(referenceDate = new Date()) {
-  const formatter = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Europe/Rome",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-
-  return formatter.format(referenceDate).replace(" ", "T");
 }
 
 function getRomePathParts(referenceDate = new Date()) {
@@ -63,24 +29,6 @@ function getRomePathParts(referenceDate = new Date()) {
   const [year, month, day] = datePart.split("-");
 
   return { year, month, day, hour: hourPart };
-}
-
-function extractJsonLines(content) {
-  const lines = content
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-  return lines
-    .map((line) => {
-      try {
-        return JSON.parse(line);
-      } catch (error) {
-        console.warn("Skipping invalid JSONL line", line);
-        return undefined;
-      }
-    })
-    .filter(Boolean);
 }
 
 async function retrieveElementFromDynamoDB(tableName, keyName, keyValue, sKeyName, sKeyValue) {
@@ -140,11 +88,6 @@ function buildPartialJsonKey() {
   return `${PENDING_PREFIX}${year}/${month}/${day}/${hour}/${randomUUID()}.json`;
 }
 
-function buildAggregatedJsonKey() {
-  const { year, month, day, hour } = getRomePathParts();
-  return `${AGGREGATE_PREFIX}${year}/${month}/${day}/${hour}/${randomUUID()}.json`;
-}
-
 async function handleSqsEvent(event) {
   const rows = [];
   let foundRecords = false;
@@ -187,63 +130,13 @@ async function handleSqsEvent(event) {
   return { status: "ok" };
 }
 
-async function handleScheduledEvent() {
-  const pendingObjects = await listObjectsByPrefix(S3_BUCKET_NAME, PENDING_PREFIX);
-  if (pendingObjects.length === 0) {
-    console.log(`No pending files found under prefix ${PENDING_PREFIX}`);
-    return { status: "ok", details: "No files to aggregate" };
-  }
-
-  const allRows = [];
-  for (const object of pendingObjects) {
-    if (!object.Key) {
-      continue;
-    }
-    const fileContent = await downloadFileFromS3(S3_BUCKET_NAME, object.Key);
-    allRows.push(...extractJsonLines(fileContent));
-  }
-
-  const aggregatedJsonlContent = allRows.length > 0
-    ? `${allRows.map((row) => JSON.stringify(row)).join("\n")}\n`
-    : "";
-  const aggregatedKey = buildAggregatedJsonKey();
-
-  await exportDataToS3(aggregatedJsonlContent, aggregatedKey);
-  await deleteObjectsFromS3(
-    S3_BUCKET_NAME,
-    pendingObjects.map((object) => object.Key).filter(Boolean)
-  );
-
-  const presignedUrl = await generatePresignedUrl(S3_BUCKET_NAME, aggregatedKey);
-  const message = prepareAggregationMessageToSns({
-    bucketName: S3_BUCKET_NAME,
-    key: aggregatedKey,
-    rowCount: allRows.length,
-    sourceFilesCount: pendingObjects.length,
-    presignedUrl,
-  });
-
-  await publishMessageToSns(SNS_TOPIC_ARN, "Critical monitoring batch ready", message);
-
-  return {
-    status: "ok",
-    aggregatedKey,
-    rowCount: allRows.length,
-    sourceFilesCount: pendingObjects.length,
-  };
-}
-
 const handler = async (event) => {
   console.info("New event received ", event);
   if (isSqsEvent(event)) {
     return handleSqsEvent(event);
   }
 
-  if (isScheduledEvent(event)) {
-    return handleScheduledEvent();
-  }
-
-  throw new Error("Unsupported trigger type. Expected SQS or Scheduled Event.");
+  throw new Error("Unsupported trigger type. Expected SQS.");
 };
 
 module.exports = {
