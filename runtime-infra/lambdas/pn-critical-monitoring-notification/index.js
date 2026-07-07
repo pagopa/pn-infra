@@ -82,7 +82,7 @@ async function processRecord(record) {
     recapitista: analogMailInfo.courier,
     cap: analogMailInfo.zip,
     timestamp: analogMailInfo.clientRequestTimeStamp,
-    pa: senderPaId
+    paId: senderPaId
   };
 }
 
