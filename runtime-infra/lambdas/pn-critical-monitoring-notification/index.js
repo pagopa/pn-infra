@@ -16,19 +16,19 @@ function isSqsEvent(event) {
 }
 
 function getRomePathParts(referenceDate = new Date()) {
-  const formatter = new Intl.DateTimeFormat("it-IT", {
+  const parts = new Intl.DateTimeFormat("it-IT", {
     timeZone: "Europe/Rome",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     hour12: false,
-  });
+  }).formatToParts(referenceDate);
 
-  const [datePart, hourPart] = formatter.format(referenceDate).split(" ");
-  const [year, month, day] = datePart.split("-");
-
-  return { year, month, day, hour: hourPart };
+  const values = Object.fromEntries(
+    parts.filter((p) => p.type !== "literal").map((p) => [p.type, p.value])
+  );
+  return { year: values.year, month: values.month, day: values.day, hour: values.hour };
 }
 
 async function retrieveElementFromDynamoDB(tableName, keyName, keyValue, sKeyName, sKeyValue) {
@@ -61,26 +61,28 @@ async function processRecord(record) {
   const analogMailInfo = retrieveInfoFromDetails(recordBody.analogMail);
 
   const notification = await retrieveElementFromDynamoDB(PN_NOTIFICATION_TABLE_NAME, "iun", analogMailInfo.iun);
+  const senderPaId = notification ? notification.pa : 'undefined';
 
-  if (WHITELISTED_PA.length > 0 && !WHITELISTED_PA.includes(notification.pa)) {
-    console.log(`Notification pa ${notification ? notification.pa : 'undefined'} is not in the whitelisted list, skipping.`);
+  if (WHITELISTED_PA.length > 0 && !WHITELISTED_PA.includes(senderPaId)) {
+    console.log(`Notification pa ${senderPaId} is not in the whitelisted list, skipping.`);
     return;
-  } 
-  
+  }
+
   if (!TAXONOMY_CODES.includes(notification.taxonomyCode)) {
     console.log(`Notification taxonomyCode ${notification ? notification.taxonomyCode : 'undefined'} is not in the monitored list, skipping.`);
     return;
   }
 
   const timelines = await retrieveElementFromDynamoDB(TIMELINE_DB_TABLE_NAME, "iun", analogMailInfo.iun, "timelineElementId", analogMailInfo.requestIdWithoutPCRETRY);
-  analogMailInfo.zip = timelines.details.physicalAddress.zip;
+  analogMailInfo.zip = timelines ? timelines.details.physicalAddress.zip : 'undefined';
 
   return {
     requestId: analogMailInfo.requestId,
     codiceOggetto: analogMailInfo.registeredLetterCode,
     recapitista: analogMailInfo.courier,
     cap: analogMailInfo.zip,
-    timestamp: analogMailInfo.clientRequestTimeStamp
+    timestamp: analogMailInfo.clientRequestTimeStamp,
+    pa: senderPaId
   };
 }
 
