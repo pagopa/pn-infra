@@ -245,6 +245,20 @@ Parameters:
     Description: Glue database name for critical monitoring exported files
     Default: monitoring_database
 
+  LogRetention:
+    Type: Number
+    Description: Log retention in days for Lambda functions
+
+  LambdaJSRuntime:
+    Type: String
+    Description: Runtime environment for Lambda functions
+    Default: nodejs24.x
+
+  LambdaCriticalMonitoringNotificationAnalyzerMemorySize:
+    Type: Number
+    Description: Memory size for the Lambda Critical Monitoring Notification Analyzer function
+    Default: 128
+
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
@@ -1213,7 +1227,7 @@ Resources:
     Type: AWS::Lambda::Function
     Condition: IsCoreAccount
     Properties:
-      Runtime: nodejs22.x
+      Runtime: !Ref LambdaJSRuntime
       Timeout: 300
       MemorySize: 512
       Handler: index.handler
@@ -1286,7 +1300,7 @@ Resources:
       TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
       Parameters:
         LogGroupName: !Ref QuickSightDataImportLambda
-        LogGroupRetention: 14
+        LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
   ScheduleQuickSightDataImport:
@@ -1428,7 +1442,7 @@ Resources:
     Type: AWS::Lambda::Function
     Condition: IsCoreAccount
     Properties:
-      Runtime: nodejs24.x
+      Runtime: !Ref LambdaJSRuntime
       Timeout: 60
       MemorySize: 128
       Handler: index.handler
@@ -1500,7 +1514,7 @@ Resources:
       TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
       Parameters:
         LogGroupName: !Ref PnAnalogRecipientsAnalyzerLambda
-        LogGroupRetention: 14
+        LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
   PnAnalogRecipientsAnalyzerLambdaAlarms:
@@ -1526,9 +1540,9 @@ Resources:
     Type: AWS::Lambda::Function
     Condition: IsCoreAccount
     Properties:
-      Runtime: nodejs24.x
+      Runtime: !Ref LambdaJSRuntime
       Timeout: 60
-      MemorySize: 128
+      MemorySize: !Ref LambdaCriticalMonitoringNotificationAnalyzerMemorySize
       ReservedConcurrentExecutions: 1
       Handler: index.handler
       FunctionName: pn-critical-monitoring-notification-analyzer-lambda
@@ -1606,7 +1620,7 @@ Resources:
       TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
       Parameters:
         LogGroupName: !Ref PnCriticalMonitoringNotificationAnalyzerLambda
-        LogGroupRetention: 14
+        LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
   PnCriticalMonitoringNotificationAnalyzerLambdaAlarms:

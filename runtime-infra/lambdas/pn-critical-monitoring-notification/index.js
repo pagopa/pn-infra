@@ -16,7 +16,7 @@ function isSqsEvent(event) {
 }
 
 function getRomePathParts(referenceDate = new Date()) {
-  const formatter = new Intl.DateTimeFormat("sv-SE", {
+  const formatter = new Intl.DateTimeFormat("it-IT", {
     timeZone: "Europe/Rome",
     year: "numeric",
     month: "2-digit",
@@ -48,7 +48,7 @@ async function exportDataToS3(data, key) {
     await uploadFileToS3(S3_BUCKET_NAME, key, data);
     console.log(`Data successfully uploaded to S3 at ${key}`);
   } catch (error) {
-    console.error(`Failed to upload data to S3 at ${key}:`, error);
+    console.warn(`Failed to upload data to S3 at ${key}:`, error);
     throw error;
   }
 }
@@ -116,7 +116,7 @@ async function handleSqsEvent(event) {
     try {
       await exportDataToS3(jsonlContent, s3Key);
     } catch (error) {
-      console.error("Error uploading partial JSONL report to S3", error);
+      console.warn("Error uploading partial JSONL report to S3", error);
       batchItemFailures.splice(0, batchItemFailures.length);
       for (const record of event.Records) {
         batchItemFailures.push({ itemIdentifier: record.messageId });
@@ -128,7 +128,7 @@ async function handleSqsEvent(event) {
     return { batchItemFailures };
   }
 
-  return { status: "ok" };
+  return { status: "ok", batchItemFailures: [] };
 }
 
 const handler = async (event) => {
