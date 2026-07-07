@@ -25,7 +25,7 @@ CDC Preprocessing Filter Lambda
 Keep only tableName = pn-UserAttributes
         ↓
 S3 raw path:
-poc/cdc-preproc/raw/TABLE_NAME_pn-UserAttributes/yyyy/MM/dd/HH/
+poc/cdc-preproc/raw(parametro dinamico)/TABLE_NAME_pn-UserAttributes/yyyy/MM/dd/HH/
 ```
 
 ## Processing Logic
@@ -172,4 +172,4 @@ Key log messages:
 * Source stream: `pn-cdc-stream`
 * Firehose processor: preprocessing Firehose delivery stream
 * Target table: `pn-UserAttributes`
-* S3 raw prefix: `poc/cdc-preproc/raw/TABLE_NAME_pn-UserAttributes/`
+* S3 raw prefix: `raw(parametro)/TABLE_NAME_pn-UserAttributes/`

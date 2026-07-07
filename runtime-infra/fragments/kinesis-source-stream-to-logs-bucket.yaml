@@ -288,11 +288,10 @@ Resources:
           LogStreamName:
             Ref: PreprocessingDeliveryStreamLogGroupS3Destination
 
-        Prefix:
-          !Sub '${PreprocessingS3RootPrefix}/raw/TABLE_NAME_!{partitionKeyFromQuery:TABLE_NAME}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
-
+        Prefix: 
+          !Sub '${PreprocessingS3RootPrefix}/!{partitionKeyFromLambda:PROCESSING_LAYER}/TABLE_NAME=!{partitionKeyFromLambda:TABLE_NAME}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
         ErrorOutputPrefix:
-          !Sub '${PreprocessingS3RootPrefix}/errors/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
+          !Sub 'errors/${PreprocessingS3RootPrefix}/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
 
         RoleARN: !Ref LogsExporterRoleArn
 
@@ -383,7 +382,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${ProjectName}-${PreprocessingStreamNamePrefix}-Kinesis-Alarm"
-      AlarmDescription: "CloudWatch alarm for preprocessing POC Firehose delivery error logs."
+      AlarmDescription: "CloudWatch alarm for preprocessing Firehose delivery error logs."
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmSNSTopicArn
@@ -409,12 +408,12 @@ Outputs:
   
   PreprocessingDeliveryStreamArn:
     Condition: CreatePreprocessingFirehose
-    Description: 'ARN of preprocessing POC delivery stream'
+    Description: 'ARN of preprocessing Firehose delivery stream'
     Value: !GetAtt PreprocessingLogsKinesisDeliveryStreamPartitioned.Arn
 
   PreprocessingDeliveryStreamErrorLogsMetricAlarmArn:
     Condition: CreatePreprocessingFirehose
-    Description: 'ARN of preprocessing POC delivery stream error log alarm'
+    Description: 'ARN of preprocessing Firehose delivery stream error log alarm'
     Value: !GetAtt PreprocessingDeliveryStreamErrorLogsMetricAlarm.Arn
 
   # LogsKinesisDeliveryStreamKmsKey:
