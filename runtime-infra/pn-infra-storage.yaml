@@ -102,6 +102,11 @@ Parameters:
     Type: String
     Default: '-'
     Description: Data lake account id 2
+
+  DataLakeAccountId1RoleName:
+    Type: String
+    Default: '-'
+    Description: Data lake account id 1 role name
   
   InfraSecTopicName:
     Type: String
@@ -124,6 +129,9 @@ Conditions:
   LogsOnDemandDisabled: !Not [!Equals [!Ref LogsStreamMode, ON_DEMAND]]
 
   HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
+
+  HasDataLakeAccountId1RoleName: !And [ !Not [ !Equals [ !Ref DataLakeAccountId1, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1, '' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1RoleName, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1RoleName, '' ] ] ]
+  HasDataLakeAccountId2: !And [ !Not [ !Equals [ !Ref DataLakeAccountId2, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId2, '' ] ] ]
 
 Resources:
   
@@ -241,21 +249,40 @@ Resources:
               - kms:GenerateDataKey*
               - kms:DescribeKey
             Resource: "*"
-          - Sid: Allow Datalake roles to access logs bucket
-            Effect: Allow
-            Action:
-              - kms:Encrypt
-              - kms:Decrypt
-              - kms:GenerateDataKey*
-            Principal:
-              AWS: !Sub "arn:aws:iam::${DataLakeAccountId1}:root"
-            Resource: "*"
-            Condition:
-              "ArnEquals": 
-                "aws:PrincipalArn": 
-                  - !Sub "arn:aws:iam::${DataLakeAccountId1}:role/pagopa-data_engineers"
-                  - !Sub "arn:aws:iam::${DataLakeAccountId1}:role/pdnd-de_ext"
-                  - !Sub "arn:aws:iam::${DataLakeAccountId1}:role/cdp_pagopa_dl_send_rw"
+          - Fn::If:
+            - HasDataLakeAccountId1RoleName
+            - Sid: Allow Datalake account id 1 role to access logs bucket
+              Effect: Allow
+              Action:
+                - kms:Encrypt
+                - kms:Decrypt
+                - kms:GenerateDataKey*
+              Principal:
+                AWS: !Sub "arn:aws:iam::${DataLakeAccountId1}:root"
+              Resource: "*"
+              Condition:
+                "ArnEquals":
+                  "aws:PrincipalArn":
+                    - !Sub "arn:aws:iam::${DataLakeAccountId1}:role/${DataLakeAccountId1RoleName}"
+            - !Ref AWS::NoValue
+          - Fn::If:
+            - HasDataLakeAccountId2
+            - Sid: Allow Datalake roles to access logs bucket
+              Effect: Allow
+              Action:
+                - kms:Encrypt
+                - kms:Decrypt
+                - kms:GenerateDataKey*
+              Principal:
+                AWS: !Sub "arn:aws:iam::${DataLakeAccountId2}:root"
+              Resource: "*"
+              Condition:
+                "ArnEquals":
+                  "aws:PrincipalArn":
+                    - !Sub "arn:aws:iam::${DataLakeAccountId2}:role/pagopa-data_engineers"
+                    - !Sub "arn:aws:iam::${DataLakeAccountId2}:role/pdnd-de_ext"
+                    - !Sub "arn:aws:iam::${DataLakeAccountId2}:role/cdp_pagopa_dl_send_rw"
+            - !Ref AWS::NoValue
           - Fn::If:
             - ActivateSafeStorageCondition
             - Sid: Allow safe storage kms usage
@@ -612,6 +639,9 @@ Outputs:
   
   DataLakeAccountId2:
     Value: !Ref DataLakeAccountId2
+
+  DataLakeAccountId1RoleName:
+    Value: !Ref DataLakeAccountId1RoleName
 
   ESMKinesisFailureNotificationsBucketName:
     Value: !Ref ESMKinesisFailureNotificationsBucket
