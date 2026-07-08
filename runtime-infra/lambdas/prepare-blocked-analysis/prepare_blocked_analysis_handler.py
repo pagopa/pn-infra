@@ -359,8 +359,17 @@ def send_weekly_report(result_dir, region, topic_arn, environment_type=''):
         open_cases = []
         analysis_file = os.path.join(result_dir, 'prepare_analog_domicile_latest.json')
         if os.path.exists(analysis_file):
-            with open(analysis_file, 'r', encoding='utf-8') as f:
-                open_cases = json.load(f).get('analysis', [])
+            try:
+                with open(analysis_file, 'r', encoding='utf-8') as f:
+                    payload = json.load(f)
+                if isinstance(payload, dict):
+                    open_cases = payload.get('analysis', []) or []
+                elif isinstance(payload, list):
+                    open_cases = payload
+                else:
+                    print(f"WARNING: Unexpected JSON type in {analysis_file}: {type(payload)}")
+            except Exception as e:
+                print(f"WARNING: Failed to parse {analysis_file}, reporting 0 open cases: {e}")
         else:
             print("WARNING: prepare_analog_domicile_latest.json not found, reporting 0 open cases")
 
