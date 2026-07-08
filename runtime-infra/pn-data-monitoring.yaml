@@ -64,12 +64,22 @@ Parameters:
   DataLakeAccountId:
     Type: String
     Description: Datalake AWS Account ID
-    Default: ''
+    Default: '-'
   
   DataLakeRoleName:
     Type: String
     Description: Datalake Role Name
-    Default: 'pagopa-pn'
+    Default: '-'
+
+  DataLakeAccountId2:
+    Type: String
+    Description: Datalake AWS Account ID 2
+    Default: '-'
+
+  DataLakeAccountId2RoleName:
+    Type: String
+    Description: Datalake account id 2 role name
+    Default: '-'
   
   DataAnalysisSlackEmail:
     Type: String
@@ -104,7 +114,7 @@ Parameters:
   LambdaPrepareBlockedAnalysisEnableCronExpression:
     Type: String
     Description: Cron expression for the scheduled rule enabled/disabled
-    Default: 'DISABLED'
+    Default: 'ENABLED'
     AllowedValues:
       - ENABLED
       - DISABLED
@@ -118,6 +128,11 @@ Parameters:
     Type: String
     Description: pn-troubleshooting repository branch or tag name (e.g. main, develop)
     Default: 'main'
+
+  LambdaPrepareBlockedAnalysisLookbackHours:
+    Type: Number
+    Description: Look-back hours applied in incremental mode (start_time = last_update - lookback) to recover late-arriving PREPARE events. Set 0 to disable overlap.
+    Default: 24
 
   CloudWatchNamespace:
     Type: String
@@ -143,6 +158,19 @@ Parameters:
     Type: String
     Description: Metric name for affected PREPARE count
     Default: 'AffectedPrepareBlockedAnalysis'
+
+  LambdaPrepareBlockedWeeklyReportCronExpression:
+    Type: String
+    Description: Cron expression (Europe/Rome timezone) for the weekly PrepareBlocked report email (e.g. Monday 10:00 Italy)
+    Default: 'cron(0 10 ? * MON *)'
+
+  LambdaPrepareBlockedWeeklyReportEnableCronExpression:
+    Type: String
+    Description: Enable/disable state for the weekly report scheduled rule
+    Default: 'ENABLED'
+    AllowedValues:
+      - ENABLED
+      - DISABLED
 
   TemplateBucketBaseUrl:
     Type: String
@@ -184,6 +212,27 @@ Parameters:
         - "true"
         - "false"
 
+  CriticalMonitoringNotificationTaxonomyCodes:
+    Type: String
+    Description: Comma separated taxonomy codes monitored by critical monitoring notification analyzer
+    Default: "050501P,050501N"
+
+  CriticalMonitoringNotificationAnalyzerMappingEnabled:
+    Type: String
+    Description: Enable or Disable the Event Source Mapping for the PnCriticalMonitoringNotificationAnalyzer Lambda Function
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+
+  CriticalMonitoringNotificationSchedulerState:
+    Type: String
+    Description: State of Critical Monitoring schedulers (ENABLED or DISABLED)
+    Default: 'ENABLED'
+    AllowedValues:
+      - 'ENABLED'
+      - 'DISABLED'
+
   AlarmSNSTopicArn:
     Type: String
 
@@ -219,16 +268,46 @@ Parameters:
     Description: Slack Email channel for Delivery Monitoring notifications
     Default: ''
 
+  CriticalMonitoringGlueDatabaseName:
+    Type: String
+    Description: Glue database name for critical monitoring exported files
+    Default: monitoring_database
+
+  LogRetention:
+    Type: Number
+    Description: Log retention in days for Lambda functions
+    Default: 14
+
+  LambdaJSRuntime:
+    Type: String
+    Description: Runtime environment for Lambda functions
+    Default: nodejs24.x
+
+  LambdaCriticalMonitoringNotificationAnalyzerMemorySize:
+    Type: Number
+    Description: Memory size for the Lambda Critical Monitoring Notification Analyzer function
+    Default: 128
+
+  LambdaCriticalMonitoringNotificationAnalyzerTimeout:
+    Type: Number
+    Description: Timeout in seconds for the Lambda Critical Monitoring Notification Analyzer function
+    Default: 60
+
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
-  IsDatalakeAccount: !Not [ !Equals [!Ref DataLakeAccountId, '' ] ]
-  IsDatalakeAccountInCore: !And [ !Condition IsDatalakeAccount, !Condition IsCoreAccount ]
+  IsDatalakeAccount: !And [ !Not [ !Equals [!Ref DataLakeAccountId, '' ] ], !Not [ !Equals [!Ref DataLakeAccountId, '-' ] ] ]
+  IsDatalakeAccountRoleName: !And [ !Condition IsDatalakeAccount, !Not [ !Equals [!Ref DataLakeRoleName, '' ] ], !Not [ !Equals [!Ref DataLakeRoleName, '-' ] ] ]
+  IsDatalakeAccountInCore: !And [ !Condition IsDatalakeAccountRoleName, !Condition IsCoreAccount ]
+  IsDatalakeAccount2: !And [ !Not [ !Equals [!Ref DataLakeAccountId2, '' ] ], !Not [ !Equals [!Ref DataLakeAccountId2, '-' ] ] ]
+  IsDatalakeAccount2RoleName: !And [ !Condition IsDatalakeAccount2, !Not [ !Equals [!Ref DataLakeAccountId2RoleName, '' ] ], !Not [ !Equals [!Ref DataLakeAccountId2RoleName, '-' ] ] ]
+  IsDatalakeAccount2InCore: !And [ !Condition IsDatalakeAccount2RoleName, !Condition IsCoreAccount ]
+  IsDatalakeAccountAnyInCore: !Or [ !Condition IsDatalakeAccountInCore, !Condition IsDatalakeAccount2InCore ]
   HasCronExpression: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
   HasCronExpressionLambdaPnSupportSqsInCoreAccount: !And [!Not [!Equals [!Ref LambdaPnSupportExportSqsCronExpression, '']], !Equals [!Ref PnCoreAwsAccountId, '']]
   HasQuickSightDataImportLambdaScheduleStateEnabled: !And [ !Condition IsCoreAccount, !Equals [!Ref QuickSightDataImportLambdaScheduleState, 'ENABLED' ] ]
-
+  
 Resources:
   
   # s3 bucket with name BucketName
@@ -313,7 +392,7 @@ Resources:
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:instance-profile/pn-data-monitoring-ec2-instance-profile"
                   - !Sub "arn:${AWS::Partition}:sts::${PnCoreAwsAccountId}:assumed-role/pn-data-monitoring-ec2-service-role/*"
           - Fn::If:
-            - IsDatalakeAccount
+            - IsDatalakeAccountRoleName
             - Effect: Allow
               Action:
                 - "s3:Get*"
@@ -329,29 +408,66 @@ Resources:
                   aws:PrincipalArn:
                     - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:role/${DataLakeRoleName}"
             - !Ref AWS::NoValue
+          - Fn::If:
+            - IsDatalakeAccount2RoleName
+            - Effect: Allow
+              Action:
+                - "s3:Get*"
+                - "s3:List*"
+              Resource:
+                - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
+                - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
+              Principal:
+                AWS:
+                  - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId2}:root"
+              Condition:
+                ArnLike:
+                  aws:PrincipalArn:
+                    - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId2}:role/${DataLakeAccountId2RoleName}"
+            - !Ref AWS::NoValue
 
   DataMonitoringBucketPolicyCore:
-    Condition: IsDatalakeAccountInCore
+    Condition: IsDatalakeAccountAnyInCore
     Type: AWS::S3::BucketPolicy
     Properties:
       Bucket: !Ref DataMonitoringBucket
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Effect: Allow
-            Action:
-              - "s3:Get*"
-              - "s3:List*"
-            Resource:
-              - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
-              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
-            Principal:
-              AWS:
-                - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:root"
-            Condition:
-              ArnLike:
-                aws:PrincipalArn:
-                  - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:role/${DataLakeRoleName}"
+          - Fn::If:
+            - IsDatalakeAccountRoleName
+            - Effect: Allow
+              Action:
+                - "s3:Get*"
+                - "s3:List*"
+              Resource:
+                - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
+                - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
+              Principal:
+                AWS:
+                  - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:root"
+              Condition:
+                ArnLike:
+                  aws:PrincipalArn:
+                    - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:role/${DataLakeRoleName}"
+            - !Ref AWS::NoValue
+          - Fn::If:
+            - IsDatalakeAccount2RoleName
+            - Effect: Allow
+              Action:
+                - "s3:Get*"
+                - "s3:List*"
+              Resource:
+                - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
+                - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
+              Principal:
+                AWS:
+                  - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId2}:root"
+              Condition:
+                ArnLike:
+                  aws:PrincipalArn:
+                    - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId2}:role/${DataLakeAccountId2RoleName}"
+            - !Ref AWS::NoValue
   
   DataMonitoringCodebuildProject:
     Type: 'AWS::CodeBuild::Project'
@@ -978,6 +1094,7 @@ Resources:
           AthenaDatabase: cdc_analytics_database
           AthenaTable: pn_timelines_json_view
           AthenaWorkgroup: primary
+          LookbackHours: !Ref LambdaPrepareBlockedAnalysisLookbackHours
           S3ResultBucket: !Sub s3://${DataMonitoringBucket}/prepare-blocked-analysis/
           AthenaResultsBucket: !Sub pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
           RepoZipUrl: !Sub 'https://github.com/pagopa/pn-troubleshooting/archive/refs/heads/${LambdaPrepareBlockedAnalysisPnTroubleshootingBranch}.zip'
@@ -986,6 +1103,8 @@ Resources:
           MetricNameResolvedInLastRun: !Ref MetricNameResolvedInLastRun
           MetricNameNewInLastRun: !Ref MetricNameNewInLastRun
           MetricNameAffectedPrepare: !Ref MetricNameAffectedPrepare
+          EnvironmentType: !Ref EnvironmentType
+          DeliveryMonitoringSnsTopicArn: !Ref DeliveryMonitoringTopic
       Role: !GetAtt LambdaPrepareBlockedAnalysisRole.Arn
 
   LambdaPrepareBlockedAnalysisRole:
@@ -1072,6 +1191,12 @@ Resources:
                   - dynamodb:Scan
                 Resource:
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperRequestError
+              # Publish weekly report to the Delivery Monitoring SNS topic (email alerting)
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource:
+                  - !Ref DeliveryMonitoringTopic
               - Effect: Allow
                 Action:
                   - kms:Decrypt
@@ -1098,29 +1223,65 @@ Resources:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         FilterPattern: "ERROR"
 
-  # EventBridge rule to trigger PrepareBlockedAnalysis Lambda
-  LambdaPrepareBlockedAnalysisScheduleRule:
+  # IAM role assumed by EventBridge Scheduler to invoke the PrepareBlockedAnalysis Lambda
+  LambdaPrepareBlockedSchedulerRole:
     Condition: IsCoreAccount
-    Type: AWS::Events::Rule
+    Type: AWS::IAM::Role
     Properties:
-      Description: "Scheduled rule to trigger PrepareBlockedAnalysis Lambda UTC"
+      RoleName: !Sub pn-prepare-blocked-scheduler-role-${EnvironmentType}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: InvokePrepareBlockedAnalysisLambda
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt LambdaPrepareBlockedAnalysis.Arn
+
+  # EventBridge Scheduler to trigger PrepareBlockedAnalysis Lambda (timezone-aware)
+  LambdaPrepareBlockedAnalysisSchedule:
+    Condition: IsCoreAccount
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub pn-prepare-blocked-analysis-${EnvironmentType}
+      Description: "Schedule to trigger PrepareBlockedAnalysis Lambda (Europe/Rome)"
       ScheduleExpression: !Ref LambdaPrepareBlockedAnalysisCronExpression
+      ScheduleExpressionTimezone: Europe/Rome
       State: !Ref LambdaPrepareBlockedAnalysisEnableCronExpression
-      Targets:
-        - Arn: !GetAtt LambdaPrepareBlockedAnalysis.Arn
-          Id: LambdaPrepareBlockedAnalysisTarget
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt LambdaPrepareBlockedAnalysis.Arn
+        RoleArn: !GetAtt LambdaPrepareBlockedSchedulerRole.Arn
 
-  LambdaPrepareBlockedAnalysisPermission:
+  # EventBridge Scheduler to send the weekly report email (report-only invocation, timezone-aware)
+  LambdaPrepareBlockedWeeklyReportSchedule:
     Condition: IsCoreAccount
-    Type: AWS::Lambda::Permission
+    Type: AWS::Scheduler::Schedule
     Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref LambdaPrepareBlockedAnalysis
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt LambdaPrepareBlockedAnalysisScheduleRule.Arn
-      SourceAccount: !Ref AWS::AccountId
+      Name: !Sub pn-prepare-blocked-weekly-report-${EnvironmentType}
+      Description: "Schedule to send the PrepareBlocked weekly report email (report-only, Europe/Rome)"
+      ScheduleExpression: !Ref LambdaPrepareBlockedWeeklyReportCronExpression
+      ScheduleExpressionTimezone: Europe/Rome
+      State: !Ref LambdaPrepareBlockedWeeklyReportEnableCronExpression
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt LambdaPrepareBlockedAnalysis.Arn
+        RoleArn: !GetAtt LambdaPrepareBlockedSchedulerRole.Arn
+        Input: '{"report_only": true}'
 
-  # CloudWatch Dashboard for PrepareBlockedAnalysis
+
   PrepareBloccateDashboard:
     Condition: IsCoreAccount
     Type: AWS::CloudWatch::Dashboard
@@ -1186,7 +1347,7 @@ Resources:
     Type: AWS::Lambda::Function
     Condition: IsCoreAccount
     Properties:
-      Runtime: nodejs22.x
+      Runtime: !Ref LambdaJSRuntime
       Timeout: 300
       MemorySize: 512
       Handler: index.handler
@@ -1259,7 +1420,7 @@ Resources:
       TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
       Parameters:
         LogGroupName: !Ref QuickSightDataImportLambda
-        LogGroupRetention: 14
+        LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
   ScheduleQuickSightDataImport:
@@ -1295,12 +1456,26 @@ Resources:
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
 
+  CriticalMonitoringNotificationEventsQueue:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-critical-monitoring-notification-events'
+        VisibilityTimeout: 900 # max time for Lambda to process the message
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
   AnalogRecipientEventsQueuePolicy:
     Type: AWS::SQS::QueuePolicy
     Condition: IsCoreAccount
     Properties:
       Queues:
         - !GetAtt AnalogRecipientEventsQueue.Outputs.QueueURL
+        - !GetAtt CriticalMonitoringNotificationEventsQueue.Outputs.QueueURL
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -1308,7 +1483,9 @@ Resources:
             Principal:
               Service: events.amazonaws.com
             Action: sqs:SendMessage
-            Resource: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+            Resource: 
+              - !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+              - !GetAtt CriticalMonitoringNotificationEventsQueue.Outputs.QueueARN
             Condition:
               ArnEquals:
                 aws:SourceArn: !GetAtt PnCoreEventBusToAnalogRecipientEventsQueue.Arn
@@ -1317,7 +1494,7 @@ Resources:
     Type: AWS::Events::Rule
     Condition: IsCoreAccount
     Properties: 
-      Description: Route Analog Recipient Events (CON080) to pn-analog-recipient-events-queue
+      Description: Route Analog Recipient Events (CON080) to analog monitoring queues
       EventBusName: !Ref EventBusToAnalogRecipientEventsQueueName
       EventPattern:
         detail-type: [ "ExternalChannelOutcomeEvent" ]
@@ -1328,6 +1505,9 @@ Resources:
       Targets: 
         - Id: !Sub '${ProjectName}-CoreEventBus-AnalogRecipientEvents'
           Arn: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
+          InputPath: $.detail
+        - Id: !Sub '${ProjectName}-CoreEventBus-CriticalMonitoringNotificationEvents'
+          Arn: !GetAtt CriticalMonitoringNotificationEventsQueue.Outputs.QueueARN
           InputPath: $.detail
 
   SafeStorageErrorEventsQueue:
@@ -1382,7 +1562,7 @@ Resources:
     Type: AWS::Lambda::Function
     Condition: IsCoreAccount
     Properties:
-      Runtime: nodejs22.x
+      Runtime: !Ref LambdaJSRuntime
       Timeout: 60
       MemorySize: 128
       Handler: index.handler
@@ -1454,7 +1634,7 @@ Resources:
       TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
       Parameters:
         LogGroupName: !Ref PnAnalogRecipientsAnalyzerLambda
-        LogGroupRetention: 14
+        LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
   PnAnalogRecipientsAnalyzerLambdaAlarms:
@@ -1475,6 +1655,188 @@ Resources:
       Enabled: !Ref AnalogRecipientsAnalyzerMappingEnabled
       EventSourceArn: !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
       FunctionName: !Ref PnAnalogRecipientsAnalyzerLambda
+
+  PnCriticalMonitoringNotificationAnalyzerLambda:
+    Type: AWS::Lambda::Function
+    Condition: IsCoreAccount
+    Properties:
+      Runtime: !Ref LambdaJSRuntime
+      Timeout: !Ref LambdaCriticalMonitoringNotificationAnalyzerTimeout
+      MemorySize: !Ref LambdaCriticalMonitoringNotificationAnalyzerMemorySize
+      ReservedConcurrentExecutions: 1
+      Handler: index.handler
+      FunctionName: pn-critical-monitoring-notification-analyzer-lambda
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/pn-critical-monitoring-notification.zip
+      Environment:
+        Variables:
+          MONITORING_BUCKET_NAME: !Ref DataMonitoringBucket
+          TAXONOMY_CODES: !Ref CriticalMonitoringNotificationTaxonomyCodes
+          WHITELISTED_PA: '{{resolve:ssm:/pn-infra-monitoring/critical-monitoring-notification/whitelisted-pa}}'
+          SNS_TOPIC_ARN: !Ref DeliveryMonitoringTopic
+      Role:
+        Fn::GetAtt:
+          - PnCriticalMonitoringNotificationAnalyzerLambdaRole
+          - Arn 
+
+  PnCriticalMonitoringNotificationAnalyzerLambdaRole:
+    Type: AWS::IAM::Role
+    Condition: IsCoreAccount
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: PnCriticalMonitoringNotificationAnalyzerLambdaPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub arn:aws:s3:::${DataMonitoringBucket}/critical-monitoring/*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream  
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/pn-critical-monitoring-notification-analyzer-lambda:*
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref DeliveryMonitoringTopic 
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                Resource: 
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-Notifications
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-Timelines
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: 
+                  - !GetAtt CriticalMonitoringNotificationEventsQueue.Outputs.QueueARN
+
+  PnCriticalMonitoringNotificationAnalyzerLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Ref PnCriticalMonitoringNotificationAnalyzerLambda
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
+  PnCriticalMonitoringNotificationAnalyzerLambdaAlarms:
+    Condition: IsCoreAccount
+    DependsOn:
+      - PnCriticalMonitoringNotificationAnalyzerLambdaLogGroup
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref PnCriticalMonitoringNotificationAnalyzerLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        FilterPattern: "ERROR"
+
+  PnCriticalMonitoringNotificationAnalyzerLambdaEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Condition: IsCoreAccount
+    Properties:
+      BatchSize: 100
+      MaximumBatchingWindowInSeconds: 300
+      Enabled: !Ref CriticalMonitoringNotificationAnalyzerMappingEnabled
+      EventSourceArn: !GetAtt CriticalMonitoringNotificationEventsQueue.Outputs.QueueARN
+      FunctionName: !Ref PnCriticalMonitoringNotificationAnalyzerLambda
+
+  CriticalMonitoringGlueDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsCoreAccount
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Ref CriticalMonitoringGlueDatabaseName
+        Description: Glue database for critical monitoring artifacts
+
+  CriticalMonitoringNotificationGlueTable:
+    Type: AWS::Glue::Table
+    Condition: IsCoreAccount
+    DependsOn:
+      - CriticalMonitoringGlueDatabase
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref CriticalMonitoringGlueDatabaseName
+      TableInput:
+        Name: critical_monitoring_notification
+        Description: Records generated by pn-critical-monitoring-notification-analyzer-lambda
+        TableType: EXTERNAL_TABLE
+        PartitionKeys:
+          - Name: year
+            Type: string
+          - Name: month
+            Type: string
+          - Name: day
+            Type: string
+          - Name: hour
+            Type: string
+        Parameters:
+          EXTERNAL: 'TRUE'
+          classification: json
+          typeOfData: file
+          has_encrypted_data: 'false'
+          projection.enabled: 'true'
+          projection.year.type: integer
+          projection.year.range: 2024,2099
+          projection.month.type: integer
+          projection.month.range: 1,12
+          projection.month.digits: '2'
+          projection.day.type: integer
+          projection.day.range: 1,31
+          projection.day.digits: '2'
+          projection.hour.type: integer
+          projection.hour.range: 0,23
+          projection.hour.digits: '2'
+          storage.location.template: !Sub s3://${DataMonitoringBucket}/critical-monitoring/${!year}/${!month}/${!day}/${!hour}/
+        StorageDescriptor:
+          Location: !Sub s3://${DataMonitoringBucket}/critical-monitoring/
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Compressed: false
+          NumberOfBuckets: -1
+          StoredAsSubDirectories: true
+          SerdeInfo:
+            SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
+            Parameters:
+              paths: requestId,codiceOggetto,recapitista,cap
+          Columns:
+            - Name: requestId
+              Type: string
+            - Name: codiceOggetto
+              Type: string
+            - Name: recapitista
+              Type: string
+            - Name: cap
+              Type: string
+            - Name: timestamp
+              Type: string
+            - Name: paId
+              Type: string
 
 Outputs:
   DataMonitoringBucketName:

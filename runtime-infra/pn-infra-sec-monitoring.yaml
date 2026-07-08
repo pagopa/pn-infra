@@ -164,6 +164,12 @@ Parameters:
     Description: 'Threshold for URL access alerts (e.g., number of events or specific pattern)' 
     Default: '5'
 
+  S3GetObjectRuleState:
+    Type: String
+    AllowedValues: ['ENABLED', 'DISABLED']
+    Default: 'ENABLED'
+    Description: 'State of the S3 GetObject EventBridge rule (ENABLED or DISABLED)'
+
 Conditions:
   HasCloudTrailLogsEnabled: !Equals [!Ref EnableCloudTrailLogs, 'true']
   HasMonitoringS3Enabled: !Equals [!Ref S3MonitoringEnabled, 'true']
@@ -375,6 +381,7 @@ Resources:
       Targets:
         - Id: SendToSNS
           Arn: !Ref InfraSecTopicArn
+          RoleArn: !GetAtt EventBridgeSnsAccountRole.Arn
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -402,6 +409,7 @@ Resources:
       Targets:
         - Id: SendToSNS
           Arn: !Ref InfraSecTopicArn
+          RoleArn: !GetAtt EventBridgeSnsAccountRole.Arn
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -425,6 +433,7 @@ Resources:
       Targets:
         - Id: SendToSNS
           Arn: !Ref InfraSecTopicArn
+          RoleArn: !GetAtt EventBridgeSnsAccountRole.Arn
           InputTransformer:
             InputPathsMap:
               time: $.time
@@ -551,6 +560,7 @@ Resources:
       Targets:
         - Id: SendToSNS
           Arn: !Ref InfraSecTopicArn
+          RoleArn: !GetAtt EventBridgeSnsAccountRole.Arn
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -580,6 +590,7 @@ Resources:
       Targets:
         - Id: SendToSNS
           Arn: !Ref InfraSecTopicArn
+          RoleArn: !GetAtt EventBridgeSnsAccountRole.Arn
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -606,6 +617,7 @@ Resources:
       Targets:
         - Id: SendToSNS
           Arn: !Ref InfraSecTopicArn
+          RoleArn: !GetAtt EventBridgeSnsAccountRole.Arn
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -633,6 +645,7 @@ Resources:
       Targets:
         - Id: SendToSNS
           Arn: !Ref InfraSecTopicArn
+          RoleArn: !GetAtt EventBridgeSnsAccountRole.Arn
           InputTransformer:
             InputPathsMap:
               time: "$.time"
@@ -641,6 +654,25 @@ Resources:
               bucketName: "$.detail.requestParameters.bucketName"
               sourceIP: "$.detail.sourceIPAddress"
             InputTemplate: !Sub '"CRITICAL ALERT: S3 Versioning Configuration Change - Environment: ${EnvironmentType} - Bucket: <bucketName> - Operation: <eventName> - User: <user> - Source IP: <sourceIP> - Time: <time> - ACTION REQUIRED: Verify versioning is still enabled for data protection"'
+
+  EventBridgeSnsAccountRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: PublishToSNSAccount
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref InfraSecTopicArn
 
   # ============================================================================
   # Metric Filters for critical DynamoDB tables
@@ -679,6 +711,7 @@ Resources:
     Properties:
       Name: !Sub "${ProjectName}-infra-sec-s3-url-getobject"
       Description: "Capture S3 GetObject events for URL access monitoring"
+      State: !Ref S3GetObjectRuleState
       EventPattern:
         source:
           - "aws.s3"

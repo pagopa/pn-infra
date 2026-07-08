@@ -17,10 +17,15 @@ def lambda_handler(event, context):
     database = os.environ.get('AthenaDatabase', 'cdc_analytics_database')
     table = os.environ.get('AthenaTable', 'pn_timelines_json_view')
     workgroup = os.environ.get('AthenaWorkgroup', 'primary')
+    lookback_hours = os.environ.get('LookbackHours', '24')
     s3_result_bucket = os.environ['S3ResultBucket']
     athena_results_bucket = os.environ['AthenaResultsBucket']
     repo_zip_url = os.environ['RepoZipUrl']
     cloudwatch_namespace = os.environ['CloudWatchNamespace']
+    
+    # Weekly report configuration (SNS/email alerting)
+    delivery_monitoring_topic_arn = os.environ.get('DeliveryMonitoringSnsTopicArn', '')
+    environment_type = os.environ.get('EnvironmentType', '')
     
     # CloudWatch metric names
     metric_name_total_open_case = os.environ['MetricNameTotalOpenCases']
@@ -30,6 +35,20 @@ def lambda_handler(event, context):
     
     # Initialize CloudWatch client
     cloudwatch = boto3.client('cloudwatch', region_name=region)
+    
+    # Report-only invocation: triggered by the dedicated weekly schedule.
+    # It does not run the Athena analysis; it just reads the latest result files
+    # from S3 (produced by the daily analysis) and sends the weekly email report.
+    if event.get('report_only'):
+        print("Report-only invocation: sending weekly report from latest S3 results")
+        result_dir = "/tmp/prepare_blocked_report"
+        os.makedirs(result_dir, exist_ok=True)
+        download_result_files(s3_result_bucket, region, result_dir)
+        send_weekly_report(result_dir, region, delivery_monitoring_topic_arn, environment_type)
+        return {
+            'statusCode': 200,
+            'body': 'PrepareBlockedAnalysis weekly report sent'
+        }
     
     # Download pn-troubleshooting repository as ZIP
     zip_path = "/tmp/pn-troubleshooting.zip"
@@ -85,6 +104,7 @@ def lambda_handler(event, context):
     database = event.get('database', database)
     table = event.get('table', table)
     workgroup = event.get('workgroup', workgroup)
+    lookback_hours = str(event.get('lookback_hours', lookback_hours))
     
     # Calculate script timeout based on remaining Lambda execution time
     # Leave 60 seconds buffer for cleanup and file upload
@@ -106,7 +126,8 @@ def lambda_handler(event, context):
         "--workgroup", workgroup,
         "--output-location", f"s3://{athena_results_bucket}/",
         "--s3-result-bucket", s3_result_bucket,
-        "--timeout", str(timeout)
+        "--timeout", str(timeout),
+        "--lookback-hours", lookback_hours
     ]
     
     # Add optional parameters from event
@@ -142,28 +163,9 @@ def lambda_handler(event, context):
         
         # Script saves files directly to S3, download them to read metrics
         print("Downloading result files from S3 for metrics publishing...")
-        s3_client = boto3.client('s3', region_name=region)
-        bucket_name = s3_result_bucket.replace('s3://', '').split('/')[0]
-        s3_prefix = '/'.join(s3_result_bucket.replace('s3://', '').split('/')[1:]).rstrip('/')
-        
-        # Create local result directory
         result_dir = "/tmp/prepare_blocked_results"
         os.makedirs(result_dir, exist_ok=True)
-        
-        # Download statistics.json and prepare_analog_domicile_latest.json from S3
-        required_files = ['statistics.json', 'prepare_analog_domicile_latest.json']
-        downloaded_files = []
-        
-        for filename in required_files:
-            s3_key = f"{s3_prefix}/{filename}".lstrip('/')
-            local_path = os.path.join(result_dir, filename)
-            try:
-                print(f"Downloading s3://{bucket_name}/{s3_key} to {local_path}")
-                s3_client.download_file(bucket_name, s3_key, local_path)
-                downloaded_files.append(filename)
-                print(f"Successfully downloaded {filename}")
-            except Exception as e:
-                print(f"ERROR: Failed to download {filename} from S3: {e}")
+        downloaded_files = download_result_files(s3_result_bucket, region, result_dir)
         
         # Read and send metrics to CloudWatch if we have the required files
         if 'statistics.json' in downloaded_files:
@@ -187,29 +189,13 @@ def lambda_handler(event, context):
         if e.returncode == 2:
             print("Script reached timeout but saved progress")
             
+            result_dir = "/tmp/prepare_blocked_results_timeout"
+            
             # Try to download and publish metrics even after timeout
             try:
                 print("Attempting to download results from S3 after timeout...")
-                s3_client = boto3.client('s3', region_name=region)
-                bucket_name = s3_result_bucket.replace('s3://', '').split('/')[0]
-                s3_prefix = '/'.join(s3_result_bucket.replace('s3://', '').split('/')[1:]).rstrip('/')
-                
-                result_dir = "/tmp/prepare_blocked_results_timeout"
                 os.makedirs(result_dir, exist_ok=True)
-                
-                # Try to download statistics.json and prepare_analog_domicile_latest.json
-                required_files = ['statistics.json', 'prepare_analog_domicile_latest.json']
-                downloaded_files = []
-                
-                for filename in required_files:
-                    s3_key = f"{s3_prefix}/{filename}".lstrip('/')
-                    local_path = os.path.join(result_dir, filename)
-                    try:
-                        s3_client.download_file(bucket_name, s3_key, local_path)
-                        downloaded_files.append(filename)
-                        print(f"Downloaded {filename} after timeout")
-                    except Exception as download_error:
-                        print(f"ERROR: Could not download {filename} from S3 after timeout: {download_error}")
+                downloaded_files = download_result_files(s3_result_bucket, region, result_dir)
                 
                 # Publish metrics if we have statistics.json
                 if 'statistics.json' in downloaded_files:
@@ -328,3 +314,91 @@ def publish_metrics_to_cloudwatch(result_dir, cloudwatch, region, namespace,
         
     except Exception as e:
         print(f"ERROR: Failed to publish metrics to CloudWatch: {e}")
+
+
+def download_result_files(s3_result_bucket, region, result_dir):
+    """Download analysis result files from S3 (statistics.json and
+    prepare_analog_domicile_latest.json) into the given local directory.
+
+    Returns:
+        list[str]: Names of the files that were successfully downloaded.
+    """
+    s3_client = boto3.client('s3', region_name=region)
+    bucket_name = s3_result_bucket.replace('s3://', '').split('/')[0]
+    s3_prefix = '/'.join(s3_result_bucket.replace('s3://', '').split('/')[1:]).rstrip('/')
+
+    required_files = ['statistics.json', 'prepare_analog_domicile_latest.json']
+    downloaded_files = []
+    for filename in required_files:
+        s3_key = f"{s3_prefix}/{filename}".lstrip('/')
+        local_path = os.path.join(result_dir, filename)
+        try:
+            s3_client.download_file(bucket_name, s3_key, local_path)
+            downloaded_files.append(filename)
+            print(f"Downloaded {filename} from s3://{bucket_name}/{s3_key}")
+        except Exception as e:
+            print(f"ERROR: Failed to download {filename} from S3: {e}")
+    return downloaded_files
+
+
+def send_weekly_report(result_dir, region, topic_arn, environment_type=''):
+    """Send the weekly SNS/email report listing still-open PREPARE cases.
+
+    The send day/time is controlled by the dedicated EventBridge Scheduler rule, so this
+    function does not apply any day-based filtering. The report is sent even when there
+    are 0 open cases (explicitly stating it) to confirm monitoring is active.
+    """
+    try:
+        if not topic_arn:
+            print("WARNING: DeliveryMonitoringSnsTopicArn not set, skipping weekly report email")
+            return
+
+        open_cases = []
+        analysis_file = os.path.join(result_dir, 'prepare_analog_domicile_latest.json')
+        if os.path.exists(analysis_file):
+            try:
+                with open(analysis_file, 'r', encoding='utf-8') as f:
+                    payload = json.load(f)
+                if isinstance(payload, dict):
+                    open_cases = payload.get('analysis', []) or []
+                elif isinstance(payload, list):
+                    open_cases = payload
+                else:
+                    print(f"WARNING: Unexpected JSON type in {analysis_file}: {type(payload)}")
+            except Exception as e:
+                print(f"WARNING: Failed to parse {analysis_file}, reporting 0 open cases: {e}")
+        else:
+            print("WARNING: prepare_analog_domicile_latest.json not found, reporting 0 open cases")
+
+        env_suffix = f" [{environment_type}]" if environment_type else ""
+        report_date = datetime.utcnow().strftime('%Y-%m-%d')
+
+        if open_cases:
+            subject = f"[SEND]{env_suffix} Report settimanale PREPARE bloccate - {len(open_cases)} casi aperti"
+            lines = [
+                f"Report settimanale monitoraggio PREPARE bloccate - {report_date}",
+                "",
+                f"Casi aperti e non risolti: {len(open_cases)}",
+                "",
+                "Elementi impattati:",
+            ]
+            for case in open_cases:
+                lines.append(
+                    f"- IUN: {case.get('iun', 'N/A')} | "
+                    f"timelineElementId: {case.get('timelineElementId', 'N/A')} | "
+                    f"timestamp: {case.get('timestamp', 'N/A')}"
+                )
+        else:
+            subject = f"[SEND]{env_suffix} Report settimanale PREPARE bloccate - nessun caso aperto"
+            lines = [
+                f"Report settimanale monitoraggio PREPARE bloccate - {report_date}",
+                "",
+                "Nessun caso aperto - monitoraggio attivo.",
+            ]
+
+        # SNS impone un massimo di 100 caratteri per il Subject
+        sns = boto3.client('sns', region_name=region)
+        sns.publish(TopicArn=topic_arn, Subject=subject[:100], Message="\n".join(lines))
+        print(f"Weekly report sent to SNS topic {topic_arn} ({len(open_cases)} open cases)")
+    except Exception as e:
+        print(f"ERROR: Failed to send weekly report: {e}")
