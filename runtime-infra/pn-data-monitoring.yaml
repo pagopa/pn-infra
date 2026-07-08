@@ -119,6 +119,11 @@ Parameters:
     Description: pn-troubleshooting repository branch or tag name (e.g. main, develop)
     Default: 'main'
 
+  LambdaPrepareBlockedAnalysisLookbackHours:
+    Type: Number
+    Description: Look-back hours applied in incremental mode (start_time = last_update - lookback) to recover late-arriving PREPARE events. Set 0 to disable overlap.
+    Default: 24
+
   CloudWatchNamespace:
     Type: String
     Description: CloudWatch namespace for PrepareBlocked metrics
@@ -991,6 +996,7 @@ Resources:
           AthenaDatabase: cdc_analytics_database
           AthenaTable: pn_timelines_json_view
           AthenaWorkgroup: primary
+          LookbackHours: !Ref LambdaPrepareBlockedAnalysisLookbackHours
           S3ResultBucket: !Sub s3://${DataMonitoringBucket}/prepare-blocked-analysis/
           AthenaResultsBucket: !Sub pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
           RepoZipUrl: !Sub 'https://github.com/pagopa/pn-troubleshooting/archive/refs/heads/${LambdaPrepareBlockedAnalysisPnTroubleshootingBranch}.zip'

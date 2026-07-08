@@ -17,6 +17,7 @@ def lambda_handler(event, context):
     database = os.environ.get('AthenaDatabase', 'cdc_analytics_database')
     table = os.environ.get('AthenaTable', 'pn_timelines_json_view')
     workgroup = os.environ.get('AthenaWorkgroup', 'primary')
+    lookback_hours = os.environ.get('LookbackHours', '24')
     s3_result_bucket = os.environ['S3ResultBucket']
     athena_results_bucket = os.environ['AthenaResultsBucket']
     repo_zip_url = os.environ['RepoZipUrl']
@@ -103,6 +104,7 @@ def lambda_handler(event, context):
     database = event.get('database', database)
     table = event.get('table', table)
     workgroup = event.get('workgroup', workgroup)
+    lookback_hours = str(event.get('lookback_hours', lookback_hours))
     
     # Calculate script timeout based on remaining Lambda execution time
     # Leave 60 seconds buffer for cleanup and file upload
@@ -124,7 +126,8 @@ def lambda_handler(event, context):
         "--workgroup", workgroup,
         "--output-location", f"s3://{athena_results_bucket}/",
         "--s3-result-bucket", s3_result_bucket,
-        "--timeout", str(timeout)
+        "--timeout", str(timeout),
+        "--lookback-hours", lookback_hours
     ]
     
     # Add optional parameters from event

@@ -24,6 +24,7 @@ EventBridge Schedule → Lambda → Download Repo → Execute Script → Athena 
 - `AthenaDatabase`: Glue database name (default: `cdc_analytics_database`)
 - `AthenaTable`: Table name (default: `pn_timelines_json_view`)
 - `AthenaWorkgroup`: Athena workgroup (default: `primary`)
+- `LookbackHours`: look-back hours applied in incremental mode (`start_time = last_update - lookback`) to recover late-arriving PREPARE events; set `0` to disable overlap (default: `24`)
 - `S3ResultBucket`: S3 path for result files (required)
 - `AthenaResultsBucket`: Athena query results bucket (required)
 - `RepoZipUrl`: GitHub ZIP URL for pn-troubleshooting repository (required)
