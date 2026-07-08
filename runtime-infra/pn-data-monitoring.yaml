@@ -69,7 +69,7 @@ Parameters:
   DataLakeRoleName:
     Type: String
     Description: Datalake Role Name
-    Default: 'pagopa-pn'
+    Default: '-'
 
   DataLakeAccountId2:
     Type: String
@@ -79,7 +79,7 @@ Parameters:
   DataLakeAccountId2RoleName:
     Type: String
     Description: Datalake account id 2 role name
-    Default: 'pagopa-pn'
+    Default: '-'
   
   DataAnalysisSlackEmail:
     Type: String
@@ -233,7 +233,8 @@ Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
   IsDatalakeAccount: !And [ !Not [ !Equals [!Ref DataLakeAccountId, '' ] ], !Not [ !Equals [!Ref DataLakeAccountId, '-' ] ] ]
-  IsDatalakeAccountInCore: !And [ !Condition IsDatalakeAccount, !Condition IsCoreAccount ]
+  IsDatalakeAccountRoleName: !And [ !Condition IsDatalakeAccount, !Not [ !Equals [!Ref DataLakeRoleName, '' ] ], !Not [ !Equals [!Ref DataLakeRoleName, '-' ] ] ]
+  IsDatalakeAccountInCore: !And [ !Condition IsDatalakeAccountRoleName, !Condition IsCoreAccount ]
   IsDatalakeAccount2: !And [ !Not [ !Equals [!Ref DataLakeAccountId2, '' ] ], !Not [ !Equals [!Ref DataLakeAccountId2, '-' ] ] ]
   IsDatalakeAccount2RoleName: !And [ !Condition IsDatalakeAccount2, !Not [ !Equals [!Ref DataLakeAccountId2RoleName, '' ] ], !Not [ !Equals [!Ref DataLakeAccountId2RoleName, '-' ] ] ]
   IsDatalakeAccount2InCore: !And [ !Condition IsDatalakeAccount2RoleName, !Condition IsCoreAccount ]
@@ -327,7 +328,7 @@ Resources:
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:instance-profile/pn-data-monitoring-ec2-instance-profile"
                   - !Sub "arn:${AWS::Partition}:sts::${PnCoreAwsAccountId}:assumed-role/pn-data-monitoring-ec2-service-role/*"
           - Fn::If:
-            - IsDatalakeAccount
+            - IsDatalakeAccountRoleName
             - Effect: Allow
               Action:
                 - "s3:Get*"
@@ -370,7 +371,7 @@ Resources:
         Version: "2012-10-17"
         Statement:
           - Fn::If:
-            - IsDatalakeAccount
+            - IsDatalakeAccountRoleName
             - Effect: Allow
               Action:
                 - "s3:Get*"
