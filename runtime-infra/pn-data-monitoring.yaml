@@ -260,6 +260,11 @@ Parameters:
     Description: Memory size for the Lambda Critical Monitoring Notification Analyzer function
     Default: 128
 
+  LambdaCriticalMonitoringNotificationAnalyzerTimeout:
+    Type: Number
+    Description: Timeout in seconds for the Lambda Critical Monitoring Notification Analyzer function
+    Default: 60
+
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
@@ -1542,7 +1547,7 @@ Resources:
     Condition: IsCoreAccount
     Properties:
       Runtime: !Ref LambdaJSRuntime
-      Timeout: 60
+      Timeout: !Ref LambdaCriticalMonitoringNotificationAnalyzerTimeout
       MemorySize: !Ref LambdaCriticalMonitoringNotificationAnalyzerMemorySize
       ReservedConcurrentExecutions: 1
       Handler: index.handler
