@@ -64,12 +64,22 @@ Parameters:
   DataLakeAccountId:
     Type: String
     Description: Datalake AWS Account ID
-    Default: ''
+    Default: '-'
   
   DataLakeRoleName:
     Type: String
     Description: Datalake Role Name
-    Default: 'pagopa-pn'
+    Default: '-'
+
+  DataLakeAccountId2:
+    Type: String
+    Description: Datalake AWS Account ID 2
+    Default: '-'
+
+  DataLakeAccountId2RoleName:
+    Type: String
+    Description: Datalake account id 2 role name
+    Default: '-'
   
   DataAnalysisSlackEmail:
     Type: String
@@ -286,8 +296,13 @@ Parameters:
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
-  IsDatalakeAccount: !Not [ !Equals [!Ref DataLakeAccountId, '' ] ]
-  IsDatalakeAccountInCore: !And [ !Condition IsDatalakeAccount, !Condition IsCoreAccount ]
+  IsDatalakeAccount: !And [ !Not [ !Equals [!Ref DataLakeAccountId, '' ] ], !Not [ !Equals [!Ref DataLakeAccountId, '-' ] ] ]
+  IsDatalakeAccountRoleName: !And [ !Condition IsDatalakeAccount, !Not [ !Equals [!Ref DataLakeRoleName, '' ] ], !Not [ !Equals [!Ref DataLakeRoleName, '-' ] ] ]
+  IsDatalakeAccountInCore: !And [ !Condition IsDatalakeAccountRoleName, !Condition IsCoreAccount ]
+  IsDatalakeAccount2: !And [ !Not [ !Equals [!Ref DataLakeAccountId2, '' ] ], !Not [ !Equals [!Ref DataLakeAccountId2, '-' ] ] ]
+  IsDatalakeAccount2RoleName: !And [ !Condition IsDatalakeAccount2, !Not [ !Equals [!Ref DataLakeAccountId2RoleName, '' ] ], !Not [ !Equals [!Ref DataLakeAccountId2RoleName, '-' ] ] ]
+  IsDatalakeAccount2InCore: !And [ !Condition IsDatalakeAccount2RoleName, !Condition IsCoreAccount ]
+  IsDatalakeAccountAnyInCore: !Or [ !Condition IsDatalakeAccountInCore, !Condition IsDatalakeAccount2InCore ]
   HasCronExpression: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
   HasCronExpressionLambdaPnSupportSqsInCoreAccount: !And [!Not [!Equals [!Ref LambdaPnSupportExportSqsCronExpression, '']], !Equals [!Ref PnCoreAwsAccountId, '']]
@@ -377,7 +392,7 @@ Resources:
                   - !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:instance-profile/pn-data-monitoring-ec2-instance-profile"
                   - !Sub "arn:${AWS::Partition}:sts::${PnCoreAwsAccountId}:assumed-role/pn-data-monitoring-ec2-service-role/*"
           - Fn::If:
-            - IsDatalakeAccount
+            - IsDatalakeAccountRoleName
             - Effect: Allow
               Action:
                 - "s3:Get*"
@@ -393,29 +408,66 @@ Resources:
                   aws:PrincipalArn:
                     - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:role/${DataLakeRoleName}"
             - !Ref AWS::NoValue
+          - Fn::If:
+            - IsDatalakeAccount2RoleName
+            - Effect: Allow
+              Action:
+                - "s3:Get*"
+                - "s3:List*"
+              Resource:
+                - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
+                - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
+              Principal:
+                AWS:
+                  - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId2}:root"
+              Condition:
+                ArnLike:
+                  aws:PrincipalArn:
+                    - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId2}:role/${DataLakeAccountId2RoleName}"
+            - !Ref AWS::NoValue
 
   DataMonitoringBucketPolicyCore:
-    Condition: IsDatalakeAccountInCore
+    Condition: IsDatalakeAccountAnyInCore
     Type: AWS::S3::BucketPolicy
     Properties:
       Bucket: !Ref DataMonitoringBucket
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Effect: Allow
-            Action:
-              - "s3:Get*"
-              - "s3:List*"
-            Resource:
-              - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
-              - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
-            Principal:
-              AWS:
-                - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:root"
-            Condition:
-              ArnLike:
-                aws:PrincipalArn:
-                  - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:role/${DataLakeRoleName}"
+          - Fn::If:
+            - IsDatalakeAccountRoleName
+            - Effect: Allow
+              Action:
+                - "s3:Get*"
+                - "s3:List*"
+              Resource:
+                - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
+                - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
+              Principal:
+                AWS:
+                  - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:root"
+              Condition:
+                ArnLike:
+                  aws:PrincipalArn:
+                    - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId}:role/${DataLakeRoleName}"
+            - !Ref AWS::NoValue
+          - Fn::If:
+            - IsDatalakeAccount2RoleName
+            - Effect: Allow
+              Action:
+                - "s3:Get*"
+                - "s3:List*"
+              Resource:
+                - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
+                - !Sub "arn:aws:s3:::${DataMonitoringBucket}/*"
+              Principal:
+                AWS:
+                  - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId2}:root"
+              Condition:
+                ArnLike:
+                  aws:PrincipalArn:
+                    - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId2}:role/${DataLakeAccountId2RoleName}"
+            - !Ref AWS::NoValue
   
   DataMonitoringCodebuildProject:
     Type: 'AWS::CodeBuild::Project'
