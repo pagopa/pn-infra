@@ -274,7 +274,6 @@ Conditions:
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
   HasCronExpressionLambdaPnSupportSqsInCoreAccount: !And [!Not [!Equals [!Ref LambdaPnSupportExportSqsCronExpression, '']], !Equals [!Ref PnCoreAwsAccountId, '']]
   HasQuickSightDataImportLambdaScheduleStateEnabled: !And [ !Condition IsCoreAccount, !Equals [!Ref QuickSightDataImportLambdaScheduleState, 'ENABLED' ] ]
-  HasCriticalMonitoringSchedulerStateEnabled: !And [ !Condition IsCoreAccount, !Equals [!Ref CriticalMonitoringNotificationSchedulerState, 'ENABLED' ] ]
   
 Resources:
   
