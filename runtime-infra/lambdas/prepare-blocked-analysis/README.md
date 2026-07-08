@@ -28,7 +28,7 @@ EventBridge Schedule → Lambda → Download Repo → Execute Script → Athena 
 - `S3ResultBucket`: S3 path for result files (required)
 - `AthenaResultsBucket`: Athena query results bucket (required)
 - `RepoZipUrl`: GitHub ZIP URL for pn-troubleshooting repository (required)
-- `DeliveryMonitoringSnsTopicArn`: SNS topic ARN for the weekly email report (optional; if empty the report is skipped)
+- `DataAnalysisSnsTopicArn`: SNS topic ARN for the weekly email report (optional; if empty the report is skipped)
 - `EnvironmentType`: environment name, shown in the weekly report subject (optional)
 
 ## Weekly report (email alerting)
@@ -36,8 +36,8 @@ EventBridge Schedule → Lambda → Download Repo → Execute Script → Athena 
 The weekly report is driven by a **dedicated EventBridge schedule** separate from the daily
 analysis. It invokes the Lambda with the payload `{"report_only": true}`: in this mode the
 Lambda does **not** run the Athena analysis, it only reads the latest result files from S3
-(`prepare_analog_domicile_latest.json`) and publishes an email to `DeliveryMonitoringSnsTopicArn`
-(subscribed to the `DeliveryMonitoringSlackEmail` channel) listing the still open/unresolved
+(`prepare_analog_domicile_latest.json`) and publishes an email to `DataAnalysisSnsTopicArn`
+(subscribed to the `DataAnalysisSlackEmail` channel) listing the still open/unresolved
 PREPARE cases (no CSV, no S3 links). The email is sent even with zero open cases, stating it
 explicitly, to confirm the monitoring is active.
 

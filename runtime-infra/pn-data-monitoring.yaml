@@ -1104,7 +1104,7 @@ Resources:
           MetricNameNewInLastRun: !Ref MetricNameNewInLastRun
           MetricNameAffectedPrepare: !Ref MetricNameAffectedPrepare
           EnvironmentType: !Ref EnvironmentType
-          DeliveryMonitoringSnsTopicArn: !Ref DeliveryMonitoringTopic
+          DataAnalysisSnsTopicArn: !Ref DataAnalysisTopic
       Role: !GetAtt LambdaPrepareBlockedAnalysisRole.Arn
 
   LambdaPrepareBlockedAnalysisRole:
@@ -1191,12 +1191,12 @@ Resources:
                   - dynamodb:Scan
                 Resource:
                   - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/pn-PaperRequestError
-              # Publish weekly report to the Delivery Monitoring SNS topic (email alerting)
+              # Publish weekly report to the Data Analysis SNS topic (email alerting)
               - Effect: Allow
                 Action:
                   - sns:Publish
                 Resource:
-                  - !Ref DeliveryMonitoringTopic
+                  - !Ref DataAnalysisTopic
               - Effect: Allow
                 Action:
                   - kms:Decrypt
