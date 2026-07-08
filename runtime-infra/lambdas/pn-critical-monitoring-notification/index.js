@@ -9,7 +9,7 @@ const TIMELINE_DB_TABLE_NAME = 'pn-Timelines';
 const S3_BUCKET_NAME = process.env.MONITORING_BUCKET_NAME;
 const PENDING_PREFIX = "critical-monitoring/";
 const TAXONOMY_CODES = process.env.TAXONOMY_CODES ? process.env.TAXONOMY_CODES.split(",").map(code => code.trim()) : [];
-const WHITELISTED_PA = process.env.WHITELISTED_PA ? process.env.WHITELISTED_PA.split(",").map(pa => pa.trim()) : [];
+const WHITELISTED_PA = process.env.WHITELISTED_PA ? JSON.parse(process.env.WHITELISTED_PA) : [];
 
 function isSqsEvent(event) {
   return Array.isArray(event?.Records) && event.Records.length > 0 && event.Records[0].eventSource === "aws:sqs";
@@ -61,7 +61,7 @@ async function processRecord(record) {
   const analogMailInfo = retrieveInfoFromDetails(recordBody.analogMail);
 
   const notification = await retrieveElementFromDynamoDB(PN_NOTIFICATION_TABLE_NAME, "iun", analogMailInfo.iun);
-  const senderPaId = notification ? notification.pa : 'undefined';
+  const senderPaId = notification ? notification.senderPaId : 'undefined';
 
   if (WHITELISTED_PA.length > 0 && !WHITELISTED_PA.includes(senderPaId)) {
     console.log(`Notification pa ${senderPaId} is not in the whitelisted list, skipping.`);
