@@ -715,8 +715,8 @@ Parameters:
 
   JavaVersion:
     Type: String
-    Default: "1721"
-    AllowedValues: ["1721", "25"]
+    Default: "17_21"
+    AllowedValues: ["17_21", "25"]
 
 Mappings:
 
@@ -779,6 +779,10 @@ Mappings:
     AMD:
       image: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:1.30
 
+  # Sidecar images for OpenTelemetry agent injector: 
+  # 17_21 indicates Java 17 or Java 21
+  # 25 indicates Java 25
+  # The ARM and AMD indicate the CPU architecture.
   SidecarInjectorImage:
     '1721':
       ARM: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.33.0
