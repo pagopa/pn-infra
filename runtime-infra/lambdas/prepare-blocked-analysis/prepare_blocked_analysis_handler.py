@@ -343,13 +343,11 @@ def download_result_files(s3_result_bucket, region, result_dir):
 
 
 def send_weekly_report(result_dir, region, topic_arn, environment_type=''):
-    """
-    Invia il report settimanale via SNS/email con i casi PREPARE ancora aperti e non
-    risolti (solo elenco elementi impattati, senza CSV ne' link a S3).
+    """Send the weekly SNS/email report listing still-open PREPARE cases.
 
-    Il giorno di invio e' governato dallo scheduler EventBridge dedicato, quindi qui
-    non c'e' alcun filtro sul giorno. Il report viene inviato anche con 0 casi aperti,
-    indicandolo esplicitamente, per confermare che il monitoraggio e' attivo.
+    The send day/time is controlled by the dedicated EventBridge Scheduler rule, so this
+    function does not apply any day-based filtering. The report is sent even when there
+    are 0 open cases (explicitly stating it) to confirm monitoring is active.
     """
     try:
         if not topic_arn:
