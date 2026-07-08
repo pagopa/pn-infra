@@ -317,12 +317,11 @@ def publish_metrics_to_cloudwatch(result_dir, cloudwatch, region, namespace,
 
 
 def download_result_files(s3_result_bucket, region, result_dir):
-    """
-    Scarica da S3 i file di risultato dell'analisi (statistics.json e
-    prepare_analog_domicile_latest.json) nella directory locale indicata.
+    """Download analysis result files from S3 (statistics.json and
+    prepare_analog_domicile_latest.json) into the given local directory.
 
     Returns:
-        list: nomi dei file effettivamente scaricati.
+        list[str]: Names of the files that were successfully downloaded.
     """
     s3_client = boto3.client('s3', region_name=region)
     bucket_name = s3_result_bucket.replace('s3://', '').split('/')[0]
