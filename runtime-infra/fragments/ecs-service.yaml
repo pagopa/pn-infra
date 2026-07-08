@@ -63,26 +63,6 @@ Parameters:
     Description: Container image URI for Open telemetry
     Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-collector:v0.36.0
 
-  ContainerARMImageInjectorURI:
-    Type: String
-    Description: Container image URI for Open telemetry
-    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.33.0
-
-  ContainerARMCloudWatchAgentURI:
-    Type: String
-    Description: Container image URI for Cloud Watch Agent
-    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:v1.30-arm64
-
-  ContainerImageInjectorURI:
-    Type: String
-    Description: Container image URI for Open telemetry
-    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.32.0
-
-  ContainerCloudWatchAgentURI:
-    Type: String
-    Description: Container image URI for Cloud Watch Agent
-    Default: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:1.30
-
   EfsFilesystem:
     Type: String
     Default: "-"
@@ -733,7 +713,13 @@ Parameters:
     Default: "AMD"
     AllowedValues: ["AMD", "ARM"]
 
+  JavaVersion:
+    Type: String
+    Default: "1721"
+    AllowedValues: ["1721", "25"]
+
 Mappings:
+
   ContainerMemory:
     1GB:
       awsCollector: 256
@@ -787,13 +773,19 @@ Mappings:
       microservice: 7936
       sidecarCwAgent: 256
 
-  ContainerImagesURI:
-    sidecarCwAgent:
-      ARM: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:v1.30-arm64
-      AMD: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:1.30
-    sidecarInjector:
+  SidecarCwAgentImage:
+    ARM:
+      image: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:v1.30-arm64
+    AMD:
+      image: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/cloudwatch-agent:1.30
+
+  SidecarInjectorImage:
+    '1721':
       ARM: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.33.0
       AMD: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v1.32.0
+    '25':
+      ARM: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v2.28.1
+      AMD: 911845998067.dkr.ecr.eu-south-1.amazonaws.com/aws-otel-agent-injector:v2.28.1
 
 Conditions:
   HasAlarmTopic: !Not [ !Equals [ !Ref AlarmSNSTopicArn, '-' ] ]
@@ -1778,7 +1770,7 @@ Resources:
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
         - Name: sidecar-injector
-          Image: !FindInMap [ ContainerImagesURI, sidecarInjector, !Ref CpuArchitecture ]
+          Image: !FindInMap [ SidecarInjectorImage, !Ref JavaVersion, !Ref CpuArchitecture ]
           Essential: false
           MountPoints:
             - SourceVolume: "my-vol"
@@ -1793,7 +1785,7 @@ Resources:
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
         - Name: sidecar-cw-agent
-          Image: !FindInMap [ ContainerImagesURI, sidecarCwAgent, !Ref CpuArchitecture ]
+          Image: !FindInMap [ SidecarCwAgentImage, !Ref CpuArchitecture, image ]
           Essential: false
           Cpu: '256'
           Memory:  !FindInMap [ ContainerMemory, !Ref MemoryAmount, sidecarCwAgent ]
