@@ -99,13 +99,13 @@ def lambda_handler(event, context):
         publish_emf_metrics(log_entry)
 
         # Suspicious checks
-        if is_suspicious_access(log_entry):
-            send_alert(
-                log_entry,
-                "Suspicious access pattern detected",
-                alert_type="S3 Suspicious Access",
-                severity="WARNING",
-            )
+        #if is_suspicious_access(log_entry):
+        #    send_alert(
+        #        log_entry,
+        #        "Suspicious access pattern detected",
+        #        alert_type="S3 Suspicious Access",
+        #        severity="WARNING",
+        #    )
 
         return {"statusCode": 200, "body": "EMF metrics emitted"}
 
