@@ -24,7 +24,7 @@ def lambda_handler(event, context):
     cloudwatch_namespace = os.environ['CloudWatchNamespace']
     
     # Weekly report configuration (SNS/email alerting)
-    delivery_monitoring_topic_arn = os.environ.get('DeliveryMonitoringSnsTopicArn', '')
+    data_analysis_topic_arn = os.environ.get('DataAnalysisSnsTopicArn', '')
     environment_type = os.environ.get('EnvironmentType', '')
     
     # CloudWatch metric names
@@ -44,7 +44,7 @@ def lambda_handler(event, context):
         result_dir = "/tmp/prepare_blocked_report"
         os.makedirs(result_dir, exist_ok=True)
         download_result_files(s3_result_bucket, region, result_dir)
-        send_weekly_report(result_dir, region, delivery_monitoring_topic_arn, environment_type)
+        send_weekly_report(result_dir, region, data_analysis_topic_arn, environment_type)
         return {
             'statusCode': 200,
             'body': 'PrepareBlockedAnalysis weekly report sent'
@@ -350,7 +350,7 @@ def send_weekly_report(result_dir, region, topic_arn, environment_type=''):
     """
     try:
         if not topic_arn:
-            print("WARNING: DeliveryMonitoringSnsTopicArn not set, skipping weekly report email")
+            print("WARNING: DataAnalysisSnsTopicArn not set, skipping weekly report email")
             return
 
         open_cases = []
