@@ -534,6 +534,7 @@ Resources:
       Targets:
         - Id: SendToSNS
           Arn: !Ref InfraSecTopicArn
+          RoleArn: !GetAtt EventBridgeSnsAccountRole.Arn
           InputTransformer:
             InputPathsMap:
               time: "$.time"
