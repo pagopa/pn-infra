@@ -356,6 +356,7 @@ Conditions:
   IsSpotAllowedEnvironment: !Or
     - !Equals [!Ref EnvironmentType, "dev"]
     - !Equals [!Ref EnvironmentType, "test"]
+    - !Equals [!Ref EnvironmentType, "uat"]
     - !Equals [!Ref EnvironmentType, "hotfix"]
 
   HasDataLakeAccountId1RoleName: !And [ !Not [ !Equals [ !Ref DataLakeAccountId1, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1, '' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1RoleName, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1RoleName, '' ] ] ]
