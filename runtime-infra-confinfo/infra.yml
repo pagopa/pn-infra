@@ -239,7 +239,22 @@ Parameters:
   DataLakeAccountId:
     Type: String
     Description: 'Datalake AWS Account ID'
-    Default: ''
+    Default: '-'
+
+  DataLakeRoleName:
+    Type: String
+    Description: Datalake Role Name
+    Default: '-'
+
+  DataLakeAccountId2:
+    Type: String
+    Description: 'Datalake AWS Account ID 2'
+    Default: '-'
+
+  DataLakeAccountId2RoleName:
+    Type: String
+    Description: Datalake account id 2 role name
+    Default: '-'
     
   # Lambda deploy parameters
   CdBucketName:
@@ -1524,7 +1539,12 @@ Outputs:
     Value: !Ref DataMonitoringScriptVersion
   DataLakeAccountId:
     Value: !Ref DataLakeAccountId
-    
+  DataLakeRoleName:
+    Value: !Ref DataLakeRoleName
+  DataLakeAccountId2:
+    Value: !Ref DataLakeAccountId2
+  DataLakeAccountId2RoleName:
+    Value: !Ref DataLakeAccountId2RoleName
   # required for core compatibility
   EnvironmentType:
     Value: !Ref EnvironmentType
