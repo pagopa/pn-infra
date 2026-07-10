@@ -550,6 +550,49 @@ Parameters:
     Type: Number
     Default: 1
 
+  CSostDownstreamAlarmPeriodFilterPattern:
+    Type: String
+    Default: '{ $.level = "ERROR" }'
+
+  CSostDownstreamAlarmPeriod:
+    Type: Number
+    Default: 300
+
+  CSostDownstreamAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  CSostDownstreamAlarmEvaluationPeriods:
+    Type: Number
+    Default: 12
+
+  CSostDownstreamAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  CSostDownstreamAlarmEnableOncall:
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
+  OncallCSostDownstreamAlarmPeriod:
+    Type: Number
+    Default: 300
+
+  OncallCSostDownstreamAlarmThreshold:
+    Type: Number
+    Default: 1
+
+  OncallCSostDownstreamAlarmEvaluationPeriods:
+    Type: Number
+    Default: 12
+
+  OncallCSostDownstreamAlarmPeriodDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
 Mappings:
   DownstreamAlarms:
     EMD:
@@ -588,6 +631,9 @@ Mappings:
     InfoCamere:
       LogGroup: /aws/ecs/pn-national-registries
       Metric: pn-national-registries-InfoCamere-downstream-detection
+    CSost:
+      LogGroup: /aws/lambda/pn-legalConservationStarter
+      Metric: pn-legalConservationStarter-CSost-downstream-detection
 
 Resources:
 
@@ -928,7 +974,31 @@ Resources:
         Statistic: Sum
         ComparisonOperator: GreaterThanOrEqualToThreshold
         HasOncall: False
-        HasAlarm: False        
+        HasAlarm: False  
+
+  CSostDownstreamDetectionAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        MetricName: !FindInMap [DownstreamAlarms, CSost, Metric]
+        MetricNamespace: !Ref MetricNamespace
+        LogGroupName: !FindInMap [DownstreamAlarms, CSost, LogGroup]
+        FilterPattern: !Ref CSostDownstreamAlarmPeriodFilterPattern
+        Period: !Ref CSostDownstreamAlarmPeriod
+        Threshold: !Ref CSostDownstreamAlarmThreshold
+        EvaluationPeriods: !Ref CSostDownstreamAlarmEvaluationPeriods
+        DatapointsToAlarm: !Ref CSostDownstreamAlarmPeriodDatapointsToAlarm
+        Statistic: Sum
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        HasOncall: !Ref CSostDownstreamAlarmEnableOncall
+        OncallPeriod: !Ref OncallCSostDownstreamAlarmPeriod
+        OncallThreshold: !Ref OncallCSostDownstreamAlarmThreshold
+        OncallEvaluationPeriods: !Ref OncallCSostDownstreamAlarmEvaluationPeriods
+        OncallDatapointsToAlarm: !Ref OncallCSostDownstreamAlarmPeriodDatapointsToAlarm
+        OncallComparisonOperator: GreaterThanOrEqualToThreshold
+        OncallStatistic: Sum      
 
 Outputs:
   Version:
