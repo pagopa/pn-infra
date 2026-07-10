@@ -293,6 +293,11 @@ Parameters:
     Description: Timeout in seconds for the Lambda Critical Monitoring Notification Analyzer function
     Default: 60
 
+  LambdaCriticalMonitoringNotificationAnalyzerReservedConcurrentExecutions:
+    Type: Number
+    Description: Reserved concurrent executions for the Lambda Critical Monitoring Notification Analyzer function
+    Default: 10
+
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
@@ -1663,7 +1668,7 @@ Resources:
       Runtime: !Ref LambdaJSRuntime
       Timeout: !Ref LambdaCriticalMonitoringNotificationAnalyzerTimeout
       MemorySize: !Ref LambdaCriticalMonitoringNotificationAnalyzerMemorySize
-      ReservedConcurrentExecutions: 1
+      ReservedConcurrentExecutions: !Ref LambdaCriticalMonitoringNotificationAnalyzerReservedConcurrentExecutions
       Handler: index.handler
       FunctionName: pn-critical-monitoring-notification-analyzer-lambda
       Code:
