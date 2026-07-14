@@ -63,6 +63,12 @@ Parameters:
     Default: 'true'
     Description: 'Monitor Cognito local user creation events (console/CLI)?'
 
+  VpcMonitoringEnabled:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: 'Monitor VPC security group and networking change events?'
+
   PITRExcludedTables:
     Type: CommaDelimitedList
     Description: 'DynamoDB tables to exclude from PITR disabled alerts'
@@ -180,6 +186,7 @@ Conditions:
   HasCloudTrailLogsEnabledAndIsConfinfoAccount: !And [ !Equals [!Ref EnableCloudTrailLogs, 'true'], !Condition IsConfinfoAccount ]
   HasCloudTrailLogsEnabledAndIsCoreAccount: !And [ !Equals [!Ref EnableCloudTrailLogs, 'true'], !Condition IsCoreAccount ]
   HasMonitoringCognitoEnabledAndIsCoreAccount: !And [ !Equals [!Ref CognitoMonitoringEnabled, 'true'], !Condition IsCoreAccount ]
+  HasMonitoringVpcEnabled: !Equals [!Ref VpcMonitoringEnabled, 'true']
   HasS3CriticalPrefixMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalS3Prefixes], "" ] ]
   HasDynamoDBCriticalTableMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalDynamoDBTables], "" ] ]
   HasCloudtrailEventDataStoreEnabledAndIsConfinfoAccount: !And [ !Equals [!Ref CloudtrailEventDataStoreEnabled, 'true'], !Condition IsConfinfoAccount ]
@@ -655,6 +662,99 @@ Resources:
               bucketName: "$.detail.requestParameters.bucketName"
               sourceIP: "$.detail.sourceIPAddress"
             InputTemplate: !Sub '"CRITICAL ALERT: S3 Versioning Configuration Change - Environment: ${EnvironmentType} - Bucket: <bucketName> - Operation: <eventName> - User: <user> - Source IP: <sourceIP> - Time: <time> - ACTION REQUIRED: Verify versioning is still enabled for data protection"'
+
+  # ============================================================================
+  # EventBridge rule to monitor VPC Security Group changes
+  # ============================================================================
+  VpcSecurityGroupChangeRule:
+    Type: AWS::Events::Rule
+    Condition: HasMonitoringVpcEnabled
+    Properties:
+      Name: !Sub "${ProjectName}-infra-sec-vpc-sg-change"
+      Description: "Alert on VPC security group changes (ingress/egress rules, creation, deletion)"
+      State: ENABLED
+      EventPattern:
+        source: ["aws.ec2"]
+        detail-type: ["AWS API Call via CloudTrail"]
+        detail:
+          eventSource: ["ec2.amazonaws.com"]
+          eventName:
+            - "AuthorizeSecurityGroupIngress"
+            - "AuthorizeSecurityGroupEgress"
+            - "RevokeSecurityGroupIngress"
+            - "RevokeSecurityGroupEgress"
+            - "ModifySecurityGroupRules"
+            - "CreateSecurityGroup"
+            - "DeleteSecurityGroup"
+      Targets:
+        - Id: SendToSNS
+          Arn: !Ref InfraSecTopicArn
+          RoleArn: !GetAtt EventBridgeSnsAccountRole.Arn
+          InputTransformer:
+            InputPathsMap:
+              time: "$.time"
+              user: "$.detail.userIdentity.principalId"
+              userArn: "$.detail.userIdentity.arn"
+              sourceIP: "$.detail.sourceIPAddress"
+              eventName: "$.detail.eventName"
+              groupId: "$.detail.requestParameters.groupId"
+              region: "$.detail.awsRegion"
+              eventID: "$.detail.eventID"
+            InputTemplate: !Sub '"ALERT: VPC Security Group Change - Environment: ${EnvironmentType} - Security Group: <groupId> - Operation: <eventName> - User: <user> (ARN: <userArn>) - Source IP: <sourceIP> - Time: <time> - Region: <region> - ACTION REQUIRED: Verify the change is authorized (pipeline/IaC vs manual). CloudTrail Event ID: <eventID>"'
+
+  # ============================================================================
+  # EventBridge rule to monitor VPC networking changes (NACL, route tables, gateways, peering)
+  # ============================================================================
+  VpcNetworkingChangeRule:
+    Type: AWS::Events::Rule
+    Condition: HasMonitoringVpcEnabled
+    Properties:
+      Name: !Sub "${ProjectName}-infra-sec-vpc-networking-change"
+      Description: "Alert on VPC networking changes (network ACLs, route tables, internet gateways, peering)"
+      State: ENABLED
+      EventPattern:
+        source: ["aws.ec2"]
+        detail-type: ["AWS API Call via CloudTrail"]
+        detail:
+          eventSource: ["ec2.amazonaws.com"]
+          eventName:
+            - "CreateNetworkAcl"
+            - "DeleteNetworkAcl"
+            - "CreateNetworkAclEntry"
+            - "DeleteNetworkAclEntry"
+            - "ReplaceNetworkAclEntry"
+            - "ReplaceNetworkAclAssociation"
+            - "CreateRoute"
+            - "DeleteRoute"
+            - "ReplaceRoute"
+            - "CreateRouteTable"
+            - "DeleteRouteTable"
+            - "AssociateRouteTable"
+            - "DisassociateRouteTable"
+            - "CreateInternetGateway"
+            - "DeleteInternetGateway"
+            - "AttachInternetGateway"
+            - "DetachInternetGateway"
+            - "CreateVpcPeeringConnection"
+            - "DeleteVpcPeeringConnection"
+            - "AcceptVpcPeeringConnection"
+            - "CreateVpcEndpoint"
+            - "DeleteVpcEndpoints"
+            - "ModifyVpcEndpoint"
+      Targets:
+        - Id: SendToSNS
+          Arn: !Ref InfraSecTopicArn
+          RoleArn: !GetAtt EventBridgeSnsAccountRole.Arn
+          InputTransformer:
+            InputPathsMap:
+              time: "$.time"
+              user: "$.detail.userIdentity.principalId"
+              userArn: "$.detail.userIdentity.arn"
+              sourceIP: "$.detail.sourceIPAddress"
+              eventName: "$.detail.eventName"
+              region: "$.detail.awsRegion"
+              eventID: "$.detail.eventID"
+            InputTemplate: !Sub '"ALERT: VPC Networking Change - Environment: ${EnvironmentType} - Operation: <eventName> - User: <user> (ARN: <userArn>) - Source IP: <sourceIP> - Time: <time> - Region: <region> - ACTION REQUIRED: Verify the change is authorized (pipeline/IaC vs manual). CloudTrail Event ID: <eventID>"'
 
   EventBridgeSnsAccountRole:
     Type: AWS::IAM::Role
