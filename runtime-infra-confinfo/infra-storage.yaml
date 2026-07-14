@@ -19,7 +19,7 @@ Parameters:
     Type: String
     Description: infra fragment source
   
-  ConfidentialObjectAccountId:
+  ConfidentialInfoAccountId:
     Type: String
     Default: '-'
     Description: Confidential object Account ID
@@ -107,9 +107,9 @@ Parameters:
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
   
-  HasConfidentialObjectAccountId: !Not [ !Equals [ !Ref ConfidentialObjectAccountId, '-' ]]
+  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '-' ]]
 
-  ActivateSafeStorageCondition: !And [ !Condition MakeBucketCondition, !Condition HasConfidentialObjectAccountId]
+  ActivateSafeStorageCondition: !And [ !Condition MakeBucketCondition, !Condition HasConfidentialInfoAccountId]
 
   CdcOnDemandDisabled: !Not [!Equals [!Ref CdcStreamMode, ON_DEMAND]]
   LogsOnDemandDisabled: !Not [!Equals [!Ref LogsStreamMode, ON_DEMAND]]
@@ -251,7 +251,7 @@ Resources:
               Resource: "*"
               Condition:
                 ArnLike: 
-                  aws:SourceArn: !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${ConfidentialObjectAccountId}:trail/*"
+                  aws:SourceArn: !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${ConfidentialInfoAccountId}:trail/*"
             - !Ref AWS::NoValue
 
   ESMKinesisFailureNotificationsBucket:

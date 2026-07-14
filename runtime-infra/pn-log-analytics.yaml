@@ -33,7 +33,7 @@ Parameters:
     Type: String
     Description: ConfInfo logs bucket name
   
-  ConfidentialObjectAccountId:
+  ConfidentialInfoAccountId:
     Description: "Confinfo AWS Account id"
     Type: String
 
@@ -1098,7 +1098,7 @@ Resources:
                 Action:
                   - kms:Decrypt
                   - kms:DescribeKey
-                Resource: !Sub "arn:aws:kms:${AWS::Region}:${ConfidentialObjectAccountId}:key/*"
+                Resource: !Sub "arn:aws:kms:${AWS::Region}:${ConfidentialInfoAccountId}:key/*"
 
   GlueCrawlerConfInfo:
     Type: AWS::Glue::Crawler
