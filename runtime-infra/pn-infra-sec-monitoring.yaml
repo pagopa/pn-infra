@@ -69,6 +69,38 @@ Parameters:
     Default: 'true'
     Description: 'Monitor VPC security group and networking change events?'
 
+  VpcAutoRevertEnabled:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: 'Automatically revert DANGEROUS VPC security group rule additions (sensitive port open to a public CIDR)?'
+
+  VpcAutoRevertDangerousPorts:
+    Type: String
+    Default: '22,3389'
+    Description: 'Comma separated ports considered dangerous when exposed to a public CIDR (denylist)'
+
+  VpcAutoRevertPublicCidrs:
+    Type: String
+    Default: '0.0.0.0/0'
+    Description: 'Comma separated CIDRs considered public/world-open'
+
+  VpcAutoRevertAllPortsPublic:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: 'Also revert rules that open ALL ports/protocols to a public CIDR'
+
+  VpcAutoRevertMonitoredSecurityGroups:
+    Type: String
+    Default: ''
+    Description: 'Comma separated security group ids in scope for auto-revert (empty = all)'
+
+  VpcAutoRevertRulesSsmParameter:
+    Type: String
+    Default: '/pn-infra-sec-monitoring/vpc-auto-revert/rules'
+    Description: 'Optional SSM Parameter Store path holding a JSON denylist that overrides the defaults at runtime (enrich rules without redeploy). If the parameter does not exist, env defaults are used.'
+
   PITRExcludedTables:
     Type: CommaDelimitedList
     Description: 'DynamoDB tables to exclude from PITR disabled alerts'
@@ -187,6 +219,7 @@ Conditions:
   HasCloudTrailLogsEnabledAndIsCoreAccount: !And [ !Equals [!Ref EnableCloudTrailLogs, 'true'], !Condition IsCoreAccount ]
   HasMonitoringCognitoEnabledAndIsCoreAccount: !And [ !Equals [!Ref CognitoMonitoringEnabled, 'true'], !Condition IsCoreAccount ]
   HasMonitoringVpcEnabled: !Equals [!Ref VpcMonitoringEnabled, 'true']
+  HasVpcAutoRevertEnabled: !Equals [!Ref VpcAutoRevertEnabled, 'true']
   HasS3CriticalPrefixMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalS3Prefixes], "" ] ]
   HasDynamoDBCriticalTableMonitoring: !Not [ !Equals [ !Join  [",", !Ref CriticalDynamoDBTables], "" ] ]
   HasCloudtrailEventDataStoreEnabledAndIsConfinfoAccount: !And [ !Equals [!Ref CloudtrailEventDataStoreEnabled, 'true'], !Condition IsConfinfoAccount ]
@@ -755,6 +788,118 @@ Resources:
               region: "$.detail.awsRegion"
               eventID: "$.detail.eventID"
             InputTemplate: !Sub '"ALERT: VPC Networking Change - Environment: ${EnvironmentType} - Operation: <eventName> - User: <user> (ARN: <userArn>) - Source IP: <sourceIP> - Time: <time> - Region: <region> - ACTION REQUIRED: Verify the change is authorized (pipeline/IaC vs manual). CloudTrail Event ID: <eventID>"'
+
+  # ============================================================================
+  # VPC Security Group auto-revert (Lambda-based responsive control)
+  # Reverts unauthorized ingress/egress rule additions and notifies via SNS.
+  # Disabled by default (VpcAutoRevertEnabled=false).
+  # ============================================================================
+  VpcAutoRevertLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    Condition: HasVpcAutoRevertEnabled
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub "${ProjectName}-infra-sec-vpc-auto-revert-${EnvironmentType}"
+        LogGroupPrefix: /aws/lambda
+        LogGroupRetention: !Ref LogRetentionDays
+
+  VpcAutoRevertLambdaRole:
+    Type: AWS::IAM::Role
+    Condition: HasVpcAutoRevertEnabled
+    Properties:
+      RoleName: !Sub "${ProjectName}-infra-sec-vpc-auto-revert-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "${ProjectName}-infra-sec-vpc-auto-revert-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref InfraSecTopicArn
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeSecurityGroupRules
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:RevokeSecurityGroupEgress
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${VpcAutoRevertRulesSsmParameter}"
+
+  VpcAutoRevertLambda:
+    Type: AWS::Lambda::Function
+    Condition: HasVpcAutoRevertEnabled
+    DependsOn: VpcAutoRevertLambdaLogGroup
+    Properties:
+      FunctionName: !Sub "${ProjectName}-infra-sec-vpc-auto-revert-${EnvironmentType}"
+      Description: "Reverts unauthorized VPC security group rule additions and notifies via SNS"
+      Runtime: python3.14
+      Handler: infra-sec-vpc-auto-revert.lambda_handler
+      Role: !GetAtt VpcAutoRevertLambdaRole.Arn
+      Timeout: 30
+      MemorySize: 128
+      LoggingConfig:
+        LogFormat: JSON
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/infra-sec-vpc-auto-revert.zip
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref InfraSecTopicArn
+          ENVIRONMENT: !Ref EnvironmentType
+          DANGEROUS_PORTS: !Ref VpcAutoRevertDangerousPorts
+          PUBLIC_CIDRS: !Ref VpcAutoRevertPublicCidrs
+          REVERT_ALL_PORTS_PUBLIC: !Ref VpcAutoRevertAllPortsPublic
+          MONITORED_SECURITY_GROUPS: !Ref VpcAutoRevertMonitoredSecurityGroups
+          RULES_SSM_PARAMETER: !Ref VpcAutoRevertRulesSsmParameter
+      ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
+
+  VpcAutoRevertRule:
+    Type: AWS::Events::Rule
+    Condition: HasVpcAutoRevertEnabled
+    Properties:
+      Name: !Sub "${ProjectName}-infra-sec-vpc-auto-revert"
+      Description: "Trigger auto-revert Lambda on VPC security group ingress/egress rule additions"
+      State: ENABLED
+      EventPattern:
+        source: ["aws.ec2"]
+        detail-type: ["AWS API Call via CloudTrail"]
+        detail:
+          eventSource: ["ec2.amazonaws.com"]
+          eventName:
+            - "AuthorizeSecurityGroupIngress"
+            - "AuthorizeSecurityGroupEgress"
+      Targets:
+        - Id: SendToAutoRevertLambda
+          Arn: !GetAtt VpcAutoRevertLambda.Arn
+
+  VpcAutoRevertLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Condition: HasVpcAutoRevertEnabled
+    Properties:
+      FunctionName: !Ref VpcAutoRevertLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt VpcAutoRevertRule.Arn
 
   EventBridgeSnsAccountRole:
     Type: AWS::IAM::Role
