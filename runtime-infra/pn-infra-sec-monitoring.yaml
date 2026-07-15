@@ -73,33 +73,12 @@ Parameters:
     Type: String
     AllowedValues: ['true', 'false']
     Default: 'false'
-    Description: 'Automatically revert DANGEROUS VPC security group rule additions (sensitive port open to a public CIDR)?'
-
-  VpcAutoRevertDangerousPorts:
-    Type: String
-    Default: '22,3389'
-    Description: 'Comma separated ports considered dangerous when exposed to a public CIDR (denylist)'
-
-  VpcAutoRevertPublicCidrs:
-    Type: String
-    Default: '0.0.0.0/0'
-    Description: 'Comma separated CIDRs considered public/world-open'
-
-  VpcAutoRevertAllPortsPublic:
-    Type: String
-    AllowedValues: ['true', 'false']
-    Default: 'false'
-    Description: 'Also revert rules that open ALL ports/protocols to a public CIDR'
-
-  VpcAutoRevertMonitoredSecurityGroups:
-    Type: String
-    Default: ''
-    Description: 'Comma separated security group ids in scope for auto-revert (empty = all)'
+    Description: 'Automatically revert DANGEROUS VPC security group INGRESS rule additions (sensitive port open to a public CIDR)?'
 
   VpcAutoRevertRulesSsmParameter:
     Type: String
     Default: '/pn-infra-sec-monitoring/vpc-auto-revert/rules'
-    Description: 'Optional SSM Parameter Store path holding a JSON denylist that overrides the defaults at runtime (enrich rules without redeploy). If the parameter does not exist, env defaults are used.'
+    Description: 'SSM Parameter Store path holding the JSON denylist config (dangerousPorts, publicCidrs, revertAllPortsPublic, monitoredSecurityGroups). It is the ONLY source of config: if the parameter is missing/invalid the Lambda logs a clear error and reverts nothing.'
 
   PITRExcludedTables:
     Type: CommaDelimitedList
@@ -791,7 +770,8 @@ Resources:
 
   # ============================================================================
   # VPC Security Group auto-revert (Lambda-based responsive control)
-  # Reverts unauthorized ingress/egress rule additions and notifies via SNS.
+  # Reverts unauthorized INGRESS rule additions (dangerous port open to a public
+  # CIDR) and notifies via SNS. Egress rules are never reverted.
   # Disabled by default (VpcAutoRevertEnabled=false).
   # ============================================================================
   VpcAutoRevertLambdaLogGroup:
@@ -838,7 +818,6 @@ Resources:
                   - ec2:DescribeSecurityGroups
                   - ec2:DescribeSecurityGroupRules
                   - ec2:RevokeSecurityGroupIngress
-                  - ec2:RevokeSecurityGroupEgress
                 Resource: "*"
               - Effect: Allow
                 Action:
@@ -866,10 +845,6 @@ Resources:
         Variables:
           SNS_TOPIC_ARN: !Ref InfraSecTopicArn
           ENVIRONMENT: !Ref EnvironmentType
-          DANGEROUS_PORTS: !Ref VpcAutoRevertDangerousPorts
-          PUBLIC_CIDRS: !Ref VpcAutoRevertPublicCidrs
-          REVERT_ALL_PORTS_PUBLIC: !Ref VpcAutoRevertAllPortsPublic
-          MONITORED_SECURITY_GROUPS: !Ref VpcAutoRevertMonitoredSecurityGroups
           RULES_SSM_PARAMETER: !Ref VpcAutoRevertRulesSsmParameter
       ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
 
@@ -878,7 +853,7 @@ Resources:
     Condition: HasVpcAutoRevertEnabled
     Properties:
       Name: !Sub "${ProjectName}-infra-sec-vpc-auto-revert"
-      Description: "Trigger auto-revert Lambda on VPC security group ingress/egress rule additions"
+      Description: "Trigger auto-revert Lambda on VPC security group INGRESS rule additions"
       State: ENABLED
       EventPattern:
         source: ["aws.ec2"]
@@ -887,7 +862,6 @@ Resources:
           eventSource: ["ec2.amazonaws.com"]
           eventName:
             - "AuthorizeSecurityGroupIngress"
-            - "AuthorizeSecurityGroupEgress"
       Targets:
         - Id: SendToAutoRevertLambda
           Arn: !GetAtt VpcAutoRevertLambda.Arn

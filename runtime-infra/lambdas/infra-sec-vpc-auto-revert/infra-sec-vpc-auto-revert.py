@@ -1,5 +1,4 @@
 import json
-import json
 import os
 from datetime import datetime, timezone
 
@@ -12,11 +11,12 @@ ssm = boto3.client("ssm")
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN")
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "Missing")
 
-# Optional SSM Parameter Store path holding a JSON denylist that OVERRIDES the
-# env defaults below at runtime. This lets the rules be enriched without a
-# redeploy. Expected JSON shape (all keys optional):
+# SSM Parameter Store path holding the JSON denylist config. This is the ONLY
+# source of configuration: it can be edited at runtime to enrich the rules
+# without redeploying the Lambda. Expected JSON shape (all keys optional except
+# that dangerousPorts/publicCidrs must be set for anything to be reverted):
 #   {
-#     "dangerousPorts": [22, 3389],
+#     "dangerousPorts": [22],
 #     "publicCidrs": ["0.0.0.0/0", "::/0"],
 #     "revertAllPortsPublic": true,
 #     "monitoredSecurityGroups": ["sg-123", "sg-456"]
@@ -24,55 +24,46 @@ ENVIRONMENT = os.environ.get("ENVIRONMENT", "Missing")
 RULES_SSM_PARAMETER = os.environ.get("RULES_SSM_PARAMETER", "").strip()
 
 
-def _default_config():
-    """Baseline denylist config from environment variables."""
+def _parse_config(raw):
+    """Normalize the JSON denylist read from SSM into the internal config shape."""
+    data = json.loads(raw)
     return {
-        "dangerousPorts": [
-            int(p.strip())
-            for p in os.environ.get("DANGEROUS_PORTS", "22,3389").split(",")
-            if p.strip().isdigit()
-        ],
-        "publicCidrs": [
-            c.strip()
-            for c in os.environ.get("PUBLIC_CIDRS", "0.0.0.0/0").split(",")
-            if c.strip()
-        ],
-        "revertAllPortsPublic": os.environ.get("REVERT_ALL_PORTS_PUBLIC", "false").lower()
-        == "true",
+        "dangerousPorts": [int(p) for p in data.get("dangerousPorts", [])],
+        "publicCidrs": [str(c) for c in data.get("publicCidrs", [])],
+        "revertAllPortsPublic": bool(data.get("revertAllPortsPublic", False)),
         "monitoredSecurityGroups": [
-            sg.strip()
-            for sg in os.environ.get("MONITORED_SECURITY_GROUPS", "").split(",")
-            if sg.strip()
+            str(sg) for sg in data.get("monitoredSecurityGroups", [])
         ],
     }
 
 
 def _load_config():
-    """Return the effective denylist config: env defaults overridden by the
-    optional SSM parameter (read at every invocation so changes apply live)."""
-    config = _default_config()
+    """Return the denylist config read from the SSM parameter, or None if it is
+    not configured / missing / invalid. In that case the caller must skip the
+    revert and a clear error is logged."""
     if not RULES_SSM_PARAMETER:
-        return config
+        print(
+            "ERROR: RULES_SSM_PARAMETER env var is not set. Cannot load the "
+            "auto-revert denylist. No rule will be reverted."
+        )
+        return None
     try:
         raw = ssm.get_parameter(Name=RULES_SSM_PARAMETER)["Parameter"]["Value"]
-        overrides = json.loads(raw)
+        return _parse_config(raw)
     except ssm.exceptions.ParameterNotFound:
-        return config
-    except Exception as exc:  # noqa: BLE001 - fall back to defaults on any error
-        print(f"Could not load rules from SSM {RULES_SSM_PARAMETER}: {exc}")
-        return config
-
-    if isinstance(overrides.get("dangerousPorts"), list):
-        config["dangerousPorts"] = [int(p) for p in overrides["dangerousPorts"]]
-    if isinstance(overrides.get("publicCidrs"), list):
-        config["publicCidrs"] = [str(c) for c in overrides["publicCidrs"]]
-    if isinstance(overrides.get("revertAllPortsPublic"), bool):
-        config["revertAllPortsPublic"] = overrides["revertAllPortsPublic"]
-    if isinstance(overrides.get("monitoredSecurityGroups"), list):
-        config["monitoredSecurityGroups"] = [
-            str(sg) for sg in overrides["monitoredSecurityGroups"]
-        ]
-    return config
+        print(
+            f"ERROR: SSM parameter '{RULES_SSM_PARAMETER}' not found. Create it "
+            f"with the denylist JSON (e.g. "
+            f'{{"dangerousPorts":[22],"publicCidrs":["0.0.0.0/0","::/0"]}}). '
+            f"No rule will be reverted until it exists."
+        )
+        return None
+    except Exception as exc:  # noqa: BLE001 - never revert on config problems
+        print(
+            f"ERROR: could not load/parse SSM parameter '{RULES_SSM_PARAMETER}': "
+            f"{exc}. No rule will be reverted."
+        )
+        return None
 
 
 def _now():
@@ -122,10 +113,10 @@ def _is_dangerous_rule(item, config):
 
 
 def _collect_dangerous_rule_ids(detail, config):
-    """Return (ingress_ids, egress_ids, reasons) for the created rules that match
-    the dangerous denylist criteria."""
+    """Return (ingress_ids, reasons) for the created INGRESS rules that match the
+    dangerous denylist criteria. Egress rules are intentionally ignored: opening
+    outbound traffic to 0.0.0.0/0 is legitimate and must never be reverted."""
     ingress_ids = []
-    egress_ids = []
     reasons = []
     response = detail.get("responseElements") or {}
     rule_set = (response.get("securityGroupRuleSet") or {}).get("items") or []
@@ -133,15 +124,15 @@ def _collect_dangerous_rule_ids(detail, config):
         rule_id = item.get("securityGroupRuleId")
         if not rule_id:
             continue
+        # Skip egress rules entirely.
+        if item.get("isEgress"):
+            continue
         dangerous, reason = _is_dangerous_rule(item, config)
         if not dangerous:
             continue
         reasons.append(f"{rule_id}: {reason}")
-        if item.get("isEgress"):
-            egress_ids.append(rule_id)
-        else:
-            ingress_ids.append(rule_id)
-    return ingress_ids, egress_ids, reasons
+        ingress_ids.append(rule_id)
+    return ingress_ids, reasons
 
 
 def lambda_handler(event, context):
@@ -156,11 +147,35 @@ def lambda_handler(event, context):
 
     print(f"Processing {event_name} on {group_id} by {actor_arn}")
 
-    if event_name not in ("AuthorizeSecurityGroupIngress", "AuthorizeSecurityGroupEgress"):
+    # Only ingress rule additions are in scope for auto-revert. Egress rules
+    # (typically 0.0.0.0/0 on all ports) are legitimate and never reverted.
+    if event_name != "AuthorizeSecurityGroupIngress":
         print(f"Event {event_name} is not revertable, ignoring")
         return {"reverted": False, "reason": "event-not-revertable"}
 
     config = _load_config()
+
+    # No usable config (SSM parameter missing/invalid): a clear error was already
+    # logged. Notify and skip the revert so we never act on an unknown policy.
+    if config is None:
+        _notify(
+            f"[{ENVIRONMENT}] VPC SG Auto-Revert MISCONFIGURED (no revert)",
+            (
+                f"Auto-revert could not run because the SSM denylist parameter "
+                f"'{RULES_SSM_PARAMETER}' is missing or invalid.\n"
+                f"Create/fix it with the denylist JSON. No rule was reverted.\n"
+                f"Environment: {ENVIRONMENT}\n"
+                f"Security Group: {group_id}\n"
+                f"Operation: {event_name}\n"
+                f"Principal: {actor_arn}\n"
+                f"Source IP: {source_ip}\n"
+                f"Region: {region}\n"
+                f"Time: {_now()}\n"
+                f"CloudTrail Event ID: {event_id}\n"
+            ),
+        )
+        return {"reverted": False, "reason": "config-missing"}
+
     monitored_sgs = config["monitoredSecurityGroups"]
 
     # Out-of-scope security groups: notify only.
@@ -181,10 +196,10 @@ def lambda_handler(event, context):
         )
         return {"reverted": False, "reason": "out-of-scope"}
 
-    ingress_ids, egress_ids, reasons = _collect_dangerous_rule_ids(detail, config)
+    ingress_ids, reasons = _collect_dangerous_rule_ids(detail, config)
 
     # No dangerous rule matched the denylist: notify only, do NOT revert.
-    if not ingress_ids and not egress_ids:
+    if not ingress_ids:
         _notify(
             f"[{ENVIRONMENT}] VPC SG Change detected (no revert - not dangerous)",
             (
@@ -204,16 +219,10 @@ def lambda_handler(event, context):
     reverted = []
     errors = []
     try:
-        if ingress_ids:
-            ec2.revoke_security_group_ingress(
-                GroupId=group_id, SecurityGroupRuleIds=ingress_ids
-            )
-            reverted.extend(ingress_ids)
-        if egress_ids:
-            ec2.revoke_security_group_egress(
-                GroupId=group_id, SecurityGroupRuleIds=egress_ids
-            )
-            reverted.extend(egress_ids)
+        ec2.revoke_security_group_ingress(
+            GroupId=group_id, SecurityGroupRuleIds=ingress_ids
+        )
+        reverted.extend(ingress_ids)
     except Exception as exc:  # noqa: BLE001 - report any failure via SNS
         errors.append(str(exc))
         print(f"Error reverting rules on {group_id}: {exc}")
