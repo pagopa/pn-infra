@@ -19,10 +19,10 @@ Parameters:
     Type: String
     Description: infra fragment source
   
-  SafeStorageAccountId:
+  ConfidentialInfoAccountId:
     Type: String
     Default: '-'
-    Description: Safestorage Account ID
+    Description: Confidential object Account ID
 
   CdcStreamRetentionHours:
     Type: Number
@@ -107,9 +107,9 @@ Parameters:
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
   
-  HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
+  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '-' ]]
 
-  ActivateSafeStorageCondition: !And [ !Condition MakeBucketCondition, !Condition HasStorageStorageAccountId]
+  ActivateSafeStorageCondition: !And [ !Condition MakeBucketCondition, !Condition HasConfidentialInfoAccountId]
 
   CdcOnDemandDisabled: !Not [!Equals [!Ref CdcStreamMode, ON_DEMAND]]
   LogsOnDemandDisabled: !Not [!Equals [!Ref LogsStreamMode, ON_DEMAND]]
@@ -251,7 +251,7 @@ Resources:
               Resource: "*"
               Condition:
                 ArnLike: 
-                  aws:SourceArn: !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                  aws:SourceArn: !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${ConfidentialInfoAccountId}:trail/*"
             - !Ref AWS::NoValue
 
   ESMKinesisFailureNotificationsBucket:
@@ -563,9 +563,6 @@ Outputs:
 
   AlarmSNSTopicName:
     Value: !Ref AlarmSNSTopicName
-  
-  SafeStorageAccountId:
-    Value: !Ref SafeStorageAccountId
   
   PnCoreAwsAccountId:
     Value: !Ref PnCoreAwsAccountId
