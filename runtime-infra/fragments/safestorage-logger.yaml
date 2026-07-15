@@ -38,11 +38,12 @@ Parameters:
     Type: String
     Description: ARN of the SNS topic for alarms
 
-  SafeStorageAccountId:
+  ConfidentialInfoAccountId:
     Type: String
 
   QueueName:
     Type: String
+
 Resources:
   SafestorageLoggerLambdaRole:
     Type: AWS::IAM::Role
@@ -66,11 +67,11 @@ Resources:
                 Action:
                   - 's3:GetObject'
                 Resource: 
-                  - !Sub "arn:${AWS::Partition}:s3:::pn-logs-bucket-${AWS::Region}-${SafeStorageAccountId}-001/safeStorageObjectPutAndGetTracing/*"
+                  - !Sub "arn:${AWS::Partition}:s3:::pn-logs-bucket-${AWS::Region}-${ConfidentialInfoAccountId}-001/safeStorageObjectPutAndGetTracing/*"
                 Condition:
                   StringEquals:
                     s3:ResourceAccount:
-                      - !Ref SafeStorageAccountId
+                      - !Ref ConfidentialInfoAccountId
               - Sid: kmsDecrypt
                 Effect: Allow
                 Action:
@@ -89,7 +90,7 @@ Resources:
                   - "sqs:ChangeMessageVisibility"
                   - "sqs:GetQueueUrl"
                 Resource: 
-                  - !Sub 'arn:${AWS::Partition}:sqs:${AWS::Region}:${SafeStorageAccountId}:${QueueName}'
+                  - !Sub 'arn:${AWS::Partition}:sqs:${AWS::Region}:${ConfidentialInfoAccountId}:${QueueName}'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
         # - 'arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy'
@@ -115,8 +116,8 @@ Resources:
      Action: 'lambda:InvokeFunction'
      FunctionName: !GetAtt SafestorageLoggerLambda.Arn
      Principal: 'sqs.amazonaws.com'
-     SourceAccount: !Ref SafeStorageAccountId
-     SourceArn: !Sub 'arn:${AWS::Partition}:sqs:${AWS::Region}:${SafeStorageAccountId}:${QueueName}'
+     SourceAccount: !Ref ConfidentialInfoAccountId
+     SourceArn: !Sub 'arn:${AWS::Partition}:sqs:${AWS::Region}:${ConfidentialInfoAccountId}:${QueueName}'
 
   SafestorageLoggerLambdaQueueSourceMapping:
     DependsOn:
@@ -125,7 +126,7 @@ Resources:
     Properties: 
       BatchSize: !Ref BatchSize
       Enabled: True
-      EventSourceArn: !Sub 'arn:${AWS::Partition}:sqs:${AWS::Region}:${SafeStorageAccountId}:${QueueName}'
+      EventSourceArn: !Sub 'arn:${AWS::Partition}:sqs:${AWS::Region}:${ConfidentialInfoAccountId}:${QueueName}'
       FunctionName: !Ref SafestorageLoggerLambda
       MaximumBatchingWindowInSeconds: 0 #default value
 
