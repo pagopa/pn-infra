@@ -50,6 +50,10 @@ Parameters:
     Description: Set to true to enable parsed Parquet cache and unified view generation
     Type: String
     Default: "false"
+  HasInformal:
+    Description: Set to true to create a raw table and JSON view for INFORMAL CDC records
+    Type: String
+    Default: "false"
   GlueCrawlerSchedule:
     Type: String
     Default: ''
@@ -68,6 +72,10 @@ Conditions:
   HasCdcParsedCache: !And
     - !Condition HasCdcView
     - !Equals [ "true", !Ref GenerateCdcParsedCache ]
+  HasInformalCdc: !Equals [ "true", !Ref HasInformal ]
+  HasInformalCdcView: !And
+    - !Condition HasInformalCdc
+    - !Condition HasCdcView
   HasNewImagePart2: !Not
     - !Equals
       - !Ref DynamoDBNewImageStructurePart2
@@ -154,6 +162,83 @@ Resources:
             SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
           StoredAsSubDirectories: false
 
+  InformalGlueTable:
+    Type: AWS::Glue::Table
+    Condition: HasInformalCdc
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabaseName
+      TableInput:
+        Name: !Sub '${GlueTableName}_informal'
+        TableType: EXTERNAL_TABLE
+        PartitionKeys:
+          - Name: p_year
+            Type: string
+            Comment: Kinesis stream partition year
+          - Name: p_month
+            Type: string
+            Comment: Kinesis stream partition month
+          - Name: p_day
+            Type: string
+            Comment: Kinesis stream partition day
+          - Name: p_hour
+            Type: string
+            Comment: Kinesis stream partition hour
+        Parameters:
+          projection.enabled: 'true'
+          projection.p_year.type: integer
+          projection.p_year.range: 2022,2099
+          projection.p_month.type: integer
+          projection.p_month.range: 1,12
+          projection.p_month.digits: '2'
+          projection.p_day.type: integer
+          projection.p_day.range: 1,31
+          projection.p_day.digits: '2'
+          projection.p_hour.type: integer
+          projection.p_hour.range: 0,23
+          projection.p_hour.digits: '2'
+          storage.location.template: !If
+            - UseConfinfoLogsBucket
+            - !Sub 's3://${ConfinfoLogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}_INFORMAL/${!p_year}/${!p_month}/${!p_day}/${!p_hour}/'
+            - !Sub 's3://${LogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}_INFORMAL/${!p_year}/${!p_month}/${!p_day}/${!p_hour}/'
+        StorageDescriptor:
+          Columns:
+            - Name: awsRegion
+              Type: string
+            - Name: eventID
+              Type: string
+            - Name: eventName
+              Type: string
+            - Name: userIdentity
+              Type: string
+            - Name: recordFormat
+              Type: string
+            - Name: tableName
+              Type: string
+            - Name: dynamodb
+              Type: !Join
+                - ''
+                - !Split
+                  - ' '
+                  - !Join
+                    - ''
+                    - !Split
+                      - "\n"
+                      - !If 
+                        - HasNewImagePart2
+                        - !Sub "struct<ApproximateCreationDateTime:bigint,SizeBytes:bigint,Keys:${DynamoDBKeysStructure},NewImage:${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}>"
+                        - !Sub "struct<ApproximateCreationDateTime:bigint,SizeBytes:bigint,Keys:${DynamoDBKeysStructure},NewImage:${DynamoDBNewImageStructure}>"
+          Location: !If
+            - UseConfinfoLogsBucket
+            - !Sub s3://${ConfinfoLogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}_INFORMAL/
+            - !Sub s3://${LogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}_INFORMAL/
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Compressed: false
+          SerdeInfo:
+            SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
+          StoredAsSubDirectories: false
+
   GlueCrawler:
     Type: AWS::Glue::Crawler
     Condition: IsGlueCrawlerScheduled
@@ -230,7 +315,52 @@ Resources:
               CdcRecordFilter: !Ref CdcRecordFilter
               OutputType: 'ViewOriginalText'
               Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
-  
+
+  InformalCdcGlueView:
+    Condition: HasInformalCdcView
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabaseName
+      TableInput:
+        Name: !Sub '${GlueTableName}_informal_json_view'
+        TableType: VIRTUAL_VIEW
+        Parameters:
+          presto_view: 'true'
+          comment: !Sub "Presto View for ${GlueTableName} informal cdc"
+        StorageDescriptor:
+          Columns:
+            'Fn::Transform':
+              Name: 'GenerateCdcViewMacro'
+              Parameters:
+                DatabaseName: !Ref GlueDatabaseName
+                CatalogName : 'awsdatacatalog'
+                CdcTableName: !Sub '${GlueTableName}_informal'
+                CdcParsedTableName: !Sub '${GlueTableName}_informal_parsed_cache'
+                CdcViewName: !Sub '${GlueTableName}_informal_json_view'
+                CdcKeysType: !Ref DynamoDBKeysStructure
+                CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
+                CdcRecordFilter: !Ref CdcRecordFilter
+                OutputType: 'StorageDescriptor-Columns'
+                Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
+          Location: ""
+          SerdeInfo: {}
+        ViewExpandedText: "/* Presto View */"
+        ViewOriginalText:
+          'Fn::Transform':
+            Name: 'GenerateCdcViewMacro'
+            Parameters:
+              DatabaseName: !Ref GlueDatabaseName
+              CatalogName : 'awsdatacatalog'
+              CdcTableName: !Sub '${GlueTableName}_informal'
+              CdcParsedTableName: !Sub '${GlueTableName}_informal_parsed_cache'
+              CdcViewName: !Sub '${GlueTableName}_informal_json_view'
+              CdcKeysType: !Ref DynamoDBKeysStructure
+              CdcNewImageType: !Sub "${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}"
+              CdcRecordFilter: !Ref CdcRecordFilter
+              OutputType: 'ViewOriginalText'
+              Enabled: !Ref GenerateCdcView # Enable or disable heavy transformation computation if not needed
+   
   GlueParquetTable:
     Condition: HasCdcParsedCache
     Type: AWS::Glue::Table
