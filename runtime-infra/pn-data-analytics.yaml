@@ -15,7 +15,7 @@ Parameters:
   ConfinfoDynamoDbExportBucketName:
     Type: String
     Description: Name of the Confinfo data-monitoring bucket
-  SafeStorageAccountId:
+  ConfidentialInfoAccountId:
     Type: String
     Description: "Confinfo AWS Account id"
   ConfinfoLogsBucketSuffix:
@@ -161,7 +161,7 @@ Resources:
         GlueTableName: pn_ss_tags
         GlueDatabaseName: !Ref ConfinfoExportDatabase
         LogsBucketName: ''
-        ConfinfoLogsBucketName: !Sub 'pn-logs-bucket-${AWS::Region}-${SafeStorageAccountId}-${ConfinfoLogsBucketSuffix}'
+        ConfinfoLogsBucketName: !Sub 'pn-logs-bucket-${AWS::Region}-${ConfidentialInfoAccountId}-${ConfinfoLogsBucketSuffix}'
         GlueServiceRoleArn: ''
         ProjectName: !Ref ProjectName
         BucketSuffix: !Ref AthenaResultBucketSuffix
@@ -346,7 +346,7 @@ Resources:
       DatabaseInput:
         Name: !Sub 'address_manager_tracing_link_${AddressManagerTracingLinkSuffix}'
         TargetDatabase:
-          CatalogId: !Sub '${SafeStorageAccountId}:s3tablescatalog/${ConfinfoAddressManagerTableBucketName}'
+          CatalogId: !Sub '${ConfidentialInfoAccountId}:s3tablescatalog/${ConfinfoAddressManagerTableBucketName}'
           DatabaseName: address_manager_tracing
 
   AddressManagerTracingLFDescribeAdminCore:
