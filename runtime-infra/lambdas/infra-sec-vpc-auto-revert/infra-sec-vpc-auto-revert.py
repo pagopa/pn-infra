@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timezone
 
 import boto3
+from botocore.exceptions import ClientError
 
 ec2 = boto3.client("ec2")
 sns = boto3.client("sns")
@@ -223,7 +224,15 @@ def lambda_handler(event, context):
             GroupId=group_id, SecurityGroupRuleIds=ingress_ids
         )
         reverted.extend(ingress_ids)
-    except Exception as exc:  # noqa: BLE001 - report any failure via SNS
+    except ClientError as exc:
+        # The rule is already gone (e.g. duplicate EventBridge delivery, or it was
+        # revoked in the meantime): treat as an idempotent no-op, not a failure.
+        if exc.response.get("Error", {}).get("Code") == "InvalidSecurityGroupRuleId.NotFound":
+            print(f"Rule(s) already revoked on {group_id}, nothing to do: {exc}")
+            return {"reverted": False, "reason": "already-reverted"}
+        errors.append(str(exc))
+        print(f"Error reverting rules on {group_id}: {exc}")
+    except Exception as exc:  # noqa: BLE001 - report any other failure via SNS
         errors.append(str(exc))
         print(f"Error reverting rules on {group_id}: {exc}")
 
