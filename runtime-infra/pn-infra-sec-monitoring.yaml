@@ -710,9 +710,11 @@ Resources:
               sourceIP: "$.detail.sourceIPAddress"
               eventName: "$.detail.eventName"
               groupId: "$.detail.requestParameters.groupId"
+              groupName: "$.detail.requestParameters.groupName"
+              groupIdResponse: "$.detail.responseElements.groupId"
               region: "$.detail.awsRegion"
               eventID: "$.detail.eventID"
-            InputTemplate: !Sub '"ALERT: VPC Security Group Change - Environment: ${EnvironmentType} - Security Group: <groupId> - Operation: <eventName> - User: <user> (ARN: <userArn>) - Source IP: <sourceIP> - Time: <time> - Region: <region> - ACTION REQUIRED: Verify the change is authorized (pipeline/IaC vs manual). CloudTrail Event ID: <eventID>"'
+            InputTemplate: !Sub '"ALERT: VPC Security Group Change - Environment: ${EnvironmentType} - Security Group Id: <groupId> / <groupIdResponse> - Security Group Name: <groupName> - Operation: <eventName> - User: <user> (ARN: <userArn>) - Source IP: <sourceIP> - Time: <time> - Region: <region> - ACTION REQUIRED: Verify the change is authorized (pipeline/IaC vs manual). CloudTrail Event ID: <eventID>"'
 
   # ============================================================================
   # EventBridge rule to monitor VPC networking changes (NACL, route tables, gateways, peering)
