@@ -31,7 +31,7 @@ def _parse_config(raw):
     return {
         "dangerousPorts": [int(p) for p in data.get("dangerousPorts", [])],
         "publicCidrs": [str(c) for c in data.get("publicCidrs", [])],
-        "revertAllPortsPublic": bool(data.get("revertAllPortsPublic", False)),
+        "revertAllPortsPublic": str(data.get("revertAllPortsPublic", "false")).lower() == "true",
         "monitoredSecurityGroups": [
             str(sg) for sg in data.get("monitoredSecurityGroups", [])
         ],
