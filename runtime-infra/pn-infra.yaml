@@ -140,7 +140,7 @@ Parameters:
     Type: String
   LogsBucketName:
     Type: String
-  SafeStorageAccountId:
+  ConfidentialInfoAccountId:
     Type: String
   CdcKinesisStreamName:
     Type: String
@@ -439,7 +439,7 @@ Resources:
         LogsBucketKmsKeyArn: !Ref LogsBucketKmsKeyArn
         DataLakeAccountId1: !Ref DataLakeAccountId1
         DataLakeAccountId2: !Ref DataLakeAccountId2
-        SafeStorageAccountId: !Ref SafeStorageAccountId
+        ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
         BucketSuffix: !Ref BucketSuffix
         MoreBucketResourcePolicyStatements:
           Fn::Sub:
@@ -670,8 +670,8 @@ Outputs:
     Value: !Ref AlarmSNSTopicName
   EcsDefaultSecurityGroup:
     Value: !Ref EcsDefaultSecurityGroup
-  SafeStorageAccountId:
-    Value: !Ref SafeStorageAccountId
+  ConfidentialInfoAccountId:
+    Value: !Ref ConfidentialInfoAccountId
   LogsBucketKmsKeyArn:
     Value: !Ref LogsBucketKmsKeyArn
   LogsBucketName:

@@ -26,10 +26,10 @@ Parameters:
     Default: '-'
     Description: Data lake can read logs
   
-  SafeStorageAccountId:
+  ConfidentialInfoAccountId:
     Type: String
     Default: '-'
-    Description: Safestorage Account ID
+    Description: Confidential object Account ID
 
   BucketSuffix:
     Type: String
@@ -50,7 +50,7 @@ Conditions:
       - !Condition ActivateDataLakeRead1Condition
       - !Condition ActivateDataLakeRead2Condition
 
-  HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
+  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '-' ]]
 
 Resources:
 
@@ -119,7 +119,7 @@ Resources:
 
   CloudTrailDestinationBucketResourcePolicy:
     Type: AWS::S3::BucketPolicy
-    Condition: HasStorageStorageAccountId
+    Condition: HasConfidentialInfoAccountId
     Properties: 
       Bucket: !Ref LogsBucketName
       PolicyDocument: !Sub |
@@ -141,7 +141,7 @@ Resources:
               "Condition":{
                 "StringLike":{
                   "aws:SourceArn": [ 
-                    "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*",
+                    "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${ConfidentialInfoAccountId}:trail/*",
                     "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/*"
                   ]
                 }
@@ -162,7 +162,7 @@ Resources:
               "Condition":{
                 "StringLike":{
                   "aws:SourceArn": [ 
-                    "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                    "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${ConfidentialInfoAccountId}:trail/*"
                   ]                  
                 }
               }
