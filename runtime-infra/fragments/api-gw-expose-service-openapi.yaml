@@ -43,6 +43,11 @@ Parameters:
     Default: ''
     Description: Optional path of the exposed API
 
+  ApiMappingKey:
+    Type: String
+    Default: ''
+    Description: Optional custom domain API mapping key
+
   NetworkLoadBalancerLink:
     Type: String
     Description: Link inside the VPC
@@ -267,6 +272,9 @@ Conditions:
   ApiAlarmSegmentationDisabled: !Not [ Condition: ApiAlarmSegmentationEnabled ]
   IsNotBackofficeAndAlarmSegmentationDisabled: !And [ !Condition IsNotBackoffice, !Condition ApiAlarmSegmentationDisabled ]
   HasBasePathOverride: !Not [ !Equals [ !Ref ServiceApiPathOverride, '' ] ]
+  HasApiMappingKey: !Not [ !Equals [ !Ref ApiMappingKey, '' ] ]
+  RequiresLegacyApiMapping: !And [ !Condition RequiresStageCreation, !Not [ !Condition HasApiMappingKey ] ]
+  RequiresV2ApiMapping: !And [ !Condition RequiresStageCreation, !Condition HasApiMappingKey ]
   IsProdEnvironment: !Equals [ !Ref EnvType, 'prod' ] 
 
 Resources:
@@ -430,7 +438,7 @@ Resources:
   # Expose API to custom domain
   APIMapping:
     Type: AWS::ApiGateway::BasePathMapping
-    Condition: RequiresStageCreation
+    Condition: RequiresLegacyApiMapping
     Properties:
       BasePath: 
         'Fn::If':
@@ -439,6 +447,15 @@ Resources:
           - !Ref ServiceApiPath
       DomainName: !Ref DnsName
       RestApiId: !Ref PublicRestApiOpenapi
+      Stage: !Ref PublicRestApiStage
+
+  APIMappingV2:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Condition: RequiresV2ApiMapping
+    Properties:
+      ApiId: !Ref PublicRestApiOpenapi
+      ApiMappingKey: !Ref ApiMappingKey
+      DomainName: !Ref DnsName
       Stage: !Ref PublicRestApiStage
 
   # Rest API CloudWatch alarm 
