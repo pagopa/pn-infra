@@ -52,10 +52,10 @@ Parameters:
       - true
       - false
   
-  LogsDownstreamLambdaDestinationArn:
-    Default: ''
+  DownstreamMonitoringLambdaName:
+    Default: 'pn-downstream-monitoring'
     Type: String
-    Description: where to send downstream logs
+    Description: Name of the Lambda function for downstream monitoring
 
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
@@ -195,7 +195,7 @@ Resources:
           - "Arn"
       LogGroupName: !Ref LogGroup
       FilterPattern: !Ref LogFilterPattern
-      DestinationArn: !Ref LogsDownstreamLambdaDestinationArn
+      DestinationArn: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DownstreamMonitoringLambdaName}' 
 
   ### IAM Role used by Subscription filters to allow read logs from Cloudwatch and send logs to Kinesis Firehose
   DownstreamSubscriptionFilterServiceRole:
