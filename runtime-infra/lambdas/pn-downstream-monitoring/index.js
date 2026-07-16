@@ -46,7 +46,7 @@ exports.handler = async (event) => {
   for (const logEvent of logData.logEvents) {
     try {
       const parsed = JSON.parse(logEvent.message);
-      records.push(parsed);
+      records.push(JSON.parse(parsed.message));
     } catch (err) {
       console.error('Skipping non-JSON log event:', logEvent.message, err.message);
     }
