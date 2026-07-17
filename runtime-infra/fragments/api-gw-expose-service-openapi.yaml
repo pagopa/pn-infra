@@ -43,10 +43,11 @@ Parameters:
     Default: ''
     Description: Optional path of the exposed API
 
-  ApiMappingKey:
+  # Multi-level API mappings: https://docs.aws.amazon.com/apigateway/latest/developerguide/rest-api-mappings.html
+  ServiceApiPathOverrideV2:
     Type: String
     Default: ''
-    Description: Optional custom domain API mapping key
+    Description: Use this parameter when a multilevel mapping is needed
 
   NetworkLoadBalancerLink:
     Type: String
@@ -246,6 +247,16 @@ Parameters:
       - hotfix
       - prod
 
+#Validate parameter combinations before resource creation/update: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/rules-section-structure.html
+Rules:
+  ServiceApiPathOverrideMutualExclusion:
+    Assertions:
+      - Assert: !Not
+          - !And
+            - !Not [ !Equals [ !Ref ServiceApiPathOverride, '' ] ]
+            - !Not [ !Equals [ !Ref ServiceApiPathOverrideV2, '' ] ]
+        AssertDescription: ServiceApiPathOverride and ServiceApiPathOverrideV2 cannot both be specified. Use ServiceApiPathOverrideV2 when multi-level paths are needed.
+
 Conditions:
   IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
   IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
@@ -272,9 +283,9 @@ Conditions:
   ApiAlarmSegmentationDisabled: !Not [ Condition: ApiAlarmSegmentationEnabled ]
   IsNotBackofficeAndAlarmSegmentationDisabled: !And [ !Condition IsNotBackoffice, !Condition ApiAlarmSegmentationDisabled ]
   HasBasePathOverride: !Not [ !Equals [ !Ref ServiceApiPathOverride, '' ] ]
-  HasApiMappingKey: !Not [ !Equals [ !Ref ApiMappingKey, '' ] ]
-  RequiresLegacyApiMapping: !And [ !Condition RequiresStageCreation, !Not [ !Condition HasApiMappingKey ] ]
-  RequiresV2ApiMapping: !And [ !Condition RequiresStageCreation, !Condition HasApiMappingKey ]
+  HasBasePathOverrideV2: !Not [ !Equals [ !Ref ServiceApiPathOverrideV2, '' ] ]
+  RequiresLegacyApiMapping: !And [ !Condition RequiresStageCreation, !Not [ !Condition HasBasePathOverrideV2 ] ]
+  RequiresV2ApiMapping: !And [ !Condition RequiresStageCreation, !Condition HasBasePathOverrideV2 ]
   IsProdEnvironment: !Equals [ !Ref EnvType, 'prod' ] 
 
 Resources:
@@ -454,7 +465,7 @@ Resources:
     Condition: RequiresV2ApiMapping
     Properties:
       ApiId: !Ref PublicRestApiOpenapi
-      ApiMappingKey: !Ref ApiMappingKey
+      ApiMappingKey: !Ref ServiceApiPathOverrideV2
       DomainName: !Ref DnsName
       Stage: !Ref PublicRestApiStage
 
