@@ -19,7 +19,7 @@ Parameters:
   RoutingRulesJson:
     Type: String
     Description: JSON deviation rules used by the warning router lambda (only deviated alarms; no match = skipped)
-    Default: '[{"name":"simulatore-recapiti","match":{"alarmNamePrefix":"pn-simulatore-recapiti-"},"slackTopicArnEnv":"SLACK_TOPIC_SIMULATORE","template":"simulatore"}]'
+    Default: '[{"name":"simulatore-recapiti","match":{"alarmNamePrefix":"pn-simulatore-recapiti-"},"slackTopicArnEnv":"SLACK_TOPIC_SIMULATORE"}]'
   
   Version:
     Type: String
@@ -163,7 +163,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/dev-slack/slack-message-enrichment.yaml"
       TimeoutInMinutes: 15
 
-  # - Deploy standalone Warning router (dedicated topic + lambda + custom Slack templates)
+  # - Deploy standalone Warning router (dedicated topic + lambda)
   WarningRouterForSlack:
     Condition: MilanRegion
     Type: AWS::CloudFormation::Stack
@@ -222,4 +222,3 @@ Outputs:
   Version:
     Value: !Ref Version
     Description: Give the version string as output to avoid warnings
-

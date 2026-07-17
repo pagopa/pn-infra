@@ -2,8 +2,8 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: >
   Standalone warning router. Subscribes to the EXISTING alarm SNS topic and, via a
   config-driven routing table, DEVIATES matching alarms to dedicated Slack channels
-  with custom templates (AWS Chatbot custom notifications). Non-matching alarms are
-  ignored. Does NOT touch the existing alarm enrichment lambda.
+  preserving the original alarm payload. Non-matching alarms are ignored. Does NOT
+  touch the existing alarm enrichment lambda.
 
 Parameters:
   TemplateBucketBaseUrl:
@@ -22,7 +22,7 @@ Parameters:
   RoutingRulesJson:
     Type: String
     Description: JSON array of routing rules applied by the router lambda. Only deviation rules; if none matches the message is skipped.
-    Default: '[{"name":"simulatore-recapiti","match":{"alarmNamePrefix":"pn-simulatore-recapiti-"},"slackTopicArnEnv":"SLACK_TOPIC_SIMULATORE","template":"simulatore"}]'
+    Default: '[{"name":"simulatore-recapiti","match":{"alarmNamePrefix":"pn-simulatore-recapiti-"},"slackTopicArnEnv":"SLACK_TOPIC_SIMULATORE"}]'
 
   QueueName:
     Type: String
@@ -165,7 +165,7 @@ Resources:
   WarningRouterLambda:
     Type: AWS::Lambda::Function
     Properties:
-      Description: Routes warning messages to Slack channels with custom templates.
+      Description: Routes matching warning messages to dedicated Slack channels.
       FunctionName: !Sub '${QueueName}-router-lambda'
       Handler: index.lambda_handler
       Runtime: python3.12
@@ -201,7 +201,6 @@ Resources:
           def handle_record(record):
               body = json.loads(record['body'])
               message = json.loads(body['Message'])
-              region = record.get('awsRegion', os.environ.get('AWS_REGION', ''))
               print('########### INPUT MESSAGE #############')
               print(message)
 
@@ -214,15 +213,13 @@ Resources:
               if not topic_arn:
                   print('Rule "%s" matched but destination topic env "%s" is not set. Skipping.' % (rule.get('name'), rule.get('slackTopicArnEnv')))
                   return
-              template_name = rule.get('template', 'default')
-              print('Matched rule: %s, template: %s' % (rule.get('name', 'default'), template_name))
+              print('Matched rule: %s' % rule.get('name', 'default'))
 
-              notification = build_slack_notification(message, template_name, region)
               print('########### OUTPUT MESSAGE #############')
-              print(notification)
+              print(message)
               SNS.publish(
                   TopicArn=topic_arn,
-                  Message=json.dumps(notification),
+                  Message=json.dumps(message),
                   MessageStructure='string',
               )
 
@@ -274,34 +271,6 @@ Resources:
           def extract_namespace(message):
               trigger = message.get('Trigger') or message.get('trigger') or {}
               return trigger.get('Namespace') or trigger.get('namespace')
-
-          # --- Slack custom templates (AWS Chatbot custom notification schema) ---
-          TEMPLATES = {
-              'simulatore': {'emoji': ':satellite_antenna:', 'label': 'SIMULATORE RECAPITI'},
-              'default': {'emoji': ':warning:', 'label': 'WARNING'},
-          }
-
-          def build_slack_notification(message, template_name, region):
-              tmpl = TEMPLATES.get(template_name, TEMPLATES['default'])
-              alarm_name = extract_alarm_name(message)
-              if alarm_name:
-                  state = message.get('NewStateValue') or (message.get('state') or {}).get('value') or 'UNKNOWN'
-                  reason = message.get('NewStateReason') or message.get('AlarmDescription') or ''
-                  msg_region = message.get('Region') or region
-                  title = '%s %s - %s' % (tmpl['emoji'], tmpl['label'], alarm_name)
-                  description = '*State:* %s\n*Region:* %s\n%s' % (state, msg_region, reason)
-              else:
-                  title = '%s %s' % (tmpl['emoji'], tmpl['label'])
-                  description = '```%s```' % json.dumps(message, indent=2)[:3500]
-              return {
-                  'version': '1.0',
-                  'source': 'custom',
-                  'content': {
-                      'textType': 'client-markdown',
-                      'title': title,
-                      'description': description,
-                  },
-              }
 
   WarningRouterLambdaRole:
     Type: AWS::IAM::Role
