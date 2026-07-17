@@ -15,10 +15,6 @@ Parameters:
     Description: Confidential info (confinfo) account id allowed to publish on the warning topic.
     Default: ''
 
-  SlackInfoDefault:
-    Type: String
-    Description: '<slack workspace id>:<slack channel id> for the default warning channel.'
-
   SlackInfoSimulatore:
     Type: String
     Description: '<slack workspace id>:<slack channel id> for the simulatore-recapiti warning channel.'
@@ -40,8 +36,8 @@ Parameters:
 
   RoutingRulesJson:
     Type: String
-    Description: JSON array of routing rules applied by the router lambda. First matching rule wins; empty match is the default.
-    Default: '[{"name":"simulatore-recapiti","match":{"alarmNamePrefix":"pn-simulatore-recapiti-"},"slackTopicArnEnv":"SLACK_TOPIC_SIMULATORE","template":"simulatore"},{"name":"default","match":{},"slackTopicArnEnv":"SLACK_TOPIC_DEFAULT","template":"default"}]'
+    Description: JSON array of routing rules applied by the router lambda. Only deviation rules; if none matches the message is skipped.
+    Default: '[{"name":"simulatore-recapiti","match":{"alarmNamePrefix":"pn-simulatore-recapiti-"},"slackTopicArnEnv":"SLACK_TOPIC_SIMULATORE","template":"simulatore"}]'
 
   DelaySeconds:
     Type: Number
@@ -158,15 +154,8 @@ Resources:
       EventSourceArn: !GetAtt WarningRouterQueue.Arn
       FunctionName: !GetAtt WarningRouterLambda.Arn
 
-  # --- Slack destination topics (one per channel) -----------------------------
-  SlackTopicDefault:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Sub '${SlackTopicBaseName}-default'
-      Subscription:
-        - Endpoint: 'https://global.sns-api.chatbot.amazonaws.com'
-          Protocol: https
-
+  # --- Slack destination topics: ONLY deviation channels (one per deviated flow) ---
+  # Non-deviated alarms keep flowing through the existing enrichment stack.
   SlackTopicSimulatore:
     Type: AWS::SNS::Topic
     Properties:
@@ -179,7 +168,6 @@ Resources:
     Type: AWS::SNS::TopicPolicy
     Properties:
       Topics:
-        - !Ref SlackTopicDefault
         - !Ref SlackTopicSimulatore
       PolicyDocument:
         Version: '2012-10-17'
@@ -191,17 +179,7 @@ Resources:
                 - lambda.amazonaws.com
             Action: sns:Publish
             Resource:
-              - !Ref SlackTopicDefault
               - !Ref SlackTopicSimulatore
-
-  DefaultSlackChannelConnection:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sns-topic-to-slack-channel.yaml"
-      Parameters:
-        SNSTopicArn: !Ref SlackTopicDefault
-        SlackInfo: !Ref SlackInfoDefault
-        TopicName: 'warning-default'
 
   SimulatoreSlackChannelConnection:
     Type: AWS::CloudFormation::Stack
@@ -224,7 +202,6 @@ Resources:
       Role: !GetAtt WarningRouterLambdaRole.Arn
       Environment:
         Variables:
-          SLACK_TOPIC_DEFAULT: !Ref SlackTopicDefault
           SLACK_TOPIC_SIMULATORE: !Ref SlackTopicSimulatore
           ROUTING_RULES: !Ref RoutingRulesJson
           ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
@@ -259,9 +236,15 @@ Resources:
               print(message)
 
               rules = parse_routing_rules(os.environ.get('ROUTING_RULES', '[]'))
-              rule = select_rule(rules, message) or {}
-              template_name = rule.get('template', 'default')
+              rule = select_rule(rules, message)
+              if rule is None:
+                  print('No routing rule matched; nothing to deviate. Skipping.')
+                  return
               topic_arn = resolve_topic_arn(rule)
+              if not topic_arn:
+                  print('Rule "%s" matched but destination topic env "%s" is not set. Skipping.' % (rule.get('name'), rule.get('slackTopicArnEnv')))
+                  return
+              template_name = rule.get('template', 'default')
               print('Matched rule: %s, template: %s' % (rule.get('name', 'default'), template_name))
 
               notification = build_slack_notification(message, template_name, region)
@@ -280,7 +263,7 @@ Resources:
                       return rules
               except Exception:
                   traceback.print_exc()
-              return [{"name": "default", "match": {}, "slackTopicArnEnv": "SLACK_TOPIC_DEFAULT", "template": "default"}]
+              return []
 
           def select_rule(rules, message):
               for rule in rules:
@@ -312,8 +295,8 @@ Resources:
               return True
 
           def resolve_topic_arn(rule):
-              env_key = rule.get('slackTopicArnEnv', 'SLACK_TOPIC_DEFAULT')
-              return os.environ.get(env_key) or os.environ['SLACK_TOPIC_DEFAULT']
+              env_key = rule.get('slackTopicArnEnv', '')
+              return os.environ.get(env_key)
 
           def extract_alarm_name(message):
               return message.get('AlarmName') or message.get('alarmName')
@@ -382,7 +365,6 @@ Resources:
             Effect: Allow
             Action: sns:Publish
             Resource:
-              - !Ref SlackTopicDefault
               - !Ref SlackTopicSimulatore
           - Sid: AllowSQSAccess
             Effect: Allow

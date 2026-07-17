@@ -18,8 +18,8 @@ Parameters:
 
   RoutingRulesJson:
     Type: String
-    Description: JSON rules used by the slack router lambda
-    Default: '[{"name":"simulatore-recapiti","match":{"alarmNamePrefix":"pn-simulatore-recapiti-"},"slackTopicArnEnv":"SLACK_TOPIC_SIMULATORE","template":"warning"},{"name":"default","match":{},"slackTopicArnEnv":"SLACK_TOPIC_DEFAULT","template":"default"}]'
+    Description: JSON deviation rules used by the warning router lambda (only deviated alarms; no match = skipped)
+    Default: '[{"name":"simulatore-recapiti","match":{"alarmNamePrefix":"pn-simulatore-recapiti-"},"slackTopicArnEnv":"SLACK_TOPIC_SIMULATORE","template":"simulatore"}]'
   
   Version:
     Type: String
@@ -169,7 +169,6 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       Parameters:
-        SlackInfoDefault: !Ref SlackInfo
         SlackInfoSimulatore: !Ref SlackInfoSimulatore
         RoutingRulesJson: !Ref RoutingRulesJson
         ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
