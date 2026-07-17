@@ -34,6 +34,12 @@ Parameters:
     Description: Base name for the SNS topics forwarded to Slack via Chatbot.
     Default: 'pn-warning-bot-sns'
 
+  CreateChatbotConnection:
+    Type: String
+    Description: If 'true' create the AWS Chatbot Slack connection; if 'false' the destination topic is created without subscription (subscribe manually, e.g. email).
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+
   DelaySeconds:
     Type: Number
     Default: '0'
@@ -53,6 +59,9 @@ Parameters:
   VisibilityTimeout:
     Type: Number
     Default: '15'
+
+Conditions:
+  HasChatbotConnection: !Equals [ !Ref CreateChatbotConnection, 'true' ]
 
 Resources:
 
@@ -114,9 +123,16 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: !Sub '${SlackTopicBaseName}-simulatore'
-      Subscription:
-        - Endpoint: 'https://global.sns-api.chatbot.amazonaws.com'
-          Protocol: https
+
+  # Chatbot subscription created only when CreateChatbotConnection=true.
+  # In DEV it is disabled: subscribe the topic manually (e.g. an email) from the console.
+  SlackTopicSimulatoreChatbotSubscription:
+    Condition: HasChatbotConnection
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref SlackTopicSimulatore
+      Endpoint: 'https://global.sns-api.chatbot.amazonaws.com'
+      Protocol: https
 
   SlackTopicsPublishPolicy:
     Type: AWS::SNS::TopicPolicy
@@ -136,6 +152,7 @@ Resources:
               - !Ref SlackTopicSimulatore
 
   SimulatoreSlackChannelConnection:
+    Condition: HasChatbotConnection
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sns-topic-to-slack-channel.yaml"
