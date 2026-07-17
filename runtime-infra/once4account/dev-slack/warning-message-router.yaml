@@ -1,0 +1,402 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Standalone warning router. Receives messages on a dedicated warning SNS topic and,
+  via a config-driven routing table, dispatches them to different Slack channels with
+  custom templates (AWS Chatbot custom notifications). Does NOT touch the existing
+  alarm enrichment lambda.
+
+Parameters:
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+
+  ConfidentialInfoAccountId:
+    Type: String
+    Description: Confidential info (confinfo) account id allowed to publish on the warning topic.
+    Default: ''
+
+  SlackInfoDefault:
+    Type: String
+    Description: '<slack workspace id>:<slack channel id> for the default warning channel.'
+
+  SlackInfoSimulatore:
+    Type: String
+    Description: '<slack workspace id>:<slack channel id> for the simulatore-recapiti warning channel.'
+
+  WarningTopicName:
+    Type: String
+    Description: Name of the warning ingest SNS topic.
+    Default: 'pn-AllWarningSnsTopic'
+
+  QueueName:
+    Type: String
+    Description: Base name for the router SQS queue and lambda.
+    Default: 'Warning-Router'
+
+  SlackTopicBaseName:
+    Type: String
+    Description: Base name for the SNS topics forwarded to Slack via Chatbot.
+    Default: 'pn-warning-bot-sns'
+
+  RoutingRulesJson:
+    Type: String
+    Description: JSON array of routing rules applied by the router lambda. First matching rule wins; empty match is the default.
+    Default: '[{"name":"simulatore-recapiti","match":{"alarmNamePrefix":"pn-simulatore-recapiti-"},"slackTopicArnEnv":"SLACK_TOPIC_SIMULATORE","template":"simulatore"},{"name":"default","match":{},"slackTopicArnEnv":"SLACK_TOPIC_DEFAULT","template":"default"}]'
+
+  DelaySeconds:
+    Type: Number
+    Default: '0'
+
+  MessageRetentionPeriod:
+    Type: Number
+    Default: '600'
+
+  MaxReceiveCount:
+    Type: Number
+    Default: '5'
+
+  DeadLetterMessageRetentionPeriod:
+    Type: Number
+    Default: '1209600'
+
+  VisibilityTimeout:
+    Type: Number
+    Default: '15'
+
+Conditions:
+  HasConfidentialInfoAccount: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
+
+Resources:
+
+  # --- Warning ingest topic ---------------------------------------------------
+  WarningSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Warning topic routed to Slack channels
+      TopicName: !Ref WarningTopicName
+
+  CanPublishWarningTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref WarningSNSTopic
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowServices
+            Effect: Allow
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+                - "cloudwatch.amazonaws.com"
+            Action:
+              - 'sns:Publish'
+            Resource:
+              - !Ref WarningSNSTopic
+          - Fn::If:
+              - HasConfidentialInfoAccount
+              - Sid: AllowPublishFromConfinfo
+                Effect: Allow
+                Action:
+                  - 'sns:Publish'
+                Principal:
+                  AWS:
+                    - !Sub arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root
+                Resource:
+                  - !Ref WarningSNSTopic
+              - !Ref AWS::NoValue
+
+  # --- Buffer queue + DLQ -----------------------------------------------------
+  WarningRouterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Ref QueueName
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt WarningRouterDLQ.Arn
+        maxReceiveCount: !Ref MaxReceiveCount
+      DelaySeconds: !Ref DelaySeconds
+      MessageRetentionPeriod: !Ref MessageRetentionPeriod
+      ReceiveMessageWaitTimeSeconds: 15
+      VisibilityTimeout: !Ref VisibilityTimeout
+
+  WarningRouterDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${QueueName}-DLQ"
+      MessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
+
+  WarningRouterQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref WarningRouterQueue
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AllowSnsToSendMessage
+            Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: SQS:SendMessage
+            Resource: !GetAtt WarningRouterQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref WarningSNSTopic
+
+  WarningSNSSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !GetAtt WarningRouterQueue.Arn
+      Protocol: sqs
+      TopicArn: !Ref WarningSNSTopic
+
+  EventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      Enabled: true
+      BatchSize: 1
+      EventSourceArn: !GetAtt WarningRouterQueue.Arn
+      FunctionName: !GetAtt WarningRouterLambda.Arn
+
+  # --- Slack destination topics (one per channel) -----------------------------
+  SlackTopicDefault:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${SlackTopicBaseName}-default'
+      Subscription:
+        - Endpoint: 'https://global.sns-api.chatbot.amazonaws.com'
+          Protocol: https
+
+  SlackTopicSimulatore:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${SlackTopicBaseName}-simulatore'
+      Subscription:
+        - Endpoint: 'https://global.sns-api.chatbot.amazonaws.com'
+          Protocol: https
+
+  SlackTopicsPublishPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref SlackTopicDefault
+        - !Ref SlackTopicSimulatore
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowLambdaPublish
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sns:Publish
+            Resource:
+              - !Ref SlackTopicDefault
+              - !Ref SlackTopicSimulatore
+
+  DefaultSlackChannelConnection:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sns-topic-to-slack-channel.yaml"
+      Parameters:
+        SNSTopicArn: !Ref SlackTopicDefault
+        SlackInfo: !Ref SlackInfoDefault
+        TopicName: 'warning-default'
+
+  SimulatoreSlackChannelConnection:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sns-topic-to-slack-channel.yaml"
+      Parameters:
+        SNSTopicArn: !Ref SlackTopicSimulatore
+        SlackInfo: !Ref SlackInfoSimulatore
+        TopicName: 'warning-simulatore'
+
+  # --- Router lambda ----------------------------------------------------------
+  WarningRouterLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Routes warning messages to Slack channels with custom templates.
+      FunctionName: !Sub '${QueueName}-router-lambda'
+      Handler: index.lambda_handler
+      Runtime: python3.12
+      Timeout: 15
+      Role: !GetAtt WarningRouterLambdaRole.Arn
+      Environment:
+        Variables:
+          SLACK_TOPIC_DEFAULT: !Ref SlackTopicDefault
+          SLACK_TOPIC_SIMULATORE: !Ref SlackTopicSimulatore
+          ROUTING_RULES: !Ref RoutingRulesJson
+          ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import re
+          import traceback
+          import boto3
+
+          SNS = boto3.client('sns')
+
+          def lambda_handler(event, context):
+              if not event or 'Records' not in event:
+                  print('Empty event')
+                  return {'statusCode': 500, 'body': 'empty event'}
+              processed = 0
+              for record in event['Records']:
+                  try:
+                      handle_record(record)
+                      processed += 1
+                  except Exception:
+                      traceback.print_exc()
+              return {'statusCode': 200, 'body': json.dumps({'processed': processed})}
+
+          def handle_record(record):
+              body = json.loads(record['body'])
+              message = json.loads(body['Message'])
+              region = record.get('awsRegion', os.environ.get('AWS_REGION', ''))
+              print('########### INPUT MESSAGE #############')
+              print(message)
+
+              rules = parse_routing_rules(os.environ.get('ROUTING_RULES', '[]'))
+              rule = select_rule(rules, message) or {}
+              template_name = rule.get('template', 'default')
+              topic_arn = resolve_topic_arn(rule)
+              print('Matched rule: %s, template: %s' % (rule.get('name', 'default'), template_name))
+
+              notification = build_slack_notification(message, template_name, region)
+              print('########### OUTPUT MESSAGE #############')
+              print(notification)
+              SNS.publish(
+                  TopicArn=topic_arn,
+                  Message=json.dumps(notification),
+                  MessageStructure='string',
+              )
+
+          def parse_routing_rules(rules_json):
+              try:
+                  rules = json.loads(rules_json)
+                  if isinstance(rules, list):
+                      return rules
+              except Exception:
+                  traceback.print_exc()
+              return [{"name": "default", "match": {}, "slackTopicArnEnv": "SLACK_TOPIC_DEFAULT", "template": "default"}]
+
+          def select_rule(rules, message):
+              for rule in rules:
+                  if rule_matches(rule.get('match', {}), message):
+                      return rule
+              return None
+
+          def rule_matches(match, message):
+              alarm_name = extract_alarm_name(message)
+              source = message.get('source')
+              namespace = extract_namespace(message)
+              serialized = json.dumps(message)
+
+              prefix = match.get('alarmNamePrefix')
+              if prefix and (alarm_name is None or not alarm_name.startswith(prefix)):
+                  return False
+              alarm_regex = match.get('alarmNameRegex')
+              if alarm_regex and (alarm_name is None or re.search(alarm_regex, alarm_name) is None):
+                  return False
+              expected_source = match.get('source')
+              if expected_source and source != expected_source:
+                  return False
+              expected_namespace = match.get('namespace')
+              if expected_namespace and namespace != expected_namespace:
+                  return False
+              message_regex = match.get('messageRegex')
+              if message_regex and re.search(message_regex, serialized) is None:
+                  return False
+              return True
+
+          def resolve_topic_arn(rule):
+              env_key = rule.get('slackTopicArnEnv', 'SLACK_TOPIC_DEFAULT')
+              return os.environ.get(env_key) or os.environ['SLACK_TOPIC_DEFAULT']
+
+          def extract_alarm_name(message):
+              return message.get('AlarmName') or message.get('alarmName')
+
+          def extract_namespace(message):
+              trigger = message.get('Trigger') or message.get('trigger') or {}
+              return trigger.get('Namespace') or trigger.get('namespace')
+
+          # --- Slack custom templates (AWS Chatbot custom notification schema) ---
+          TEMPLATES = {
+              'simulatore': {'emoji': ':satellite_antenna:', 'label': 'SIMULATORE RECAPITI'},
+              'default': {'emoji': ':warning:', 'label': 'WARNING'},
+          }
+
+          def build_slack_notification(message, template_name, region):
+              tmpl = TEMPLATES.get(template_name, TEMPLATES['default'])
+              alarm_name = extract_alarm_name(message)
+              if alarm_name:
+                  state = message.get('NewStateValue') or (message.get('state') or {}).get('value') or 'UNKNOWN'
+                  reason = message.get('NewStateReason') or message.get('AlarmDescription') or ''
+                  msg_region = message.get('Region') or region
+                  title = '%s %s - %s' % (tmpl['emoji'], tmpl['label'], alarm_name)
+                  description = '*State:* %s\n*Region:* %s\n%s' % (state, msg_region, reason)
+              else:
+                  title = '%s %s' % (tmpl['emoji'], tmpl['label'])
+                  description = '```%s```' % json.dumps(message, indent=2)[:3500]
+              return {
+                  'version': '1.0',
+                  'source': 'custom',
+                  'content': {
+                      'textType': 'client-markdown',
+                      'title': title,
+                      'description': description,
+                  },
+              }
+
+  WarningRouterLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${QueueName}-Role'
+      Path: /
+      Description: Execution role for the warning router lambda.
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole
+
+  WarningRouterLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub '${QueueName}-Policy'
+      Roles:
+        - !Ref WarningRouterLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: PublishToSlackTopics
+            Effect: Allow
+            Action: sns:Publish
+            Resource:
+              - !Ref SlackTopicDefault
+              - !Ref SlackTopicSimulatore
+          - Sid: AllowSQSAccess
+            Effect: Allow
+            Action:
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ChangeMessageVisibility
+            Resource: !GetAtt WarningRouterQueue.Arn
+
+Outputs:
+  WarningSNSTopicArn:
+    Description: ARN of the warning ingest SNS topic.
+    Value: !Ref WarningSNSTopic
+  WarningSNSTopicName:
+    Description: Name of the warning ingest SNS topic.
+    Value: !GetAtt WarningSNSTopic.TopicName

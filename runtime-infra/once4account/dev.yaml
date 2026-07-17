@@ -10,6 +10,16 @@ Parameters:
     Type: String
     Description: <slack workspace id>:<slack channel id>. 'team_notifiche_dev_alarm' by default
     Default: TQSBH3ZS4:C02V0SRC4TV
+
+  SlackInfoSimulatore:
+    Type: String
+    Description: <slack workspace id>:<slack channel id> for simulatore warnings
+    Default: TQSBH3ZS4:C02V0SRC4TV
+
+  RoutingRulesJson:
+    Type: String
+    Description: JSON rules used by the slack router lambda
+    Default: '[{"name":"simulatore-recapiti","match":{"alarmNamePrefix":"pn-simulatore-recapiti-"},"slackTopicArnEnv":"SLACK_TOPIC_SIMULATORE","template":"warning"},{"name":"default","match":{},"slackTopicArnEnv":"SLACK_TOPIC_DEFAULT","template":"default"}]'
   
   Version:
     Type: String
@@ -153,6 +163,20 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/dev-slack/slack-message-enrichment.yaml"
       TimeoutInMinutes: 15
 
+  # - Deploy standalone Warning router (dedicated topic + lambda + custom Slack templates)
+  WarningRouterForSlack:
+    Condition: MilanRegion
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        SlackInfoDefault: !Ref SlackInfo
+        SlackInfoSimulatore: !Ref SlackInfoSimulatore
+        RoutingRulesJson: !Ref RoutingRulesJson
+        ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/dev-slack/warning-message-router.yaml"
+      TimeoutInMinutes: 15
+
   # - Deploy Lambda to send notifications to oncall system
   EnrichNotificationsForOncall:
     Condition: MilanRegion
@@ -194,6 +218,13 @@ Outputs:
   AlarmSNSTopicName:
     Value: !GetAtt  AlarmSNSTopic.TopicName
     Description: Name of the Alarm SNS Topic
+
+  WarningSNSTopicArn:
+    Value: !If
+      - MilanRegion
+      - !GetAtt WarningRouterForSlack.Outputs.WarningSNSTopicArn
+      - !Ref AWS::NoValue
+    Description: ARN of the Warning SNS Topic
   
   Version:
     Value: !Ref Version
