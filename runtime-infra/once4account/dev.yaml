@@ -18,7 +18,7 @@ Parameters:
 
   RoutingRulesJson:
     Type: String
-    Description: JSON deviation rules used by the warning router lambda (only deviated alarms; no match = skipped)
+    Description: Ordered JSON routing rules used by the warning router lambda (first match wins; no match = standard workflow)
     Default: '[{"name":"simulatore-recapiti","match":{"alarmNamePrefix":"pn-simulatore-recapiti-"},"slackTopicArnEnv":"SLACK_TOPIC_SIMULATORE"}]'
   
   Version:
@@ -149,21 +149,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/dev-slack/no-codestar-deploy-notifications.yaml"
       TimeoutInMinutes: 15
 
-  # - Deploy Lambda to enrich messages
-  EnrichNotificationsForSlack:
-    Condition: MilanRegion
-    Type: AWS::CloudFormation::Stack
-    Properties: 
-      Parameters: 
-        AlarmSNSTopicName: !GetAtt  AlarmSNSTopic.TopicName
-        SlackInfo: !Ref SlackInfo
-        ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
-        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
-        AlarmPrefix: 'oncall-'
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/dev-slack/slack-message-enrichment.yaml"
-      TimeoutInMinutes: 15
-
-  # - Deploy standalone Warning router (dedicated topic + lambda)
+  # - Deploy central warning router (dedicated routes + standard fallback topic)
   WarningRouterForSlack:
     Condition: MilanRegion
     Type: AWS::CloudFormation::Stack
@@ -175,6 +161,20 @@ Resources:
         TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
         CreateChatbotConnection: 'false'
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/dev-slack/warning-message-router.yaml"
+      TimeoutInMinutes: 15
+
+  # - Deploy Lambda to enrich messages from the router standard destination
+  EnrichNotificationsForSlack:
+    Condition: MilanRegion
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        AlarmSNSTopicName: !GetAtt WarningRouterForSlack.Outputs.StandardAlarmTopicName
+        SlackInfo: !Ref SlackInfo
+        ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
+        AlarmPrefix: 'oncall-'
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/dev-slack/slack-message-enrichment.yaml"
       TimeoutInMinutes: 15
 
   # - Deploy Lambda to send notifications to oncall system

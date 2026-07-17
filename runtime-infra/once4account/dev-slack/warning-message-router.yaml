@@ -1,9 +1,8 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >
-  Standalone warning router. Subscribes to the EXISTING alarm SNS topic and, via a
-  config-driven routing table, DEVIATES matching alarms to dedicated Slack channels
-  preserving the original alarm payload. Non-matching alarms are ignored. Does NOT
-  touch the existing alarm enrichment lambda.
+  Central warning router. Subscribes to the existing alarm SNS topic and routes each
+  message to exactly one destination, preserving the original payload. Matching alarms
+  go to dedicated Slack topics; non-matching messages go to the standard workflow topic.
 
 Parameters:
   TemplateBucketBaseUrl:
@@ -21,7 +20,7 @@ Parameters:
 
   RoutingRulesJson:
     Type: String
-    Description: JSON array of routing rules applied by the router lambda. Only deviation rules; if none matches the message is skipped.
+    Description: JSON array of ordered routing rules. The first match wins; if none matches the message is sent to the standard workflow.
     Default: '[{"name":"simulatore-recapiti","match":{"alarmNamePrefix":"pn-simulatore-recapiti-"},"slackTopicArnEnv":"SLACK_TOPIC_SIMULATORE"}]'
 
   QueueName:
@@ -117,8 +116,14 @@ Resources:
       EventSourceArn: !GetAtt WarningRouterQueue.Arn
       FunctionName: !GetAtt WarningRouterLambda.Arn
 
-  # --- Slack destination topics: ONLY deviation channels (one per deviated flow) ---
-  # Non-deviated alarms keep flowing through the existing enrichment stack.
+  # --- Destination topics ----------------------------------------------------
+  # The existing enrichment stack subscribes to this topic instead of the source topic.
+  StandardAlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${SlackTopicBaseName}-standard'
+
+  # One topic per deviated flow.
   SlackTopicSimulatore:
     Type: AWS::SNS::Topic
     Properties:
@@ -138,6 +143,7 @@ Resources:
     Type: AWS::SNS::TopicPolicy
     Properties:
       Topics:
+        - !Ref StandardAlarmTopic
         - !Ref SlackTopicSimulatore
       PolicyDocument:
         Version: '2012-10-17'
@@ -149,6 +155,7 @@ Resources:
                 - lambda.amazonaws.com
             Action: sns:Publish
             Resource:
+              - !Ref StandardAlarmTopic
               - !Ref SlackTopicSimulatore
 
   SimulatoreSlackChannelConnection:
@@ -165,7 +172,7 @@ Resources:
   WarningRouterLambda:
     Type: AWS::Lambda::Function
     Properties:
-      Description: Routes matching warning messages to dedicated Slack channels.
+      Description: Routes every warning message to one dedicated or standard destination.
       FunctionName: !Sub '${QueueName}-router-lambda'
       Handler: index.lambda_handler
       Runtime: python3.12
@@ -173,6 +180,7 @@ Resources:
       Role: !GetAtt WarningRouterLambdaRole.Arn
       Environment:
         Variables:
+          STANDARD_ALARM_TOPIC: !Ref StandardAlarmTopic
           SLACK_TOPIC_SIMULATORE: !Ref SlackTopicSimulatore
           ROUTING_RULES: !Ref RoutingRulesJson
       Code:
@@ -180,23 +188,16 @@ Resources:
           import json
           import os
           import re
-          import traceback
           import boto3
 
           SNS = boto3.client('sns')
 
           def lambda_handler(event, context):
               if not event or 'Records' not in event:
-                  print('Empty event')
-                  return {'statusCode': 500, 'body': 'empty event'}
-              processed = 0
+                  raise ValueError('Empty event')
               for record in event['Records']:
-                  try:
-                      handle_record(record)
-                      processed += 1
-                  except Exception:
-                      traceback.print_exc()
-              return {'statusCode': 200, 'body': json.dumps({'processed': processed})}
+                  handle_record(record)
+              return {'processed': len(event['Records'])}
 
           def handle_record(record):
               body = json.loads(record['body'])
@@ -207,30 +208,27 @@ Resources:
               rules = parse_routing_rules(os.environ.get('ROUTING_RULES', '[]'))
               rule = select_rule(rules, message)
               if rule is None:
-                  print('No routing rule matched; nothing to deviate. Skipping.')
-                  return
-              topic_arn = resolve_topic_arn(rule)
+                  topic_arn = os.environ.get('STANDARD_ALARM_TOPIC')
+                  route_name = 'standard'
+              else:
+                  topic_arn = resolve_topic_arn(rule)
+                  route_name = rule.get('name', 'unnamed')
               if not topic_arn:
-                  print('Rule "%s" matched but destination topic env "%s" is not set. Skipping.' % (rule.get('name'), rule.get('slackTopicArnEnv')))
-                  return
-              print('Matched rule: %s' % rule.get('name', 'default'))
+                  raise ValueError('Destination topic is not configured for route "%s"' % route_name)
+              print('Selected route: %s' % route_name)
 
               print('########### OUTPUT MESSAGE #############')
               print(message)
               SNS.publish(
                   TopicArn=topic_arn,
                   Message=json.dumps(message),
-                  MessageStructure='string',
               )
 
           def parse_routing_rules(rules_json):
-              try:
-                  rules = json.loads(rules_json)
-                  if isinstance(rules, list):
-                      return rules
-              except Exception:
-                  traceback.print_exc()
-              return []
+              rules = json.loads(rules_json)
+              if not isinstance(rules, list):
+                  raise ValueError('ROUTING_RULES must be a JSON array')
+              return rules
 
           def select_rule(rules, message):
               for rule in rules:
@@ -304,6 +302,7 @@ Resources:
             Effect: Allow
             Action: sns:Publish
             Resource:
+              - !Ref StandardAlarmTopic
               - !Ref SlackTopicSimulatore
           - Sid: AllowSQSAccess
             Effect: Allow
@@ -315,6 +314,14 @@ Resources:
             Resource: !GetAtt WarningRouterQueue.Arn
 
 Outputs:
+  StandardAlarmTopicName:
+    Description: Name of the topic feeding the standard alarm enrichment workflow.
+    Value: !GetAtt StandardAlarmTopic.TopicName
+
+  StandardAlarmTopicArn:
+    Description: ARN of the topic feeding the standard alarm enrichment workflow.
+    Value: !Ref StandardAlarmTopic
+
   WarningRouterLambdaArn:
     Description: ARN of the warning router lambda.
     Value: !GetAtt WarningRouterLambda.Arn
