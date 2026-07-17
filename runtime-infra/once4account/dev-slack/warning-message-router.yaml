@@ -1,28 +1,28 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >
-  Standalone warning router. Receives messages on a dedicated warning SNS topic and,
-  via a config-driven routing table, dispatches them to different Slack channels with
-  custom templates (AWS Chatbot custom notifications). Does NOT touch the existing
-  alarm enrichment lambda.
+  Standalone warning router. Subscribes to the EXISTING alarm SNS topic and, via a
+  config-driven routing table, DEVIATES matching alarms to dedicated Slack channels
+  with custom templates (AWS Chatbot custom notifications). Non-matching alarms are
+  ignored. Does NOT touch the existing alarm enrichment lambda.
 
 Parameters:
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
 
-  ConfidentialInfoAccountId:
+  AlarmSNSTopicName:
     Type: String
-    Description: Confidential info (confinfo) account id allowed to publish on the warning topic.
-    Default: ''
+    Description: Name of the EXISTING alarm SNS topic the router subscribes to.
+    Default: 'pn-AllAlarmSnsTopic'
 
   SlackInfoSimulatore:
     Type: String
     Description: '<slack workspace id>:<slack channel id> for the simulatore-recapiti warning channel.'
 
-  WarningTopicName:
+  RoutingRulesJson:
     Type: String
-    Description: Name of the warning ingest SNS topic.
-    Default: 'pn-AllWarningSnsTopic'
+    Description: JSON array of routing rules applied by the router lambda. Only deviation rules; if none matches the message is skipped.
+    Default: '[{"name":"simulatore-recapiti","match":{"alarmNamePrefix":"pn-simulatore-recapiti-"},"slackTopicArnEnv":"SLACK_TOPIC_SIMULATORE","template":"simulatore"}]'
 
   QueueName:
     Type: String
@@ -33,11 +33,6 @@ Parameters:
     Type: String
     Description: Base name for the SNS topics forwarded to Slack via Chatbot.
     Default: 'pn-warning-bot-sns'
-
-  RoutingRulesJson:
-    Type: String
-    Description: JSON array of routing rules applied by the router lambda. Only deviation rules; if none matches the message is skipped.
-    Default: '[{"name":"simulatore-recapiti","match":{"alarmNamePrefix":"pn-simulatore-recapiti-"},"slackTopicArnEnv":"SLACK_TOPIC_SIMULATORE","template":"simulatore"}]'
 
   DelaySeconds:
     Type: Number
@@ -59,48 +54,7 @@ Parameters:
     Type: Number
     Default: '15'
 
-Conditions:
-  HasConfidentialInfoAccount: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
-
 Resources:
-
-  # --- Warning ingest topic ---------------------------------------------------
-  WarningSNSTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      DisplayName: Warning topic routed to Slack channels
-      TopicName: !Ref WarningTopicName
-
-  CanPublishWarningTopicPolicy:
-    Type: AWS::SNS::TopicPolicy
-    Properties:
-      Topics:
-        - !Ref WarningSNSTopic
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Sid: AllowServices
-            Effect: Allow
-            Principal:
-              Service:
-                - "events.amazonaws.com"
-                - "cloudwatch.amazonaws.com"
-            Action:
-              - 'sns:Publish'
-            Resource:
-              - !Ref WarningSNSTopic
-          - Fn::If:
-              - HasConfidentialInfoAccount
-              - Sid: AllowPublishFromConfinfo
-                Effect: Allow
-                Action:
-                  - 'sns:Publish'
-                Principal:
-                  AWS:
-                    - !Sub arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root
-                Resource:
-                  - !Ref WarningSNSTopic
-              - !Ref AWS::NoValue
 
   # --- Buffer queue + DLQ -----------------------------------------------------
   WarningRouterQueue:
@@ -137,14 +91,14 @@ Resources:
             Resource: !GetAtt WarningRouterQueue.Arn
             Condition:
               ArnEquals:
-                aws:SourceArn: !Ref WarningSNSTopic
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
   WarningSNSSubscription:
     Type: AWS::SNS::Subscription
     Properties:
       Endpoint: !GetAtt WarningRouterQueue.Arn
       Protocol: sqs
-      TopicArn: !Ref WarningSNSTopic
+      TopicArn: !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
 
   EventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
@@ -204,7 +158,6 @@ Resources:
         Variables:
           SLACK_TOPIC_SIMULATORE: !Ref SlackTopicSimulatore
           ROUTING_RULES: !Ref RoutingRulesJson
-          ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
       Code:
         ZipFile: |
           import json
@@ -376,9 +329,6 @@ Resources:
             Resource: !GetAtt WarningRouterQueue.Arn
 
 Outputs:
-  WarningSNSTopicArn:
-    Description: ARN of the warning ingest SNS topic.
-    Value: !Ref WarningSNSTopic
-  WarningSNSTopicName:
-    Description: Name of the warning ingest SNS topic.
-    Value: !GetAtt WarningSNSTopic.TopicName
+  WarningRouterLambdaArn:
+    Description: ARN of the warning router lambda.
+    Value: !GetAtt WarningRouterLambda.Arn

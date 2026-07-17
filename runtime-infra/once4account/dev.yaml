@@ -169,9 +169,9 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       Parameters:
+        AlarmSNSTopicName: !GetAtt AlarmSNSTopic.TopicName
         SlackInfoSimulatore: !Ref SlackInfoSimulatore
         RoutingRulesJson: !Ref RoutingRulesJson
-        ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
         TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/dev-slack/warning-message-router.yaml"
       TimeoutInMinutes: 15
@@ -218,13 +218,6 @@ Outputs:
     Value: !GetAtt  AlarmSNSTopic.TopicName
     Description: Name of the Alarm SNS Topic
 
-  WarningSNSTopicArn:
-    Value: !If
-      - MilanRegion
-      - !GetAtt WarningRouterForSlack.Outputs.WarningSNSTopicArn
-      - !Ref AWS::NoValue
-    Description: ARN of the Warning SNS Topic
-  
   Version:
     Value: !Ref Version
     Description: Give the version string as output to avoid warnings
