@@ -244,10 +244,10 @@ Resources:
       Timeout: 60
       MemorySize: 128
       Handler: index.lambda_handler
-      FunctionName: !Sub '${ProjectName}-${PreprocessingStreamNamePrefix}-filter-user-attributes'
+      FunctionName: !Sub '${ProjectName}-${PreprocessingStreamNamePrefix}-data-quality-filter'
       Code:
         S3Bucket: !Ref LambdasBucketName
-        S3Key: !Sub '${LambdasBasePath}/cdc-preproc-filter-user-attributes.zip'
+        S3Key: !Sub '${LambdasBasePath}/cdc-preproc-data-quality-filter.zip'
       Role: !GetAtt PreprocessingFilterLambdaRole.Arn
 
   PreprocessingLogsKinesisDeliveryStreamPartitioned:

@@ -7,7 +7,7 @@ La configurazione è centralizzata e consente di definire controlli differenti p
 ## Struttura
 
 ```text
-cdc-preproc-filter-user-attributes/
+cdc-preproc-data-quality-filter/
 ├── __init__.py
 ├── index.py
 ├── README.md
