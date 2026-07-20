@@ -56,10 +56,7 @@ exports.handler = async (event) => {
     console.log('No JSON records to write, skipping S3 upload.');
     return;
   }
-
-  const partitionDate = logData.logEvents[0]?.timestamp
-    ? new Date(logData.logEvents[0].timestamp)
-    : new Date();
+  const partitionDate = new Date(new Date().toLocaleString('it-IT', { timeZone: 'Europe/Rome' }));
 
   const key  = buildS3Key(partitionDate);
   const body = records.map(r => JSON.stringify(r)).join('\n');
