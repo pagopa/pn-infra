@@ -44,16 +44,6 @@ def load_manifest():
     return _manifest_cache
 
 
-def get_default_behavior():
-    manifest = load_manifest()
-
-    return (
-        manifest
-        .get("defaults", {})
-        .get("unconfiguredTableBehavior", "drop")
-    )
-
-
 def load_table_config(table_name):
     if not table_name:
         return None
