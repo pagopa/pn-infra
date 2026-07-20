@@ -155,11 +155,6 @@ Parameters:
     Type: String
     Default: ""
     Description: Root S3 prefix used to isolate CDC preprocessing test data from active paths
-  
-  PreprocessingTargetTableName:
-    Type: String
-    Default: ""
-    Description: CDC tableName to keep in preprocessing Firehose
 
 
 Conditions:
@@ -196,7 +191,6 @@ Resources:
         LambdasBasePath: !Ref LambdasBasePath
         PreprocessingEnabled: !Ref PreprocessingEnabled
         PreprocessingS3RootPrefix: !Ref PreprocessingS3RootPrefix
-        PreprocessingTargetTableName: !Ref PreprocessingTargetTableName
 
 
   ###             Export CloudWatch Logs to Log saving bucket             ###
