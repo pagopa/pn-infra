@@ -26,6 +26,7 @@ ENV_NAME      = os.environ["ENV_NAME"]
 ACCOUNT_ROLE  = os.environ["ACCOUNT_ROLE"]  # 'core' | 'confinfo'
 RESOLVE_ROLE_TAGS = os.environ.get("RESOLVE_ROLE_TAGS", "true").lower() == "true"
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN", "")
+REPORT_NOTIFICATIONS_ENABLED = os.environ.get("REPORT_NOTIFICATIONS_ENABLED", "false").lower() == "true"
 EXCLUDE_TAG_KEY = os.environ.get("EXCLUDE_TAG_KEY", "")
 ARCHIVE_RULE_PATTERNS = [p.strip() for p in os.environ.get("ARCHIVE_RULE_PATTERNS", "").split(",") if p.strip()]
 
@@ -265,7 +266,7 @@ def lambda_handler(event, context):
         ContentType="text/csv",
     )
 
-    if count > 0 and SNS_TOPIC_ARN:
+    if count > 0 and REPORT_NOTIFICATIONS_ENABLED and SNS_TOPIC_ARN:
         dashboard_name = f"pn-iam-unused-access-{ENV_NAME}"
         region = os.environ.get("AWS_REGION", "eu-south-1")
         dashboard_url = (
@@ -273,28 +274,37 @@ def lambda_handler(event, context):
             f"?region={region}#dashboards/dashboard/{dashboard_name}"
         )
         account_label = f"{ACCOUNT_ROLE}-{ENV_NAME}"
-        breakdown_lines = "\n".join(
-            f"  - {ftype}: {fcount}" for ftype, fcount in sorted(finding_type_counts.items())
-        )
-        subject = f"[{account_label}] IAM unused access: {count} finding rilevati"
-        message = (
-            f"Account: {account_id} ({account_label})\n"
-            f"Ambiente: {ENV_NAME}\n"
-            f"Ruolo account: {ACCOUNT_ROLE}\n\n"
-            f"Sono stati rilevati {count} finding IAM unused access.\n\n"
-            f"Dettaglio per tipologia:\n{breakdown_lines}\n\n"
-            f"Consultare la dashboard CloudWatch per i dettagli:\n{dashboard_url}\n\n"
-            f"Report CSV: s3://{BUCKET}/{key}"
-        )
+        message = {
+            "schemaVersion": "1.0",
+            "eventId": request_id,
+            "eventType": "report",
+            "producer": "pn-iam-unused-access-analyzer",
+            "eventName": "unused-access-findings",
+            "occurredAt": now.isoformat(),
+            "severity": "warning",
+            "environment": ENV_NAME,
+            "data": {
+                "accountId": account_id,
+                "accountRole": ACCOUNT_ROLE,
+                "findingCount": count,
+                "findingTypeCounts": finding_type_counts,
+                "skippedByTag": skipped_by_tag,
+            },
+            "links": {
+                "dashboard": dashboard_url,
+                "report": f"s3://{BUCKET}/{key}",
+            },
+        }
         try:
             sns.publish(
                 TopicArn=SNS_TOPIC_ARN,
-                Subject=subject[:100],
-                Message=message,
+                Subject=f"[{account_label}] IAM unused access report"[:100],
+                Message=json.dumps(message, separators=(",", ":")),
             )
-            log.info(json.dumps({"msg": "sns alert sent", "topic": SNS_TOPIC_ARN, "findings": count}))
+            log.info(json.dumps({"msg": "sns report sent", "topic": SNS_TOPIC_ARN, "findings": count}))
         except Exception as exc:
-            log.warning(json.dumps({"msg": "sns publish failed", "error": str(exc)}))
+            log.exception(json.dumps({"msg": "sns publish failed", "error": str(exc)}))
+            raise
 
     log.info(json.dumps({"msg": "export completed", "account_id": account_id,
                          "account_role": ACCOUNT_ROLE, "env": ENV_NAME,

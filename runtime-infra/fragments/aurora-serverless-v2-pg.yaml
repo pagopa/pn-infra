@@ -66,6 +66,7 @@ Parameters:
   AlarmSNSTopicArn:
     Type: String
     Description: "ARN of the SNS topic for CloudWatch alarms"
+    Default: '-'
   DbCpuAlarmThreshold:
     Type: Number
     Default: 80
@@ -95,6 +96,7 @@ Conditions:
   IsDeletionProtectionTrue: !Equals [!Ref DeletionProtectionEnabled, "true"]
   HasMultiAZ: !Equals [!Ref EnableMultiAZ, "true"]
   HasAutoUpdateMinorVersion: !Equals [!Ref AutoUpdateMinorVersion, "true"]
+  HasAlarmTopic: !Not [!Equals [!Ref AlarmSNSTopicArn, '-']]
 
 Resources:
   PnAuroraDbClusterParameterGroup:
@@ -232,6 +234,7 @@ Resources:
 
   PnAuroraDbClusterCPUAlarm:
     Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmTopic
     Properties:
       AlarmName: !Sub "pn-${ClusterIdentifierSuffix}-DBCluster-CPU-High"
       AlarmDescription: "Alarm if DB cluster CPU utilization exceeds threshold"
@@ -253,6 +256,7 @@ Resources:
 
   PnAuroraDbClusterConnectionsAlarm:
     Type: AWS::CloudWatch::Alarm
+    Condition: HasAlarmTopic
     Properties:
       AlarmName: !Sub "pn-${ClusterIdentifierSuffix}-DBCluster-Connections-High"
       AlarmDescription: "Alarm if DB cluster connections exceeds threshold"
