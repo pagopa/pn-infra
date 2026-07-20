@@ -1859,6 +1859,15 @@ Resources:
         FunctionName: !Ref PnDownstreamMonitoringLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         FilterPattern: "ERROR"
+        
+  PnDownstreamMonitoringLambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt PnDownstreamMonitoringLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: !Sub "logs.${AWS::Region}.amazonaws.com"
+      SourceArn: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*"
+      SourceAccount: !Ref AWS::AccountId
 
   CriticalMonitoringGlueDatabase:
     Type: AWS::Glue::Database

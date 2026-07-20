@@ -189,10 +189,6 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain    
     Properties:
-      RoleArn:
-        Fn::GetAtt:
-          - "DownstreamSubscriptionFilterServiceRole"
-          - "Arn"
       LogGroupName: !Ref LogGroup
       FilterPattern: !Ref LogDownstreamFilterPattern
       DestinationArn: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DownstreamMonitoringLambdaName}' 
