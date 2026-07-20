@@ -84,7 +84,7 @@ Parameters:
     Type: String
     Description: ARN of the SNS topic for alarms
 
-  SafeStorageAccountId: 
+  ConfidentialInfoAccountId: 
     Type: String
     Default: '-'
     
@@ -140,7 +140,7 @@ Parameters:
 
 Conditions:
   HasOpenSearchExport: !Not [ !Equals [ !Ref OpenSearchClusterEndpoint, "" ] ]
-  HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, "-" ] ]
+  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, "-" ] ]
   IsUatEnvironment: !Equals [ !Ref EnvironmentType, "uat" ]
   IsProdEnvironment: !Equals [ !Ref EnvironmentType, "prod" ]
   IsOpensearchIngestionEnabled: !Equals  [true, !Ref OpensearchIngestionEnabled]
@@ -267,7 +267,7 @@ Resources:
   ###########################################################################
   SafestorageLogger:
     Type: AWS::CloudFormation::Stack
-    Condition: HasStorageStorageAccountId
+    Condition: HasConfidentialInfoAccountId
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/safestorage-logger.yaml"
       Parameters:
@@ -277,7 +277,7 @@ Resources:
         LambdaS3Key: !Sub "${LambdasBasePath}/safestorage-logger.zip"
         LambdaMemory: !Ref SafestorageLoggerLambdaMemory
         BatchSize: !Ref SafestorageLoggerBatchSize
-        SafeStorageAccountId: !Ref SafeStorageAccountId
+        ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
         LambdaName: !Ref SafestorageLoggerLogGroupName
         QueueName: !Sub '${ProjectName}-new-safestorage-cloudtrail-file'
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
