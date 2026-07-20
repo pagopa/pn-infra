@@ -43,6 +43,12 @@ Parameters:
     Default: ''
     Description: Optional path of the exposed API
 
+  # Same purpose as ServiceApiPathOverride, with additional multi-level path support.
+  ServiceApiPathOverrideV2:
+    Type: String
+    Default: ''
+    Description: Alternative to ServiceApiPathOverride using API Gateway V2 mappings
+
   NetworkLoadBalancerLink:
     Type: String
     Description: Link inside the VPC
@@ -241,6 +247,16 @@ Parameters:
       - hotfix
       - prod
 
+#Validate parameter combinations before resource creation/update: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/rules-section-structure.html
+Rules:
+  ServiceApiPathOverrideMutualExclusion:
+    Assertions:
+      - Assert: !Not
+          - !And
+            - !Not [ !Equals [ !Ref ServiceApiPathOverride, '' ] ]
+            - !Not [ !Equals [ !Ref ServiceApiPathOverrideV2, '' ] ]
+        AssertDescription: ServiceApiPathOverride and ServiceApiPathOverrideV2 cannot both be specified. Use ServiceApiPathOverrideV2 when multi-level paths are needed.
+
 Conditions:
   IsWeb: !Equals [ !Ref IntendedUsage, 'WEB' ]
   IsB2B: !Equals [ !Ref IntendedUsage, 'B2B' ]
@@ -267,6 +283,9 @@ Conditions:
   ApiAlarmSegmentationDisabled: !Not [ Condition: ApiAlarmSegmentationEnabled ]
   IsNotBackofficeAndAlarmSegmentationDisabled: !And [ !Condition IsNotBackoffice, !Condition ApiAlarmSegmentationDisabled ]
   HasBasePathOverride: !Not [ !Equals [ !Ref ServiceApiPathOverride, '' ] ]
+  HasBasePathOverrideV2: !Not [ !Equals [ !Ref ServiceApiPathOverrideV2, '' ] ]
+  RequiresLegacyApiMapping: !And [ !Condition RequiresStageCreation, !Not [ !Condition HasBasePathOverrideV2 ] ]
+  RequiresV2ApiMapping: !And [ !Condition RequiresStageCreation, !Condition HasBasePathOverrideV2 ]
   IsProdEnvironment: !Equals [ !Ref EnvType, 'prod' ] 
 
 Resources:
@@ -430,7 +449,7 @@ Resources:
   # Expose API to custom domain
   APIMapping:
     Type: AWS::ApiGateway::BasePathMapping
-    Condition: RequiresStageCreation
+    Condition: RequiresLegacyApiMapping
     Properties:
       BasePath: 
         'Fn::If':
@@ -439,6 +458,15 @@ Resources:
           - !Ref ServiceApiPath
       DomainName: !Ref DnsName
       RestApiId: !Ref PublicRestApiOpenapi
+      Stage: !Ref PublicRestApiStage
+
+  APIMappingV2:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Condition: RequiresV2ApiMapping
+    Properties:
+      ApiId: !Ref PublicRestApiOpenapi
+      ApiMappingKey: !Ref ServiceApiPathOverrideV2
+      DomainName: !Ref DnsName
       Stage: !Ref PublicRestApiStage
 
   # Rest API CloudWatch alarm 
