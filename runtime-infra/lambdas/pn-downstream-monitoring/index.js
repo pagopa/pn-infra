@@ -10,6 +10,27 @@ const gunzip = promisify(zlib.gunzip);
 // MONITORING_BUCKET_NAME is in the form "<bucket-name>/<prefix>"
 const [BUCKET_NAME, ...prefixParts] = process.env.MONITORING_BUCKET_NAME.split('/');
 const KEY_PREFIX = prefixParts.join('/');
+const ROME_TIME_ZONE = 'Europe/Rome';
+
+function getRomeDateParts(date) {
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: ROME_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+  });
+
+  const parts = formatter.formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return {
+    year: values.year,
+    month: values.month,
+    day: values.day,
+    hour: values.hour,
+  };
+}
 
 /**
  * Decodes and decompresses the CloudWatch Logs subscription filter payload.
@@ -23,16 +44,13 @@ async function decodeLogData(data) {
 }
 
 /**
- * Builds the S3 key for the given timestamp.
+ * Builds the S3 key for the given timestamp in Europe/Rome.
  * Path: <prefix>/<year>/<MM>/<DD>/<HH>/<uuid>.json
  * @param {Date} date
  * @returns {string}
  */
 function buildS3Key(date) {
-  const year  = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day   = String(date.getUTCDate()).padStart(2, '0');
-  const hour  = String(date.getUTCHours()).padStart(2, '0');
+  const { year, month, day, hour } = getRomeDateParts(date);
   const prefix = KEY_PREFIX ? `${KEY_PREFIX}/` : '';
   return `${prefix}${year}/${month}/${day}/${hour}/${randomUUID()}.json`;
 }
@@ -56,9 +74,8 @@ exports.handler = async (event) => {
     console.log('No JSON records to write, skipping S3 upload.');
     return;
   }
-  const partitionDate = new Date(new Date().toLocaleString('it-IT', { timeZone: 'Europe/Rome' }));
-
-  const key  = buildS3Key(partitionDate);
+  const partitionDate = new Date();
+  const key = buildS3Key(partitionDate);
   const body = records.map(r => JSON.stringify(r)).join('\n');
 
   await uploadFileToS3(BUCKET_NAME, key, body);
