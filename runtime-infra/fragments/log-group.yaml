@@ -53,7 +53,7 @@ Parameters:
       - false
   
   DownstreamMonitoringLambdaName:
-    Default: 'pn-downstream-monitoring'
+    Default: 'pn-downstream-monitoring-lambda'
     Type: String
     Description: Name of the Lambda function for downstream monitoring
 
@@ -194,7 +194,7 @@ Resources:
           - "DownstreamSubscriptionFilterServiceRole"
           - "Arn"
       LogGroupName: !Ref LogGroup
-      FilterPattern: !Ref LogFilterPattern
+      FilterPattern: !Ref LogDownstreamFilterPattern
       DestinationArn: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DownstreamMonitoringLambdaName}' 
 
   ### IAM Role used by Subscription filters to allow read logs from Cloudwatch and send logs to Kinesis Firehose
@@ -219,7 +219,7 @@ Resources:
               - Action:
                   - lambda:InvokeFunction
                 Effect: Allow
-                Resource: "*"
+                Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DownstreamMonitoringLambdaName}'
               - Action:
                 - "kms:Encrypt"
                 - "kms:GenerateDataKey"
