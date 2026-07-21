@@ -30,13 +30,10 @@ Parameters:
     Default: '/warning-notifications/slack-bot-token'
     MinLength: 1
 
-  RouteAlarmSimulatoreRecapiti:
+  Routes:
     Type: String
-    Description: JSON route for simulator alarms.
-
-  RouteReportIamAccessAnalyzer:
-    Type: String
-    Description: JSON route for IAM unused access analyzer reports.
+    Description: Semicolon-separated notification routes in type,match,channel format.
+    AllowedPattern: '^(alarm|report),[A-Za-z0-9][A-Za-z0-9_-]*,C[A-Z0-9]+(;(alarm|report),[A-Za-z0-9][A-Za-z0-9_-]*,C[A-Z0-9]+)*$'
 
   QueueName:
     Type: String
@@ -172,7 +169,7 @@ Resources:
       Role: !GetAtt WarningNotificationDispatcherRole.Arn
       Environment:
         Variables:
-          ROUTES: !Sub '[${RouteAlarmSimulatoreRecapiti},${RouteReportIamAccessAnalyzer}]'
+          ROUTES: !Ref Routes
           SLACK_BOT_TOKEN_SECRET_NAME: !Ref SlackBotTokenSecretName
           MAX_CSV_ATTACHMENT_BYTES: !Ref MaxCsvAttachmentBytes
       Code:

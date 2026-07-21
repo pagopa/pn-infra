@@ -31,12 +31,12 @@ def handle_record(record):
         'alarmName': extract_alarm_name(message),
     })
 
-    routes = parse_routes(os.environ.get('ROUTES', '[]'))
+    routes = parse_routes(os.environ.get('ROUTES', ''))
     route = select_route(routes, message)
     if route is None:
         raise ValueError('No route matched the warning message')
     channel_id = route['channel']
-    print('Selected route: %s/%s -> %s' % (route['type'], route['source'], channel_id))
+    print('Selected route: %s/%s -> %s' % (route['type'], route['match'], channel_id))
 
     attachment = message.get('attachment')
     prepared_attachment = None
@@ -58,20 +58,25 @@ def handle_record(record):
         upload_csv_to_slack(prepared_attachment, channel_id, slack_message.get('ts'))
 
 
-def parse_routes(routes_json):
-    routes = json.loads(routes_json)
-    if not isinstance(routes, list):
-        raise ValueError('ROUTES must be a JSON array')
-    for route in routes:
-        if not isinstance(route, dict):
-            raise ValueError('Each route must be a JSON object')
-        missing = [key for key in ('type', 'source', 'channel') if not route.get(key)]
-        if missing:
-            raise ValueError('Invalid route: missing %s' % ', '.join(missing))
-        if route['type'] not in ('alarm', 'report'):
-            raise ValueError('Unsupported route type: %s' % route['type'])
-        if re.fullmatch(r'C[A-Z0-9]+', route['channel']) is None:
-            raise ValueError('Invalid Slack channel ID for source %s' % route['source'])
+def parse_routes(routes_config):
+    if not routes_config:
+        raise ValueError('ROUTES must contain at least one route')
+
+    routes = []
+    for position, route_config in enumerate(routes_config.split(';'), start=1):
+        fields = [field.strip() for field in route_config.split(',')]
+        if len(fields) != 3 or not all(fields):
+            raise ValueError('Invalid route at position %s: expected type,match,channel' % position)
+
+        route_type, match, channel = fields
+        if route_type not in ('alarm', 'report'):
+            raise ValueError('Unsupported route type at position %s: %s' % (position, route_type))
+        if re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', match) is None:
+            raise ValueError('Invalid route match at position %s: %s' % (position, match))
+        if re.fullmatch(r'C[A-Z0-9]+', channel) is None:
+            raise ValueError('Invalid Slack channel ID for match %s' % match)
+
+        routes.append({'type': route_type, 'match': match, 'channel': channel})
     return routes
 
 
@@ -89,9 +94,9 @@ def route_matches(route, message):
         if event_type != 'cloudwatch-alarm' or not alarm_name:
             return False
         normalized_name = alarm_name.removeprefix('oncall-')
-        return normalized_name == route['source'] or normalized_name.startswith(route['source'] + '-')
+        return normalized_name == route['match'] or normalized_name.startswith(route['match'] + '-')
     if route['type'] == 'report':
-        return event_type == 'report' and message.get('producer') == route['source']
+        return event_type == 'report' and message.get('producer') == route['match']
     return False
 
 
@@ -182,8 +187,8 @@ def mrkdwn_field(text):
 
 
 def route_label(route):
-    source = route['source'].removeprefix('pn-')
-    return source.replace('-', ' ').upper()
+    match = route['match'].removeprefix('pn-')
+    return match.replace('-', ' ').upper()
 
 
 def post_to_slack(payload):
