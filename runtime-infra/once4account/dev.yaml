@@ -11,44 +11,6 @@ Parameters:
     Description: <slack workspace id>:<slack channel id>. 'team_notifiche_dev_alarm' by default
     Default: TQSBH3ZS4:C02V0SRC4TV
 
-  SlackInfoSimulatore:
-    Type: String
-    Description: <slack workspace id>:<slack channel id> for simulatore warnings
-    Default: TQSBH3ZS4:C02V0SRC4TV
-
-  SlackInfoIamUnusedAccess:
-    Type: String
-    Description: <slack workspace id>:<slack channel id> for IAM unused access reports
-    Default: TQSBH3ZS4:C02V0SRC4TV
-
-  RoutingRulesJson:
-    Type: String
-    Description: Ordered JSON rules used by the warning notification dispatcher (first match wins; no match = dispatcher DLQ)
-    Default: '[{"name":"simulatore-recapiti-cloudwatch","match":{"eventType":"cloudwatch-alarm","alarmNameRegex":"^(?:oncall-)?pn-simulatore-recapiti(?:-|$)"},"topicArnEnv":"TOPIC_SIMULATORE","renderer":"aws-native"},{"name":"iam-unused-access-report","match":{"eventType":"report","producer":"pn-iam-unused-access-analyzer","eventName":"unused-access-findings"},"topicArnEnv":"TOPIC_IAM_UNUSED_ACCESS","renderer":"custom","template":"iam-unused-access-report-v1"}]'
-
-  WarningSNSTopicName:
-    Type: String
-    Description: Name of the central warning topic created by the storage stack
-    Default: 'pn-WarningSnsTopic'
-
-  CreateWarningChatbotConnection:
-    Type: String
-    Description: Enable Amazon Q Developer delivery to the configured Slack channels.
-    AllowedValues: ['true', 'false']
-    Default: 'false'
-
-  CreateWarningEmailSubscriptions:
-    Type: String
-    Description: Enable email subscriptions on the dispatcher destination topics.
-    AllowedValues: ['true', 'false']
-    Default: 'true'
-
-  EnableWarningNotificationDispatcher:
-    Type: String
-    Description: Enable the warning notification dispatcher after pn-WarningSnsTopic has been created.
-    AllowedValues: ['true', 'false']
-    Default: 'false'
-  
   Version:
     Type: String
     Description: 'keep track of used projects commitIds'
@@ -62,10 +24,6 @@ Conditions:
     !Equals [!Ref 'AWS::Region', 'eu-south-1']
 
   HasConfidentialInfoAccount: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
-
-  DeployWarningNotificationDispatcher: !And
-    - !Condition MilanRegion
-    - !Equals [!Ref EnableWarningNotificationDispatcher, 'true']
 
 Resources:
 
@@ -179,22 +137,6 @@ Resources:
       Parameters: 
         AlarmSNSTopicName: !GetAtt  AlarmSNSTopic.TopicName
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/dev-slack/no-codestar-deploy-notifications.yaml"
-      TimeoutInMinutes: 15
-
-  # - Deploy the warning notification dispatcher for the dedicated warning topic
-  WarningNotificationDispatcher:
-    Condition: DeployWarningNotificationDispatcher
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      Parameters:
-        WarningSNSTopicName: !Ref WarningSNSTopicName
-        SlackInfoSimulatore: !Ref SlackInfoSimulatore
-        SlackInfoIamUnusedAccess: !Ref SlackInfoIamUnusedAccess
-        RoutingRulesJson: !Ref RoutingRulesJson
-        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
-        CreateChatbotConnection: !Ref CreateWarningChatbotConnection
-        CreateEmailSubscriptions: !Ref CreateWarningEmailSubscriptions
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/dev-slack/warning-notification-dispatcher.yaml"
       TimeoutInMinutes: 15
 
   # - Deploy the unchanged standard alarm enrichment workflow

@@ -115,11 +115,6 @@ Parameters:
     Description: 'Infrastructure security topic name'
     Default: 'pn-InfraSecTopic'
 
-  WarningSNSTopicName:
-    Type: String
-    Description: 'Central warning topic name'
-    Default: 'pn-WarningSnsTopic'
-  
   ConfidentialInfoAccountId:
     Type: String
     Default: '-'
@@ -567,42 +562,6 @@ Resources:
       Topics:
         - !Ref InfraSecTopic
 
-  WarningSNSTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Ref WarningSNSTopicName
-
-  CanPublishWarningSNSTopicPolicy:
-    Type: AWS::SNS::TopicPolicy
-    Properties:
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Sid: AllowAwsServicesToPublishWarnings
-            Effect: Allow
-            Principal:
-              Service:
-                - "events.amazonaws.com"
-                - "cloudwatch.amazonaws.com"
-            Action:
-              - 'sns:Publish'
-            Resource:
-              - !Ref WarningSNSTopic
-          - !If
-            - HasConfidentialInfoAccountId
-            - Sid: AllowPublishFromPnConfinfoAccount
-              Effect: Allow
-              Action:
-                - 'sns:Publish'
-              Principal:
-                AWS:
-                  - !Sub arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root
-              Resource:
-                - !Ref WarningSNSTopic
-            - !Ref AWS::NoValue
-      Topics:
-        - !Ref WarningSNSTopic
-
   InfraSecConfidentialTopicSubscription:
     Type: AWS::SNS::Subscription
     Condition: HasConfidentialInfoAccountId
@@ -698,11 +657,3 @@ Outputs:
   InfraSecTopicName:
     Value: !Ref InfraSecTopicName
     Description: 'Infrastructure security topic name'
-
-  WarningSNSTopicArn:
-    Value: !Ref WarningSNSTopic
-    Description: 'Central warning topic ARN'
-
-  WarningSNSTopicName:
-    Value: !Ref WarningSNSTopicName
-    Description: 'Central warning topic name'

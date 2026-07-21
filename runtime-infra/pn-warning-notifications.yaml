@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >
-  Warning notification dispatcher. Subscribes to the central warning SNS topic,
-  selects one dedicated destination and renders custom notifications. A warning
-  without a matching rule is retried and eventually moved to the dispatcher DLQ.
+  Warning notification stack. Owns the central warning SNS topic, selects one
+  dedicated destination and renders custom notifications. A warning without a
+  matching rule is retried and eventually moved to the dispatcher DLQ.
 
 Parameters:
   TemplateBucketBaseUrl:
@@ -11,16 +11,23 @@ Parameters:
 
   WarningSNSTopicName:
     Type: String
-    Description: Name of the warning SNS topic the dispatcher subscribes to.
+    Description: Name of the central warning SNS topic.
     Default: 'pn-WarningSnsTopic'
+
+  ConfidentialInfoAccountId:
+    Type: String
+    Description: AWS account ID allowed to publish warnings from the confidential-info account.
+    Default: '-'
 
   SlackInfoSimulatore:
     Type: String
     Description: '<slack workspace id>:<slack channel id> for the simulatore-recapiti warning channel.'
+    Default: '-'
 
   SlackInfoIamUnusedAccess:
     Type: String
     Description: '<slack workspace id>:<slack channel id> for IAM unused access reports.'
+    Default: '-'
 
   RoutingRulesJson:
     Type: String
@@ -72,8 +79,43 @@ Parameters:
 Conditions:
   HasChatbotConnection: !Equals [ !Ref CreateChatbotConnection, 'true' ]
   HasEmailSubscriptions: !Equals [ !Ref CreateEmailSubscriptions, 'true' ]
+  HasConfidentialInfoAccountId: !And
+    - !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '-' ] ]
+    - !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
 
 Resources:
+
+  # --- Central ingress topic -------------------------------------------------
+  WarningSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Ref WarningSNSTopicName
+
+  CanPublishWarningSNSTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowAwsServicesToPublishWarnings
+            Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+                - cloudwatch.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref WarningSNSTopic
+          - !If
+            - HasConfidentialInfoAccountId
+            - Sid: AllowPublishFromPnConfinfoAccount
+              Effect: Allow
+              Principal:
+                AWS: !Sub 'arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root'
+              Action: sns:Publish
+              Resource: !Ref WarningSNSTopic
+            - !Ref AWS::NoValue
+      Topics:
+        - !Ref WarningSNSTopic
 
   # --- Buffer queue + DLQ -----------------------------------------------------
   WarningDispatcherQueue:
@@ -110,14 +152,15 @@ Resources:
             Resource: !GetAtt WarningDispatcherQueue.Arn
             Condition:
               ArnEquals:
-                aws:SourceArn: !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}'
+                aws:SourceArn: !Ref WarningSNSTopic
 
   WarningTopicSubscription:
     Type: AWS::SNS::Subscription
+    DependsOn: WarningDispatcherQueuePolicy
     Properties:
       Endpoint: !GetAtt WarningDispatcherQueue.Arn
       Protocol: sqs
-      TopicArn: !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}'
+      TopicArn: !Ref WarningSNSTopic
 
   WarningDispatcherEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
@@ -391,6 +434,14 @@ Resources:
             Resource: !GetAtt WarningDispatcherQueue.Arn
 
 Outputs:
+  WarningSNSTopicArn:
+    Description: ARN of the central warning topic.
+    Value: !Ref WarningSNSTopic
+
+  WarningSNSTopicName:
+    Description: Name of the central warning topic.
+    Value: !GetAtt WarningSNSTopic.TopicName
+
   WarningNotificationDispatcherLambdaArn:
     Description: ARN of the warning notification dispatcher lambda.
     Value: !GetAtt WarningNotificationDispatcherLambda.Arn
