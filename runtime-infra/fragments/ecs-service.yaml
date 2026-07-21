@@ -121,6 +121,11 @@ Parameters:
     Type: String
     Default: '/'
 
+  ContainerStopTimeout:
+    Description: Seconds to wait after SIGTERM before forcing container stop. Should be >= target group deregistration delay.
+    Type: Number
+    Default: 90
+
   # Autoscaling parameters
   AutoscalingStrategy:
     Description: Autoscaling strategy.
@@ -1139,6 +1144,7 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
+          StopTimeout: !Ref ContainerStopTimeout
           Memory: 
             'Fn::If':
               - HasOtelXRayDisable
