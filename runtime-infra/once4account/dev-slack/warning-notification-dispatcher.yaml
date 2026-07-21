@@ -29,8 +29,8 @@ Parameters:
 
   QueueName:
     Type: String
-    Description: Base name for the dispatcher SQS queue and lambda. Kept for resource compatibility.
-    Default: 'Warning-Router'
+    Description: Base name for the notification dispatcher SQS queue and lambda.
+    Default: 'Warning-Notification-Dispatcher'
 
   SlackTopicBaseName:
     Type: String
@@ -76,29 +76,29 @@ Conditions:
 Resources:
 
   # --- Buffer queue + DLQ -----------------------------------------------------
-  WarningRouterQueue:
+  WarningDispatcherQueue:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Ref QueueName
       RedrivePolicy:
-        deadLetterTargetArn: !GetAtt WarningRouterDLQ.Arn
+        deadLetterTargetArn: !GetAtt WarningDispatcherDLQ.Arn
         maxReceiveCount: !Ref MaxReceiveCount
       DelaySeconds: !Ref DelaySeconds
       MessageRetentionPeriod: !Ref MessageRetentionPeriod
       ReceiveMessageWaitTimeSeconds: 15
       VisibilityTimeout: !Ref VisibilityTimeout
 
-  WarningRouterDLQ:
+  WarningDispatcherDLQ:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub "${QueueName}-DLQ"
       MessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
 
-  WarningRouterQueuePolicy:
+  WarningDispatcherQueuePolicy:
     Type: AWS::SQS::QueuePolicy
     Properties:
       Queues:
-        - !Ref WarningRouterQueue
+        - !Ref WarningDispatcherQueue
       PolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -107,25 +107,25 @@ Resources:
             Principal:
               Service: sns.amazonaws.com
             Action: SQS:SendMessage
-            Resource: !GetAtt WarningRouterQueue.Arn
+            Resource: !GetAtt WarningDispatcherQueue.Arn
             Condition:
               ArnEquals:
                 aws:SourceArn: !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}'
 
-  WarningSNSSubscription:
+  WarningTopicSubscription:
     Type: AWS::SNS::Subscription
     Properties:
-      Endpoint: !GetAtt WarningRouterQueue.Arn
+      Endpoint: !GetAtt WarningDispatcherQueue.Arn
       Protocol: sqs
       TopicArn: !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}'
 
-  EventSourceMapping:
+  WarningDispatcherEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
       Enabled: true
       BatchSize: 1
-      EventSourceArn: !GetAtt WarningRouterQueue.Arn
-      FunctionName: !GetAtt WarningRouterLambda.Arn
+      EventSourceArn: !GetAtt WarningDispatcherQueue.Arn
+      FunctionName: !GetAtt WarningNotificationDispatcherLambda.Arn
 
   # --- Destination topics: one topic per warning flow -----------------------
   SlackTopicSimulatore:
@@ -175,16 +175,16 @@ Resources:
         SlackInfo: !Ref SlackInfoIamUnusedAccess
         TopicName: 'report-iam-unused-access'
 
-  # --- Router lambda ----------------------------------------------------------
-  WarningRouterLambda:
+  # --- Notification dispatcher lambda ----------------------------------------
+  WarningNotificationDispatcherLambda:
     Type: AWS::Lambda::Function
     Properties:
       Description: Routes every warning message to one dedicated destination.
-      FunctionName: !Sub '${QueueName}-router-lambda'
+      FunctionName: !Sub '${QueueName}-lambda'
       Handler: index.lambda_handler
       Runtime: python3.12
       Timeout: 15
-      Role: !GetAtt WarningRouterLambdaRole.Arn
+      Role: !GetAtt WarningNotificationDispatcherRole.Arn
       Environment:
         Variables:
           TOPIC_SIMULATORE: !Ref SlackTopicSimulatore
@@ -347,7 +347,7 @@ Resources:
               trigger = message.get('Trigger') or message.get('trigger') or {}
               return trigger.get('Namespace') or trigger.get('namespace')
 
-  WarningRouterLambdaRole:
+  WarningNotificationDispatcherRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub '${QueueName}-Role'
@@ -366,12 +366,12 @@ Resources:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole
 
-  WarningRouterLambdaPolicy:
+  WarningNotificationDispatcherPolicy:
     Type: AWS::IAM::Policy
     Properties:
       PolicyName: !Sub '${QueueName}-Policy'
       Roles:
-        - !Ref WarningRouterLambdaRole
+        - !Ref WarningNotificationDispatcherRole
       PolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -388,12 +388,12 @@ Resources:
               - sqs:DeleteMessage
               - sqs:GetQueueAttributes
               - sqs:ChangeMessageVisibility
-            Resource: !GetAtt WarningRouterQueue.Arn
+            Resource: !GetAtt WarningDispatcherQueue.Arn
 
 Outputs:
-  WarningRouterLambdaArn:
+  WarningNotificationDispatcherLambdaArn:
     Description: ARN of the warning notification dispatcher lambda.
-    Value: !GetAtt WarningRouterLambda.Arn
+    Value: !GetAtt WarningNotificationDispatcherLambda.Arn
 
   SimulatoreDestinationTopicArn:
     Description: Destination topic used by simulator CloudWatch alarms.
