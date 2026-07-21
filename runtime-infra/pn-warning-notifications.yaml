@@ -1,13 +1,18 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >
   Warning notification stack. Owns the central warning SNS topic, selects one
-  dedicated destination and renders custom notifications. A warning without a
-  matching rule is retried and eventually moved to the dispatcher DLQ.
+  Slack channel and renders custom notifications. A warning without a matching
+  rule is retried and eventually moved to the dispatcher DLQ.
 
 Parameters:
-  TemplateBucketBaseUrl:
+  LambdasBucketName:
     Type: String
-    Description: 'The S3 bucket from which to fetch the templates used by this stack.'
+    Description: S3 bucket name containing Lambda deployment packages.
+
+  LambdasBasePath:
+    Type: String
+    Description: S3 key prefix for Lambda deployment packages.
+    Default: ''
 
   WarningSNSTopicName:
     Type: String
@@ -19,42 +24,24 @@ Parameters:
     Description: AWS account ID allowed to publish warnings from the confidential-info account.
     Default: '-'
 
-  SlackInfoSimulatore:
+  SlackBotTokenSecretName:
     Type: String
-    Description: '<slack workspace id>:<slack channel id> for the simulatore-recapiti warning channel.'
-    Default: '-'
+    Description: Secrets Manager secret containing the Slack bot token, either as plain text or in a token JSON property.
+    Default: '/warning-notifications/slack-bot-token'
+    MinLength: 1
 
-  SlackInfoIamUnusedAccess:
+  RouteAlarmSimulatoreRecapiti:
     Type: String
-    Description: '<slack workspace id>:<slack channel id> for IAM unused access reports.'
-    Default: '-'
+    Description: JSON route for simulator alarms.
 
-  RoutingRulesJson:
+  RouteReportIamAccessAnalyzer:
     Type: String
-    Description: JSON array of ordered routing rules. The first match wins; no match is treated as a routing error.
-    Default: '[{"name":"simulatore-recapiti-cloudwatch","match":{"eventType":"cloudwatch-alarm","alarmNameRegex":"^(?:oncall-)?pn-simulatore-recapiti(?:-|$)"},"topicArnEnv":"TOPIC_SIMULATORE","renderer":"aws-native"},{"name":"iam-unused-access-report","match":{"eventType":"report","producer":"pn-iam-unused-access-analyzer","eventName":"unused-access-findings"},"topicArnEnv":"TOPIC_IAM_UNUSED_ACCESS","renderer":"custom","template":"iam-unused-access-report-v1"}]'
+    Description: JSON route for IAM unused access analyzer reports.
 
   QueueName:
     Type: String
     Description: Base name for the notification dispatcher SQS queue and lambda.
     Default: 'Warning-Notification-Dispatcher'
-
-  SlackTopicBaseName:
-    Type: String
-    Description: Base name for the SNS topics forwarded to Slack via Amazon Q Developer.
-    Default: 'pn-warning-bot-sns'
-
-  CreateChatbotConnection:
-    Type: String
-    Description: If 'true' create the Amazon Q Developer Slack connection; the CloudFormation resource type retains the AWS::Chatbot name.
-    AllowedValues: ['true', 'false']
-    Default: 'true'
-
-  CreateEmailSubscriptions:
-    Type: String
-    Description: If 'true', subscribe the DEV notification email to each destination topic. Each subscription must be confirmed.
-    AllowedValues: ['true', 'false']
-    Default: 'false'
 
   DelaySeconds:
     Type: Number
@@ -74,11 +61,14 @@ Parameters:
 
   VisibilityTimeout:
     Type: Number
-    Default: '15'
+    Default: '180'
+
+  MaxCsvAttachmentBytes:
+    Type: Number
+    Description: Maximum CSV attachment size downloaded and uploaded to Slack.
+    Default: '5242880'
 
 Conditions:
-  HasChatbotConnection: !Equals [ !Ref CreateChatbotConnection, 'true' ]
-  HasEmailSubscriptions: !Equals [ !Ref CreateEmailSubscriptions, 'true' ]
   HasConfidentialInfoAccountId: !And
     - !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '-' ] ]
     - !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
@@ -170,54 +160,6 @@ Resources:
       EventSourceArn: !GetAtt WarningDispatcherQueue.Arn
       FunctionName: !GetAtt WarningNotificationDispatcherLambda.Arn
 
-  # --- Destination topics: one topic per warning flow -----------------------
-  SlackTopicSimulatore:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Sub '${SlackTopicBaseName}-simulatore'
-
-  SlackTopicIamUnusedAccess:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Sub '${SlackTopicBaseName}-iam-unused-access'
-
-  SlackTopicSimulatoreEmailSubscription:
-    Condition: HasEmailSubscriptions
-    Type: AWS::SNS::Subscription
-    Properties:
-      TopicArn: !Ref SlackTopicSimulatore
-      Endpoint: '{{resolve:ssm:/notification/infra/email}}'
-      Protocol: email
-
-  SlackTopicIamUnusedAccessEmailSubscription:
-    Condition: HasEmailSubscriptions
-    Type: AWS::SNS::Subscription
-    Properties:
-      TopicArn: !Ref SlackTopicIamUnusedAccess
-      Endpoint: '{{resolve:ssm:/notification/infra/email}}'
-      Protocol: email
-
-  # The nested fragment owns the Amazon Q configuration and its SNS subscription.
-  SimulatoreSlackChannelConnection:
-    Condition: HasChatbotConnection
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sns-topic-to-slack-channel.yaml"
-      Parameters:
-        SNSTopicArn: !Ref SlackTopicSimulatore
-        SlackInfo: !Ref SlackInfoSimulatore
-        TopicName: 'warning-simulatore'
-
-  IamUnusedAccessSlackChannelConnection:
-    Condition: HasChatbotConnection
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sns-topic-to-slack-channel.yaml"
-      Parameters:
-        SNSTopicArn: !Ref SlackTopicIamUnusedAccess
-        SlackInfo: !Ref SlackInfoIamUnusedAccess
-        TopicName: 'report-iam-unused-access'
-
   # --- Notification dispatcher lambda ----------------------------------------
   WarningNotificationDispatcherLambda:
     Type: AWS::Lambda::Function
@@ -226,169 +168,16 @@ Resources:
       FunctionName: !Sub '${QueueName}-lambda'
       Handler: index.lambda_handler
       Runtime: python3.12
-      Timeout: 15
+      Timeout: 30
       Role: !GetAtt WarningNotificationDispatcherRole.Arn
       Environment:
         Variables:
-          TOPIC_SIMULATORE: !Ref SlackTopicSimulatore
-          TOPIC_IAM_UNUSED_ACCESS: !Ref SlackTopicIamUnusedAccess
-          ROUTING_RULES: !Ref RoutingRulesJson
+          ROUTES: !Sub '[${RouteAlarmSimulatoreRecapiti},${RouteReportIamAccessAnalyzer}]'
+          SLACK_BOT_TOKEN_SECRET_NAME: !Ref SlackBotTokenSecretName
+          MAX_CSV_ATTACHMENT_BYTES: !Ref MaxCsvAttachmentBytes
       Code:
-        ZipFile: |
-          import json
-          import os
-          import re
-          import boto3
-
-          SNS = boto3.client('sns')
-
-          def lambda_handler(event, context):
-              if not event or 'Records' not in event:
-                  raise ValueError('Empty event')
-              for record in event['Records']:
-                  handle_record(record)
-              return {'processed': len(event['Records'])}
-
-          def handle_record(record):
-              body = json.loads(record['body'])
-              message = json.loads(body['Message'])
-              print('########### INPUT MESSAGE #############')
-              print(message)
-
-              rules = parse_routing_rules(os.environ.get('ROUTING_RULES', '[]'))
-              rule = select_rule(rules, message)
-              if rule is None:
-                  raise ValueError('No routing rule matched the warning message')
-              topic_arn = resolve_topic_arn(rule)
-              route_name = rule.get('name', 'unnamed')
-              if not topic_arn:
-                  raise ValueError('Destination topic is not configured for route "%s"' % route_name)
-              print('Selected route: %s' % route_name)
-
-              output_message = render_message(rule, message)
-              print('########### OUTPUT MESSAGE #############')
-              print(output_message)
-              SNS.publish(
-                  TopicArn=topic_arn,
-                  Message=json.dumps(output_message),
-                  Subject=notification_subject(output_message)[:100],
-              )
-
-          def parse_routing_rules(rules_json):
-              rules = json.loads(rules_json)
-              if not isinstance(rules, list):
-                  raise ValueError('ROUTING_RULES must be a JSON array')
-              return rules
-
-          def select_rule(rules, message):
-              for rule in rules:
-                  if rule_matches(rule.get('match', {}), message):
-                      return rule
-              return None
-
-          def rule_matches(match, message):
-              event_type = classify_event(message)
-              alarm_name = extract_alarm_name(message)
-              source = message.get('source')
-              namespace = extract_namespace(message)
-              serialized = json.dumps(message)
-
-              expected_event_type = match.get('eventType')
-              if expected_event_type and event_type != expected_event_type:
-                  return False
-              expected_producer = match.get('producer')
-              if expected_producer and message.get('producer') != expected_producer:
-                  return False
-              expected_event_name = match.get('eventName')
-              if expected_event_name and message.get('eventName') != expected_event_name:
-                  return False
-              prefix = match.get('alarmNamePrefix')
-              if prefix and (alarm_name is None or not alarm_name.startswith(prefix)):
-                  return False
-              alarm_regex = match.get('alarmNameRegex')
-              if alarm_regex and (alarm_name is None or re.search(alarm_regex, alarm_name) is None):
-                  return False
-              expected_source = match.get('source')
-              if expected_source and source != expected_source:
-                  return False
-              expected_namespace = match.get('namespace')
-              if expected_namespace and namespace != expected_namespace:
-                  return False
-              message_regex = match.get('messageRegex')
-              if message_regex and re.search(message_regex, serialized) is None:
-                  return False
-              return True
-
-          def resolve_topic_arn(rule):
-              env_key = rule.get('topicArnEnv') or rule.get('slackTopicArnEnv', '')
-              return os.environ.get(env_key)
-
-          def classify_event(message):
-              if extract_alarm_name(message):
-                  return 'cloudwatch-alarm'
-              return message.get('eventType', 'unknown')
-
-          def notification_subject(message):
-              alarm_name = extract_alarm_name(message)
-              if alarm_name:
-                  return 'CloudWatch alarm: %s' % alarm_name
-              content = message.get('content') or {}
-              return content.get('title') or 'PN warning notification'
-
-          def render_message(rule, message):
-              renderer = rule.get('renderer', 'aws-native')
-              if renderer == 'aws-native':
-                  return message
-              template = rule.get('template')
-              if renderer == 'custom' and template == 'iam-unused-access-report-v1':
-                  return render_iam_unused_access_report(message)
-              raise ValueError('Unsupported renderer/template for route "%s"' % rule.get('name', 'unnamed'))
-
-          def render_iam_unused_access_report(message):
-              data = message.get('data') or {}
-              links = message.get('links') or {}
-              required = ['findingCount', 'findingTypeCounts', 'accountId', 'accountRole']
-              missing = [key for key in required if key not in data]
-              if missing or not links.get('dashboard'):
-                  raise ValueError('Invalid IAM unused access report: missing %s' % ', '.join(missing or ['links.dashboard']))
-
-              breakdown = '\n'.join(
-                  '- %s: %s' % (name, count)
-                  for name, count in sorted(data['findingTypeCounts'].items())
-              ) or '- Nessun dettaglio disponibile'
-              report_link = links.get('report', 'non disponibile')
-              environment = message.get('environment', 'unknown')
-              account_label = '%s-%s' % (data['accountRole'], environment)
-              description = (
-                  '*Account:* %s (%s)\n'
-                  '*Finding IAM unused access:* %s\n\n'
-                  '*Dettaglio per tipologia:*\n%s\n\n'
-                  '*Dashboard CloudWatch:* %s\n'
-                  '*Report CSV:* %s'
-              ) % (data['accountId'], account_label, data['findingCount'], breakdown,
-                   links['dashboard'], report_link)
-              return {
-                  'version': '1.0',
-                  'source': 'custom',
-                  'content': {
-                      'textType': 'client-markdown',
-                      'title': 'IAM unused access - %s: %s finding' % (account_label, data['findingCount']),
-                      'description': description,
-                      'nextSteps': ['Consultare la dashboard CloudWatch e il report CSV per verificare i finding.'],
-                      'keywords': ['iam', 'unused-access', 'report', environment],
-                  },
-                  'metadata': {
-                      'threadId': message.get('eventId'),
-                      'summary': 'IAM unused access report for %s' % account_label,
-                  },
-              }
-
-          def extract_alarm_name(message):
-              return message.get('AlarmName') or message.get('alarmName')
-
-          def extract_namespace(message):
-              trigger = message.get('Trigger') or message.get('trigger') or {}
-              return trigger.get('Namespace') or trigger.get('namespace')
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/warning-notification-dispatcher.zip
 
   WarningNotificationDispatcherRole:
     Type: AWS::IAM::Role
@@ -407,7 +196,6 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole
 
   WarningNotificationDispatcherPolicy:
     Type: AWS::IAM::Policy
@@ -418,12 +206,10 @@ Resources:
       PolicyDocument:
         Version: 2012-10-17
         Statement:
-          - Sid: PublishToSlackTopics
+          - Sid: ReadSlackBotToken
             Effect: Allow
-            Action: sns:Publish
-            Resource:
-              - !Ref SlackTopicSimulatore
-              - !Ref SlackTopicIamUnusedAccess
+            Action: secretsmanager:GetSecretValue
+            Resource: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${SlackBotTokenSecretName}*'
           - Sid: AllowSQSAccess
             Effect: Allow
             Action:
@@ -445,11 +231,3 @@ Outputs:
   WarningNotificationDispatcherLambdaArn:
     Description: ARN of the warning notification dispatcher lambda.
     Value: !GetAtt WarningNotificationDispatcherLambda.Arn
-
-  SimulatoreDestinationTopicArn:
-    Description: Destination topic used by simulator CloudWatch alarms.
-    Value: !Ref SlackTopicSimulatore
-
-  IamUnusedAccessDestinationTopicArn:
-    Description: Destination topic used by IAM unused access reports.
-    Value: !Ref SlackTopicIamUnusedAccess

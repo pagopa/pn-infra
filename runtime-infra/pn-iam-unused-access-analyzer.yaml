@@ -225,13 +225,14 @@ Resources:
                   - access-analyzer:CreateArchiveRule
                   - access-analyzer:DeleteArchiveRule
                 Resource: '*'
-        - PolicyName: s3-write-reports
+        - PolicyName: s3-read-write-reports
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
                   - s3:PutObject
+                  - s3:GetObject
                   - s3:AbortMultipartUpload
                 Resource: !Sub
                   - '${BucketArn}/${Env}/${Role}/*'

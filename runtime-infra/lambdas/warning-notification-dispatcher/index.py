@@ -1,0 +1,286 @@
+import json
+import os
+import re
+import urllib.error
+import urllib.parse
+import urllib.request
+
+import boto3
+
+
+SECRETS_MANAGER = boto3.client('secretsmanager')
+SLACK_API_BASE_URL = 'https://slack.com/api/'
+SLACK_TOKEN = None
+
+
+def lambda_handler(event, context):
+    if not event or 'Records' not in event:
+        raise ValueError('Empty event')
+    for record in event['Records']:
+        handle_record(record)
+    return {'processed': len(event['Records'])}
+
+
+def handle_record(record):
+    body = json.loads(record['body'])
+    message = json.loads(body['Message'])
+    print('Input event: %s' % {
+        'eventId': message.get('eventId'),
+        'eventType': classify_event(message),
+        'producer': message.get('producer'),
+        'alarmName': extract_alarm_name(message),
+    })
+
+    routes = parse_routes(os.environ.get('ROUTES', '[]'))
+    route = select_route(routes, message)
+    if route is None:
+        raise ValueError('No route matched the warning message')
+    channel_id = route['channel']
+    print('Selected route: %s/%s -> %s' % (route['type'], route['source'], channel_id))
+
+    attachment = message.get('attachment')
+    prepared_attachment = None
+    if route['type'] == 'report' and attachment:
+        prepared_attachment = prepare_csv_attachment(attachment)
+
+    output_message = render_message(route, message, channel_id)
+    if prepared_attachment and prepared_attachment.get('tooLarge'):
+        output_message['blocks'].append(mrkdwn_section(
+            '*CSV non allegato:* il file `%s` supera il limite di %s MiB.' % (
+                prepared_attachment['filename'],
+                int(os.environ.get('MAX_CSV_ATTACHMENT_BYTES', '5242880')) // 1048576,
+            )
+        ))
+    print('########### OUTPUT MESSAGE #############')
+    print(output_message)
+    slack_message = post_to_slack(output_message)
+    if prepared_attachment and not prepared_attachment.get('tooLarge'):
+        upload_csv_to_slack(prepared_attachment, channel_id, slack_message.get('ts'))
+
+
+def parse_routes(routes_json):
+    routes = json.loads(routes_json)
+    if not isinstance(routes, list):
+        raise ValueError('ROUTES must be a JSON array')
+    for route in routes:
+        if not isinstance(route, dict):
+            raise ValueError('Each route must be a JSON object')
+        missing = [key for key in ('type', 'source', 'channel') if not route.get(key)]
+        if missing:
+            raise ValueError('Invalid route: missing %s' % ', '.join(missing))
+        if route['type'] not in ('alarm', 'report'):
+            raise ValueError('Unsupported route type: %s' % route['type'])
+        if re.fullmatch(r'C[A-Z0-9]+', route['channel']) is None:
+            raise ValueError('Invalid Slack channel ID for source %s' % route['source'])
+    return routes
+
+
+def select_route(routes, message):
+    for route in routes:
+        if route.get('enabled', True) and route_matches(route, message):
+            return route
+    return None
+
+
+def route_matches(route, message):
+    event_type = classify_event(message)
+    if route['type'] == 'alarm':
+        alarm_name = extract_alarm_name(message)
+        if event_type != 'cloudwatch-alarm' or not alarm_name:
+            return False
+        normalized_name = alarm_name.removeprefix('oncall-')
+        return normalized_name == route['source'] or normalized_name.startswith(route['source'] + '-')
+    if route['type'] == 'report':
+        return event_type == 'report' and message.get('producer') == route['source']
+    return False
+
+
+def classify_event(message):
+    if extract_alarm_name(message):
+        return 'cloudwatch-alarm'
+    return message.get('eventType', 'unknown')
+
+
+def render_message(route, message, channel_id):
+    if route['type'] == 'alarm':
+        return render_cloudwatch_alarm(route, message, channel_id)
+    if route['type'] == 'report':
+        return render_report(route, message, channel_id)
+    raise ValueError('Unsupported route type: %s' % route['type'])
+
+
+def render_cloudwatch_alarm(route, message, channel_id):
+    alarm_name = extract_alarm_name(message) or 'CloudWatch alarm'
+    state = message.get('NewStateValue') or message.get('newStateValue') or 'UNKNOWN'
+    reason = message.get('NewStateReason') or message.get('newStateReason') or 'Motivo non disponibile'
+    region = message.get('Region') or message.get('region') or os.environ.get('AWS_REGION', 'unknown')
+    title = '%s - %s' % (route_label(route), alarm_name)
+    return {
+        'channel': channel_id,
+        'text': '%s: %s' % (title, state),
+        'blocks': [
+            header_block(title),
+            {
+                'type': 'section',
+                'fields': [
+                    mrkdwn_field('*Stato:*\n%s' % state),
+                    mrkdwn_field('*Regione:*\n%s' % region),
+                ],
+            },
+            mrkdwn_section('*Dettaglio:*\n%s' % reason),
+        ],
+    }
+
+
+def render_report(route, message, channel_id):
+    data = message.get('data') or {}
+    links = message.get('links') or {}
+    required = ['findingCount', 'findingTypeCounts', 'accountId', 'accountRole']
+    missing = [key for key in required if key not in data]
+    if missing or not links.get('dashboard'):
+        raise ValueError('Invalid IAM unused access report: missing %s' % ', '.join(missing or ['links.dashboard']))
+
+    breakdown = '\n'.join(
+        '- %s: %s' % (name, count)
+        for name, count in sorted(data['findingTypeCounts'].items())
+    ) or '- Nessun dettaglio disponibile'
+    report_link = links.get('report', 'non disponibile')
+    environment = message.get('environment', 'unknown')
+    account_label = '%s-%s' % (data['accountRole'], environment)
+    title = '%s - %s' % (route_label(route), account_label)
+    return {
+        'channel': channel_id,
+        'text': '%s: %s finding' % (title, data['findingCount']),
+        'blocks': [
+            header_block(title),
+            {
+                'type': 'section',
+                'fields': [
+                    mrkdwn_field('*Account:*\n%s' % data['accountId']),
+                    mrkdwn_field('*Finding:*\n%s' % data['findingCount']),
+                ],
+            },
+            mrkdwn_section('*Dettaglio per tipologia:*\n%s' % breakdown),
+            mrkdwn_section('*Dashboard CloudWatch:* <%s|Apri dashboard>\n*Report CSV:* %s' % (links['dashboard'], report_link)),
+        ],
+    }
+
+
+def header_block(text):
+    return {
+        'type': 'header',
+        'text': {'type': 'plain_text', 'text': text[:150]},
+    }
+
+
+def mrkdwn_section(text):
+    return {'type': 'section', 'text': {'type': 'mrkdwn', 'text': text[:3000]}}
+
+
+def mrkdwn_field(text):
+    return {'type': 'mrkdwn', 'text': text[:2000]}
+
+
+def route_label(route):
+    source = route['source'].removeprefix('pn-')
+    return source.replace('-', ' ').upper()
+
+
+def post_to_slack(payload):
+    return slack_api('chat.postMessage', payload)
+
+
+def slack_api(method, payload):
+    request = urllib.request.Request(
+        SLACK_API_BASE_URL + method,
+        data=json.dumps(payload).encode('utf-8'),
+        headers={
+            'Authorization': 'Bearer %s' % slack_token(),
+            'Content-Type': 'application/json; charset=utf-8',
+        },
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            result = json.loads(response.read().decode('utf-8'))
+    except urllib.error.HTTPError as error:
+        raise RuntimeError('Slack HTTP error %s' % error.code) from error
+    if not result.get('ok'):
+        raise RuntimeError('Slack API error: %s' % result.get('error', 'unknown_error'))
+    return result
+
+
+def prepare_csv_attachment(attachment):
+    filename = os.path.basename(str(attachment.get('filename', '')))
+    content_type = attachment.get('contentType')
+    download_url = attachment.get('downloadUrl')
+    declared_size = attachment.get('size')
+    if not filename or content_type != 'text/csv' or not download_url:
+        raise ValueError('Invalid CSV attachment metadata')
+    max_size = int(os.environ.get('MAX_CSV_ATTACHMENT_BYTES', '5242880'))
+    if declared_size is not None and int(declared_size) > max_size:
+        return {'filename': filename, 'size': int(declared_size), 'tooLarge': True}
+
+    parsed_url = urllib.parse.urlparse(download_url)
+    hostname = parsed_url.hostname or ''
+    if parsed_url.scheme != 'https' or not (
+        hostname.endswith('.amazonaws.com') or hostname.endswith('.amazonaws.com.cn')
+    ):
+        raise ValueError('CSV attachment URL must be an HTTPS AWS URL')
+
+    with urllib.request.urlopen(download_url, timeout=10) as response:
+        csv_content = response.read(max_size + 1)
+    if len(csv_content) > max_size:
+        return {'filename': filename, 'size': len(csv_content), 'tooLarge': True}
+    return {'filename': filename, 'content': csv_content, 'tooLarge': False}
+
+
+def upload_csv_to_slack(prepared_attachment, channel_id, thread_ts):
+    filename = prepared_attachment['filename']
+    csv_content = prepared_attachment['content']
+    upload_ticket = slack_api('files.getUploadURLExternal', {
+        'filename': filename[:255],
+        'length': len(csv_content),
+    })
+    upload_request = urllib.request.Request(
+        upload_ticket['upload_url'],
+        data=csv_content,
+        headers={'Content-Type': 'application/octet-stream'},
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(upload_request, timeout=15):
+            pass
+    except urllib.error.HTTPError as error:
+        raise RuntimeError('Slack file upload HTTP error %s' % error.code) from error
+
+    completion_payload = {
+        'files': [{'id': upload_ticket['file_id'], 'title': filename[:255]}],
+        'channel_id': channel_id,
+    }
+    if thread_ts:
+        completion_payload['thread_ts'] = thread_ts
+    slack_api('files.completeUploadExternal', completion_payload)
+
+
+def slack_token():
+    global SLACK_TOKEN
+    if SLACK_TOKEN:
+        return SLACK_TOKEN
+    secret_name = os.environ['SLACK_BOT_TOKEN_SECRET_NAME']
+    secret_value = SECRETS_MANAGER.get_secret_value(SecretId=secret_name)['SecretString']
+    try:
+        secret_json = json.loads(secret_value)
+        if isinstance(secret_json, dict):
+            SLACK_TOKEN = secret_json.get('token') or secret_json.get('botToken') or secret_json.get('slackBotToken')
+        elif isinstance(secret_json, str):
+            SLACK_TOKEN = secret_json
+    except json.JSONDecodeError:
+        SLACK_TOKEN = secret_value
+    if not SLACK_TOKEN:
+        raise ValueError('Slack bot token secret is empty or has no supported token property')
+    return SLACK_TOKEN
+
+
+def extract_alarm_name(message):
+    return message.get('AlarmName') or message.get('alarmName')

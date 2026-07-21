@@ -259,10 +259,11 @@ def lambda_handler(event, context):
         ])
         count += 1
 
+    csv_bytes = buf.getvalue().encode("utf-8")
     s3.put_object(
         Bucket=BUCKET,
         Key=key,
-        Body=buf.getvalue().encode("utf-8"),
+        Body=csv_bytes,
         ContentType="text/csv",
     )
 
@@ -274,6 +275,11 @@ def lambda_handler(event, context):
             f"?region={region}#dashboards/dashboard/{dashboard_name}"
         )
         account_label = f"{ACCOUNT_ROLE}-{ENV_NAME}"
+        report_download_url = s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": BUCKET, "Key": key},
+            ExpiresIn=3600,
+        )
         message = {
             "schemaVersion": "1.0",
             "eventId": request_id,
@@ -293,6 +299,12 @@ def lambda_handler(event, context):
             "links": {
                 "dashboard": dashboard_url,
                 "report": f"s3://{BUCKET}/{key}",
+            },
+            "attachment": {
+                "filename": key.rsplit("/", 1)[-1],
+                "contentType": "text/csv",
+                "size": len(csv_bytes),
+                "downloadUrl": report_download_url,
             },
         }
         try:
