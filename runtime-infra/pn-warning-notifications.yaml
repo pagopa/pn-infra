@@ -5,6 +5,10 @@ Description: >
   rule is retried and eventually moved to the dispatcher DLQ.
 
 Parameters:
+  ProjectName:
+    Type: String
+    Description: Project prefix used in physical resource names.
+
   TemplateBucketBaseUrl:
     Type: String
     Description: URL used to load infrastructure template fragments.
@@ -46,8 +50,8 @@ Parameters:
 
   QueueName:
     Type: String
-    Description: Base name for the notification dispatcher SQS queue and lambda.
-    Default: 'pn-Warning-Notification-Dispatcher'
+    Description: Base name for the notification dispatcher resources.
+    Default: 'Warning-Notification-Dispatcher'
 
   LogRetention:
     Type: Number
@@ -120,23 +124,49 @@ Resources:
 
   # --- Buffer queue + DLQ -----------------------------------------------------
   WarningDispatcherQueue:
-    Type: AWS::CloudFormation::Stack
+    Type: AWS::SQS::Queue
     Properties:
-      TemplateURL: !Sub '${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml'
-      Parameters:
-        QueueName: !Ref QueueName
-        AlarmSNSTopicName: !GetAtt WarningSNSTopic.TopicName
-        DelaySeconds: !Ref DelaySeconds
-        MessageRetentionPeriod: !Ref MessageRetentionPeriod
-        MaxReceiveCount: !Ref MaxReceiveCount
-        DeadLetterMessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
-        VisibilityTimeout: !Ref VisibilityTimeout
+      QueueName: !Sub '${ProjectName}-${QueueName}'
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt WarningDispatcherDLQ.Arn
+        maxReceiveCount: !Ref MaxReceiveCount
+      DelaySeconds: !Ref DelaySeconds
+      MessageRetentionPeriod: !Ref MessageRetentionPeriod
+      ReceiveMessageWaitTimeSeconds: 15
+      VisibilityTimeout: !Ref VisibilityTimeout
+
+  WarningDispatcherDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${ProjectName}-${QueueName}-DLQ'
+      MessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
+
+  WarningDispatcherDLQHasMessagesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-${QueueName}-DLQ-HasMessage'
+      AlarmDescription: Warning notification dispatcher messages moved to the DLQ.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt WarningDispatcherDLQ.QueueName
+      Statistic: Sum
+      Period: 60
+      Threshold: 1
+      TreatMissingData: notBreaching
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      AlarmActions:
+        - !Ref WarningSNSTopic
+      OKActions:
+        - !Ref WarningSNSTopic
 
   WarningDispatcherQueuePolicy:
     Type: AWS::SQS::QueuePolicy
     Properties:
       Queues:
-        - !GetAtt WarningDispatcherQueue.Outputs.QueueURL
+        - !Ref WarningDispatcherQueue
       PolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -145,7 +175,7 @@ Resources:
             Principal:
               Service: sns.amazonaws.com
             Action: SQS:SendMessage
-            Resource: !GetAtt WarningDispatcherQueue.Outputs.QueueARN
+            Resource: !GetAtt WarningDispatcherQueue.Arn
             Condition:
               ArnEquals:
                 aws:SourceArn: !Ref WarningSNSTopic
@@ -154,16 +184,17 @@ Resources:
     Type: AWS::SNS::Subscription
     DependsOn: WarningDispatcherQueuePolicy
     Properties:
-      Endpoint: !GetAtt WarningDispatcherQueue.Outputs.QueueARN
+      Endpoint: !GetAtt WarningDispatcherQueue.Arn
       Protocol: sqs
       TopicArn: !Ref WarningSNSTopic
 
   WarningDispatcherEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
+    DependsOn: WarningNotificationDispatcherPolicy
     Properties:
       Enabled: true
       BatchSize: 1
-      EventSourceArn: !GetAtt WarningDispatcherQueue.Outputs.QueueARN
+      EventSourceArn: !GetAtt WarningDispatcherQueue.Arn
       FunctionName: !GetAtt WarningNotificationDispatcherLambda.Arn
 
   WarningNotificationDispatcherLogGroup:
@@ -173,7 +204,7 @@ Resources:
     Properties:
       TemplateURL: !Sub '${TemplateBucketBaseUrl}/fragments/log-group.yaml'
       Parameters:
-        LogGroupName: !Sub '${QueueName}-lambda-${EnvironmentType}'
+        LogGroupName: !Sub '${ProjectName}-${QueueName}-lambda-${EnvironmentType}'
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: '/aws/lambda'
 
@@ -182,7 +213,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       Description: Routes every warning message to one dedicated destination.
-      FunctionName: !Sub '${QueueName}-lambda-${EnvironmentType}'
+      FunctionName: !Sub '${ProjectName}-${QueueName}-lambda-${EnvironmentType}'
       Handler: index.lambda_handler
       Runtime: python3.14
       Timeout: 30
@@ -209,7 +240,7 @@ Resources:
   WarningNotificationDispatcherRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub '${QueueName}-Role'
+      RoleName: !Sub '${ProjectName}-${QueueName}-Role'
       Path: /
       Description: Execution role for the warning notification dispatcher lambda.
       AssumeRolePolicyDocument:
@@ -227,7 +258,7 @@ Resources:
   WarningNotificationDispatcherPolicy:
     Type: AWS::IAM::Policy
     Properties:
-      PolicyName: !Sub '${QueueName}-Policy'
+      PolicyName: !Sub '${ProjectName}-${QueueName}-Policy'
       Roles:
         - !Ref WarningNotificationDispatcherRole
       PolicyDocument:
@@ -244,7 +275,7 @@ Resources:
               - sqs:DeleteMessage
               - sqs:GetQueueAttributes
               - sqs:ChangeMessageVisibility
-            Resource: !GetAtt WarningDispatcherQueue.Outputs.QueueARN
+            Resource: !GetAtt WarningDispatcherQueue.Arn
 
 Outputs:
   WarningSNSTopicArn:
