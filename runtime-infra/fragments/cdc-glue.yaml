@@ -28,6 +28,10 @@ Parameters:
   DynamoTableName:
     Description: Name of dynamoDb table
     Type: String
+  CdcS3PathSuffix:
+    Description: Optional suffix appended to the DynamoDB table name in CDC S3 paths
+    Type: String
+    Default: ''
   DynamoDBKeysStructure:
     Description: Structure of the dynamodb column
     Type: String
@@ -68,6 +72,10 @@ Conditions:
   HasCdcParsedCache: !And
     - !Condition HasCdcView
     - !Equals [ "true", !Ref GenerateCdcParsedCache ]
+  HasCdcS3PathSuffix: !Not
+    - !Equals
+      - !Ref CdcS3PathSuffix
+      - ''
   HasNewImagePart2: !Not
     - !Equals
       - !Ref DynamoDBNewImageStructurePart2
@@ -113,9 +121,15 @@ Resources:
           projection.p_hour.range: 0,23
           projection.p_hour.digits: '2'
           storage.location.template: !If
-            - UseConfinfoLogsBucket
-            - !Sub 's3://${ConfinfoLogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}/${!p_year}/${!p_month}/${!p_day}/${!p_hour}/'
-            - !Sub 's3://${LogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}/${!p_year}/${!p_month}/${!p_day}/${!p_hour}/'
+            - HasCdcS3PathSuffix
+            - !If
+              - UseConfinfoLogsBucket
+              - !Sub 's3://${ConfinfoLogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}${CdcS3PathSuffix}/${!p_year}/${!p_month}/${!p_day}/${!p_hour}/'
+              - !Sub 's3://${LogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}${CdcS3PathSuffix}/${!p_year}/${!p_month}/${!p_day}/${!p_hour}/'
+            - !If
+              - UseConfinfoLogsBucket
+              - !Sub 's3://${ConfinfoLogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}/${!p_year}/${!p_month}/${!p_day}/${!p_hour}/'
+              - !Sub 's3://${LogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}/${!p_year}/${!p_month}/${!p_day}/${!p_hour}/'
         StorageDescriptor:
           Columns:
             - Name: awsRegion
@@ -144,9 +158,15 @@ Resources:
                         - !Sub "struct<ApproximateCreationDateTime:bigint,SizeBytes:bigint,Keys:${DynamoDBKeysStructure},NewImage:${DynamoDBNewImageStructure}${DynamoDBNewImageStructurePart2}>"
                         - !Sub "struct<ApproximateCreationDateTime:bigint,SizeBytes:bigint,Keys:${DynamoDBKeysStructure},NewImage:${DynamoDBNewImageStructure}>"
           Location: !If
-            - UseConfinfoLogsBucket
-            - !Sub s3://${ConfinfoLogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}/
-            - !Sub s3://${LogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}/
+            - HasCdcS3PathSuffix
+            - !If
+              - UseConfinfoLogsBucket
+              - !Sub s3://${ConfinfoLogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}${CdcS3PathSuffix}/
+              - !Sub s3://${LogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}${CdcS3PathSuffix}/
+            - !If
+              - UseConfinfoLogsBucket
+              - !Sub s3://${ConfinfoLogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}/
+              - !Sub s3://${LogsBucketName}/cdcTos3/TABLE_NAME_${DynamoTableName}/
           InputFormat: org.apache.hadoop.mapred.TextInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
           Compressed: false
@@ -260,13 +280,23 @@ Resources:
           projection.p_day.type: integer
           projection.p_day.range: 1,31
           projection.p_day.digits: '2'
-          storage.location.template: !Join
-            - ''
-            - - 's3://'
-              - !Sub ${ProjectName}-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}
-              - '/cdcTos3_parsed/TABLE_NAME_'
-              - !Ref DynamoTableName
-              - '/${p_year}/${p_month}/${p_day}/'
+          storage.location.template: !If
+            - HasCdcS3PathSuffix
+            - !Join
+              - ''
+              - - 's3://'
+                - !Sub ${ProjectName}-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}
+                - '/cdcTos3_parsed/TABLE_NAME_'
+                - !Ref DynamoTableName
+                - !Ref CdcS3PathSuffix
+                - '/${p_year}/${p_month}/${p_day}/'
+            - !Join
+              - ''
+              - - 's3://'
+                - !Sub ${ProjectName}-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}
+                - '/cdcTos3_parsed/TABLE_NAME_'
+                - !Ref DynamoTableName
+                - '/${p_year}/${p_month}/${p_day}/'
         StorageDescriptor:
           Columns:
             'Fn::Transform':
@@ -282,7 +312,10 @@ Resources:
                 CdcRecordFilter: !Ref CdcRecordFilter
                 OutputType: 'StorageDescriptor-Columns-noParsedPartition'
                 Enabled: !Ref GenerateCdcParsedCache # Enable or disable heavy transformation computation if not needed
-          Location: !Sub s3://${ProjectName}-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}/cdcTos3_parsed/TABLE_NAME_${DynamoTableName}/
+          Location: !If
+            - HasCdcS3PathSuffix
+            - !Sub s3://${ProjectName}-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}/cdcTos3_parsed/TABLE_NAME_${DynamoTableName}${CdcS3PathSuffix}/
+            - !Sub s3://${ProjectName}-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-${BucketSuffix}/cdcTos3_parsed/TABLE_NAME_${DynamoTableName}/
           InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat
           Compressed: false
