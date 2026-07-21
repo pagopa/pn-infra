@@ -38,10 +38,29 @@ Parameters:
     Default: ''
     Type: String
     Description: where to send logs
+
+  LogDownstreamFilterPattern:
+    Default: '{ $.message = "*downstream_http_call*" }'
+    Type: String
+    Description: filter expression for downstream exported logs
   
+  LogEnableDownstreamSubscriptionFilter:
+    Default: false
+    Type: String
+    Description: Enable downstream subscription filter
+    AllowedValues:
+      - true
+      - false
+  
+  DownstreamMonitoringLambdaName:
+    Default: 'pn-downstream-monitoring-lambda'
+    Type: String
+    Description: Name of the Lambda function for downstream monitoring
+
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
   IsLogMasking: !Equals [ !Ref LogEnableMasking, 'true' ]
+  ActivateDownstreamSubscriptionFilter: !Equals [ !Ref LogEnableDownstreamSubscriptionFilter, 'true' ]
 
 Resources:
 
@@ -156,6 +175,47 @@ Resources:
                   - kinesis:PutRecord
                 Effect: Allow
                 Resource: "*"
+              - Action:
+                - "kms:Encrypt"
+                - "kms:GenerateDataKey"
+                - "kms:Decrypt"
+                Effect: Allow
+                Resource: "*"
+
+  ### Subscription filters with Kinesis  https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#DestinationKinesisExample
+  DownstreamSubscriptionFilter:
+    Condition: ActivateDownstreamSubscriptionFilter
+    Type: AWS::Logs::SubscriptionFilter
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain    
+    Properties:
+      LogGroupName: !Ref LogGroup
+      FilterPattern: !Ref LogDownstreamFilterPattern
+      DestinationArn: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DownstreamMonitoringLambdaName}' 
+
+  ### IAM Role used by Subscription filters to allow read logs from Cloudwatch and send logs to Kinesis Firehose
+  DownstreamSubscriptionFilterServiceRole:
+    Condition: ActivateDownstreamSubscriptionFilter
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: logs.amazonaws.com
+        Version: "2012-10-17"
+      Path: /
+      Policies:
+        -
+          PolicyName: !Sub '${LogGroupName}-logs-subscription-role'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - lambda:InvokeFunction
+                Effect: Allow
+                Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DownstreamMonitoringLambdaName}'
               - Action:
                 - "kms:Encrypt"
                 - "kms:GenerateDataKey"
