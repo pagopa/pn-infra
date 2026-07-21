@@ -93,8 +93,7 @@ def route_matches(route, message):
         alarm_name = extract_alarm_name(message)
         if event_type != 'cloudwatch-alarm' or not alarm_name:
             return False
-        normalized_name = alarm_name.removeprefix('oncall-')
-        return normalized_name == route['match'] or normalized_name.startswith(route['match'] + '-')
+        return re.search(r'(^|-)%s($|-)' % re.escape(route['match']), alarm_name) is not None
     if route['type'] == 'report':
         return event_type == 'report' and message.get('producer') == route['match']
     return False
