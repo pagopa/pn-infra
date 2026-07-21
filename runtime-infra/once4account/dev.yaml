@@ -10,7 +10,7 @@ Parameters:
     Type: String
     Description: <slack workspace id>:<slack channel id>. 'team_notifiche_dev_alarm' by default
     Default: TQSBH3ZS4:C02V0SRC4TV
-
+  
   Version:
     Type: String
     Description: 'keep track of used projects commitIds'
@@ -139,13 +139,13 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/once4account/dev-slack/no-codestar-deploy-notifications.yaml"
       TimeoutInMinutes: 15
 
-  # - Deploy the unchanged standard alarm enrichment workflow
+  # - Deploy Lambda to enrich messages
   EnrichNotificationsForSlack:
     Condition: MilanRegion
     Type: AWS::CloudFormation::Stack
-    Properties:
-      Parameters:
-        AlarmSNSTopicName: !GetAtt AlarmSNSTopic.TopicName
+    Properties: 
+      Parameters: 
+        AlarmSNSTopicName: !GetAtt  AlarmSNSTopic.TopicName
         SlackInfo: !Ref SlackInfo
         ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
         TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
@@ -194,7 +194,8 @@ Outputs:
   AlarmSNSTopicName:
     Value: !GetAtt  AlarmSNSTopic.TopicName
     Description: Name of the Alarm SNS Topic
-
+  
   Version:
     Value: !Ref Version
     Description: Give the version string as output to avoid warnings
+
