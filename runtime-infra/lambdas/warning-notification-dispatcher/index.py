@@ -43,6 +43,16 @@ def handle_record(record):
         raise ValueError('No route matched the warning message')
     channel_id = route['channel']
     print('Selected route: %s/%s -> %s' % (route['type'], route['match'], channel_id))
+    if channel_id == 'DROP':
+        print(json.dumps({
+            'action': 'DROP',
+            'eventType': classify_event(message),
+            'match': route['match'],
+            'alarmName': extract_alarm_name(message),
+            'producer': message.get('producer'),
+            'environment': os.environ.get('ENVIRONMENT_TYPE', 'unknown'),
+        }, separators=(',', ':')))
+        return
 
     attachment = message.get('attachment')
     prepared_attachment = None
@@ -92,8 +102,8 @@ def parse_routes(routes_config):
             raise ValueError('Unsupported route type at position %s: %s' % (position, route_type))
         if re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', match) is None:
             raise ValueError('Invalid route match at position %s: %s' % (position, match))
-        if re.fullmatch(r'C[A-Z0-9]+', channel) is None:
-            raise ValueError('Invalid Slack channel ID for match %s' % match)
+        if channel != 'DROP' and re.fullmatch(r'C[A-Z0-9]+', channel) is None:
+            raise ValueError('Invalid route destination for match %s' % match)
 
         routes.append({'type': route_type, 'match': match, 'channel': channel})
     return routes
