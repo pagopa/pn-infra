@@ -10,6 +10,7 @@ import boto3
 
 SECRETS_MANAGER = boto3.client('secretsmanager')
 SLACK_API_BASE_URL = 'https://slack.com/api/'
+SLACK_SNIPPET_MAX_BYTES = 1000000
 SLACK_TOKEN = None
 
 
@@ -65,9 +66,10 @@ def handle_record(record):
         ))
     print('########### OUTPUT MESSAGE #############')
     print(output_message)
-    slack_message = post_to_slack(output_message)
     if prepared_attachment and not prepared_attachment.get('tooLarge') and not prepared_attachment.get('downloadError'):
-        upload_csv_to_slack(prepared_attachment, channel_id, slack_message.get('ts'))
+        upload_csv_to_slack(prepared_attachment, output_message)
+    else:
+        post_to_slack(output_message)
 
 
 def parse_routes(routes_config):
@@ -162,7 +164,6 @@ def render_report(route, message, channel_id):
         '- %s: %s' % (name, count)
         for name, count in sorted(data['findingTypeCounts'].items())
     ) or '- Nessun dettaglio disponibile'
-    report_link = links.get('report', 'non disponibile')
     environment = str(message.get('environment', os.environ.get('ENVIRONMENT_TYPE', 'unknown'))).upper()
     producer = message.get('producer') or route['match']
     title = '%s %s - %s' % (data['accountId'], environment, producer)
@@ -179,7 +180,7 @@ def render_report(route, message, channel_id):
                 ],
             },
             mrkdwn_section('*Dettaglio per tipologia:*\n%s' % breakdown),
-            mrkdwn_section('*Dashboard CloudWatch:* <%s|Apri dashboard>\n*Report CSV:* %s' % (links['dashboard'], report_link)),
+            mrkdwn_section('*Dashboard CloudWatch:* <%s|Apri dashboard>' % links['dashboard']),
         ],
     }
 
@@ -203,13 +204,19 @@ def post_to_slack(payload):
     return slack_api('chat.postMessage', payload)
 
 
-def slack_api(method, payload):
+def slack_api(method, payload, form_encoded=False):
+    if form_encoded:
+        request_body = urllib.parse.urlencode(payload).encode('utf-8')
+        content_type = 'application/x-www-form-urlencoded; charset=utf-8'
+    else:
+        request_body = json.dumps(payload).encode('utf-8')
+        content_type = 'application/json; charset=utf-8'
     request = urllib.request.Request(
         SLACK_API_BASE_URL + method,
-        data=json.dumps(payload).encode('utf-8'),
+        data=request_body,
         headers={
             'Authorization': 'Bearer %s' % slack_token(),
-            'Content-Type': 'application/json; charset=utf-8',
+            'Content-Type': content_type,
         },
         method='POST',
     )
@@ -219,7 +226,12 @@ def slack_api(method, payload):
     except urllib.error.HTTPError as error:
         raise RuntimeError('Slack HTTP error %s' % error.code) from error
     if not result.get('ok'):
-        raise RuntimeError('Slack API error: %s' % result.get('error', 'unknown_error'))
+        error_details = {
+            key: result[key]
+            for key in ('error', 'needed', 'provided', 'response_metadata')
+            if key in result
+        }
+        raise RuntimeError('Slack API error: %s' % json.dumps(error_details, separators=(',', ':')))
     return result
 
 
@@ -257,13 +269,16 @@ def attachment_download_error(error):
     return str(error)
 
 
-def upload_csv_to_slack(prepared_attachment, channel_id, thread_ts):
+def upload_csv_to_slack(prepared_attachment, message):
     filename = prepared_attachment['filename']
     csv_content = prepared_attachment['content']
-    upload_ticket = slack_api('files.getUploadURLExternal', {
+    upload_metadata = {
         'filename': filename[:255],
         'length': len(csv_content),
-    })
+    }
+    if len(csv_content) <= SLACK_SNIPPET_MAX_BYTES:
+        upload_metadata['snippet_type'] = 'csv'
+    upload_ticket = slack_api('files.getUploadURLExternal', upload_metadata, form_encoded=True)
     upload_request = urllib.request.Request(
         upload_ticket['upload_url'],
         data=csv_content,
@@ -278,10 +293,9 @@ def upload_csv_to_slack(prepared_attachment, channel_id, thread_ts):
 
     completion_payload = {
         'files': [{'id': upload_ticket['file_id'], 'title': filename[:255]}],
-        'channel_id': channel_id,
+        'channel_id': message['channel'],
+        'blocks': json.dumps(message['blocks'], separators=(',', ':')),
     }
-    if thread_ts:
-        completion_payload['thread_ts'] = thread_ts
     slack_api('files.completeUploadExternal', completion_payload)
 
 
