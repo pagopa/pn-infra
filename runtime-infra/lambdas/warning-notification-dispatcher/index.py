@@ -118,7 +118,9 @@ def render_cloudwatch_alarm(route, message, channel_id):
     state = message.get('NewStateValue') or message.get('newStateValue') or 'UNKNOWN'
     reason = message.get('NewStateReason') or message.get('newStateReason') or 'Motivo non disponibile'
     region = message.get('Region') or message.get('region') or os.environ.get('AWS_REGION', 'unknown')
-    title = '%s - %s' % (route_label(route), alarm_name)
+    account_id = extract_alarm_account_id(message)
+    environment = os.environ.get('ENVIRONMENT_TYPE', 'unknown').upper()
+    title = '%s %s - %s' % (account_id, environment, alarm_name)
     return {
         'channel': channel_id,
         'text': '%s: %s' % (title, state),
@@ -149,9 +151,9 @@ def render_report(route, message, channel_id):
         for name, count in sorted(data['findingTypeCounts'].items())
     ) or '- Nessun dettaglio disponibile'
     report_link = links.get('report', 'non disponibile')
-    environment = message.get('environment', 'unknown')
-    account_label = '%s-%s' % (data['accountRole'], environment)
-    title = '%s - %s' % (route_label(route), account_label)
+    environment = str(message.get('environment', os.environ.get('ENVIRONMENT_TYPE', 'unknown'))).upper()
+    producer = message.get('producer') or route['match']
+    title = '%s %s - %s' % (data['accountId'], environment, producer)
     return {
         'channel': channel_id,
         'text': '%s: %s finding' % (title, data['findingCount']),
@@ -183,11 +185,6 @@ def mrkdwn_section(text):
 
 def mrkdwn_field(text):
     return {'type': 'mrkdwn', 'text': text[:2000]}
-
-
-def route_label(route):
-    match = route['match'].removeprefix('pn-')
-    return match.replace('-', ' ').upper()
 
 
 def post_to_slack(payload):
@@ -288,3 +285,15 @@ def slack_token():
 
 def extract_alarm_name(message):
     return message.get('AlarmName') or message.get('alarmName')
+
+
+def extract_alarm_account_id(message):
+    account_id = message.get('AWSAccountId') or message.get('awsAccountId')
+    if account_id:
+        return str(account_id)
+
+    alarm_arn = message.get('AlarmArn') or message.get('alarmArn') or ''
+    arn_parts = alarm_arn.split(':', 6)
+    if len(arn_parts) == 7 and arn_parts[4]:
+        return arn_parts[4]
+    return 'unknown-account'
