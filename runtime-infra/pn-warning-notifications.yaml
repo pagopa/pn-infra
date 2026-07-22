@@ -44,6 +44,13 @@ Parameters:
     Default: 'go/send-monitor-tpp-messages/slack-token'
     MinLength: 1
 
+  SlackSecretCacheTtlSeconds:
+    Type: Number
+    Description: Seconds before the local Parameters and Secrets Extension cache refreshes the Slack bot token.
+    Default: 300
+    MinValue: 0
+    MaxValue: 300
+
   Routes:
     Type: String
     Description: Semicolon-separated routes in type,match,destination format. Destination is a Slack channel ID or DROP.
@@ -98,7 +105,10 @@ Resources:
           ROUTES: !Ref Routes
           ENVIRONMENT_TYPE: !Ref EnvironmentType
           SLACK_BOT_TOKEN_SECRET_NAME: !Ref SlackBotTokenSecretName
+          SECRETS_MANAGER_TTL: !Ref SlackSecretCacheTtlSeconds
           MAX_CSV_ATTACHMENT_BYTES: !Ref MaxCsvAttachmentBytes
+      Layers:
+        - arn:aws:lambda:eu-south-1:325218067255:layer:AWS-Parameters-and-Secrets-Lambda-Extension:79
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/warning-notification-dispatcher.zip

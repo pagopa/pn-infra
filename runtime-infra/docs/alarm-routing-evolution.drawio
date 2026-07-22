@@ -1,0 +1,66 @@
+<mxfile host="app.diagrams.net" modified="2026-07-22T12:30:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="architecture" name="01 - Architettura">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Warning notifications - architettura" style="text;html=1;align=left;fontSize=26;fontStyle=1;strokeColor=none;fillColor=none;" vertex="1" parent="1"><mxGeometry x="50" y="25" width="750" height="45" as="geometry"/></mxCell>
+        <mxCell id="subtitle" value="Un topic centrale, trasporto durevole, routing Slack o soppressione esplicita" style="text;html=1;align=left;fontSize=14;fontColor=#4b5563;strokeColor=none;fillColor=none;" vertex="1" parent="1"><mxGeometry x="50" y="70" width="850" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="producers" value="PRODUCER - ESEMPI" style="swimlane;html=1;horizontal=1;startSize=34;fillColor=#f8fafc;strokeColor=#94a3b8;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="50" y="140" width="310" height="570" as="geometry"/></mxCell>
+        <mxCell id="alarm" value="CloudWatch Alarm&#xa;&#xa;AlarmActions / OKActions&#xa;WarningSNSTopicArn" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" vertex="1" parent="producers"><mxGeometry x="35" y="75" width="240" height="100" as="geometry"/></mxCell>
+        <mxCell id="sim" value="ESEMPIO&#xa;pn-simulatore-recapiti&#xa;&#xa;ECS, Lambda, Aurora, Step Functions" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#fff8e1;strokeColor=#d6b656;dashed=1;fontSize=13;" vertex="1" parent="producers"><mxGeometry x="35" y="205" width="240" height="110" as="geometry"/></mxCell>
+        <mxCell id="report" value="Report producer&#xa;&#xa;Riepilogo + CSV su S3&#xa;Presigned GET URL" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" vertex="1" parent="producers"><mxGeometry x="35" y="350" width="240" height="100" as="geometry"/></mxCell>
+        <mxCell id="iam" value="ESEMPIO&#xa;pn-iam-unused-access-analyzer&#xa;Report anche con 0 finding" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#e8f5e9;strokeColor=#82b366;dashed=1;fontSize=13;" vertex="1" parent="producers"><mxGeometry x="35" y="475" width="240" height="70" as="geometry"/></mxCell>
+
+        <mxCell id="transport" value="INFRA - TRASPORTO STABILE" style="swimlane;html=1;horizontal=1;startSize=34;fillColor=#f8fafc;strokeColor=#94a3b8;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="430" y="140" width="330" height="570" as="geometry"/></mxCell>
+        <mxCell id="sns" value="pn-WarningSnsTopic&#xa;Account core" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=15;fontStyle=1;" vertex="1" parent="transport"><mxGeometry x="45" y="95" width="240" height="80" as="geometry"/></mxCell>
+        <mxCell id="sqs" value="SQS Dispatcher&#xa;Subscription SNS" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;" vertex="1" parent="transport"><mxGeometry x="45" y="245" width="240" height="80" as="geometry"/></mxCell>
+        <mxCell id="dlq" value="DLQ + CloudWatch alarm&#xa;dopo 5 tentativi" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;" vertex="1" parent="transport"><mxGeometry x="45" y="400" width="240" height="75" as="geometry"/></mxCell>
+
+        <mxCell id="runtime" value="POST-DEPLOY - RUNTIME" style="swimlane;html=1;horizontal=1;startSize=34;fillColor=#f8fafc;strokeColor=#94a3b8;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="830" y="140" width="340" height="570" as="geometry"/></mxCell>
+        <mxCell id="dispatcher" value="WarningNotificationDispatcher&#xa;&#xa;Classifica evento&#xa;Applica prima route&#xa;Renderizza&#xa;Consegna o sopprime" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1;" vertex="1" parent="runtime"><mxGeometry x="45" y="90" width="250" height="140" as="geometry"/></mxCell>
+        <mxCell id="routes" value="Routes&#xa;&#xa;type,match,C...&#xa;type,match,DROP" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f5f5f5;strokeColor=#666666;fontFamily=Courier New;fontSize=13;" vertex="1" parent="runtime"><mxGeometry x="45" y="290" width="250" height="105" as="geometry"/></mxCell>
+        <mxCell id="secret" value="Secrets Manager&#xa;go/send-monitor-tpp-messages/&#xa;slack-token" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;" vertex="1" parent="runtime"><mxGeometry x="45" y="450" width="250" height="80" as="geometry"/></mxCell>
+
+        <mxCell id="destinations" value="DESTINAZIONI" style="swimlane;html=1;horizontal=1;startSize=34;fillColor=#f8fafc;strokeColor=#94a3b8;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1240" y="140" width="300" height="570" as="geometry"/></mxCell>
+        <mxCell id="slackA" value="Canale Slack A&#xa;Allarmi colorati" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" vertex="1" parent="destinations"><mxGeometry x="35" y="90" width="230" height="80" as="geometry"/></mxCell>
+        <mxCell id="slackB" value="Canale Slack B&#xa;Report + CSV preview" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" vertex="1" parent="destinations"><mxGeometry x="35" y="230" width="230" height="80" as="geometry"/></mxCell>
+        <mxCell id="drop" value="DROP&#xa;&#xa;Log strutturato&#xa;Nessuna notifica&#xa;Nessun retry" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;fontSize=14;fontStyle=1;" vertex="1" parent="destinations"><mxGeometry x="35" y="380" width="230" height="105" as="geometry"/></mxCell>
+
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" edge="1" parent="1" source="alarm" target="sns"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" edge="1" parent="1" source="report" target="sns"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" edge="1" parent="1" source="sns" target="sqs"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" edge="1" parent="1" source="sqs" target="dispatcher"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="retry exhausted" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;dashed=1;strokeColor=#b85450;" edge="1" parent="1" source="sqs" target="dlq"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="routes" target="dispatcher"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="secret" target="dispatcher"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" edge="1" parent="1" source="dispatcher" target="slackA"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" edge="1" parent="1" source="dispatcher" target="slackB"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;dashed=1;" edge="1" parent="1" source="dispatcher" target="drop"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram id="routing" name="02 - Decisione route">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="r0"/>
+        <mxCell id="r1" parent="r0"/>
+        <mxCell id="rtitle" value="Decisione di routing" style="text;html=1;align=left;fontSize=26;fontStyle=1;strokeColor=none;fillColor=none;" vertex="1" parent="r1"><mxGeometry x="60" y="35" width="600" height="45" as="geometry"/></mxCell>
+        <mxCell id="input" value="Evento da SQS" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=16;fontStyle=1;" vertex="1" parent="r1"><mxGeometry x="100" y="190" width="230" height="80" as="geometry"/></mxCell>
+        <mxCell id="match" value="Prima route valida?&#xa;&#xa;alarm: match su AlarmName&#xa;report: match su producer" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" vertex="1" parent="r1"><mxGeometry x="470" y="150" width="280" height="160" as="geometry"/></mxCell>
+        <mxCell id="destination" value="Destination?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=15;fontStyle=1;" vertex="1" parent="r1"><mxGeometry x="870" y="160" width="240" height="140" as="geometry"/></mxCell>
+        <mxCell id="slack" value="C...&#xa;&#xa;Render + Slack&#xa;Record completato" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;" vertex="1" parent="r1"><mxGeometry x="1260" y="100" width="250" height="110" as="geometry"/></mxCell>
+        <mxCell id="dropRoute" value="DROP&#xa;&#xa;Log action=DROP&#xa;Record completato" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f5f5f5;strokeColor=#666666;fontSize=15;" vertex="1" parent="r1"><mxGeometry x="1260" y="300" width="250" height="110" as="geometry"/></mxCell>
+        <mxCell id="error" value="Nessuna route&#xa;&#xa;Errore Lambda&#xa;Retry SQS&#xa;DLQ dopo max receive" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;" vertex="1" parent="r1"><mxGeometry x="470" y="500" width="280" height="130" as="geometry"/></mxCell>
+        <mxCell id="example" value="ESEMPIO DEV&#xa;&#xa;alarm,pn-simulatore-recapiti,DROP&#xa;&#xa;Soppressione intenzionale e osservabile. Rimuovere la route non e equivalente." style="shape=note;whiteSpace=wrap;html=1;size=15;fillColor=#fff8e1;strokeColor=#d6b656;fontFamily=Courier New;fontSize=14;" vertex="1" parent="r1"><mxGeometry x="900" y="570" width="570" height="135" as="geometry"/></mxCell>
+        <mxCell id="re1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" edge="1" parent="r1" source="input" target="match"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="re2" value="si" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" edge="1" parent="r1" source="match" target="destination"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="re3" value="no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#b85450;" edge="1" parent="r1" source="match" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="re4" value="channel ID" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" edge="1" parent="r1" source="destination" target="slack"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="re5" value="DROP" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;dashed=1;" edge="1" parent="r1" source="destination" target="dropRoute"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

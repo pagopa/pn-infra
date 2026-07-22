@@ -5,13 +5,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-import boto3
-
-
-SECRETS_MANAGER = boto3.client('secretsmanager')
 SLACK_API_BASE_URL = 'https://slack.com/api/'
 SLACK_SNIPPET_MAX_BYTES = 1000000
-SLACK_TOKEN = None
 ALARM_STATE_COLORS = {
     'ALARM': '#D13212',
     'OK': '#2EB67D',
@@ -320,22 +315,40 @@ def upload_csv_to_slack(prepared_attachment, message):
 
 
 def slack_token():
-    global SLACK_TOKEN
-    if SLACK_TOKEN:
-        return SLACK_TOKEN
     secret_name = os.environ['SLACK_BOT_TOKEN_SECRET_NAME']
-    secret_value = SECRETS_MANAGER.get_secret_value(SecretId=secret_name)['SecretString']
+    port = os.environ.get('PARAMETERS_SECRETS_EXTENSION_HTTP_PORT', '2773')
+    query = urllib.parse.urlencode({'secretId': secret_name})
+    request = urllib.request.Request(
+        'http://localhost:%s/secretsmanager/get?%s' % (port, query),
+        headers={
+            'X-Aws-Parameters-Secrets-Token': os.environ['AWS_SESSION_TOKEN'],
+        },
+        method='GET',
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=2) as response:
+            secret_response = json.loads(response.read().decode('utf-8'))
+    except urllib.error.HTTPError as error:
+        raise RuntimeError('Unable to read Slack bot token from cache: HTTP %s' % error.code) from error
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, KeyError) as error:
+        raise RuntimeError('Unable to read Slack bot token from cache') from error
+
+    secret_value = secret_response.get('SecretString')
+    if not secret_value:
+        raise ValueError('Slack bot token secret has no SecretString value')
+
+    token = None
     try:
         secret_json = json.loads(secret_value)
         if isinstance(secret_json, dict):
-            SLACK_TOKEN = secret_json.get('token') or secret_json.get('botToken') or secret_json.get('slackBotToken')
+            token = secret_json.get('token') or secret_json.get('botToken') or secret_json.get('slackBotToken')
         elif isinstance(secret_json, str):
-            SLACK_TOKEN = secret_json
+            token = secret_json
     except json.JSONDecodeError:
-        SLACK_TOKEN = secret_value
-    if not SLACK_TOKEN:
+        token = secret_value
+    if not token:
         raise ValueError('Slack bot token secret is empty or has no supported token property')
-    return SLACK_TOKEN
+    return token
 
 
 def extract_alarm_name(message):
