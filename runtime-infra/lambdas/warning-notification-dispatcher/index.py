@@ -166,7 +166,7 @@ def render_cloudwatch_alarm(route, message, channel_id):
 def render_report(route, message, channel_id):
     data = message.get('data') or {}
     links = message.get('links') or {}
-    required = ['findingCount', 'findingTypeCounts', 'accountId', 'accountRole']
+    required = ['findingCount', 'findingTypeCounts', 'accountRole']
     missing = [key for key in required if key not in data]
     if missing or not links.get('dashboard'):
         raise ValueError('Invalid IAM unused access report: missing %s' % ', '.join(missing or ['links.dashboard']))
@@ -176,6 +176,7 @@ def render_report(route, message, channel_id):
         for name, count in sorted(data['findingTypeCounts'].items())
     ) or '- Nessun dettaglio disponibile'
     environment = str(message.get('environment', os.environ.get('ENVIRONMENT_TYPE', 'unknown')))
+    environment_label = '%s-%s' % (environment.upper(), str(data['accountRole']).upper())
     producer = message.get('producer') or route['match']
     return {
         'channel': channel_id,
@@ -184,9 +185,8 @@ def render_report(route, message, channel_id):
             {
                 'type': 'section',
                 'fields': [
-                    mrkdwn_field('*Account:*\n%s' % data['accountId']),
                     mrkdwn_field('*Finding:*\n%s' % data['findingCount']),
-                    mrkdwn_field('*Env:*\n%s' % environment),
+                    mrkdwn_field('*Env:*\n%s' % environment_label),
                 ],
             },
             mrkdwn_section('*Dettaglio per tipologia:*\n%s' % breakdown),
