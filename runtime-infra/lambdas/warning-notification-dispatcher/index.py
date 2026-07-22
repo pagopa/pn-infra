@@ -137,24 +137,26 @@ def render_cloudwatch_alarm(route, message, channel_id):
     state = message.get('NewStateValue') or message.get('newStateValue') or 'UNKNOWN'
     reason = message.get('NewStateReason') or message.get('newStateReason') or 'Motivo non disponibile'
     region = message.get('Region') or message.get('region') or os.environ.get('AWS_REGION', 'unknown')
-    account_id = extract_alarm_account_id(message)
-    environment = os.environ.get('ENVIRONMENT_TYPE', 'unknown').upper()
-    title = '%s %s - %s' % (account_id, environment, alarm_name)
+    environment = os.environ.get('ENVIRONMENT_TYPE', 'unknown')
+    alarm_url = cloudwatch_alarm_url(message, alarm_name)
     alarm_blocks = [
-        header_block(title),
+        header_block(alarm_name),
         {
             'type': 'section',
             'fields': [
                 mrkdwn_field('*Stato:*\n%s' % state),
                 mrkdwn_field('*Regione:*\n%s' % region),
+                mrkdwn_field('*Env:*\n%s' % environment),
             ],
         },
         mrkdwn_section('*Dettaglio:*\n%s' % reason),
     ]
+    if alarm_url:
+        alarm_blocks.append(mrkdwn_section('*CloudWatch:* <%s|Apri allarme>' % alarm_url))
     return {
         'channel': channel_id,
-        'text': '%s: %s' % (title, state),
         'attachments': [{
+            'fallback': '%s: %s' % (alarm_name, state),
             'color': ALARM_STATE_COLORS.get(str(state).upper(), '#808080'),
             'blocks': alarm_blocks,
         }],
@@ -173,19 +175,18 @@ def render_report(route, message, channel_id):
         '- %s: %s' % (name, count)
         for name, count in sorted(data['findingTypeCounts'].items())
     ) or '- Nessun dettaglio disponibile'
-    environment = str(message.get('environment', os.environ.get('ENVIRONMENT_TYPE', 'unknown'))).upper()
+    environment = str(message.get('environment', os.environ.get('ENVIRONMENT_TYPE', 'unknown')))
     producer = message.get('producer') or route['match']
-    title = '%s %s - %s' % (data['accountId'], environment, producer)
     return {
         'channel': channel_id,
-        'text': '%s: %s finding' % (title, data['findingCount']),
         'blocks': [
-            header_block(title),
+            header_block(producer),
             {
                 'type': 'section',
                 'fields': [
                     mrkdwn_field('*Account:*\n%s' % data['accountId']),
                     mrkdwn_field('*Finding:*\n%s' % data['findingCount']),
+                    mrkdwn_field('*Env:*\n%s' % environment),
                 ],
             },
             mrkdwn_section('*Dettaglio per tipologia:*\n%s' % breakdown),
@@ -331,13 +332,13 @@ def extract_alarm_name(message):
     return message.get('AlarmName') or message.get('alarmName')
 
 
-def extract_alarm_account_id(message):
-    account_id = message.get('AWSAccountId') or message.get('awsAccountId')
-    if account_id:
-        return str(account_id)
-
+def cloudwatch_alarm_url(message, alarm_name):
     alarm_arn = message.get('AlarmArn') or message.get('alarmArn') or ''
     arn_parts = alarm_arn.split(':', 6)
-    if len(arn_parts) == 7 and arn_parts[4]:
-        return arn_parts[4]
-    return 'unknown-account'
+    region = arn_parts[3] if len(arn_parts) == 7 else os.environ.get('AWS_REGION')
+    if not region:
+        return None
+    return (
+        'https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#alarmsV2:alarm/%s'
+        % (region, region, urllib.parse.quote(alarm_name, safe=''))
+    )
