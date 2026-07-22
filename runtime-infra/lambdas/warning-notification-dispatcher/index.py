@@ -7,6 +7,7 @@ import urllib.request
 
 SLACK_API_BASE_URL = 'https://slack.com/api/'
 SLACK_SNIPPET_MAX_BYTES = 1000000
+REPORT_DELIVERY_MODES = ('ATTACHMENT', 'SUMMARY', 'LINK')
 ALARM_STATE_COLORS = {
     'ALARM': '#D13212',
     'OK': '#2EB67D',
@@ -37,7 +38,12 @@ def handle_record(record):
     if route is None:
         raise ValueError('No route matched the warning message')
     channel_id = route['channel']
-    print('Selected route: %s/%s -> %s' % (route['type'], route['match'], channel_id))
+    print('Selected route: %s/%s -> %s (%s)' % (
+        route['type'],
+        route['match'],
+        channel_id,
+        route.get('deliveryMode', 'DEFAULT'),
+    ))
     if channel_id == 'DROP':
         print(json.dumps({
             'action': 'DROP',
@@ -51,7 +57,7 @@ def handle_record(record):
 
     attachment = message.get('attachment')
     prepared_attachment = None
-    if route['type'] == 'report' and attachment:
+    if route['type'] == 'report' and route['deliveryMode'] == 'ATTACHMENT' and attachment:
         try:
             prepared_attachment = prepare_csv_attachment(attachment)
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as error:
@@ -74,8 +80,13 @@ def handle_record(record):
                 prepared_attachment['filename'],
             )
         ))
-    print('########### OUTPUT MESSAGE #############')
-    print(output_message)
+    print('Output message prepared: %s' % {
+        'routeType': route['type'],
+        'match': route['match'],
+        'channel': channel_id,
+        'deliveryMode': route.get('deliveryMode'),
+        'hasAttachment': bool(prepared_attachment),
+    })
     if prepared_attachment and not prepared_attachment.get('tooLarge') and not prepared_attachment.get('downloadError'):
         upload_csv_to_slack(prepared_attachment, output_message)
     else:
@@ -89,18 +100,30 @@ def parse_routes(routes_config):
     routes = []
     for position, route_config in enumerate(routes_config.split(';'), start=1):
         fields = [field.strip() for field in route_config.split(',')]
-        if len(fields) != 3 or not all(fields):
-            raise ValueError('Invalid route at position %s: expected type,match,channel' % position)
+        if len(fields) not in (3, 4) or not all(fields):
+            raise ValueError(
+                'Invalid route at position %s: expected type,match,channel[,deliveryMode]' % position
+            )
 
-        route_type, match, channel = fields
+        route_type, match, channel = fields[:3]
+        delivery_mode = fields[3] if len(fields) == 4 else None
         if route_type not in ('alarm', 'report'):
             raise ValueError('Unsupported route type at position %s: %s' % (position, route_type))
         if re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', match) is None:
             raise ValueError('Invalid route match at position %s: %s' % (position, match))
         if channel != 'DROP' and re.fullmatch(r'C[A-Z0-9]+', channel) is None:
             raise ValueError('Invalid route destination for match %s' % match)
+        if delivery_mode and (route_type != 'report' or channel == 'DROP'):
+            raise ValueError('Delivery mode is supported only for report routes to Slack')
+        if delivery_mode and delivery_mode not in REPORT_DELIVERY_MODES:
+            raise ValueError('Unsupported report delivery mode at position %s: %s' % (position, delivery_mode))
+        if route_type == 'report' and channel != 'DROP' and delivery_mode is None:
+            delivery_mode = 'ATTACHMENT'
 
-        routes.append({'type': route_type, 'match': match, 'channel': channel})
+        route = {'type': route_type, 'match': match, 'channel': channel}
+        if delivery_mode:
+            route['deliveryMode'] = delivery_mode
+        routes.append(route)
     return routes
 
 
@@ -183,21 +206,28 @@ def render_report(route, message, channel_id):
     environment = str(message.get('environment', os.environ.get('ENVIRONMENT_TYPE', 'unknown')))
     environment_label = '%s-%s' % (environment.upper(), str(data['accountRole']).upper())
     producer = message.get('producer') or route['match']
-    return {
+    blocks = [
+        header_block(producer),
+        {
+            'type': 'section',
+            'fields': [
+                mrkdwn_field('*Finding:*\n%s' % data['findingCount']),
+                mrkdwn_field('*Env:*\n%s' % environment_label),
+            ],
+        },
+        mrkdwn_section('*Dettaglio per tipologia:*\n%s' % breakdown),
+        mrkdwn_section('*Dashboard CloudWatch:* <%s|Apri dashboard>' % links['dashboard']),
+    ]
+    result = {
         'channel': channel_id,
-        'blocks': [
-            header_block(producer),
-            {
-                'type': 'section',
-                'fields': [
-                    mrkdwn_field('*Finding:*\n%s' % data['findingCount']),
-                    mrkdwn_field('*Env:*\n%s' % environment_label),
-                ],
-            },
-            mrkdwn_section('*Dettaglio per tipologia:*\n%s' % breakdown),
-            mrkdwn_section('*Dashboard CloudWatch:* <%s|Apri dashboard>' % links['dashboard']),
-        ],
+        'blocks': blocks,
     }
+    if route['deliveryMode'] == 'LINK':
+        _, download_url = validate_csv_attachment(message.get('attachment') or {})
+        blocks.append(mrkdwn_section('*Report CSV:* <%s|Scarica CSV (link temporaneo)>' % download_url))
+        result['unfurl_links'] = False
+        result['unfurl_media'] = False
+    return result
 
 
 def header_block(text):
@@ -251,15 +281,25 @@ def slack_api(method, payload, form_encoded=False):
 
 
 def prepare_csv_attachment(attachment):
-    filename = os.path.basename(str(attachment.get('filename', '')))
-    content_type = attachment.get('contentType')
-    download_url = attachment.get('downloadUrl')
+    filename, download_url = validate_csv_attachment(attachment)
     declared_size = attachment.get('size')
-    if not filename or content_type != 'text/csv' or not download_url:
-        raise ValueError('Invalid CSV attachment metadata')
     max_size = int(os.environ.get('MAX_CSV_ATTACHMENT_BYTES', '5242880'))
     if declared_size is not None and int(declared_size) > max_size:
         return {'filename': filename, 'size': int(declared_size), 'tooLarge': True}
+
+    with urllib.request.urlopen(download_url, timeout=10) as response:
+        csv_content = response.read(max_size + 1)
+    if len(csv_content) > max_size:
+        return {'filename': filename, 'size': len(csv_content), 'tooLarge': True}
+    return {'filename': filename, 'content': csv_content, 'tooLarge': False}
+
+
+def validate_csv_attachment(attachment):
+    filename = os.path.basename(str(attachment.get('filename', '')))
+    content_type = attachment.get('contentType')
+    download_url = attachment.get('downloadUrl')
+    if not filename or content_type != 'text/csv' or not download_url:
+        raise ValueError('Invalid CSV attachment metadata')
 
     parsed_url = urllib.parse.urlparse(download_url)
     hostname = parsed_url.hostname or ''
@@ -267,12 +307,7 @@ def prepare_csv_attachment(attachment):
         hostname.endswith('.amazonaws.com') or hostname.endswith('.amazonaws.com.cn')
     ):
         raise ValueError('CSV attachment URL must be an HTTPS AWS URL')
-
-    with urllib.request.urlopen(download_url, timeout=10) as response:
-        csv_content = response.read(max_size + 1)
-    if len(csv_content) > max_size:
-        return {'filename': filename, 'size': len(csv_content), 'tooLarge': True}
-    return {'filename': filename, 'content': csv_content, 'tooLarge': False}
+    return filename, download_url
 
 
 def attachment_download_error(error):
