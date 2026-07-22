@@ -41,7 +41,13 @@ def handle_record(record):
     attachment = message.get('attachment')
     prepared_attachment = None
     if route['type'] == 'report' and attachment:
-        prepared_attachment = prepare_csv_attachment(attachment)
+        try:
+            prepared_attachment = prepare_csv_attachment(attachment)
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as error:
+            prepared_attachment = {
+                'filename': os.path.basename(str(attachment.get('filename', 'report.csv'))),
+                'downloadError': attachment_download_error(error),
+            }
 
     output_message = render_message(route, message, channel_id)
     if prepared_attachment and prepared_attachment.get('tooLarge'):
@@ -51,10 +57,16 @@ def handle_record(record):
                 int(os.environ.get('MAX_CSV_ATTACHMENT_BYTES', '5242880')) // 1048576,
             )
         ))
+    elif prepared_attachment and prepared_attachment.get('downloadError'):
+        output_message['blocks'].append(mrkdwn_section(
+            '*CSV non allegato:* non e stato possibile scaricare `%s` da S3.' % (
+                prepared_attachment['filename'],
+            )
+        ))
     print('########### OUTPUT MESSAGE #############')
     print(output_message)
     slack_message = post_to_slack(output_message)
-    if prepared_attachment and not prepared_attachment.get('tooLarge'):
+    if prepared_attachment and not prepared_attachment.get('tooLarge') and not prepared_attachment.get('downloadError'):
         upload_csv_to_slack(prepared_attachment, channel_id, slack_message.get('ts'))
 
 
@@ -234,6 +246,15 @@ def prepare_csv_attachment(attachment):
     if len(csv_content) > max_size:
         return {'filename': filename, 'size': len(csv_content), 'tooLarge': True}
     return {'filename': filename, 'content': csv_content, 'tooLarge': False}
+
+
+def attachment_download_error(error):
+    if isinstance(error, urllib.error.HTTPError):
+        response_body = error.read(2048).decode('utf-8', errors='replace')
+        print('S3 attachment download failed: HTTP %s, response=%s' % (error.code, response_body))
+        return 'HTTP %s' % error.code
+    print('S3 attachment download failed: %s' % error)
+    return str(error)
 
 
 def upload_csv_to_slack(prepared_attachment, channel_id, thread_ts):
