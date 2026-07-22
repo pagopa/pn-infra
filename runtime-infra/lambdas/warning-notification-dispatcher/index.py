@@ -69,11 +69,15 @@ def handle_record(record):
     output_message = render_message(route, message, channel_id)
     if prepared_attachment and prepared_attachment.get('tooLarge'):
         output_message['blocks'].append(mrkdwn_section(
-            '*CSV non allegato:* il file `%s` supera il limite di %s MiB.' % (
+            '*CSV non allegato:* il file `%s` supera il limite di %s MiB. '
+            '<%s|Scarica CSV (link temporaneo)>' % (
                 prepared_attachment['filename'],
                 int(os.environ.get('MAX_CSV_ATTACHMENT_BYTES', '5242880')) // 1048576,
+                prepared_attachment['downloadUrl'],
             )
         ))
+        output_message['unfurl_links'] = False
+        output_message['unfurl_media'] = False
     elif prepared_attachment and prepared_attachment.get('downloadError'):
         output_message['blocks'].append(mrkdwn_section(
             '*CSV non allegato:* non e stato possibile scaricare `%s` da S3.' % (
@@ -285,12 +289,22 @@ def prepare_csv_attachment(attachment):
     declared_size = attachment.get('size')
     max_size = int(os.environ.get('MAX_CSV_ATTACHMENT_BYTES', '5242880'))
     if declared_size is not None and int(declared_size) > max_size:
-        return {'filename': filename, 'size': int(declared_size), 'tooLarge': True}
+        return {
+            'filename': filename,
+            'downloadUrl': download_url,
+            'size': int(declared_size),
+            'tooLarge': True,
+        }
 
     with urllib.request.urlopen(download_url, timeout=10) as response:
         csv_content = response.read(max_size + 1)
     if len(csv_content) > max_size:
-        return {'filename': filename, 'size': len(csv_content), 'tooLarge': True}
+        return {
+            'filename': filename,
+            'downloadUrl': download_url,
+            'size': len(csv_content),
+            'tooLarge': True,
+        }
     return {'filename': filename, 'content': csv_content, 'tooLarge': False}
 
 
