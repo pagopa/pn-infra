@@ -120,12 +120,6 @@ Parameters:
     Description: 'Central warning topic name'
     Default: 'pn-WarningSnsTopic'
 
-  WarningNotificationsEnabled:
-    Type: String
-    Description: 'Create the central warning transport resources'
-    Default: 'false'
-    AllowedValues: ['true', 'false']
-
   WarningDispatcherName:
     Type: String
     Description: 'Base name for warning notification dispatcher resources'
@@ -165,8 +159,6 @@ Conditions:
   LogsOnDemandDisabled: !Not [!Equals [!Ref LogsStreamMode, ON_DEMAND]]
 
   HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '-' ] ]
-
-  CreateWarningNotifications: !Equals [ !Ref WarningNotificationsEnabled, 'true' ]
 
   HasDataLakeAccountId1RoleName: !And [ !Not [ !Equals [ !Ref DataLakeAccountId1, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1, '' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1RoleName, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1RoleName, '' ] ] ]
   HasDataLakeAccountId2: !And [ !Not [ !Equals [ !Ref DataLakeAccountId2, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId2, '' ] ] ]
@@ -609,13 +601,11 @@ Resources:
       TopicArn: !Ref InfraSecTopic
 
   WarningSNSTopic:
-    Condition: CreateWarningNotifications
     Type: AWS::SNS::Topic
     Properties:
       TopicName: !Ref WarningSNSTopicName
 
   CanPublishWarningSNSTopicPolicy:
-    Condition: CreateWarningNotifications
     Type: AWS::SNS::TopicPolicy
     Properties:
       PolicyDocument:
@@ -642,7 +632,6 @@ Resources:
         - !Ref WarningSNSTopic
 
   WarningDispatcherQueue:
-    Condition: CreateWarningNotifications
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub '${ProjectName}-${WarningDispatcherName}'
@@ -655,14 +644,12 @@ Resources:
       VisibilityTimeout: !Ref WarningDispatcherVisibilityTimeout
 
   WarningDispatcherDLQ:
-    Condition: CreateWarningNotifications
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub '${ProjectName}-${WarningDispatcherName}-DLQ'
       MessageRetentionPeriod: !Ref WarningDispatcherDeadLetterMessageRetentionPeriod
 
   WarningDispatcherQueuePolicy:
-    Condition: CreateWarningNotifications
     Type: AWS::SQS::QueuePolicy
     Properties:
       Queues:
@@ -681,7 +668,6 @@ Resources:
                 aws:SourceArn: !Ref WarningSNSTopic
 
   WarningTopicSubscription:
-    Condition: CreateWarningNotifications
     Type: AWS::SNS::Subscription
     DependsOn: WarningDispatcherQueuePolicy
     Properties:
@@ -690,7 +676,6 @@ Resources:
       TopicArn: !Ref WarningSNSTopic
 
   WarningDispatcherDLQHasMessagesAlarm:
-    Condition: CreateWarningNotifications
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub '${ProjectName}-${WarningDispatcherName}-DLQ-HasMessage'
@@ -800,21 +785,17 @@ Outputs:
     Description: 'Infrastructure security topic name'
 
   WarningSNSTopicArn:
-    Condition: CreateWarningNotifications
     Value: !Ref WarningSNSTopic
     Description: 'Central warning topic ARN'
 
   WarningSNSTopicName:
-    Condition: CreateWarningNotifications
     Value: !GetAtt WarningSNSTopic.TopicName
     Description: 'Central warning topic name'
 
   WarningDispatcherName:
-    Condition: CreateWarningNotifications
     Value: !Ref WarningDispatcherName
     Description: 'Base name for warning notification dispatcher resources'
 
   WarningDispatcherQueueArn:
-    Condition: CreateWarningNotifications
     Value: !GetAtt WarningDispatcherQueue.Arn
     Description: 'Warning notification dispatcher queue ARN'
