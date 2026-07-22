@@ -80,7 +80,7 @@ def handle_record(record):
         output_message['unfurl_media'] = False
     elif prepared_attachment and prepared_attachment.get('downloadError'):
         output_message['blocks'].append(mrkdwn_section(
-            '*CSV non allegato:* non e stato possibile scaricare `%s` da S3.' % (
+            '*CSV non allegato:* non è stato possibile scaricare `%s` da S3.' % (
                 prepared_attachment['filename'],
             )
         ))
