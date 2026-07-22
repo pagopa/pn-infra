@@ -71,10 +71,16 @@ Parameters:
     Description: S3 key prefix for Lambda deployment packages
     Default: ''
 
-  InfraSecTopicName:
+  WarningSNSTopicName:
     Type: String
-    Default: pn-InfraSecTopic
-    Description: 'SNS topic name for security alerts'
+    Default: pn-WarningSnsTopic
+    Description: 'SNS topic name for routed warning and report events'
+
+  ReportNotificationsEnabled:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: If true, publish the unused access report event to the warning topic.
 
   LambdaRuntime:
     Type: String
@@ -219,13 +225,14 @@ Resources:
                   - access-analyzer:CreateArchiveRule
                   - access-analyzer:DeleteArchiveRule
                 Resource: '*'
-        - PolicyName: s3-write-reports
+        - PolicyName: s3-read-write-reports
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
                   - s3:PutObject
+                  - s3:GetObject
                   - s3:AbortMultipartUpload
                 Resource: !Sub
                   - '${BucketArn}/${Env}/${Role}/*'
@@ -249,8 +256,8 @@ Resources:
                   - sns:Publish
                 Resource: !If
                   - IsConfinfoAccount
-                  - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}'
-                  - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}'
+                  - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${WarningSNSTopicName}'
+                  - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}'
 
   ExporterLambdaLogGroup:
     Type: AWS::Logs::LogGroup
@@ -275,10 +282,11 @@ Resources:
           ENV_NAME: !Ref EnvironmentType
           ACCOUNT_ROLE: !If [IsConfinfoAccount, 'confinfo', 'core']
           RESOLVE_ROLE_TAGS: !Ref ResolveRoleTagsInExporter
+          REPORT_NOTIFICATIONS_ENABLED: !Ref ReportNotificationsEnabled
           SNS_TOPIC_ARN: !If
             - IsConfinfoAccount
-            - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}'
-            - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${InfraSecTopicName}'
+            - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${WarningSNSTopicName}'
+            - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}'
           EXCLUDE_TAG_KEY: !Ref ExcludeTagKey
           ARCHIVE_RULE_PATTERNS: !Join
             - ','
