@@ -1,8 +1,7 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >
-  Warning notification stack. Owns the central warning SNS topic, selects one
-  Slack channel and renders custom notifications. A warning without a matching
-  rule is retried and eventually moved to the dispatcher DLQ.
+  Warning notification runtime stack. Consumes the durable warning queue,
+  selects one Slack channel and renders custom notifications.
 
 Parameters:
   ProjectName:
@@ -27,15 +26,17 @@ Parameters:
     Description: Deployment environment.
     AllowedValues: [dev, test, uat, hotfix, prod]
 
-  WarningSNSTopicName:
+  WarningSNSTopicArn:
     Type: String
-    Description: Name of the central warning SNS topic.
-    Default: 'pn-WarningSnsTopic'
+    Description: ARN of the central warning SNS topic owned by pn-infra-storage.
 
-  ConfidentialInfoAccountId:
+  WarningDispatcherQueueArn:
     Type: String
-    Description: AWS account ID allowed to publish warnings from the confidential-info account.
-    Default: '-'
+    Description: ARN of the durable warning dispatcher queue owned by pn-infra-storage.
+
+  WarningDispatcherName:
+    Type: String
+    Description: Base name for warning notification dispatcher resources.
 
   SlackBotTokenSecretName:
     Type: String
@@ -48,145 +49,17 @@ Parameters:
     Description: Semicolon-separated notification routes in type,match,channel format.
     AllowedPattern: '^(alarm|report),[A-Za-z0-9][A-Za-z0-9_-]*,C[A-Z0-9]+(;(alarm|report),[A-Za-z0-9][A-Za-z0-9_-]*,C[A-Z0-9]+)*$'
 
-  QueueName:
-    Type: String
-    Description: Base name for the notification dispatcher resources.
-    Default: 'Warning-Notification-Dispatcher'
-
   LogRetention:
     Type: Number
     Description: CloudWatch Logs retention in days.
     Default: 14
-
-  DelaySeconds:
-    Type: Number
-    Default: '0'
-
-  MessageRetentionPeriod:
-    Type: Number
-    Default: '600'
-
-  MaxReceiveCount:
-    Type: Number
-    Default: '5'
-
-  DeadLetterMessageRetentionPeriod:
-    Type: Number
-    Default: '1209600'
-
-  VisibilityTimeout:
-    Type: Number
-    Default: '180'
 
   MaxCsvAttachmentBytes:
     Type: Number
     Description: Maximum CSV attachment size downloaded and uploaded to Slack.
     Default: '5242880'
 
-Conditions:
-  HasConfidentialInfoAccountId: !And
-    - !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '-' ] ]
-    - !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
-
 Resources:
-
-  # --- Central ingress topic -------------------------------------------------
-  WarningSNSTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Ref WarningSNSTopicName
-
-  CanPublishWarningSNSTopicPolicy:
-    Type: AWS::SNS::TopicPolicy
-    Properties:
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: AllowAwsServicesToPublishWarnings
-            Effect: Allow
-            Principal:
-              Service:
-                - events.amazonaws.com
-                - cloudwatch.amazonaws.com
-            Action: sns:Publish
-            Resource: !Ref WarningSNSTopic
-          - !If
-            - HasConfidentialInfoAccountId
-            - Sid: AllowPublishFromPnConfinfoAccount
-              Effect: Allow
-              Principal:
-                AWS: !Sub 'arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root'
-              Action: sns:Publish
-              Resource: !Ref WarningSNSTopic
-            - !Ref AWS::NoValue
-      Topics:
-        - !Ref WarningSNSTopic
-
-  # --- Buffer queue + DLQ -----------------------------------------------------
-  WarningDispatcherQueue:
-    Type: AWS::SQS::Queue
-    Properties:
-      QueueName: !Sub '${ProjectName}-${QueueName}'
-      RedrivePolicy:
-        deadLetterTargetArn: !GetAtt WarningDispatcherDLQ.Arn
-        maxReceiveCount: !Ref MaxReceiveCount
-      DelaySeconds: !Ref DelaySeconds
-      MessageRetentionPeriod: !Ref MessageRetentionPeriod
-      ReceiveMessageWaitTimeSeconds: 15
-      VisibilityTimeout: !Ref VisibilityTimeout
-
-  WarningDispatcherDLQ:
-    Type: AWS::SQS::Queue
-    Properties:
-      QueueName: !Sub '${ProjectName}-${QueueName}-DLQ'
-      MessageRetentionPeriod: !Ref DeadLetterMessageRetentionPeriod
-
-  WarningDispatcherDLQHasMessagesAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub '${ProjectName}-${QueueName}-DLQ-HasMessage'
-      AlarmDescription: Warning notification dispatcher messages moved to the DLQ.
-      Namespace: AWS/SQS
-      MetricName: ApproximateNumberOfMessagesVisible
-      Dimensions:
-        - Name: QueueName
-          Value: !GetAtt WarningDispatcherDLQ.QueueName
-      Statistic: Sum
-      Period: 60
-      Threshold: 1
-      TreatMissingData: notBreaching
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 1
-      AlarmActions:
-        - !Ref WarningSNSTopic
-      OKActions:
-        - !Ref WarningSNSTopic
-
-  WarningDispatcherQueuePolicy:
-    Type: AWS::SQS::QueuePolicy
-    Properties:
-      Queues:
-        - !Ref WarningDispatcherQueue
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Sid: AllowSnsToSendMessage
-            Effect: Allow
-            Principal:
-              Service: sns.amazonaws.com
-            Action: SQS:SendMessage
-            Resource: !GetAtt WarningDispatcherQueue.Arn
-            Condition:
-              ArnEquals:
-                aws:SourceArn: !Ref WarningSNSTopic
-
-  WarningTopicSubscription:
-    Type: AWS::SNS::Subscription
-    DependsOn: WarningDispatcherQueuePolicy
-    Properties:
-      Endpoint: !GetAtt WarningDispatcherQueue.Arn
-      Protocol: sqs
-      TopicArn: !Ref WarningSNSTopic
 
   WarningDispatcherEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
@@ -194,7 +67,7 @@ Resources:
     Properties:
       Enabled: true
       BatchSize: 1
-      EventSourceArn: !GetAtt WarningDispatcherQueue.Arn
+      EventSourceArn: !Ref WarningDispatcherQueueArn
       FunctionName: !GetAtt WarningNotificationDispatcherLambda.Arn
 
   WarningNotificationDispatcherLogGroup:
@@ -204,7 +77,7 @@ Resources:
     Properties:
       TemplateURL: !Sub '${TemplateBucketBaseUrl}/fragments/log-group.yaml'
       Parameters:
-        LogGroupName: !Sub '${ProjectName}-${QueueName}-lambda-${EnvironmentType}'
+        LogGroupName: !Sub '${ProjectName}-${WarningDispatcherName}-lambda-${EnvironmentType}'
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: '/aws/lambda'
 
@@ -213,7 +86,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       Description: Routes every warning message to one dedicated destination.
-      FunctionName: !Sub '${ProjectName}-${QueueName}-lambda-${EnvironmentType}'
+      FunctionName: !Sub '${ProjectName}-${WarningDispatcherName}-lambda-${EnvironmentType}'
       Handler: index.lambda_handler
       Runtime: python3.14
       Timeout: 30
@@ -236,12 +109,12 @@ Resources:
       TemplateURL: !Sub '${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml'
       Parameters:
         FunctionName: !Ref WarningNotificationDispatcherLambda
-        AlarmSNSTopicArn: !Ref WarningSNSTopic
+        AlarmSNSTopicArn: !Ref WarningSNSTopicArn
 
   WarningNotificationDispatcherRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub '${ProjectName}-${QueueName}-Role'
+      RoleName: !Sub '${ProjectName}-${WarningDispatcherName}-Role'
       Path: /
       Description: Execution role for the warning notification dispatcher lambda.
       AssumeRolePolicyDocument:
@@ -259,7 +132,7 @@ Resources:
   WarningNotificationDispatcherPolicy:
     Type: AWS::IAM::Policy
     Properties:
-      PolicyName: !Sub '${ProjectName}-${QueueName}-Policy'
+      PolicyName: !Sub '${ProjectName}-${WarningDispatcherName}-Policy'
       Roles:
         - !Ref WarningNotificationDispatcherRole
       PolicyDocument:
@@ -276,17 +149,9 @@ Resources:
               - sqs:DeleteMessage
               - sqs:GetQueueAttributes
               - sqs:ChangeMessageVisibility
-            Resource: !GetAtt WarningDispatcherQueue.Arn
+            Resource: !Ref WarningDispatcherQueueArn
 
 Outputs:
-  WarningSNSTopicArn:
-    Description: ARN of the central warning topic.
-    Value: !Ref WarningSNSTopic
-
-  WarningSNSTopicName:
-    Description: Name of the central warning topic.
-    Value: !GetAtt WarningSNSTopic.TopicName
-
   WarningNotificationDispatcherLambdaArn:
     Description: ARN of the warning notification dispatcher lambda.
     Value: !GetAtt WarningNotificationDispatcherLambda.Arn
