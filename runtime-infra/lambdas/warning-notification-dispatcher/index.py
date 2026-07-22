@@ -12,6 +12,11 @@ SECRETS_MANAGER = boto3.client('secretsmanager')
 SLACK_API_BASE_URL = 'https://slack.com/api/'
 SLACK_SNIPPET_MAX_BYTES = 1000000
 SLACK_TOKEN = None
+ALARM_STATE_COLORS = {
+    'ALARM': '#D13212',
+    'OK': '#2EB67D',
+    'INSUFFICIENT_DATA': '#ECB22E',
+}
 
 
 def lambda_handler(event, context):
@@ -135,20 +140,24 @@ def render_cloudwatch_alarm(route, message, channel_id):
     account_id = extract_alarm_account_id(message)
     environment = os.environ.get('ENVIRONMENT_TYPE', 'unknown').upper()
     title = '%s %s - %s' % (account_id, environment, alarm_name)
+    alarm_blocks = [
+        header_block(title),
+        {
+            'type': 'section',
+            'fields': [
+                mrkdwn_field('*Stato:*\n%s' % state),
+                mrkdwn_field('*Regione:*\n%s' % region),
+            ],
+        },
+        mrkdwn_section('*Dettaglio:*\n%s' % reason),
+    ]
     return {
         'channel': channel_id,
         'text': '%s: %s' % (title, state),
-        'blocks': [
-            header_block(title),
-            {
-                'type': 'section',
-                'fields': [
-                    mrkdwn_field('*Stato:*\n%s' % state),
-                    mrkdwn_field('*Regione:*\n%s' % region),
-                ],
-            },
-            mrkdwn_section('*Dettaglio:*\n%s' % reason),
-        ],
+        'attachments': [{
+            'color': ALARM_STATE_COLORS.get(str(state).upper(), '#808080'),
+            'blocks': alarm_blocks,
+        }],
     }
 
 
