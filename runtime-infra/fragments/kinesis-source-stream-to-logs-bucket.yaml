@@ -49,7 +49,7 @@ Parameters:
   PreprocessingStreamNamePrefix:
     Type: String
     Default: ""
-    Description: Prefix dedicated to the preprocessing POC Firehose
+    Description: Prefix dedicated to the preprocessing Firehose
 
   PreprocessingS3RootPrefix:
     Type: String
@@ -238,6 +238,8 @@ Resources:
 
   PreprocessingFilterLambda:
     Condition: CreatePreprocessingFirehose
+    DependsOn:
+      - PreprocessingLambdaLogGroup
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.12
@@ -249,6 +251,16 @@ Resources:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub '${LambdasBasePath}/cdc-preproc-data-quality-filter.zip'
       Role: !GetAtt PreprocessingFilterLambdaRole.Arn
+  
+  PreprocessingLambdaLogGroup:
+    Condition: CreatePreprocessingFirehose
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-${PreprocessingStreamNamePrefix}-data-quality-filter'
+      RetentionInDays: 120
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+            
 
   PreprocessingLogsKinesisDeliveryStreamPartitioned:
     Condition: CreatePreprocessingFirehose
