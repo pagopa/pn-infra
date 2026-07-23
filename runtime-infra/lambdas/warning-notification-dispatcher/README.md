@@ -40,7 +40,7 @@ in `Routes`.
 }
 ```
 
-`title` e un oggetto `data.metrics` non vuoto sono obbligatori. `data.details`,
+`title` è un oggetto `data.metrics` non vuoto sono obbligatori. `data.details`,
 `data.durationMs`, `links` e `attachment` sono opzionali.
 
 ## Delivery mode
