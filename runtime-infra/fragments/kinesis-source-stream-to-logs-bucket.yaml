@@ -37,11 +37,46 @@ Parameters:
   AlarmSNSTopicArn:
     Description: The ARN of the Alarm SNS Topic for notifications.
     Type: String
+  
+  PreprocessingEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Enable preprocessing Firehose for CDC records
+
+  PreprocessingStreamNamePrefix:
+    Type: String
+    Default: ""
+    Description: Prefix dedicated to the preprocessing Firehose
+
+  PreprocessingS3RootPrefix:
+    Type: String
+    Default: ""
+    Description: Root S3 prefix used to isolate CDC preprocessing test data from active paths
+  
+  LambdasBucketName:
+    Type: String
+    Default: ""
+    Description: Bucket containing Lambda artifacts
+
+  LambdasBasePath:
+    Type: String
+    Default: ""
+    Description: S3 object key prefix for Lambda artifacts
 
 Conditions:
   ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
 
   IsCdcStream: !Equals [ !Ref StreamContent, 'DYNAMO_CDC' ]
+
+  IsPreprocessingEnabled: !Equals [ !Ref PreprocessingEnabled, "true" ]
+
+  CreatePreprocessingFirehose: !And
+    - !Condition ExportLogs
+    - !Condition IsPreprocessingEnabled
+
 
 Resources:
 
@@ -91,6 +126,14 @@ Resources:
   #########################################
   DeliveryStreamLogGroup:
     Condition: ExportLogs
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 120
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+
+  PreprocessingDeliveryStreamLogGroup:
+    Condition: CreatePreprocessingFirehose
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: 120
@@ -168,6 +211,118 @@ Resources:
       #   KeyARN: !GetAtt LogsKinesisDeliveryStreamKmsKey.Arn
       #   KeyType: CUSTOMER_MANAGED_CMK
 
+  PreprocessingDeliveryStreamLogGroupS3Destination:
+    Condition: CreatePreprocessingFirehose
+    Type: AWS::Logs::LogStream
+    Properties:
+      LogGroupName:
+        Ref: PreprocessingDeliveryStreamLogGroup
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+  
+
+  PreprocessingFilterLambdaRole:
+    Condition: CreatePreprocessingFirehose
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-${PreprocessingStreamNamePrefix}-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  PreprocessingFilterLambda:
+    Condition: CreatePreprocessingFirehose
+    DependsOn:
+      - PreprocessingLambdaLogGroup
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Timeout: 60
+      MemorySize: 128
+      Handler: index.lambda_handler
+      FunctionName: !Sub '${ProjectName}-${PreprocessingStreamNamePrefix}-data-quality-filter'
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub '${LambdasBasePath}/cdc-preproc-data-quality-filter.zip'
+      Role: !GetAtt PreprocessingFilterLambdaRole.Arn
+  
+  PreprocessingLambdaLogGroup:
+    Condition: CreatePreprocessingFirehose
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-${PreprocessingStreamNamePrefix}-data-quality-filter'
+      RetentionInDays: 120
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+            
+
+  PreprocessingLogsKinesisDeliveryStreamPartitioned:
+    Condition: CreatePreprocessingFirehose
+    DependsOn:
+      - DeliveryStreamSourceServiceRoleDefaultPolicy
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamName: !Sub '${ProjectName}-${PreprocessingStreamNamePrefix}-delivery-stream-v1'
+      DeliveryStreamType: KinesisStreamAsSource
+
+      KinesisStreamSourceConfiguration:
+        KinesisStreamARN: !Ref SourceKinesisDataStreamArn
+        RoleARN:
+          Fn::GetAtt:
+            - DeliveryStreamSourceServiceRole
+            - Arn
+
+      ExtendedS3DestinationConfiguration:
+        BucketARN: !Sub arn:aws:s3:::${LogsBucketName}
+
+        BufferingHints:
+          IntervalInSeconds: 60
+          SizeInMBs: 64
+
+        CloudWatchLoggingOptions:
+          Enabled: true
+          LogGroupName:
+            Ref: PreprocessingDeliveryStreamLogGroup
+          LogStreamName:
+            Ref: PreprocessingDeliveryStreamLogGroupS3Destination
+
+        Prefix: 
+          !Sub '${PreprocessingS3RootPrefix}/!{partitionKeyFromLambda:PROCESSING_LAYER}/TABLE_NAME=!{partitionKeyFromLambda:TABLE_NAME}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
+        ErrorOutputPrefix:
+          !Sub 'errors/${PreprocessingS3RootPrefix}/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
+
+        RoleARN: !Ref LogsExporterRoleArn
+
+        DynamicPartitioningConfiguration:
+          Enabled: true
+          RetryOptions:
+            DurationInSeconds: 300
+
+        ProcessingConfiguration:
+          Enabled: true
+          Processors:
+            - Type: Lambda
+              Parameters:
+                - ParameterName: LambdaArn
+                  ParameterValue: !GetAtt PreprocessingFilterLambda.Arn
+                - ParameterName: BufferSizeInMBs
+                  ParameterValue: "1"
+                - ParameterName: BufferIntervalInSeconds
+                  ParameterValue: "60"
+                - ParameterName: NumberOfRetries
+                  ParameterValue: "3"
+        
+            - Type: AppendDelimiterToRecord
+              Parameters:
+                - ParameterName: Delimiter
+                  ParameterValue: "\\n"
+
   # CloudWatch metric to filer error lines, in Log group
   DeliveryStreamErrorLogsMetricFilter:
     Condition: ExportLogs
@@ -204,6 +359,41 @@ Resources:
       Statistic: Sum
       Threshold: 1
 
+  PreprocessingDeliveryStreamErrorLogsMetricFilter:
+    Condition: CreatePreprocessingFirehose
+    DependsOn:
+      - PreprocessingDeliveryStreamLogGroup
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref PreprocessingDeliveryStreamLogGroup
+      FilterPattern: '?S3 ?InternalError'
+      MetricTransformations:
+        - MetricValue: 1
+          MetricNamespace: "LogsExport"
+          MetricName: !Sub "${ProjectName}-${PreprocessingStreamNamePrefix}-kinesis-error"
+  
+  PreprocessingDeliveryStreamErrorLogsMetricAlarm:
+    Condition: CreatePreprocessingFirehose
+    DependsOn:
+      - PreprocessingDeliveryStreamErrorLogsMetricFilter
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${PreprocessingStreamNamePrefix}-Kinesis-Alarm"
+      AlarmDescription: "CloudWatch alarm for preprocessing Firehose delivery error logs."
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: 1
+      MetricName: !Sub "${ProjectName}-${PreprocessingStreamNamePrefix}-kinesis-error"
+      Namespace: "LogsExport"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 60
+      Period: 60
+      Statistic: Sum
+      Threshold: 1
+
 Outputs:
   DeliveryStreamErrorLogsMetricAlarmArn:
     Description: 'ARN of delivery stream error log alarm'
@@ -212,6 +402,16 @@ Outputs:
   DeliveryStreamArn:
     Description: 'ARN of delivery stream'
     Value: !GetAtt LogsKinesisDeliveryStreamPartitioned.Arn
+  
+  PreprocessingDeliveryStreamArn:
+    Condition: CreatePreprocessingFirehose
+    Description: 'ARN of preprocessing Firehose delivery stream'
+    Value: !GetAtt PreprocessingLogsKinesisDeliveryStreamPartitioned.Arn
+
+  PreprocessingDeliveryStreamErrorLogsMetricAlarmArn:
+    Condition: CreatePreprocessingFirehose
+    Description: 'ARN of preprocessing Firehose delivery stream error log alarm'
+    Value: !GetAtt PreprocessingDeliveryStreamErrorLogsMetricAlarm.Arn
 
   # LogsKinesisDeliveryStreamKmsKey:
   #   Condition: ExportLogs
