@@ -197,35 +197,46 @@ def render_cloudwatch_alarm(route, message, channel_id):
 
 def render_report(route, message, channel_id):
     data = message.get('data') or {}
+    metrics = data.get('metrics')
+    details = data.get('details') or {}
     links = message.get('links') or {}
-    required = ['findingCount', 'findingTypeCounts', 'accountRole']
-    missing = [key for key in required if key not in data]
-    if missing or not links.get('dashboard'):
-        raise ValueError('Invalid IAM unused access report: missing %s' % ', '.join(missing or ['links.dashboard']))
+    title = message.get('title')
+    if not title or not isinstance(metrics, dict) or not metrics:
+        raise ValueError('Invalid report: title and non-empty data.metrics are required')
+    if not isinstance(details, dict):
+        raise ValueError('Invalid report: data.details must be an object')
+    if not isinstance(links, dict):
+        raise ValueError('Invalid report: links must be an object')
 
-    breakdown = '\n'.join(
-        '- %s: %s' % (name, count)
-        for name, count in sorted(data['findingTypeCounts'].items())
-    ) or '- Nessun dettaglio disponibile'
     environment = str(message.get('environment', os.environ.get('ENVIRONMENT_TYPE', 'unknown')))
-    environment_label = '%s-%s' % (environment.upper(), str(data['accountRole']).upper())
-    producer = message.get('producer') or route['match']
+    fields = [mrkdwn_field('*Env:*\n%s' % environment.upper())]
+    for name, value in list(metrics.items())[:9]:
+        fields.append(mrkdwn_field('*%s:*\n%s' % (str(name), str(value))))
     blocks = [
-        header_block(producer),
-        {
-            'type': 'section',
-            'fields': [
-                mrkdwn_field('*Finding:*\n%s' % data['findingCount']),
-                mrkdwn_field('*Env:*\n%s' % environment_label),
-            ],
-        },
-        mrkdwn_section('*Dettaglio per tipologia:*\n%s' % breakdown),
-        mrkdwn_section('*Dashboard CloudWatch:* <%s|Apri dashboard>' % links['dashboard']),
+        header_block(str(title)),
+        {'type': 'section', 'fields': fields},
     ]
-    result = {
-        'channel': channel_id,
-        'blocks': blocks,
-    }
+
+    duration_ms = data.get('durationMs')
+    if duration_ms is not None:
+        blocks.append(mrkdwn_section('*Durata:* %.2f secondi' % (float(duration_ms) / 1000)))
+    if details:
+        breakdown = '\n'.join(
+            '- %s: %s' % (name, value)
+            for name, value in list(sorted(details.items()))[:20]
+        )
+        blocks.append(mrkdwn_section('*Dettaglio:*\n%s' % breakdown))
+
+    report_links = []
+    for name, url in list(links.items())[:10]:
+        parsed_url = urllib.parse.urlparse(str(url))
+        if parsed_url.scheme == 'https' and parsed_url.netloc:
+            label = str(name).replace('_', ' ').strip().title()
+            report_links.append('<%s|%s>' % (url, label))
+    if report_links:
+        blocks.append(mrkdwn_section('*Link:* ' + ' | '.join(report_links)))
+
+    result = {'channel': channel_id, 'blocks': blocks}
     if route['deliveryMode'] == 'LINK':
         _, download_url = validate_csv_attachment(message.get('attachment') or {})
         blocks.append(mrkdwn_section('*Report CSV:* <%s|Scarica CSV (link temporaneo)>' % download_url))

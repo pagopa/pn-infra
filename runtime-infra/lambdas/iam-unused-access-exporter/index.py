@@ -293,12 +293,14 @@ def lambda_handler(event, context):
             "occurredAt": now.isoformat(),
             "severity": "info",
             "environment": ENV_NAME,
+            "title": "IAM unused access report",
             "data": {
-                "accountId": account_id,
-                "accountRole": ACCOUNT_ROLE,
-                "findingCount": count,
-                "findingTypeCounts": finding_type_counts,
-                "skippedByTag": skipped_by_tag,
+                "metrics": {
+                    "Finding": count,
+                    "Ruolo account": ACCOUNT_ROLE,
+                    "Esclusi per tag": skipped_by_tag,
+                },
+                "details": finding_type_counts,
             },
             "links": {
                 "dashboard": dashboard_url,
