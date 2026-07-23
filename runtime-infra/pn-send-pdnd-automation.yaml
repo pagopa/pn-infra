@@ -66,6 +66,8 @@ Parameters:
     Type: String
   ApiKeysTableName:
     Type: String
+  ApiKeyTablesEncryptKeyId:
+    Type: String
 
   SignupScheduleExpression:
     Type: String
@@ -82,7 +84,10 @@ Parameters:
 
   LambdaMemorySize:
     Type: Number
-  LambdaTimeoutSeconds:
+  SignupLambdaTimeoutSeconds:
+    Type: Number
+    MaxValue: 900
+  OnboardingTechLambdaTimeoutSeconds:
     Type: Number
     MaxValue: 900
   LambdaRuntime:
@@ -280,6 +285,13 @@ Resources:
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${OnboardInstitutionsTableName}'
                   - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ApiKeysTableName}'
+              - Sid: DecryptApiKeyTable
+                Effect: Allow
+                Action: kms:Decrypt
+                Resource: !Sub 'arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:key/${ApiKeyTablesEncryptKeyId}'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub 'dynamodb.${AWS::Region}.amazonaws.com'
               - Sid: StoreOnboardingReports
                 Effect: Allow
                 Action:
@@ -301,7 +313,7 @@ Resources:
       Architectures: [arm64]
       Handler: index.handler
       Role: !GetAtt SignupRole.Arn
-      Timeout: !Ref LambdaTimeoutSeconds
+      Timeout: !Ref SignupLambdaTimeoutSeconds
       MemorySize: !Ref LambdaMemorySize
       ReservedConcurrentExecutions: 1
       LoggingConfig:
@@ -346,7 +358,7 @@ Resources:
       Architectures: [arm64]
       Handler: index.handler
       Role: !GetAtt OnboardingTechRole.Arn
-      Timeout: !Ref LambdaTimeoutSeconds
+      Timeout: !Ref OnboardingTechLambdaTimeoutSeconds
       MemorySize: !Ref LambdaMemorySize
       ReservedConcurrentExecutions: 1
       LoggingConfig:
