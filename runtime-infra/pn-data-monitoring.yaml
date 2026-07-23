@@ -312,6 +312,14 @@ Parameters:
     Type: Number
     Description: Reserved concurrent executions for the Lambda Downstream Monitoring function
     Default: 10
+  
+  EnableDataMonitoringCodeBuild:
+    Type: String
+    Description: State of the data monitoring codebuild rule
+    Default: 'ENABLED'
+    AllowedValues:
+      - 'ENABLED'
+      - 'DISABLED'
 
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
@@ -782,7 +790,7 @@ Resources:
       Description: "pn-data-monitoring-codebuild-scheduled-rule"
       # every day at 9 am
       ScheduleExpression: !Ref DataMonitoringIndexCronExpression 
-      State: "ENABLED"
+      State: !Ref EnableDataMonitoringCodeBuild
       RoleArn: !GetAtt "DataMonitoringScheduleRole.Arn"
       Targets: 
         - Id: "DataMonitoringIndex"
