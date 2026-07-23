@@ -50,6 +50,9 @@ Parameters:
     Type: Number
   MaxDailyCalls:
     Type: Number
+  SignupDryRun:
+    Type: String
+    AllowedValues: ['true', 'false']
   SelfcareMaxRetries:
     Type: Number
   SelfcareRetryBaseMs:
@@ -82,10 +85,8 @@ Parameters:
   LambdaTimeoutSeconds:
     Type: Number
     MaxValue: 900
-  LambdaEphemeralStorageMb:
-    Type: Number
-    MinValue: 512
-    MaxValue: 10240
+  LambdaRuntime:
+    Type: String
   LogRetention:
     Type: Number
   ReportsRetentionDays:
@@ -296,24 +297,20 @@ Resources:
     Properties:
       FunctionName: !Sub '${ProjectName}-send-pdnd-signup-v3-${EnvironmentType}'
       Description: Approves eligible SEND agreements and purposes through PDND Core v3.
-      Runtime: nodejs22.x
+      Runtime: !Ref LambdaRuntime
       Architectures: [arm64]
       Handler: index.handler
       Role: !GetAtt SignupRole.Arn
       Timeout: !Ref LambdaTimeoutSeconds
       MemorySize: !Ref LambdaMemorySize
       ReservedConcurrentExecutions: 1
-      EphemeralStorage:
-        Size: !Ref LambdaEphemeralStorageMb
       LoggingConfig:
         LogGroup: !GetAtt SignupLogGroup.Outputs.LogGroupName
       Code:
         S3Bucket: !Ref LambdasBucketName
-        S3Key: !Sub '${LambdasBasePath}/send-pdnd-automation-runner.zip'
+        S3Key: !Sub '${LambdasBasePath}/send-pdnd-signup-runner.zip'
       Environment:
         Variables:
-          AUTOMATION_NAME: signup
-          PROJECT_DIRECTORY: Send_PDND_SignUP_V3
           GITHUB_REPOSITORY: !Ref GithubRepository
           GITHUB_REF: !Ref GithubRef
           GITHUB_TOKEN_SECRET_ID: !Ref GithubTokenSecretName
@@ -326,6 +323,7 @@ Resources:
           ISSUER: !Ref PdndIssuer
           KID: !Ref PdndKid
           MAX_DAILY_CALLS: !Ref MaxDailyCalls
+          SIGNUP_DRY_RUN: !Ref SignupDryRun
           PDND_MIN_REQUEST_INTERVAL_MS: !Ref PdndMinRequestIntervalMs
           CLIENT_ASSERTION_TTL_SECONDS: !Ref ClientAssertionTtlSeconds
           SELFCARE_MAX_RETRIES: !Ref SelfcareMaxRetries
@@ -344,24 +342,20 @@ Resources:
     Properties:
       FunctionName: !Sub '${ProjectName}-send-pdnd-onboarding-tech-v3-${EnvironmentType}'
       Description: Produces the SEND technical onboarding report through PDND Core v3.
-      Runtime: nodejs22.x
+      Runtime: !Ref LambdaRuntime
       Architectures: [arm64]
       Handler: index.handler
       Role: !GetAtt OnboardingTechRole.Arn
       Timeout: !Ref LambdaTimeoutSeconds
       MemorySize: !Ref LambdaMemorySize
       ReservedConcurrentExecutions: 1
-      EphemeralStorage:
-        Size: !Ref LambdaEphemeralStorageMb
       LoggingConfig:
         LogGroup: !GetAtt OnboardingTechLogGroup.Outputs.LogGroupName
       Code:
         S3Bucket: !Ref LambdasBucketName
-        S3Key: !Sub '${LambdasBasePath}/send-pdnd-automation-runner.zip'
+        S3Key: !Sub '${LambdasBasePath}/send-pdnd-onboarding-tech-runner.zip'
       Environment:
         Variables:
-          AUTOMATION_NAME: onboarding-tech
-          PROJECT_DIRECTORY: Send_PDND_OnboardingTech_V3
           GITHUB_REPOSITORY: !Ref GithubRepository
           GITHUB_REF: !Ref GithubRef
           GITHUB_TOKEN_SECRET_ID: !Ref GithubTokenSecretName
