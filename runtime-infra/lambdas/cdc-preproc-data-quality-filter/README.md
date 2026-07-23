@@ -83,10 +83,6 @@ Il file `config/manifest.yaml` contiene l'elenco delle tabelle abilitate e il ri
 ```yaml
 version: 1.0
 
-defaults:
-  unconfiguredTableBehavior: drop
-  technicalErrorResult: ProcessingFailed
-
 tables:
   pn-UserAttributes:
     enabled: true
