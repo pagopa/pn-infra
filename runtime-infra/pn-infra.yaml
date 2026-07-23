@@ -55,6 +55,16 @@ Parameters:
     Default: '-'
     Description: Data lake can read logs
 
+  DataLakeAccountId1RoleName:
+    Type: String
+    Default: '-'
+    Description: Data lake account id 1 role name
+
+  DataLakeAccountId2RoleName:
+    Type: String
+    Default: '-'
+    Description: Data lake account id 2 role name
+
   TemplateBucketBaseUrl:
     Type: String
     Description: 'The S3 bucket from which to fetch the templates used by this stack.'
@@ -124,13 +134,21 @@ Parameters:
     Type: String
   AlarmSNSTopicName:
     Type: String
+  WarningSNSTopicArn:
+    Type: String
+  WarningSNSTopicName:
+    Type: String
+  WarningDispatcherName:
+    Type: String
+  WarningDispatcherQueueArn:
+    Type: String
   EcsDefaultSecurityGroup:
     Type: String
   LogsBucketKmsKeyArn:
     Type: String
   LogsBucketName:
     Type: String
-  SafeStorageAccountId:
+  ConfidentialInfoAccountId:
     Type: String
   CdcKinesisStreamName:
     Type: String
@@ -346,7 +364,11 @@ Conditions:
   IsSpotAllowedEnvironment: !Or
     - !Equals [!Ref EnvironmentType, "dev"]
     - !Equals [!Ref EnvironmentType, "test"]
+    - !Equals [!Ref EnvironmentType, "uat"]
     - !Equals [!Ref EnvironmentType, "hotfix"]
+
+  HasDataLakeAccountId1RoleName: !And [ !Not [ !Equals [ !Ref DataLakeAccountId1, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1, '' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1RoleName, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1RoleName, '' ] ] ]
+  HasDataLakeAccountId2: !And [ !Not [ !Equals [ !Ref DataLakeAccountId2, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId2, '' ] ] ]
 
 Resources:
   ###                       VPC BASE CONFIGURATIONS                       ###
@@ -425,48 +447,81 @@ Resources:
         LogsBucketKmsKeyArn: !Ref LogsBucketKmsKeyArn
         DataLakeAccountId1: !Ref DataLakeAccountId1
         DataLakeAccountId2: !Ref DataLakeAccountId2
-        SafeStorageAccountId: !Ref SafeStorageAccountId
+        ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
         BucketSuffix: !Ref BucketSuffix
         MoreBucketResourcePolicyStatements:
-          !Sub |
-            ,{
-              "Sid": "AWSCloudTrailInfraSecWrite",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "cloudtrail.amazonaws.com"
-              },
-              "Action": "s3:PutObject",
-              "Resource": "arn:aws:s3:::${LogsBucketName}/pn-infra-sec-monitoring/*",
-              "Condition": {
-                "StringLike": {
-                    "aws:SourceArn": "arn:aws:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/*"
+          Fn::Sub:
+            - |
+              ,{
+                "Sid": "AWSCloudTrailInfraSecWrite",
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "cloudtrail.amazonaws.com"
+                },
+                "Action": "s3:PutObject",
+                "Resource": "arn:aws:s3:::${LogsBucketName}/pn-infra-sec-monitoring/*",
+                "Condition": {
+                  "StringLike": {
+                      "aws:SourceArn": "arn:aws:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/*"
+                  }
                 }
-              }
-            }
-            ,{
-              "Sid": "datalakeBucketReadonly",
-              "Effect": "Allow",
-              "Principal": {
-                "AWS": "arn:aws:iam::${DataLakeAccountId1}:root"
-              },
-              "Action": [
-                "s3:Get*",
-                "s3:List*"
-              ],
-              "Resource": [
-                "arn:${AWS::Partition}:s3:::${LogsBucketName}",
-                "arn:${AWS::Partition}:s3:::${LogsBucketName}/*"      
-              ],
-              "Condition": {
-                "ArnEquals": {
-                  "aws:PrincipalArn": [ 
-                    "arn:aws:iam::${DataLakeAccountId1}:role/pagopa-data_engineers",
-                    "arn:aws:iam::${DataLakeAccountId1}:role/pdnd-de_ext",
-                    "arn:aws:iam::${DataLakeAccountId1}:role/cdp_pagopa_dl_send_rw"
-                  ]                  
-                }
-              }
-            }
+              }${DataLakeAccountId1PolicyStatement}${DataLakeAccountId2PolicyStatement}
+            - DataLakeAccountId1PolicyStatement:
+                Fn::If:
+                  - HasDataLakeAccountId1RoleName
+                  - Fn::Sub: |
+                      ,{
+                        "Sid": "datalakeAccountId1BucketReadonly",
+                        "Effect": "Allow",
+                        "Principal": {
+                          "AWS": "arn:aws:iam::${DataLakeAccountId1}:root"
+                        },
+                        "Action": [
+                          "s3:Get*",
+                          "s3:List*"
+                        ],
+                        "Resource": [
+                          "arn:${AWS::Partition}:s3:::${LogsBucketName}",
+                          "arn:${AWS::Partition}:s3:::${LogsBucketName}/*"
+                        ],
+                        "Condition": {
+                          "ArnEquals": {
+                            "aws:PrincipalArn": [
+                              "arn:aws:iam::${DataLakeAccountId1}:role/${DataLakeAccountId1RoleName}"
+                            ]
+                          }
+                        }
+                      }
+                  - ''
+              DataLakeAccountId2PolicyStatement:
+                Fn::If:
+                  - HasDataLakeAccountId2
+                  - Fn::Sub: |
+                      ,{
+                        "Sid": "datalakeBucketReadonly",
+                        "Effect": "Allow",
+                        "Principal": {
+                          "AWS": "arn:aws:iam::${DataLakeAccountId2}:root"
+                        },
+                        "Action": [
+                          "s3:Get*",
+                          "s3:List*"
+                        ],
+                        "Resource": [
+                          "arn:${AWS::Partition}:s3:::${LogsBucketName}",
+                          "arn:${AWS::Partition}:s3:::${LogsBucketName}/*"
+                        ],
+                        "Condition": {
+                          "ArnEquals": {
+                            "aws:PrincipalArn": [
+                              "arn:aws:iam::${DataLakeAccountId2}:role/pagopa-data_engineers",
+                              "arn:aws:iam::${DataLakeAccountId2}:role/pdnd-de_ext",
+                              "arn:aws:iam::${DataLakeAccountId2}:role/cdp_pagopa_dl_send_rw"
+                            ]
+                          }
+                        }
+                      }
+                  - ''
 
   # VPN ECS cluster
   VPNECSCluster:
@@ -621,10 +676,18 @@ Outputs:
     Value: !Ref AlarmSNSTopicArn
   AlarmSNSTopicName:
     Value: !Ref AlarmSNSTopicName
+  WarningSNSTopicArn:
+    Value: !Ref WarningSNSTopicArn
+  WarningSNSTopicName:
+    Value: !Ref WarningSNSTopicName
+  WarningDispatcherName:
+    Value: !Ref WarningDispatcherName
+  WarningDispatcherQueueArn:
+    Value: !Ref WarningDispatcherQueueArn
   EcsDefaultSecurityGroup:
     Value: !Ref EcsDefaultSecurityGroup
-  SafeStorageAccountId:
-    Value: !Ref SafeStorageAccountId
+  ConfidentialInfoAccountId:
+    Value: !Ref ConfidentialInfoAccountId
   LogsBucketKmsKeyArn:
     Value: !Ref LogsBucketKmsKeyArn
   LogsBucketName:
@@ -685,6 +748,12 @@ Outputs:
     Value: !Ref DataMonitoringScriptVersion
   DataLakeAccountId:
     Value: !Ref DataLakeAccountId1
+  DataLakeRoleName:
+    Value: !Ref DataLakeAccountId1RoleName
+  DataLakeAccountId2:
+    Value: !Ref DataLakeAccountId2
+  DataLakeAccountId2RoleName:
+    Value: !Ref DataLakeAccountId2RoleName
   DataMonitoringPrototypeVersion:
     Value: !Ref DataMonitoringPrototypeVersion
 

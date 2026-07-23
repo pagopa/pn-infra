@@ -18,11 +18,6 @@ Parameters:
   BucketSuffix:
     Type: String
     Description: Suffix to the log bucket name
-  
-  SafeStorageAccountId:
-    Type: String
-    Default: '-'
-    Description: Safestorage Account ID
 
   CdcStreamRetentionHours:
     Type: Number
@@ -96,34 +91,77 @@ Parameters:
 
   DataLakeAccountId1:
     Type: String
+    Default: '-'
     Description: Data lake account id 1
 
   DataLakeAccountId2:
     Type: String
     Default: '-'
     Description: Data lake account id 2
+
+  DataLakeAccountId1RoleName:
+    Type: String
+    Default: '-'
+    Description: Data lake account id 1 role name
+
+  # Added for pass-through output only
+  DataLakeAccountId2RoleName:
+    Type: String
+    Default: '-'
+    Description: Data lake account id 2 role name
   
   InfraSecTopicName:
     Type: String
     Description: 'Infrastructure security topic name'
     Default: 'pn-InfraSecTopic'
-  
+
+  WarningSNSTopicName:
+    Type: String
+    Description: 'Central warning topic name'
+    Default: 'pn-WarningSnsTopic'
+
+  WarningDispatcherName:
+    Type: String
+    Description: 'Base name for warning notification dispatcher resources'
+    Default: 'Warning-Notification-Dispatcher'
+
+  WarningDispatcherDelaySeconds:
+    Type: Number
+    Default: 0
+
+  WarningDispatcherMessageRetentionPeriod:
+    Type: Number
+    Default: 345600
+
+  WarningDispatcherMaxReceiveCount:
+    Type: Number
+    Default: 5
+
+  WarningDispatcherDeadLetterMessageRetentionPeriod:
+    Type: Number
+    Default: 1209600
+
+  WarningDispatcherVisibilityTimeout:
+    Type: Number
+    Default: 180
+
   ConfidentialInfoAccountId:
     Type: String
-    Default: ''
+    Default: '-'
     Description: AWS AccountId of the confidential info account in same environment
 
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
-  
-  HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
 
-  ActivateSafeStorageCondition: !And [ !Condition MakeBucketCondition, !Condition HasStorageStorageAccountId]
+  ActivateSafeStorageCondition: !And [ !Condition MakeBucketCondition, !Condition HasConfidentialInfoAccountId]
 
   CdcOnDemandDisabled: !Not [!Equals [!Ref CdcStreamMode, ON_DEMAND]]
   LogsOnDemandDisabled: !Not [!Equals [!Ref LogsStreamMode, ON_DEMAND]]
 
-  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ] ]
+  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '-' ] ]
+
+  HasDataLakeAccountId1RoleName: !And [ !Not [ !Equals [ !Ref DataLakeAccountId1, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1, '' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1RoleName, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1RoleName, '' ] ] ]
+  HasDataLakeAccountId2: !And [ !Not [ !Equals [ !Ref DataLakeAccountId2, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId2, '' ] ] ]
 
 Resources:
   
@@ -241,21 +279,40 @@ Resources:
               - kms:GenerateDataKey*
               - kms:DescribeKey
             Resource: "*"
-          - Sid: Allow Datalake roles to access logs bucket
-            Effect: Allow
-            Action:
-              - kms:Encrypt
-              - kms:Decrypt
-              - kms:GenerateDataKey*
-            Principal:
-              AWS: !Sub "arn:aws:iam::${DataLakeAccountId1}:root"
-            Resource: "*"
-            Condition:
-              "ArnEquals": 
-                "aws:PrincipalArn": 
-                  - !Sub "arn:aws:iam::${DataLakeAccountId1}:role/pagopa-data_engineers"
-                  - !Sub "arn:aws:iam::${DataLakeAccountId1}:role/pdnd-de_ext"
-                  - !Sub "arn:aws:iam::${DataLakeAccountId1}:role/cdp_pagopa_dl_send_rw"
+          - Fn::If:
+            - HasDataLakeAccountId1RoleName
+            - Sid: Allow Datalake account id 1 role to access logs bucket
+              Effect: Allow
+              Action:
+                - kms:Encrypt
+                - kms:Decrypt
+                - kms:GenerateDataKey*
+              Principal:
+                AWS: !Sub "arn:aws:iam::${DataLakeAccountId1}:root"
+              Resource: "*"
+              Condition:
+                "ArnEquals":
+                  "aws:PrincipalArn":
+                    - !Sub "arn:aws:iam::${DataLakeAccountId1}:role/${DataLakeAccountId1RoleName}"
+            - !Ref AWS::NoValue
+          - Fn::If:
+            - HasDataLakeAccountId2
+            - Sid: Allow Datalake roles to access logs bucket
+              Effect: Allow
+              Action:
+                - kms:Encrypt
+                - kms:Decrypt
+                - kms:GenerateDataKey*
+              Principal:
+                AWS: !Sub "arn:aws:iam::${DataLakeAccountId2}:root"
+              Resource: "*"
+              Condition:
+                "ArnEquals":
+                  "aws:PrincipalArn":
+                    - !Sub "arn:aws:iam::${DataLakeAccountId2}:role/pagopa-data_engineers"
+                    - !Sub "arn:aws:iam::${DataLakeAccountId2}:role/pdnd-de_ext"
+                    - !Sub "arn:aws:iam::${DataLakeAccountId2}:role/cdp_pagopa_dl_send_rw"
+            - !Ref AWS::NoValue
           - Fn::If:
             - ActivateSafeStorageCondition
             - Sid: Allow safe storage kms usage
@@ -270,7 +327,7 @@ Resources:
               Condition:
                 ArnLike: 
                   aws:SourceArn: 
-                    - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${SafeStorageAccountId}:trail/*"
+                    - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${ConfidentialInfoAccountId}:trail/*"
                     - !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/*"
             - !Ref AWS::NoValue
 
@@ -543,6 +600,102 @@ Resources:
       Endpoint: '{{resolve:ssm:/notification/infra/email}}'
       TopicArn: !Ref InfraSecTopic
 
+  WarningSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Ref WarningSNSTopicName
+
+  CanPublishWarningSNSTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowAwsServicesToPublishWarnings
+            Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+                - cloudwatch.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref WarningSNSTopic
+          - !If
+            - HasConfidentialInfoAccountId
+            - Sid: AllowPublishFromPnConfinfoAccount
+              Effect: Allow
+              Principal:
+                AWS: !Sub 'arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:root'
+              Action: sns:Publish
+              Resource: !Ref WarningSNSTopic
+            - !Ref AWS::NoValue
+      Topics:
+        - !Ref WarningSNSTopic
+
+  WarningDispatcherQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${ProjectName}-${WarningDispatcherName}'
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt WarningDispatcherDLQ.Arn
+        maxReceiveCount: !Ref WarningDispatcherMaxReceiveCount
+      DelaySeconds: !Ref WarningDispatcherDelaySeconds
+      MessageRetentionPeriod: !Ref WarningDispatcherMessageRetentionPeriod
+      ReceiveMessageWaitTimeSeconds: 15
+      VisibilityTimeout: !Ref WarningDispatcherVisibilityTimeout
+
+  WarningDispatcherDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${ProjectName}-${WarningDispatcherName}-DLQ'
+      MessageRetentionPeriod: !Ref WarningDispatcherDeadLetterMessageRetentionPeriod
+
+  WarningDispatcherQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref WarningDispatcherQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowSnsToSendMessage
+            Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt WarningDispatcherQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref WarningSNSTopic
+
+  WarningTopicSubscription:
+    Type: AWS::SNS::Subscription
+    DependsOn: WarningDispatcherQueuePolicy
+    Properties:
+      Endpoint: !GetAtt WarningDispatcherQueue.Arn
+      Protocol: sqs
+      TopicArn: !Ref WarningSNSTopic
+
+  WarningDispatcherDLQHasMessagesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-${WarningDispatcherName}-DLQ-HasMessage'
+      AlarmDescription: Warning notification dispatcher messages moved to the DLQ.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt WarningDispatcherDLQ.QueueName
+      Statistic: Sum
+      Period: 60
+      Threshold: 1
+      TreatMissingData: notBreaching
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      AlarmActions:
+        - !Ref WarningSNSTopic
+      OKActions:
+        - !Ref WarningSNSTopic
+
 Outputs:
   LogsBucketKmsKeyArn:
     Value: 
@@ -592,8 +745,8 @@ Outputs:
   AlarmSNSTopicName:
     Value: !Ref AlarmSNSTopicName
   
-  SafeStorageAccountId:
-    Value: !Ref SafeStorageAccountId
+  ConfidentialInfoAccountId:
+    Value: !Ref ConfidentialInfoAccountId
 
   Version:
     Value: !Ref Version
@@ -613,6 +766,12 @@ Outputs:
   DataLakeAccountId2:
     Value: !Ref DataLakeAccountId2
 
+  DataLakeAccountId1RoleName:
+    Value: !Ref DataLakeAccountId1RoleName
+
+  DataLakeAccountId2RoleName:
+    Value: !Ref DataLakeAccountId2RoleName
+
   ESMKinesisFailureNotificationsBucketName:
     Value: !Ref ESMKinesisFailureNotificationsBucket
     Description: 'Bucket name for ESM Kinesis failure notifications'
@@ -624,3 +783,19 @@ Outputs:
   InfraSecTopicName:
     Value: !Ref InfraSecTopicName
     Description: 'Infrastructure security topic name'
+
+  WarningSNSTopicArn:
+    Value: !Ref WarningSNSTopic
+    Description: 'Central warning topic ARN'
+
+  WarningSNSTopicName:
+    Value: !GetAtt WarningSNSTopic.TopicName
+    Description: 'Central warning topic name'
+
+  WarningDispatcherName:
+    Value: !Ref WarningDispatcherName
+    Description: 'Base name for warning notification dispatcher resources'
+
+  WarningDispatcherQueueArn:
+    Value: !GetAtt WarningDispatcherQueue.Arn
+    Description: 'Warning notification dispatcher queue ARN'

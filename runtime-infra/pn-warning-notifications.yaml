@@ -1,0 +1,167 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Warning notification runtime stack. Consumes the durable warning queue,
+  selects one Slack channel and renders custom notifications.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Project prefix used in physical resource names.
+
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: URL used to load infrastructure template fragments.
+
+  LambdasBucketName:
+    Type: String
+    Description: S3 bucket name containing Lambda deployment packages.
+
+  LambdasBasePath:
+    Type: String
+    Description: S3 key prefix for Lambda deployment packages.
+    Default: ''
+
+  EnvironmentType:
+    Type: String
+    Description: Deployment environment.
+    AllowedValues: [dev, test, uat, hotfix, prod]
+
+  WarningSNSTopicArn:
+    Type: String
+    Description: ARN of the central warning SNS topic owned by pn-infra-storage.
+
+  WarningDispatcherQueueArn:
+    Type: String
+    Description: ARN of the durable warning dispatcher queue owned by pn-infra-storage.
+
+  WarningDispatcherName:
+    Type: String
+    Description: Base name for warning notification dispatcher resources.
+
+  SlackBotTokenSecretName:
+    Type: String
+    Description: Secrets Manager secret containing the Slack bot token, either as plain text or in a token JSON property.
+    Default: '/warning-notifications/slack-bot-token'
+    MinLength: 1
+
+  SlackSecretCacheTtlSeconds:
+    Type: Number
+    Description: Seconds before the local Parameters and Secrets Extension cache refreshes the Slack bot token.
+    Default: 300
+    MinValue: 0
+    MaxValue: 300
+
+  Routes:
+    Type: String
+    Description: Semicolon-separated routes in type,match,destination[,deliveryMode] format. Report modes are ATTACHMENT, SUMMARY and LINK.
+    AllowedPattern: '^(alarm|report),[A-Za-z0-9][A-Za-z0-9_-]*,(C[A-Z0-9]+|DROP)(,(ATTACHMENT|SUMMARY|LINK))?(;(alarm|report),[A-Za-z0-9][A-Za-z0-9_-]*,(C[A-Z0-9]+|DROP)(,(ATTACHMENT|SUMMARY|LINK))?)*$'
+
+  LogRetention:
+    Type: Number
+    Description: CloudWatch Logs retention in days.
+    Default: 14
+
+  MaxCsvAttachmentBytes:
+    Type: Number
+    Description: Maximum CSV attachment size downloaded and uploaded to Slack.
+    Default: '5242880'
+
+Resources:
+
+  WarningDispatcherEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    DependsOn: WarningNotificationDispatcherPolicy
+    Properties:
+      Enabled: true
+      BatchSize: 1
+      EventSourceArn: !Ref WarningDispatcherQueueArn
+      FunctionName: !GetAtt WarningNotificationDispatcherLambda.Arn
+
+  WarningNotificationDispatcherLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub '${TemplateBucketBaseUrl}/fragments/log-group.yaml'
+      Parameters:
+        LogGroupName: !Sub '${ProjectName}-${WarningDispatcherName}-lambda-${EnvironmentType}'
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: '/aws/lambda'
+
+  # --- Notification dispatcher lambda ----------------------------------------
+  WarningNotificationDispatcherLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Routes every warning message to one dedicated destination.
+      FunctionName: !Sub '${ProjectName}-${WarningDispatcherName}-lambda-${EnvironmentType}'
+      Handler: index.lambda_handler
+      Runtime: python3.14
+      Timeout: 30
+      Role: !GetAtt WarningNotificationDispatcherRole.Arn
+      LoggingConfig:
+        LogGroup: !GetAtt WarningNotificationDispatcherLogGroup.Outputs.LogGroupName
+      Environment:
+        Variables:
+          ROUTES: !Ref Routes
+          ENVIRONMENT_TYPE: !Ref EnvironmentType
+          SLACK_BOT_TOKEN_SECRET_NAME: !Ref SlackBotTokenSecretName
+          SECRETS_MANAGER_TTL: !Ref SlackSecretCacheTtlSeconds
+          MAX_CSV_ATTACHMENT_BYTES: !Ref MaxCsvAttachmentBytes
+      Layers:
+        - arn:aws:lambda:eu-south-1:325218067255:layer:AWS-Parameters-and-Secrets-Lambda-Extension:79
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/warning-notification-dispatcher.zip
+
+  WarningNotificationDispatcherAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub '${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml'
+      Parameters:
+        FunctionName: !Ref WarningNotificationDispatcherLambda
+        AlarmSNSTopicArn: !Ref WarningSNSTopicArn
+
+  WarningNotificationDispatcherRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-${WarningDispatcherName}-Role'
+      Path: /
+      Description: Execution role for the warning notification dispatcher lambda.
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  WarningNotificationDispatcherPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub '${ProjectName}-${WarningDispatcherName}-Policy'
+      Roles:
+        - !Ref WarningNotificationDispatcherRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: ReadSlackBotToken
+            Effect: Allow
+            Action: secretsmanager:GetSecretValue
+            Resource: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${SlackBotTokenSecretName}*'
+          - Sid: AllowSQSAccess
+            Effect: Allow
+            Action:
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ChangeMessageVisibility
+            Resource: !Ref WarningDispatcherQueueArn
+
+Outputs:
+  WarningNotificationDispatcherLambdaArn:
+    Description: ARN of the warning notification dispatcher lambda.
+    Value: !GetAtt WarningNotificationDispatcherLambda.Arn

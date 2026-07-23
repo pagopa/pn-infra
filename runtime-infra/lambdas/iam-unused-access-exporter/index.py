@@ -24,13 +24,19 @@ ANALYZER_ARN  = os.environ["ANALYZER_ARN"]
 BUCKET        = os.environ["REPORTS_BUCKET"]
 ENV_NAME      = os.environ["ENV_NAME"]
 ACCOUNT_ROLE  = os.environ["ACCOUNT_ROLE"]  # 'core' | 'confinfo'
+AWS_REGION    = os.environ.get("AWS_REGION", "eu-south-1")
 RESOLVE_ROLE_TAGS = os.environ.get("RESOLVE_ROLE_TAGS", "true").lower() == "true"
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN", "")
+REPORT_NOTIFICATIONS_ENABLED = os.environ.get("REPORT_NOTIFICATIONS_ENABLED", "false").lower() == "true"
 EXCLUDE_TAG_KEY = os.environ.get("EXCLUDE_TAG_KEY", "")
 ARCHIVE_RULE_PATTERNS = [p.strip() for p in os.environ.get("ARCHIVE_RULE_PATTERNS", "").split(",") if p.strip()]
 
 aa  = boto3.client("accessanalyzer", config=Config(retries={"max_attempts": 10, "mode": "adaptive"}))
-s3  = boto3.client("s3")
+s3  = boto3.client(
+    "s3",
+    region_name=AWS_REGION,
+    config=Config(signature_version="s3v4", s3={"addressing_style": "virtual"}),
+)
 sts = boto3.client("sts")
 iam = boto3.client("iam")
 sns = boto3.client("sns")
@@ -258,43 +264,63 @@ def lambda_handler(event, context):
         ])
         count += 1
 
+    csv_bytes = buf.getvalue().encode("utf-8")
     s3.put_object(
         Bucket=BUCKET,
         Key=key,
-        Body=buf.getvalue().encode("utf-8"),
+        Body=csv_bytes,
         ContentType="text/csv",
     )
 
-    if count > 0 and SNS_TOPIC_ARN:
+    if REPORT_NOTIFICATIONS_ENABLED and SNS_TOPIC_ARN:
         dashboard_name = f"pn-iam-unused-access-{ENV_NAME}"
-        region = os.environ.get("AWS_REGION", "eu-south-1")
         dashboard_url = (
-            f"https://{region}.console.aws.amazon.com/cloudwatch/home"
-            f"?region={region}#dashboards/dashboard/{dashboard_name}"
+            f"https://{AWS_REGION}.console.aws.amazon.com/cloudwatch/home"
+            f"?region={AWS_REGION}#dashboards/dashboard/{dashboard_name}"
         )
         account_label = f"{ACCOUNT_ROLE}-{ENV_NAME}"
-        breakdown_lines = "\n".join(
-            f"  - {ftype}: {fcount}" for ftype, fcount in sorted(finding_type_counts.items())
+        report_download_url = s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": BUCKET, "Key": key},
+            ExpiresIn=3600,
         )
-        subject = f"[{account_label}] IAM unused access: {count} finding rilevati"
-        message = (
-            f"Account: {account_id} ({account_label})\n"
-            f"Ambiente: {ENV_NAME}\n"
-            f"Ruolo account: {ACCOUNT_ROLE}\n\n"
-            f"Sono stati rilevati {count} finding IAM unused access.\n\n"
-            f"Dettaglio per tipologia:\n{breakdown_lines}\n\n"
-            f"Consultare la dashboard CloudWatch per i dettagli:\n{dashboard_url}\n\n"
-            f"Report CSV: s3://{BUCKET}/{key}"
-        )
+        message = {
+            "schemaVersion": "1.0",
+            "eventId": request_id,
+            "eventType": "report",
+            "producer": "pn-iam-unused-access-analyzer",
+            "eventName": "unused-access-findings",
+            "occurredAt": now.isoformat(),
+            "severity": "info",
+            "environment": ENV_NAME,
+            "data": {
+                "accountId": account_id,
+                "accountRole": ACCOUNT_ROLE,
+                "findingCount": count,
+                "findingTypeCounts": finding_type_counts,
+                "skippedByTag": skipped_by_tag,
+            },
+            "links": {
+                "dashboard": dashboard_url,
+                "report": f"s3://{BUCKET}/{key}",
+            },
+            "attachment": {
+                "filename": key.rsplit("/", 1)[-1],
+                "contentType": "text/csv",
+                "size": len(csv_bytes),
+                "downloadUrl": report_download_url,
+            },
+        }
         try:
             sns.publish(
                 TopicArn=SNS_TOPIC_ARN,
-                Subject=subject[:100],
-                Message=message,
+                Subject=f"[{account_label}] IAM unused access report"[:100],
+                Message=json.dumps(message, separators=(",", ":")),
             )
-            log.info(json.dumps({"msg": "sns alert sent", "topic": SNS_TOPIC_ARN, "findings": count}))
+            log.info(json.dumps({"msg": "sns report sent", "topic": SNS_TOPIC_ARN, "findings": count}))
         except Exception as exc:
-            log.warning(json.dumps({"msg": "sns publish failed", "error": str(exc)}))
+            log.exception(json.dumps({"msg": "sns publish failed", "error": str(exc)}))
+            raise
 
     log.info(json.dumps({"msg": "export completed", "account_id": account_id,
                          "account_role": ACCOUNT_ROLE, "env": ENV_NAME,
