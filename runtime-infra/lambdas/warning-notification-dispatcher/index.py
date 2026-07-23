@@ -232,7 +232,7 @@ def render_report(route, message, channel_id):
         parsed_url = urllib.parse.urlparse(str(url))
         if parsed_url.scheme == 'https' and parsed_url.netloc:
             label = str(name).replace('_', ' ').strip().title()
-            report_links.append('<%s|%s>' % (url, label))
+            report_links.append('<%s|%s>' % (parsed_url.geturl(), label))
     if report_links:
         blocks.append(mrkdwn_section('*Link:* ' + ' | '.join(report_links)))
 
