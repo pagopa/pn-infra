@@ -1,0 +1,482 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: SEND PDND v3 signup and technical onboarding automations.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: pn
+  EnvironmentType:
+    Type: String
+    AllowedValues: [dev, test, uat, hotfix, prod]
+  PnCoreAwsAccountId:
+    Type: String
+    Default: ''
+    Description: Core account ID. Leave blank when deploying in the core account.
+  TemplateBucketBaseUrl:
+    Type: String
+  LambdasBucketName:
+    Type: String
+  LambdasBasePath:
+    Type: String
+    Default: ''
+  WarningSNSTopicArn:
+    Type: String
+
+  GithubRepository:
+    Type: String
+  GithubRef:
+    Type: String
+  GithubTokenSecretName:
+    Type: String
+  AutomationSecretName:
+    Type: String
+
+  PdndEnvironment:
+    Type: String
+    AllowedValues: [prod, uat]
+  PdndBaseUrl:
+    Type: String
+  PdndServiceId:
+    Type: String
+  PdndProducerId:
+    Type: String
+  PdndIssuer:
+    Type: String
+  PdndKid:
+    Type: String
+  PdndMinRequestIntervalMs:
+    Type: Number
+  ClientAssertionTtlSeconds:
+    Type: Number
+  MaxDailyCalls:
+    Type: Number
+  SignupDryRun:
+    Type: String
+    AllowedValues: ['true', 'false']
+  SelfcareMaxRetries:
+    Type: Number
+  SelfcareRetryBaseMs:
+    Type: Number
+  SelfcareMinRequestIntervalMs:
+    Type: Number
+  SelfcareBaseUrl:
+    Type: String
+
+  OnboardInstitutionsTableName:
+    Type: String
+  ApiKeysTableName:
+    Type: String
+  ApiKeyTablesEncryptKeyId:
+    Type: String
+
+  SignupScheduleExpression:
+    Type: String
+  SignupScheduleState:
+    Type: String
+    AllowedValues: [ENABLED, DISABLED]
+  OnboardingTechScheduleExpression:
+    Type: String
+  OnboardingTechScheduleState:
+    Type: String
+    AllowedValues: [ENABLED, DISABLED]
+  ScheduleTimezone:
+    Type: String
+
+  LambdaMemorySize:
+    Type: Number
+  SignupLambdaTimeoutSeconds:
+    Type: Number
+    MaxValue: 900
+  OnboardingTechLambdaTimeoutSeconds:
+    Type: Number
+    MaxValue: 900
+  LambdaRuntime:
+    Type: String
+  LogRetention:
+    Type: Number
+  ReportsRetentionDays:
+    Type: Number
+  ReportUrlExpirationSeconds:
+    Type: Number
+    MinValue: 60
+    MaxValue: 604800
+  SignupReportPrefix:
+    Type: String
+  OnboardingTechReportPrefix:
+    Type: String
+  SignupReportProducer:
+    Type: String
+  OnboardingTechReportProducer:
+    Type: String
+
+Conditions:
+  IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '']
+  IsSupportedEnvironment: !Or
+    - !Equals [!Ref EnvironmentType, dev]
+    - !Equals [!Ref EnvironmentType, hotfix]
+    - !Equals [!Ref EnvironmentType, prod]
+  ShouldDeploy: !And
+    - !Condition IsCoreAccount
+    - !Condition IsSupportedEnvironment
+
+Resources:
+  ReportsBucket:
+    Condition: ShouldDeploy
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub 'send-pdnd-automation-${AWS::Region}-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireReports
+            Status: Enabled
+            ExpirationInDays: !Ref ReportsRetentionDays
+            NoncurrentVersionExpiration:
+              NoncurrentDays: !Ref ReportsRetentionDays
+          - Id: AbortIncompleteUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+
+  ReportsBucketPolicy:
+    Condition: ShouldDeploy
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ReportsBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt ReportsBucket.Arn
+              - !Sub '${ReportsBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  SignupLogGroup:
+    Condition: ShouldDeploy
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub '${TemplateBucketBaseUrl}/fragments/log-group.yaml'
+      Parameters:
+        LogGroupName: !Sub '${ProjectName}-send-pdnd-signup-v3-${EnvironmentType}'
+        LogGroupPrefix: /aws/lambda
+        LogGroupRetention: !Ref LogRetention
+
+  OnboardingTechLogGroup:
+    Condition: ShouldDeploy
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub '${TemplateBucketBaseUrl}/fragments/log-group.yaml'
+      Parameters:
+        LogGroupName: !Sub '${ProjectName}-send-pdnd-onboarding-tech-v3-${EnvironmentType}'
+        LogGroupPrefix: /aws/lambda
+        LogGroupRetention: !Ref LogRetention
+
+  SignupRole:
+    Condition: ShouldDeploy
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-send-pdnd-signup-v3-${EnvironmentType}'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RuntimeAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: WriteLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${SignupLogGroup.Outputs.LogGroupName}:*'
+              - Sid: ReadAutomationSecrets
+                Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GithubTokenSecretName}*'
+                  - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${AutomationSecretName}*'
+              - Sid: DecryptAutomationSecrets
+                Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub 'secretsmanager.${AWS::Region}.amazonaws.com'
+                  ForAnyValue:StringLike:
+                    kms:EncryptionContext:SecretARN:
+                      - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GithubTokenSecretName}*'
+                      - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${AutomationSecretName}*'
+              - Sid: StoreSignupReports
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub '${ReportsBucket.Arn}/${SignupReportPrefix}/*'
+              - Sid: PublishReports
+                Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref WarningSNSTopicArn
+
+  OnboardingTechRole:
+    Condition: ShouldDeploy
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-send-pdnd-onboarding-tech-v3-${EnvironmentType}'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RuntimeAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: WriteLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${OnboardingTechLogGroup.Outputs.LogGroupName}:*'
+              - Sid: ReadAutomationSecrets
+                Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GithubTokenSecretName}*'
+                  - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${AutomationSecretName}*'
+              - Sid: DecryptAutomationSecrets
+                Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub 'secretsmanager.${AWS::Region}.amazonaws.com'
+                  ForAnyValue:StringLike:
+                    kms:EncryptionContext:SecretARN:
+                      - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GithubTokenSecretName}*'
+                      - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${AutomationSecretName}*'
+              - Sid: ReadOnboardingTables
+                Effect: Allow
+                Action: dynamodb:Scan
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${OnboardInstitutionsTableName}'
+                  - !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ApiKeysTableName}'
+              - Sid: DecryptApiKeyTable
+                Effect: Allow
+                Action: kms:Decrypt
+                Resource: !Sub 'arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:key/${ApiKeyTablesEncryptKeyId}'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub 'dynamodb.${AWS::Region}.amazonaws.com'
+              - Sid: StoreOnboardingReports
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub '${ReportsBucket.Arn}/${OnboardingTechReportPrefix}/*'
+              - Sid: PublishReports
+                Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref WarningSNSTopicArn
+
+  SignupLambda:
+    Condition: ShouldDeploy
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-send-pdnd-signup-v3-${EnvironmentType}'
+      Description: Approves eligible SEND agreements and purposes through PDND Core v3.
+      Runtime: !Ref LambdaRuntime
+      Architectures: [arm64]
+      Handler: index.handler
+      Role: !GetAtt SignupRole.Arn
+      Timeout: !Ref SignupLambdaTimeoutSeconds
+      MemorySize: !Ref LambdaMemorySize
+      ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogGroup: !GetAtt SignupLogGroup.Outputs.LogGroupName
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub '${LambdasBasePath}/send-pdnd-signup-runner.zip'
+      Environment:
+        Variables:
+          GITHUB_REPOSITORY: !Ref GithubRepository
+          GITHUB_REF: !Ref GithubRef
+          GITHUB_TOKEN_SECRET_ID: !Ref GithubTokenSecretName
+          AUTOMATION_SECRET_ID: !Ref AutomationSecretName
+          ENVIRONMENT_TYPE: !Ref EnvironmentType
+          ENV: !Ref PdndEnvironment
+          BASE_URL: !Ref PdndBaseUrl
+          SERVICE_ID: !Ref PdndServiceId
+          PRODUCER_ID: !Ref PdndProducerId
+          ISSUER: !Ref PdndIssuer
+          KID: !Ref PdndKid
+          MAX_DAILY_CALLS: !Ref MaxDailyCalls
+          SIGNUP_DRY_RUN: !Ref SignupDryRun
+          PDND_MIN_REQUEST_INTERVAL_MS: !Ref PdndMinRequestIntervalMs
+          CLIENT_ASSERTION_TTL_SECONDS: !Ref ClientAssertionTtlSeconds
+          SELFCARE_MAX_RETRIES: !Ref SelfcareMaxRetries
+          SELFCARE_RETRY_BASE_MS: !Ref SelfcareRetryBaseMs
+          SELFCARE_MIN_REQUEST_INTERVAL_MS: !Ref SelfcareMinRequestIntervalMs
+          SELFCARE_BASE_URL: !Ref SelfcareBaseUrl
+          REPORT_BUCKET: !Ref ReportsBucket
+          REPORT_PREFIX: !Ref SignupReportPrefix
+          REPORT_PRODUCER: !Ref SignupReportProducer
+          REPORT_URL_EXPIRATION_SECONDS: !Ref ReportUrlExpirationSeconds
+          WARNING_SNS_TOPIC_ARN: !Ref WarningSNSTopicArn
+
+  OnboardingTechLambda:
+    Condition: ShouldDeploy
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-send-pdnd-onboarding-tech-v3-${EnvironmentType}'
+      Description: Produces the SEND technical onboarding report through PDND Core v3.
+      Runtime: !Ref LambdaRuntime
+      Architectures: [arm64]
+      Handler: index.handler
+      Role: !GetAtt OnboardingTechRole.Arn
+      Timeout: !Ref OnboardingTechLambdaTimeoutSeconds
+      MemorySize: !Ref LambdaMemorySize
+      ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogGroup: !GetAtt OnboardingTechLogGroup.Outputs.LogGroupName
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub '${LambdasBasePath}/send-pdnd-onboarding-tech-runner.zip'
+      Environment:
+        Variables:
+          GITHUB_REPOSITORY: !Ref GithubRepository
+          GITHUB_REF: !Ref GithubRef
+          GITHUB_TOKEN_SECRET_ID: !Ref GithubTokenSecretName
+          AUTOMATION_SECRET_ID: !Ref AutomationSecretName
+          ENVIRONMENT_TYPE: !Ref EnvironmentType
+          ENV: !Ref PdndEnvironment
+          BASE_URL: !Ref PdndBaseUrl
+          SERVICE_ID: !Ref PdndServiceId
+          ISSUER: !Ref PdndIssuer
+          KID: !Ref PdndKid
+          PDND_MIN_REQUEST_INTERVAL_MS: !Ref PdndMinRequestIntervalMs
+          CLIENT_ASSERTION_TTL_SECONDS: !Ref ClientAssertionTtlSeconds
+          ONBOARD_INSTITUTIONS_TABLE: !Ref OnboardInstitutionsTableName
+          API_KEYS_TABLE: !Ref ApiKeysTableName
+          REPORT_BUCKET: !Ref ReportsBucket
+          REPORT_PREFIX: !Ref OnboardingTechReportPrefix
+          REPORT_PRODUCER: !Ref OnboardingTechReportProducer
+          REPORT_URL_EXPIRATION_SECONDS: !Ref ReportUrlExpirationSeconds
+          WARNING_SNS_TOPIC_ARN: !Ref WarningSNSTopicArn
+
+  LambdaAlarmsSignup:
+    Condition: ShouldDeploy
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub '${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml'
+      Parameters:
+        FunctionName: !Ref SignupLambda
+        AlarmSNSTopicArn: !Ref WarningSNSTopicArn
+        FilterPattern: ERROR
+
+  LambdaAlarmsOnboardingTech:
+    Condition: ShouldDeploy
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub '${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml'
+      Parameters:
+        FunctionName: !Ref OnboardingTechLambda
+        AlarmSNSTopicArn: !Ref WarningSNSTopicArn
+        FilterPattern: ERROR
+
+  SchedulerRole:
+    Condition: ShouldDeploy
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-send-pdnd-automation-scheduler-${EnvironmentType}'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: InvokeAutomations
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  - !GetAtt SignupLambda.Arn
+                  - !GetAtt OnboardingTechLambda.Arn
+
+  SignupSchedule:
+    Condition: ShouldDeploy
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub '${ProjectName}-send-pdnd-signup-v3-${EnvironmentType}'
+      ScheduleExpression: !Ref SignupScheduleExpression
+      ScheduleExpressionTimezone: !Ref ScheduleTimezone
+      State: !Ref SignupScheduleState
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt SignupLambda.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+
+  OnboardingTechSchedule:
+    Condition: ShouldDeploy
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub '${ProjectName}-send-pdnd-onboarding-tech-v3-${EnvironmentType}'
+      ScheduleExpression: !Ref OnboardingTechScheduleExpression
+      ScheduleExpressionTimezone: !Ref ScheduleTimezone
+      State: !Ref OnboardingTechScheduleState
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt OnboardingTechLambda.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+
+Outputs:
+  ReportsBucketName:
+    Condition: ShouldDeploy
+    Value: !Ref ReportsBucket
+  SignupLambdaArn:
+    Condition: ShouldDeploy
+    Value: !GetAtt SignupLambda.Arn
+  OnboardingTechLambdaArn:
+    Condition: ShouldDeploy
+    Value: !GetAtt OnboardingTechLambda.Arn

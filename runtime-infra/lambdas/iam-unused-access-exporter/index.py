@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 
 import boto3
 from botocore.config import Config
+from reporting import publish_warning_report
 
 log = logging.getLogger()
 log.setLevel(logging.INFO)
@@ -279,43 +280,34 @@ def lambda_handler(event, context):
             f"?region={AWS_REGION}#dashboards/dashboard/{dashboard_name}"
         )
         account_label = f"{ACCOUNT_ROLE}-{ENV_NAME}"
-        report_download_url = s3.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": BUCKET, "Key": key},
-            ExpiresIn=3600,
-        )
-        message = {
-            "schemaVersion": "1.0",
-            "eventId": request_id,
-            "eventType": "report",
-            "producer": "pn-iam-unused-access-analyzer",
-            "eventName": "unused-access-findings",
-            "occurredAt": now.isoformat(),
-            "severity": "info",
-            "environment": ENV_NAME,
-            "data": {
-                "accountId": account_id,
-                "accountRole": ACCOUNT_ROLE,
-                "findingCount": count,
-                "findingTypeCounts": finding_type_counts,
-                "skippedByTag": skipped_by_tag,
-            },
-            "links": {
-                "dashboard": dashboard_url,
-                "report": f"s3://{BUCKET}/{key}",
-            },
-            "attachment": {
-                "filename": key.rsplit("/", 1)[-1],
-                "contentType": "text/csv",
-                "size": len(csv_bytes),
-                "downloadUrl": report_download_url,
-            },
-        }
         try:
-            sns.publish(
-                TopicArn=SNS_TOPIC_ARN,
-                Subject=f"[{account_label}] IAM unused access report"[:100],
-                Message=json.dumps(message, separators=(",", ":")),
+            publish_warning_report(
+                sns_client=sns,
+                s3_client=s3,
+                topic_arn=SNS_TOPIC_ARN,
+                subject=f"[{account_label}] IAM unused access report",
+                event_id=request_id,
+                producer="pn-iam-unused-access-analyzer",
+                event_name="unused-access-findings",
+                occurred_at=now,
+                environment=ENV_NAME,
+                title="IAM unused access report",
+                metrics={
+                    "Finding": count,
+                    "Ruolo account": ACCOUNT_ROLE,
+                    "Esclusi per tag": skipped_by_tag,
+                },
+                details=finding_type_counts,
+                links={
+                    "dashboard": dashboard_url,
+                    "report": f"s3://{BUCKET}/{key}",
+                },
+                attachment={
+                    "bucket": BUCKET,
+                    "key": key,
+                    "filename": key.rsplit("/", 1)[-1],
+                    "size": len(csv_bytes),
+                },
             )
             log.info(json.dumps({"msg": "sns report sent", "topic": SNS_TOPIC_ARN, "findings": count}))
         except Exception as exc:
