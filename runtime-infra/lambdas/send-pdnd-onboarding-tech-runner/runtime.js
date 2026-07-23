@@ -164,7 +164,7 @@ async function extractProject(archivePath, projectName, destination) {
         extractedFiles += 1;
     }
     if (extractedFiles === 0) {
-        throw new Error(`Project ${projectName} was not found in pn-troubleshooting archive`);
+        throw new Error(`Project ${projectName} was not found in repository archive`);
     }
 }
 
