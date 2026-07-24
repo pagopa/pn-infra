@@ -312,6 +312,14 @@ Parameters:
     Type: Number
     Description: Reserved concurrent executions for the Lambda Downstream Monitoring function
     Default: 10
+  
+  EnableDataMonitoringCodeBuild:
+    Type: String
+    Description: State of the data monitoring codebuild rule
+    Default: 'ENABLED'
+    AllowedValues:
+      - 'ENABLED'
+      - 'DISABLED'
 
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
@@ -782,7 +790,7 @@ Resources:
       Description: "pn-data-monitoring-codebuild-scheduled-rule"
       # every day at 9 am
       ScheduleExpression: !Ref DataMonitoringIndexCronExpression 
-      State: "ENABLED"
+      State: !Ref EnableDataMonitoringCodeBuild
       RoleArn: !GetAtt "DataMonitoringScheduleRole.Arn"
       Targets: 
         - Id: "DataMonitoringIndex"
@@ -901,45 +909,6 @@ Resources:
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         FilterPattern: "ERROR"
   
-
-  # Send codebuild events to Frankfurt; Needed by celonis :(
-  SendCodeBuildEventsToFrankfurt: 
-    Type: AWS::Events::Rule
-    Properties: 
-      Description: "Routes datamonitoring ends to eu-central-1"
-      State: "ENABLED"
-      EventPattern:
-        source:  [ "aws.codebuild" ]
-        detail-type: [ "CodeBuild Build State Change" ]
-        detail: 
-          project-name: [ "pn-data-monitoring-codebuild" ]
-      Targets: 
-        - Arn: !Sub "arn:${AWS::Partition}:events:eu-central-1:${AWS::AccountId}:event-bus/default"
-          Id: "CrossRegionDestinationBus"
-          RoleArn: !GetAtt SendCodeBuildEventsToFrankfurtRole.Arn
-  
-  SendCodeBuildEventsToFrankfurtRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-        - Effect: Allow
-          Principal:
-            Service: events.amazonaws.com
-          Action: sts:AssumeRole
-      Path: /
-      Policies:
-      - PolicyName: PutEventsDestinationBus
-        PolicyDocument:
-          Version: 2012-10-17
-          Statement:
-          - Effect: Allow
-            Action:
-            - events:PutEvents
-            Resource:
-            - !Sub "arn:${AWS::Partition}:events:eu-central-1:${AWS::AccountId}:event-bus/default"
-
   LambdaPnSupportExport:
     Condition: IsCoreAccount
     Type: AWS::Lambda::Function
@@ -1643,7 +1612,6 @@ Resources:
                   - sqs:GetQueueAttributes
                 Resource: 
                   - !GetAtt AnalogRecipientEventsQueue.Outputs.QueueARN
-
 
   PnAnalogRecipientsAnalyzerLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
