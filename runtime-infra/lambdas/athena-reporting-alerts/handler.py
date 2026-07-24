@@ -1,14 +1,40 @@
 """Main handler orchestrating Athena query execution with export and alerts"""
 import json
+import socket
+import time
 import urllib.request
 from datetime import datetime, timedelta, timezone
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 import os
 from config import logger, setup_logger, CONFIG_GIT_URL, ATHENA_DATABASE, ATHENA_WORKGROUP, ATHENA_QUERY_TIMEOUT_SECONDS
 from services.athena_client import execute_athena_query
 from services.s3_client import export_results_to_csv
 from services.slack_client import send_slack_notification
+
+MAX_GIT_FETCH_ATTEMPTS = 3
+RETRYABLE_HTTP_STATUS_CODES = {408, 500, 502, 503, 504}
+GIT_FETCH_RETRY_DELAYS_SECONDS = (1, 2)
+GITHUB_RATE_LIMIT_RETRY_DELAY_SECONDS = 5
+
+
+def is_retryable_network_error(error):
+    """Return whether an urlopen error is a transient network failure."""
+    if isinstance(error, URLError):
+        return is_retryable_network_error(error.reason)
+
+    return isinstance(error, (TimeoutError, ConnectionError, socket.gaierror))
+
+
+def wait_before_git_fetch_retry(delay_seconds, error, attempt):
+    logger.warning(
+        "Git config fetch failed (%s) on attempt %s/%s; retrying in %s seconds",
+        error,
+        attempt,
+        MAX_GIT_FETCH_ATTEMPTS,
+        delay_seconds,
+    )
+    time.sleep(delay_seconds)
 
 
 def fetch_config_from_git():
@@ -18,22 +44,40 @@ def fetch_config_from_git():
     
     url = CONFIG_GIT_URL
     logger.info(f"Fetching config from Git: {url}")
-    
-    try:
-        with urllib.request.urlopen(url, timeout=10) as response:
-            content = response.read().decode('utf-8').strip()
-            
-            if not content:
-                raise ValueError("Git config file is empty")
-            
-            return json.loads(content)
-            
-    except HTTPError as e:
-        if e.code == 404:
-            raise FileNotFoundError(f"Config file not found at {url}")
-        raise RuntimeError(f"Failed to fetch config from Git (HTTP {e.code}): {url}")
-    except Exception as e:
-        raise RuntimeError(f"Failed to fetch config from Git: {e}")
+    rate_limit_retried = False
+
+    for attempt in range(1, MAX_GIT_FETCH_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(url, timeout=10) as response:
+                content = response.read().decode('utf-8').strip()
+
+                if not content:
+                    raise ValueError("Git config file is empty")
+
+                return json.loads(content)
+
+        except HTTPError as error:
+            if error.code == 404:
+                raise FileNotFoundError(f"Config file not found at {url}")
+
+            if error.code == 429 and not rate_limit_retried and attempt < MAX_GIT_FETCH_ATTEMPTS:
+                rate_limit_retried = True
+                wait_before_git_fetch_retry(GITHUB_RATE_LIMIT_RETRY_DELAY_SECONDS, error, attempt)
+                continue
+
+            if error.code in RETRYABLE_HTTP_STATUS_CODES and attempt < MAX_GIT_FETCH_ATTEMPTS:
+                wait_before_git_fetch_retry(GIT_FETCH_RETRY_DELAYS_SECONDS[attempt - 1], error, attempt)
+                continue
+
+            raise RuntimeError(f"Failed to fetch config from Git (HTTP {error.code}): {url}")
+        except (URLError, TimeoutError, ConnectionError, socket.gaierror) as error:
+            if is_retryable_network_error(error) and attempt < MAX_GIT_FETCH_ATTEMPTS:
+                wait_before_git_fetch_retry(GIT_FETCH_RETRY_DELAYS_SECONDS[attempt - 1], error, attempt)
+                continue
+
+            raise RuntimeError(f"Failed to fetch config from Git: {error}")
+        except Exception as error:
+            raise RuntimeError(f"Failed to fetch config from Git: {error}")
 
 
 def calculate_today():
