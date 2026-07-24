@@ -50,8 +50,20 @@ Parameters:
     Description: 'Slack channel email address for Athena reporting and alerts notifications. Format: channel-name@workspace.slack.com'
   AthenaReportingAlertsSchedulerRate:
     Type: String
-    Default: 'rate(1 minute)'
-    Description: Schedule rate for Reporting Alerts Scheduler reconciliation loop. Default is 1 minute.
+    Default: 'rate(15 minutes)'
+    Description: Schedule rate for Reporting Alerts Scheduler reconciliation loop. Default is 15 minutes.
+  AthenaReportingAlertsSchedulerAlarmPeriod:
+    Type: Number
+    Default: 900
+    Description: CloudWatch alarm period in seconds for Reporting Alerts Scheduler errors.
+  AthenaReportingAlertsSchedulerAlarmEvaluationPeriods:
+    Type: Number
+    Default: 2
+    Description: Number of periods evaluated by the Reporting Alerts Scheduler error alarm.
+  AthenaReportingAlertsSchedulerAlarmDataPointsToAlarm:
+    Type: Number
+    Default: 2
+    Description: Number of breaching periods required by the Reporting Alerts Scheduler error alarm.
   AthenaReportingAlertsQueryTimeoutSeconds:
     Type: String
     Default: '600'
@@ -482,6 +494,9 @@ Resources:
       Parameters:
         FunctionName: !Ref ReportingAlertsSchedulerLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        Period: !Ref AthenaReportingAlertsSchedulerAlarmPeriod
+        EvaluationPeriods: !Ref AthenaReportingAlertsSchedulerAlarmEvaluationPeriods
+        DataPointsToAlarm: !Ref AthenaReportingAlertsSchedulerAlarmDataPointsToAlarm
 
   ReportingAlertsSchedulerTriggerRule:
     Type: AWS::Events::Rule
