@@ -104,6 +104,11 @@ Parameters:
     Description: 'Infrastructure security topic name'
     Default: 'pn-InfraSecTopic'
 
+  WarningSNSTopicName:
+    Type: String
+    Description: 'Central warning topic name in the pn-core account'
+    Default: 'pn-WarningSnsTopic'
+
 Conditions:
   MakeBucketCondition: !Not [ !Equals [ !Ref BucketSuffix, '' ]]
   
@@ -589,3 +594,11 @@ Outputs:
     
   InfraSecTopicArn:
     Value: !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${InfraSecTopicName}'
+
+  WarningSNSTopicName:
+    Value: !Ref WarningSNSTopicName
+    Description: 'Central warning topic name in the pn-core account'
+
+  WarningSNSTopicArn:
+    Value: !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${WarningSNSTopicName}'
+    Description: 'Central warning topic ARN in the pn-core account'
