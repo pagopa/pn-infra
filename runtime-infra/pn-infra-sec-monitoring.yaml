@@ -40,9 +40,8 @@ Parameters:
     Default: 'false'
     Description: 'Multi-region CloudTrail?'
 
-  LogRetentionDays:
+  LogRetention:
     Type: Number
-    Default: 365
     Description: 'CloudWatch Logs retention (0=infinite)'
 
   S3MonitoringEnabled:
@@ -254,7 +253,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/lambda/${ProjectName}-infra-sec-monitoring-dynamo-alert"
-      RetentionInDays: !Ref LogRetentionDays
+      RetentionInDays: !Ref LogRetention
 
   InfraSecMonitoringDynamoAlertLambda:
     Type: AWS::Lambda::Function
@@ -363,7 +362,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/cloudtrail/${ProjectName}-${InfraSecTrailName}"
-      RetentionInDays: !Ref LogRetentionDays
+      RetentionInDays: !Ref LogRetention
 
   CloudTrailLogsPolicy:
     Condition: HasCloudTrailLogsEnabled
@@ -786,7 +785,7 @@ Resources:
       Parameters:
         LogGroupName: !Sub "${ProjectName}-infra-sec-vpc-auto-revert-${EnvironmentType}"
         LogGroupPrefix: /aws/lambda
-        LogGroupRetention: !Ref LogRetentionDays
+        LogGroupRetention: !Ref LogRetention
 
   VpcAutoRevertLambdaRole:
     Type: AWS::IAM::Role
@@ -1003,7 +1002,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/lambda/${ProjectName}-infra-sec-url-access-analyzer-alert"
-      RetentionInDays: !Ref LogRetentionDays
+      RetentionInDays: !Ref LogRetention
       
   InfraSecMonitoringUrlAccessAnalyzerAlertLambda:
     Type: AWS::Lambda::Function
@@ -1206,7 +1205,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/lambda/${ProjectName}-infra-sec-access-validator-alert"
-      RetentionInDays: !Ref LogRetentionDays
+      RetentionInDays: !Ref LogRetention
 
   InfraSecAccessValidatorFunction:
     Type: AWS::Lambda::Function
