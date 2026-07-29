@@ -141,6 +141,7 @@ call_api() {
   local path="$3"
   local payload="${4:-}"
   local tried_https_fallback="false"
+  local tried_policy_conflict_retry="false"
 
   echo "\n==> ${name}"
 
@@ -178,6 +179,37 @@ call_api() {
       continue
     fi
 
+    # ISM policy update path: retry with optimistic-concurrency parameters.
+    if [[ "${http_code}" == "409" && "${method}" == "PUT" && "${path}" == /_plugins/_ism/policies/* && "${tried_policy_conflict_retry}" == "false" && "${body}" == *"version_conflict_engine_exception"* ]]; then
+      local current_response
+      local current_code
+      local current_body
+      local seq_no
+      local primary_term
+
+      current_response=$(curl -sS "${CURL_SSL_ARGS[@]}" \
+        -u "${MASTER_USER}:${MASTER_PASSWORD}" \
+        -H "Content-Type: application/json" \
+        -X "GET" \
+        "${BASE_URL}${path}" \
+        -w "\n%{http_code}")
+
+      current_code=$(echo "${current_response}" | tail -n 1)
+      current_body=$(echo "${current_response}" | sed '$d')
+
+      if [[ "${current_code}" =~ ^2[0-9][0-9]$ ]]; then
+        seq_no=$(echo "${current_body}" | sed -n 's/.*"_seq_no"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -n 1)
+        primary_term=$(echo "${current_body}" | sed -n 's/.*"_primary_term"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -n 1)
+
+        if [[ -n "${seq_no}" && -n "${primary_term}" ]]; then
+          path="${path}?if_seq_no=${seq_no}&if_primary_term=${primary_term}"
+          tried_policy_conflict_retry="true"
+          echo "WARN: policy already exists with different version. Retrying update with if_seq_no=${seq_no}, if_primary_term=${primary_term}"
+          continue
+        fi
+      fi
+    fi
+
     break
   done
 
@@ -201,7 +233,7 @@ routing_pipeline_payload='{
   "processors": [
     {
       "script": {
-        "source": "if (ctx.tags != null && ctx.tags.size() > 0) { for (String tag : ctx.tags) { if (tag.equals(\"AUDIT5Y\")) { ctx._index = \"pn-logs5y\"; } else if (tag.equals(\"AUDIT10Y\")) { ctx._index = \"pn-logs10y\"; } else { ctx._index = \"pn-logs120d\"; } } } else { ctx._index = \"pn-logs120d\"; }"
+        "source": "if (ctx.tags != null && ctx.tags.size() > 0) { for (String tag : ctx.tags) { if (tag.equals(\"AUDIT5Y\")) { ctx._index = \"pn-logs5y\"; } else if (tag.equals(\"AUDIT10Y\")) { ctx._index = \"pn-logs10y\"; } else if (tag.equals(\"AUDIT2Y\")) { ctx._index = \"pn-logs2y\"; } else { ctx._index = \"pn-logs120d\"; } } } else { ctx._index = \"pn-logs120d\"; }"
       }
     }
   ]
@@ -242,6 +274,45 @@ index_template_120d='{
         "opendistro": {
           "index_state_management": {
             "rollover_alias": "pn-logs120d"
+          }
+        },
+        "number_of_shards": "1",
+        "number_of_replicas": "1"
+      }
+    },
+    "mappings": {
+      "dynamic_templates": [
+        {
+          "strings_as_keyword": {
+            "match_mapping_type": "string",
+            "mapping": {
+              "type": "keyword"
+            }
+          }
+        }
+      ],
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        }
+      }
+    },
+    "aliases": {
+      "pn-logs": {}
+    }
+  },
+  "composed_of": []
+}'
+
+index_template_2y='{
+  "index_patterns": ["pn-logs2y*"],
+  "template": {
+    "settings": {
+      "index": {
+        "final_pipeline": "import",
+        "opendistro": {
+          "index_state_management": {
+            "rollover_alias": "pn-logs2y"
           }
         },
         "number_of_shards": "1",
@@ -410,9 +481,29 @@ policy_5y='{
         ],
         "transitions": [
           {
+            "state_name": "warm",
+            "conditions": {
+              "min_index_age": "365d"
+            }
+          }
+        ]
+      },
+      {
+        "name": "warm",
+        "actions": [
+          {
+            "warm_migration": {},
+            "retry": {
+              "count": 5,
+              "delay": "1h"
+            }
+          }
+        ],
+        "transitions": [
+          {
             "state_name": "delete",
             "conditions": {
-              "min_index_age": "1825d"
+              "min_index_age": "1835d"
             }
           }
         ]
@@ -423,8 +514,7 @@ policy_5y='{
           {
             "delete": {}
           }
-        ],
-        "transitions": []
+        ]
       }
     ],
     "ism_template": [
@@ -453,9 +543,219 @@ policy_10y='{
         ],
         "transitions": [
           {
+            "state_name": "warm",
+            "conditions": {
+              "min_index_age": "365d"
+            }
+          }
+        ]
+      },
+      {
+        "name": "warm",
+        "actions": [
+          {
+            "warm_migration": {},
+            "retry": {
+              "count": 5,
+              "delay": "1h"
+            }
+          }
+        ],
+        "transitions": [
+          {
             "state_name": "delete",
             "conditions": {
-              "min_index_age": "3650d"
+              "min_index_age": "3660d"
+            }
+          }
+        ]
+      },
+      {
+        "name": "delete",
+        "actions": [
+          {
+            "delete": {}
+          }
+        ]
+      }
+    ],
+    "ism_template": [
+      {
+        "index_patterns": ["pn-logs10y*"],
+        "priority": 100
+      }
+    ]
+  }
+}'
+
+policy_2y='{
+  "policy": {
+    "description": "Rollover audit2y",
+    "default_state": "rollover",
+    "states": [
+      {
+        "name": "rollover",
+        "actions": [
+          {
+            "rollover": {
+              "min_size": "20gb",
+              "min_index_age": "3d"
+            }
+          }
+        ],
+        "transitions": [
+          {
+            "state_name": "warm",
+            "conditions": {
+              "min_index_age": "365d"
+            }
+          }
+        ]
+      },
+      {
+        "name": "warm",
+        "actions": [
+          {
+            "warm_migration": {},
+            "retry": {
+              "count": 5,
+              "delay": "1h"
+            }
+          }
+        ],
+        "transitions": [
+          {
+            "state_name": "delete",
+            "conditions": {
+              "min_index_age": "740d"
+            }
+          }
+        ]
+      },
+      {
+        "name": "delete",
+        "actions": [
+          {
+            "delete": {}
+          }
+        ]
+      }
+    ],
+    "ism_template": [
+      {
+        "index_patterns": ["pn-logs2y*"],
+        "priority": 100
+      }
+    ]
+  }
+}'
+
+policy_2y_test='{
+  "policy": {
+    "description": "Rollover audit2y",
+    "default_state": "rollover",
+    "states": [
+      {
+        "name": "rollover",
+        "actions": [
+          {
+            "rollover": {
+              "min_size": "20gb",
+              "min_index_age": "3d"
+            }
+          }
+        ],
+        "transitions": [
+          {
+            "state_name": "delete",
+            "conditions": {
+              "min_index_age": "740d"
+            }
+          }
+        ]
+      },
+      {
+        "name": "delete",
+        "actions": [
+          {
+            "delete": {}
+          }
+        ],
+        "transitions": []
+      }
+    ],
+    "ism_template": [
+      {
+        "index_patterns": ["pn-logs2y*"],
+        "priority": 100
+      }
+    ]
+  }
+}'
+
+policy_5y_test='{
+  "policy": {
+    "description": "Rollover audit5y",
+    "default_state": "rollover",
+    "states": [
+      {
+        "name": "rollover",
+        "actions": [
+          {
+            "rollover": {
+              "min_size": "20gb",
+              "min_index_age": "3d"
+            }
+          }
+        ],
+        "transitions": [
+          {
+            "state_name": "delete",
+            "conditions": {
+              "min_index_age": "1835d"
+            }
+          }
+        ]
+      },
+      {
+        "name": "delete",
+        "actions": [
+          {
+            "delete": {}
+          }
+        ],
+        "transitions": []
+      }
+    ],
+    "ism_template": [
+      {
+        "index_patterns": ["pn-logs5y*"],
+        "priority": 100
+      }
+    ]
+  }
+}'
+
+policy_10y_test='{
+  "policy": {
+    "description": "Rollover audit10y",
+    "default_state": "rollover",
+    "states": [
+      {
+        "name": "rollover",
+        "actions": [
+          {
+            "rollover": {
+              "min_size": "20gb",
+              "min_index_age": "3d"
+            }
+          }
+        ],
+        "transitions": [
+          {
+            "state_name": "delete",
+            "conditions": {
+              "min_index_age": "3660d"
             }
           }
         ]
@@ -552,6 +852,14 @@ index_5y='{
   }
 }'
 
+index_2y='{
+  "aliases": {
+    "pn-logs2y": {
+      "is_write_index": true
+    }
+  }
+}'
+
 index_10y='{
   "aliases": {
     "pn-logs10y": {
@@ -635,31 +943,40 @@ writer_mapping='{
 echo "Starting OpenSearch initialization on ${BASE_URL} (environment=${ENVIRONMENT})"
 
 # 1) Preliminary security configuration: roles and users
-call_api "CREATE ROLE pn-log-extractor-reader" "PUT" "/_plugins/_security/api/roles/pn-log-extractor-reader" "${reader_role}"
-call_api "CREATE ROLE pn-lambda-writer" "PUT" "/_plugins/_security/api/roles/pn-lambda-writer" "${writer_role}"
-call_api "CREATE USER pn-log-extractor-reader" "PUT" "/_plugins/_security/api/internalusers/pn-log-extractor-reader" "${reader_user_payload}"
-call_api "CREATE USER pn-lambda-writer" "PUT" "/_plugins/_security/api/internalusers/pn-lambda-writer" "${writer_user_payload}"
-call_api "MAP USER pn-log-extractor-reader -> ROLE" "PUT" "/_plugins/_security/api/rolesmapping/pn-log-extractor-reader" "${reader_mapping}"
-call_api "MAP USER pn-lambda-writer -> ROLE" "PUT" "/_plugins/_security/api/rolesmapping/pn-lambda-writer" "${writer_mapping}"
+#call_api "CREATE ROLE pn-log-extractor-reader" "PUT" "/_plugins/_security/api/roles/pn-log-extractor-reader" "${reader_role}"
+#call_api "CREATE ROLE pn-lambda-writer" "PUT" "/_plugins/_security/api/roles/pn-lambda-writer" "${writer_role}"
+#call_api "CREATE USER pn-log-extractor-reader" "PUT" "/_plugins/_security/api/internalusers/pn-log-extractor-reader" "${reader_user_payload}"
+#call_api "CREATE USER pn-lambda-writer" "PUT" "/_plugins/_security/api/internalusers/pn-lambda-writer" "${writer_user_payload}"
+#call_api "MAP USER pn-log-extractor-reader -> ROLE" "PUT" "/_plugins/_security/api/rolesmapping/pn-log-extractor-reader" "${reader_mapping}"
+#call_api "MAP USER pn-lambda-writer -> ROLE" "PUT" "/_plugins/_security/api/rolesmapping/pn-lambda-writer" "${writer_mapping}"
 
 # 2) OpenSearch bootstrap (pipelines, templates, policies, indexes)
-call_api "BOOTSTRAP ROUTING INGEST PIPELINE" "PUT" "/_ingest/pipeline/routing_pipeline" "${routing_pipeline_payload}"
-call_api "BOOTSTRAP INGEST PIPELINE" "PUT" "/_ingest/pipeline/import" "${ingest_pipeline_payload}"
+#call_api "BOOTSTRAP ROUTING INGEST PIPELINE" "PUT" "/_ingest/pipeline/routing_pipeline" "${routing_pipeline_payload}"
+#call_api "BOOTSTRAP INGEST PIPELINE" "PUT" "/_ingest/pipeline/import" "${ingest_pipeline_payload}"
 
 call_api "BOOTSTRAP INDEX TEMPLATE 120D" "PUT" "/_index_template/ism_rollover120d" "${index_template_120d}"
+call_api "BOOTSTRAP INDEX TEMPLATE 2Y" "PUT" "/_index_template/ism_rollover2y" "${index_template_2y}"
 call_api "BOOTSTRAP INDEX TEMPLATE 5Y" "PUT" "/_index_template/ism_rollover5y" "${index_template_5y}"
 call_api "BOOTSTRAP INDEX TEMPLATE 10Y" "PUT" "/_index_template/ism_rollover10y" "${index_template_10y}"
 
-if [[ "${ENVIRONMENT}" == "test" ]]; then
-  call_api "BOOTSTRAP LIFECYCLE POLICY 7D (TEST)" "PUT" "/_plugins/_ism/policies/rollover7d" "${policy_7d_test}"
-fi
+#if [[ "${ENVIRONMENT}" == "test" ]]; then
+#  call_api "BOOTSTRAP LIFECYCLE POLICY 7D (TEST)" "PUT" "/_plugins/_ism/policies/rollover7d" "${policy_7d_test}"
+#fi
 
 call_api "BOOTSTRAP LIFECYCLE POLICY 120D" "PUT" "/_plugins/_ism/policies/rollover120d" "${policy_120d}"
-call_api "BOOTSTRAP LIFECYCLE POLICY 5Y" "PUT" "/_plugins/_ism/policies/rollover5y" "${policy_5y}"
-call_api "BOOTSTRAP LIFECYCLE POLICY 10Y" "PUT" "/_plugins/_ism/policies/rollover10y" "${policy_10y}"
+if [[ "${ENVIRONMENT}" == "test" ]]; then
+  call_api "BOOTSTRAP LIFECYCLE POLICY 2Y (TEST NO WARM)" "PUT" "/_plugins/_ism/policies/rollover2y" "${policy_2y_test}"
+  call_api "BOOTSTRAP LIFECYCLE POLICY 5Y (TEST NO WARM)" "PUT" "/_plugins/_ism/policies/rollover5y" "${policy_5y_test}"
+  call_api "BOOTSTRAP LIFECYCLE POLICY 10Y (TEST NO WARM)" "PUT" "/_plugins/_ism/policies/rollover10y" "${policy_10y_test}"
+else
+  call_api "BOOTSTRAP LIFECYCLE POLICY 2Y" "PUT" "/_plugins/_ism/policies/rollover2y" "${policy_2y}"
+  call_api "BOOTSTRAP LIFECYCLE POLICY 5Y" "PUT" "/_plugins/_ism/policies/rollover5y" "${policy_5y}"
+  call_api "BOOTSTRAP LIFECYCLE POLICY 10Y" "PUT" "/_plugins/_ism/policies/rollover10y" "${policy_10y}"
+fi
 
 call_api "BOOTSTRAP INDEX 10Y" "PUT" "/pn-logs10y-000001" "${index_10y}"
 call_api "BOOTSTRAP INDEX 5Y" "PUT" "/pn-logs5y-000001" "${index_5y}"
+call_api "BOOTSTRAP INDEX 2Y" "PUT" "/pn-logs2y-000001" "${index_2y}"
 call_api "BOOTSTRAP INDEX 120D" "PUT" "/pn-logs120d-000001" "${index_120d}"
 
 call_api "BOOTSTRAP ROUTING INDEX" "PUT" "/routing_index" "${routing_index}"
