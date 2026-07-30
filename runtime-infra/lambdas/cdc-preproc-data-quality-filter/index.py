@@ -5,7 +5,10 @@ from datetime import datetime, timezone
 from processor.input_loader import load_table_config
 from processor.dq_executor import execute_dq
 from processor.payload_filter import apply_filters
+import logging
 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 def decode_payload(encoded_data):
     decoded_data = base64.b64decode(
@@ -143,6 +146,9 @@ def lambda_handler(event, context):
             counters["failed"] += 1
 
             print(
+                f"{datetime.now(timezone.utc).isoformat()} "
+                f"{context.aws_request_id} "
+                "ERROR "
                 "Technical error during record processing. "
                 f"RecordId={record_id}, "
                 f"ErrorType={type(error).__name__}, "
