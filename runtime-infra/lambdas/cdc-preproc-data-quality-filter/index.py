@@ -104,11 +104,13 @@ def lambda_handler(event, context):
                     "Unsupported processing layer: "
                     f"{processing_layer}"
                 )
-
-            if dq_errors:
+            
+            if processing_layer == "quarantine":
                 print(
-                    "Data Quality checks failed. "
+                    "QUARANTINE Record routed to quarantine. "
                     f"RecordId={record_id}, "
+                    f"Result=Ok, "
+                    f"ProcessingLayer={processing_layer}, "
                     f"TableName={table_name}, "
                     f"ImageSource={image_source}, "
                     f"Errors={json.dumps(dq_errors)}"
