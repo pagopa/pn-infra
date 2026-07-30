@@ -256,12 +256,15 @@ Resources:
   
   PreprocessingLambdaLogGroup:
     Condition: CreatePreprocessingFirehose
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub '/aws/lambda/${ProjectName}-${PreprocessingStreamNamePrefix}-data-quality-filter'
-      RetentionInDays: 120
+    Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub "${ProjectName}-${PreprocessingStreamNamePrefix}-data-quality-filter"
+        LogGroupRetention: 120
+        LogGroupPrefix: /aws/lambda
   
   PreprocessingFilterLambdaAlarms:
     Condition: CreatePreprocessingFirehose
@@ -273,7 +276,6 @@ Resources:
       Parameters:
         FunctionName: !Ref PreprocessingFilterLambda
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        FilterPattern: "QUARANTINE"
 
   PreprocessingLogsKinesisDeliveryStreamPartitioned:
     Condition: CreatePreprocessingFirehose
@@ -306,7 +308,7 @@ Resources:
             Ref: PreprocessingDeliveryStreamLogGroupS3Destination
 
         Prefix: 
-          !Sub '${PreprocessingS3RootPrefix}/!{partitionKeyFromLambda:PROCESSING_LAYER}/TABLE_NAME=_{partitionKeyFromLambda:TABLE_NAME}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
+          !Sub '${PreprocessingS3RootPrefix}/!{partitionKeyFromLambda:PROCESSING_LAYER}/TABLE_NAME_!{partitionKeyFromLambda:TABLE_NAME}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
         ErrorOutputPrefix:
           !Sub 'errors/${PreprocessingS3RootPrefix}/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
 

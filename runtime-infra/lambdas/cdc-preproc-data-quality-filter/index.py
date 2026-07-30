@@ -1,14 +1,11 @@
 import base64
 import json
-from datetime import datetime, timezone
 
+from config import logger, setup_logger
 from processor.input_loader import load_table_config
 from processor.dq_executor import execute_dq
 from processor.payload_filter import apply_filters
-import logging
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
 
 def decode_payload(encoded_data):
     decoded_data = base64.b64decode(
@@ -40,11 +37,14 @@ def build_metadata(table_name, processing_layer):
 
 
 def lambda_handler(event, context):
+    setup_logger(context.aws_request_id)
+
     records = event.get("records", [])
 
-    print(
+    logger.info(
         "Starting Firehose preprocessing Lambda. "
-        f"Processing {len(records)} records."
+        "Processing %s records.",
+        len(records),
     )
 
     output = []
@@ -81,6 +81,15 @@ def lambda_handler(event, context):
                     ),
                 })
 
+                logger.info(
+                    "Record dropped because table configuration "
+                    "was not found. "
+                    "RecordId=%s, "
+                    "TableName=%s",
+                    record_id,
+                    table_name,
+                )
+
                 continue
 
             dq_result = execute_dq(
@@ -104,25 +113,18 @@ def lambda_handler(event, context):
                     "Unsupported processing layer: "
                     f"{processing_layer}"
                 )
-            
-            if processing_layer == "quarantine":
-                print(
-                    "QUARANTINE Record routed to quarantine. "
-                    f"RecordId={record_id}, "
-                    f"Result=Ok, "
-                    f"ProcessingLayer={processing_layer}, "
-                    f"TableName={table_name}, "
-                    f"ImageSource={image_source}, "
-                    f"Errors={json.dumps(dq_errors)}"
-                )
 
             if processing_layer == "excluded":
-                print(
+                logger.info(
                     "Record excluded. "
-                    f"RecordId={record_id}, "
-                    f"TableName={table_name}, "
-                    f"ImageSource={image_source}, "
-                    f"Exclusion={dq_result.get('exclusion')}"
+                    "RecordId=%s, "
+                    "TableName=%s, "
+                    "ImageSource=%s, "
+                    "Exclusion=%s",
+                    record_id,
+                    table_name,
+                    image_source,
+                    dq_result.get("exclusion"),
                 )
 
             filtered_payload = apply_filters(
@@ -130,9 +132,6 @@ def lambda_handler(event, context):
                 processing_layer=processing_layer,
                 filters=table_config.get("filters", []),
             )
-
-            counters["kept"] += 1
-            counters[processing_layer] += 1
 
             output.append({
                 "recordId": record_id,
@@ -144,17 +143,40 @@ def lambda_handler(event, context):
                 ),
             })
 
+            counters["kept"] += 1
+            counters[processing_layer] += 1
+
+            if processing_layer == "quarantine":
+                logger.error(
+                    "QUARANTINE Record routed to quarantine. "
+                    "RecordId=%s, "
+                    "Result=Ok, "
+                    "ProcessingLayer=%s, "
+                    "TableName=%s, "
+                    "ImageSource=%s, "
+                    "Errors=%s",
+                    record_id,
+                    processing_layer,
+                    table_name,
+                    image_source,
+                    json.dumps(
+                        dq_errors,
+                        separators=(",", ":"),
+                        ensure_ascii=False,
+                    ),
+                )
+
         except Exception as error:
             counters["failed"] += 1
 
-            print(
-                f"{datetime.now(timezone.utc).isoformat()} "
-                f"{context.aws_request_id} "
-                "ERROR "
+            logger.exception(
                 "Technical error during record processing. "
-                f"RecordId={record_id}, "
-                f"ErrorType={type(error).__name__}, "
-                f"Error={str(error)}"
+                "RecordId=%s, "
+                "ErrorType=%s, "
+                "Error=%s",
+                record_id,
+                type(error).__name__,
+                str(error),
             )
 
             output.append({
@@ -163,16 +185,20 @@ def lambda_handler(event, context):
                 "data": original_data,
             })
 
-    execution_time = datetime.now(timezone.utc).isoformat()
-
-    print(
-        f"Batch processed at {execution_time}. "
-        f"Kept={counters['kept']}, "
-        f"Dropped={counters['dropped']}, "
-        f"Clean={counters['clean']}, "
-        f"Quarantine={counters['quarantine']}, "
-        f"Excluded={counters['excluded']}, "
-        f"Failed={counters['failed']}"
+    logger.info(
+        "Batch processed. "
+        "Kept=%s, "
+        "Dropped=%s, "
+        "Clean=%s, "
+        "Quarantine=%s, "
+        "Excluded=%s, "
+        "Failed=%s",
+        counters["kept"],
+        counters["dropped"],
+        counters["clean"],
+        counters["quarantine"],
+        counters["excluded"],
+        counters["failed"],
     )
 
     return {
