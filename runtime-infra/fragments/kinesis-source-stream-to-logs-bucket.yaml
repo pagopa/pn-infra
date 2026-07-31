@@ -69,6 +69,11 @@ Parameters:
   TemplateBucketBaseUrl:
     Type: String
     Description: URL to load infrastructure model fragments from
+  
+  LogsKinesisSourceStreamArn:
+    Type: String
+    Default: ""
+    Description: Kinesis stream ARN used to export CloudWatch logs
 
 Conditions:
   ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
@@ -267,6 +272,7 @@ Resources:
         LogGroupName: !Sub "${ProjectName}-${PreprocessingStreamNamePrefix}-data-quality-filter"
         LogGroupRetention: 120
         LogGroupPrefix: /aws/lambda
+        LogsKinesisSourceStreamArn: !Ref LogsKinesisSourceStreamArn
   
   PreprocessingFilterLambdaAlarms:
     Condition: CreatePreprocessingFirehose
