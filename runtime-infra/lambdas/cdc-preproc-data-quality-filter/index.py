@@ -61,9 +61,12 @@ def lambda_handler(event, context):
     for record in records:
         record_id = record.get("recordId")
         original_data = record.get("data")
+        event_id = None
 
         try:
             payload = decode_payload(original_data)
+
+            event_id = payload.get("eventID")
             table_name = payload.get("tableName")
 
             table_config = load_table_config(table_name)
@@ -80,15 +83,6 @@ def lambda_handler(event, context):
                         processing_layer="dropped",
                     ),
                 })
-
-                logger.info(
-                    "Record dropped because table configuration "
-                    "was not found. "
-                    "RecordId=%s, "
-                    "TableName=%s",
-                    record_id,
-                    table_name,
-                )
 
                 continue
 
@@ -114,19 +108,6 @@ def lambda_handler(event, context):
                     f"{processing_layer}"
                 )
 
-            if processing_layer == "excluded":
-                logger.info(
-                    "Record excluded. "
-                    "RecordId=%s, "
-                    "TableName=%s, "
-                    "ImageSource=%s, "
-                    "Exclusion=%s",
-                    record_id,
-                    table_name,
-                    image_source,
-                    dq_result.get("exclusion"),
-                )
-
             filtered_payload = apply_filters(
                 payload=payload,
                 processing_layer=processing_layer,
@@ -146,22 +127,52 @@ def lambda_handler(event, context):
             counters["kept"] += 1
             counters[processing_layer] += 1
 
-            if processing_layer == "quarantine":
+            if processing_layer == "clean":
+                logger.info(
+                    "Record routed to clean.\n"
+                    "  EventID=%s,"
+                    "  Result=Ok,"
+                    "  ProcessingLayer=%s,"
+                    "  TableName=%s,"
+                    "  ImageSource=%s",
+                    event_id,
+                    processing_layer,
+                    table_name,
+                    image_source,
+                )
+
+            elif processing_layer == "excluded":
+                logger.info(
+                    "Record routed to excluded.\n"
+                    "  EventID=%s,"
+                    "  Result=Ok,"
+                    "  ProcessingLayer=%s,"
+                    "  TableName=%s,"
+                    "  ImageSource=%s\n"
+                    "  Exclusion=%s",
+                    event_id,
+                    processing_layer,
+                    table_name,
+                    image_source,
+                    dq_result.get("exclusion"),
+                )
+
+            elif processing_layer == "quarantine":
                 logger.error(
-                    "QUARANTINE Record routed to quarantine. "
-                    "RecordId=%s, "
+                    "QUARANTINE Record routed to quarantine.\n"
+                    "EventID=%s, "
                     "Result=Ok, "
                     "ProcessingLayer=%s, "
                     "TableName=%s, "
-                    "ImageSource=%s, "
+                    "ImageSource=%s\n"
                     "Errors=%s",
-                    record_id,
+                    event_id,
                     processing_layer,
                     table_name,
                     image_source,
                     json.dumps(
                         dq_errors,
-                        separators=(",", ":"),
+                        indent=2,
                         ensure_ascii=False,
                     ),
                 )
@@ -170,11 +181,11 @@ def lambda_handler(event, context):
             counters["failed"] += 1
 
             logger.exception(
-                "Technical error during record processing. "
-                "RecordId=%s, "
-                "ErrorType=%s, "
+                "Technical error during record processing.\n"
+                "EventID=%s\n"
+                "ErrorType=%s\n"
                 "Error=%s",
-                record_id,
+                event_id,
                 type(error).__name__,
                 str(error),
             )
