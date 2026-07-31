@@ -253,6 +253,8 @@ Resources:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub '${LambdasBasePath}/cdc-preproc-data-quality-filter.zip'
       Role: !GetAtt PreprocessingFilterLambdaRole.Arn
+      LoggingConfig:
+        LogGroup: !GetAtt PreprocessingLambdaLogGroup.Outputs.LogGroupName
   
   PreprocessingLambdaLogGroup:
     Condition: CreatePreprocessingFirehose
