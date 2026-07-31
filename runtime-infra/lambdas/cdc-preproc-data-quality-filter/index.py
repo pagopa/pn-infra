@@ -129,12 +129,12 @@ def lambda_handler(event, context):
 
             if processing_layer == "clean":
                 logger.info(
-                    "Record routed to clean.\n"
-                    "  EventID=%s,"
-                    "  Result=Ok,"
-                    "  ProcessingLayer=%s,"
-                    "  TableName=%s,"
-                    "  ImageSource=%s",
+                    "Record routed to clean. "
+                    "EventID=%s, "
+                    "Result=Ok, "
+                    "ProcessingLayer=%s, "
+                    "TableName=%s, "
+                    "ImageSource=%s",
                     event_id,
                     processing_layer,
                     table_name,
@@ -143,13 +143,13 @@ def lambda_handler(event, context):
 
             elif processing_layer == "excluded":
                 logger.info(
-                    "Record routed to excluded.\n"
-                    "  EventID=%s,"
-                    "  Result=Ok,"
-                    "  ProcessingLayer=%s,"
-                    "  TableName=%s,"
-                    "  ImageSource=%s\n"
-                    "  Exclusion=%s",
+                    "Record routed to excluded. "
+                    "EventID=%s, "
+                    "Result=Ok, "
+                    "ProcessingLayer=%s, "
+                    "TableName=%s, "
+                    "ImageSource=%s, "
+                    "Exclusion=%s",
                     event_id,
                     processing_layer,
                     table_name,
@@ -159,12 +159,12 @@ def lambda_handler(event, context):
 
             elif processing_layer == "quarantine":
                 logger.error(
-                    "QUARANTINE Record routed to quarantine.\n"
+                    "Record routed to quarantine. "
                     "EventID=%s, "
                     "Result=Ok, "
                     "ProcessingLayer=%s, "
                     "TableName=%s, "
-                    "ImageSource=%s\n"
+                    "ImageSource=%s, "
                     "Errors=%s",
                     event_id,
                     processing_layer,
@@ -172,18 +172,18 @@ def lambda_handler(event, context):
                     image_source,
                     json.dumps(
                         dq_errors,
-                        indent=2,
+                        separators=(",", ":"),
                         ensure_ascii=False,
                     ),
-                )
+                )     
 
         except Exception as error:
             counters["failed"] += 1
 
             logger.exception(
                 "Technical error during record processing.\n"
-                "EventID=%s\n"
-                "ErrorType=%s\n"
+                "EventID=%s "
+                "ErrorType=%s "
                 "Error=%s",
                 event_id,
                 type(error).__name__,
