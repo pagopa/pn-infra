@@ -18,8 +18,8 @@ def _payload_with_addresshash():
     }
 
 
-# test che verifica quando il filtro "remove_fields" viene applicato o meno, in base a processing layer,
-# applyTo e immagini indicate
+# Verify that remove_fields is applied only to the configured layers/images
+# and that fields are removed from NewImage and OldImage as expected.
 @pytest.mark.parametrize(
     "processing_layer,filters,removed_from_new,removed_from_old",
     [
@@ -62,9 +62,7 @@ def test_apply_filters_remove_fields(processing_layer, filters, removed_from_new
     assert ("addresshash" not in result["dynamodb"]["OldImage"]) == removed_from_old
 
 
-# test che verifica che il payload resti invariato quando non è configurato alcun filtro:
-# il confronto è con una copia costruita a parte, perché apply_filters restituisce lo
-# stesso oggetto ricevuto e un assert result == payload sarebbe sempre vero
+# Verify that the payload is left unchanged when no filters are configured.
 def test_apply_filters_with_no_filters_returns_payload_unchanged():
     payload = _payload_with_addresshash()
 
@@ -73,7 +71,7 @@ def test_apply_filters_with_no_filters_returns_payload_unchanged():
     assert result == _payload_with_addresshash()
 
 
-# test che verifica che venga sollevato un errore per un tipo di filtro non supportato
+# Verify that an unsupported filter type raises a ValueError.
 def test_apply_filters_unsupported_type_raises_value_error():
     payload = _payload_with_addresshash()
     filters = [{"type": "unsupported_filter"}]

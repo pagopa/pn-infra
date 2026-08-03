@@ -11,8 +11,8 @@ from processor.ddb_utils import (
 )
 
 
-# test che verifica l'estrazione della sezione "dynamodb": viene restituita quando è un
-# dizionario valido, altrimenti si ottiene un dizionario vuoto
+# Verify that the "dynamodb" section is extracted, and that an empty dict is
+# returned when it's missing or not a dict.
 @pytest.mark.parametrize(
     "payload,expected",
     [
@@ -29,7 +29,8 @@ def test_get_dynamodb(payload, expected):
     assert get_dynamodb(payload) == expected
 
 
-# test che verifica la scelta dell'immagine (NewImage/OldImage/Keys) secondo la priorità di default o personalizzata
+# Verify that the correct image (NewImage/OldImage/Keys) is picked, using the
+# default priority order or a custom one.
 @pytest.mark.parametrize(
     "payload,priority,expected_image,expected_source",
     [
@@ -99,6 +100,7 @@ def test_get_dynamodb(payload, expected):
     ],
 )
 def test_get_image(payload, priority, expected_image, expected_source):
+    # priority is None for the cases exercising the function's default priority order.
     if priority is None:
         image, source = get_image(payload)
     else:
@@ -108,7 +110,8 @@ def test_get_image(payload, priority, expected_image, expected_source):
     assert source == expected_source
 
 
-# test che verifica l'estrazione del valore tipizzato DynamoDB e i casi limite (NULL, campo assente, immagine non valida)
+# Verify that a typed DynamoDB attribute is unwrapped correctly, including the
+# NULL, missing-field, and invalid-shape edge cases.
 @pytest.mark.parametrize(
     "image,expected",
     [
@@ -133,7 +136,8 @@ def test_get_value(image, expected):
     assert get_value(image, "field") == expected
 
 
-# test che verifica se un campo ha un valore significativo, escludendo None e stringhe vuote o di soli spazi
+# Verify that a field is considered to have a value unless it's None or a
+# blank/whitespace-only string.
 @pytest.mark.parametrize(
     "image,expected",
     [
@@ -151,9 +155,9 @@ PK = {"S": "a"}
 HASH = {"S": "hash"}
 
 
-# test che verifica la rimozione dei campi dalle immagini: quali immagini vengono toccate
-# (default o esplicite) e i casi che devono restare no-op senza sollevare errori.
-# expected_dynamodb descrive la sezione dynamodb dopo la chiamata
+# Verify that fields are removed from the default or an explicit list of images,
+# and that the no-op cases don't raise. expected_dynamodb is the "dynamodb" section
+# as it should look after the call.
 @pytest.mark.parametrize(
     "dynamodb,field_names,image_names,expected_dynamodb",
     [
@@ -204,10 +208,12 @@ HASH = {"S": "hash"}
     ],
 )
 def test_remove_fields(dynamodb, field_names, image_names, expected_dynamodb):
-    # copia: remove_fields muta le immagini, che altrimenti sarebbero condivise tra i
-    # parametri costruiti una sola volta in fase di collection
+    # Deep-copy because remove_fields mutates in place, and parametrize builds these
+    # params once at collection time; without the copy, test cases would leak into
+    # each other.
     payload = {"dynamodb": deepcopy(dynamodb)}
 
+    # image_names is None for the cases exercising the function's default image list.
     if image_names is None:
         result = remove_fields(payload, field_names=field_names)
     else:
@@ -215,6 +221,6 @@ def test_remove_fields(dynamodb, field_names, image_names, expected_dynamodb):
             payload, field_names=field_names, image_names=image_names
         )
 
-    # remove_fields muta e restituisce lo stesso payload ricevuto
+    # remove_fields mutates in place and returns the same object it received.
     assert result is payload
     assert result["dynamodb"] == expected_dynamodb

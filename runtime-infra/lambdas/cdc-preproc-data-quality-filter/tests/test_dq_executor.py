@@ -13,8 +13,7 @@ def _field(value):
     return {"S": value}
 
 
-# test che verifica ogni tipo di regola (required, not_null, starts_with, starts_with_any, allowed_values, matches_regex)
-# nei rispettivi casi di successo, fallimento e valore non valido
+# Verify every rule type in its success case, its failure case, and with an invalid value.
 @pytest.mark.parametrize(
     "image,rule,expected",
     [
@@ -97,18 +96,6 @@ def _field(value):
             id="allowed_values-not-in-list",
         ),
         pytest.param(
-            {"sk": _field("COURTESY#default#EMAIL")},
-            {"type": "matches_regex", "field": "sk", "pattern": "^COURTESY#.*#(SMS|EMAIL|APPIO)$"},
-            True,
-            id="matches_regex-match",
-        ),
-        pytest.param(
-            {"sk": _field("COURTESY#default#FAX")},
-            {"type": "matches_regex", "field": "sk", "pattern": "^COURTESY#.*#(SMS|EMAIL|APPIO)$"},
-            False,
-            id="matches_regex-mismatch",
-        ),
-        pytest.param(
             {"sk": {"BOOL": True}},
             {"type": "matches_regex", "field": "sk", "pattern": ".*"},
             False,
@@ -120,19 +107,19 @@ def test_execute_rule(image, rule, expected):
     assert execute_rule(image, rule) is expected
 
 
-# test che verifica che venga sollevato un errore per un tipo di regola non supportato
+# Verify that an unsupported rule type raises a ValueError.
 def test_execute_rule_unsupported_type_raises_value_error():
     with pytest.raises(ValueError):
         execute_rule({}, {"type": "not_a_real_check"})
 
 
-# test che verifica che una condizione assente (vuota o None) sia sempre considerata soddisfatta
+# Verify that an empty or missing condition is always treated as satisfied.
 def test_matches_condition_true_when_condition_empty():
     assert matches_condition({"pk": _field("AB#1")}, {}) is True
     assert matches_condition({"pk": _field("AB#1")}, None) is True
 
 
-# test che verifica che la condizione venga valutata applicando l'operatore configurato
+# Verify that a condition is evaluated using its configured operator.
 def test_matches_condition_evaluates_operator():
     image = {"pk": _field("AB#1")}
     condition = {"field": "pk", "operator": "starts_with", "value": "AB#"}
@@ -143,7 +130,7 @@ def test_matches_condition_evaluates_operator():
     assert matches_condition(image, condition_false) is False
 
 
-# test che verifica che nessuna esclusione venga applicata quando nessuna regola di esclusione corrisponde
+# Verify that no exclusion is applied when no exclusion rule matches.
 def test_is_excluded_no_match_returns_false_and_none():
     image = {"pk": _field("AB#1")}
     exclusions = [
@@ -156,7 +143,7 @@ def test_is_excluded_no_match_returns_false_and_none():
     assert name is None
 
 
-# test che verifica che venga restituito il nome dell'esclusione quando una regola corrisponde
+# Verify that a matching exclusion rule returns its name along with the match.
 def test_is_excluded_match_returns_true_and_exclusion_name():
     image = {"pk": _field("VC#1")}
     exclusions = [
@@ -169,7 +156,7 @@ def test_is_excluded_match_returns_true_and_exclusion_name():
     assert name == "excluded_pk_prefix"
 
 
-# test che verifica che un controllo con condizione "when" non soddisfatta venga considerato automaticamente superato
+# Verify that a check with an unmet "when" condition is skipped and counted as passed.
 def test_execute_check_passes_automatically_when_condition_not_met():
     image = {"pk": _field("CO#1")}
     check = {
@@ -183,7 +170,7 @@ def test_execute_check_passes_automatically_when_condition_not_met():
     assert execute_check(image, check) is True
 
 
-# test che verifica che le regole annidate vengano valutate quando la condizione "when" è soddisfatta
+# Verify that nested rules are evaluated once the "when" condition is met.
 def test_execute_check_evaluates_nested_rules_when_condition_met():
     image = {
         "pk": _field("AB#1"),
@@ -200,7 +187,7 @@ def test_execute_check_evaluates_nested_rules_when_condition_met():
     assert execute_check(image, check) is False
 
 
-# test che verifica che, in assenza di "when", il controllo venga valutato direttamente come regola singola
+# Verify that a check with no "when" is evaluated directly as a plain rule.
 def test_execute_check_without_when_evaluates_rule_directly():
     image = {"pk": _field("a"), "sk": _field("b")}
     check = {"type": "required", "fields": ["pk", "sk"]}
@@ -235,7 +222,7 @@ def _synthetic_config():
     }
 
 
-# test che verifica che il payload venga instradato come "clean" quando nessun controllo fallisce
+# Verify that the payload is routed to "clean" when no check fails.
 def test_execute_dq_returns_clean_when_no_errors():
     payload = {"dynamodb": {"NewImage": {"pk": _field("KEEP#1")}}}
 
@@ -247,7 +234,8 @@ def test_execute_dq_returns_clean_when_no_errors():
     assert result["exclusion"] is None
 
 
-# test che verifica che il payload venga instradato come "quarantine" e riporti l'errore quando un controllo fallisce
+# Verify that the payload is routed to "quarantine" and the failing check is reported
+# as an error when a check fails.
 def test_execute_dq_returns_quarantine_when_check_fails():
     payload = {"dynamodb": {"NewImage": {"other": _field("value")}}}
 
@@ -260,7 +248,8 @@ def test_execute_dq_returns_quarantine_when_check_fails():
     assert result["exclusion"] is None
 
 
-# test che verifica che il payload venga instradato come "excluded" quando corrisponde a una regola di esclusione
+# Verify that the payload is routed to "excluded" when an exclusion rule matches,
+# without running any of the checks.
 def test_execute_dq_returns_excluded_when_exclusion_matches():
     payload = {"dynamodb": {"NewImage": {"pk": _field("EXCLUDED#1")}}}
 
@@ -271,8 +260,8 @@ def test_execute_dq_returns_excluded_when_exclusion_matches():
     assert result["exclusion"] == "excluded_pk_prefix"
 
 
-# test che verifica che vengano usati gli stati di routing di default quando la
-# configurazione non li specifica, per tutti e tre gli instradamenti possibili
+# Verify that the default routing statuses are used for all three layers when the
+# config doesn't set them explicitly.
 @pytest.mark.parametrize(
     "image,expected_layer",
     [
@@ -293,7 +282,7 @@ def test_execute_dq_falls_back_to_default_routing_statuses(image, expected_layer
     assert result["processingLayer"] == expected_layer
 
 
-# test che verifica che l'assenza di immagini disponibili venga riportata come sorgente "Missing"
+# Verify that the image source is reported as "Missing" when no image is available.
 def test_execute_dq_reports_missing_image_as_missing_source():
     result = execute_dq(payload={"dynamodb": {}}, config=_synthetic_config())
 

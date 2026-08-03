@@ -1,7 +1,6 @@
 import pytest
 import yaml
 
-import processor.input_loader as input_loader
 from processor.input_loader import load_manifest, load_table_config
 
 
@@ -21,33 +20,34 @@ def _write_manifest(manifest_path, table_name, config_file=None, enabled=True):
     _write_yaml(manifest_path, {"tables": {table_name: entry}})
 
 
-@pytest.fixture
-def temp_config_env(tmp_path, monkeypatch):
-    config_path = tmp_path / "config"
-    manifest_path = config_path / "manifest.yaml"
-
-    monkeypatch.setattr(input_loader, "CONFIG_PATH", config_path)
-    monkeypatch.setattr(input_loader, "MANIFEST_PATH", manifest_path)
-
-    return config_path, manifest_path
-
-
-# test che verifica che venga restituito None quando il nome tabella è vuoto o assente
-def test_load_table_config_returns_none_for_falsy_table_name():
-    assert load_table_config(None) is None
-    assert load_table_config("") is None
-
-
-# test che verifica che venga restituito None per una tabella non presente nel manifest
-def test_load_table_config_returns_none_for_unknown_table(temp_config_env):
+# Verify that None is returned for a falsy table name, an unknown table, or a
+# table not present in the manifest.
+@pytest.mark.parametrize(
+    "table_name",
+    [
+        pytest.param(None, id="falsy-table-name"),
+        pytest.param("", id="falsy-table-name-empty-string"),
+        pytest.param("some-unknown-table", id="unknown-table"),
+    ],
+)
+def test_load_table_config_returns_none_for_falsy_or_unknown_table_name(table_name, temp_config_env):
     _, manifest_path = temp_config_env
 
     _write_yaml(manifest_path, {"tables": {}})
 
-    assert load_table_config("some-unknown-table") is None
+    assert load_table_config(table_name) is None
 
 
-# test che verifica che la configurazione della tabella venga letta e restituita correttamente
+# Verify that None is returned for a table that is disabled in the manifest.
+def test_load_table_config_disabled_table_returns_none(temp_config_env):
+    _, manifest_path = temp_config_env
+
+    _write_manifest(manifest_path, "disabled-table", config_file="tables/disabled-table.yaml", enabled=False)
+
+    assert load_table_config("disabled-table") is None
+
+
+# Verify that the table's config file is read and parsed correctly.
 def test_load_table_config_returns_parsed_config(temp_config_env):
     config_path, manifest_path = temp_config_env
 
@@ -64,7 +64,7 @@ def test_load_table_config_returns_parsed_config(temp_config_env):
     assert "checks" in config
 
 
-# test che verifica che chiamate successive per la stessa tabella restituiscano l'oggetto di configurazione dalla cache
+# Verify that subsequent calls for the same table return the cached config object.
 def test_load_table_config_caches_result(temp_config_env):
     config_path, manifest_path = temp_config_env
 
@@ -79,7 +79,7 @@ def test_load_table_config_caches_result(temp_config_env):
     assert first is second
 
 
-# test che verifica che il manifest venga letto e contenga le tabelle configurate
+# Verify that the manifest is loaded and contains the configured tables.
 def test_load_manifest_returns_dict_with_tables(temp_config_env):
     _, manifest_path = temp_config_env
 
@@ -91,39 +91,37 @@ def test_load_manifest_returns_dict_with_tables(temp_config_env):
     assert "sample-table" in manifest["tables"]
 
 
-# test che verifica che venga restituito None per una tabella disabilitata nel manifest
-def test_load_table_config_disabled_table_returns_none(temp_config_env):
-    _, manifest_path = temp_config_env
-
-    _write_manifest(manifest_path, "disabled-table", config_file="tables/disabled-table.yaml", enabled=False)
-
-    assert load_table_config("disabled-table") is None
-
-
-# test che verifica che venga sollevato un errore se manca il percorso di configurazione per una tabella abilitata
-def test_load_table_config_missing_config_field_raises_value_error(temp_config_env):
-    _, manifest_path = temp_config_env
-
-    _write_manifest(manifest_path, "no-config-table")
-
-    with pytest.raises(ValueError):
-        load_table_config("no-config-table")
-
-
-# test che verifica che venga sollevato un errore se il nome tabella nel file di configurazione non corrisponde a quello atteso
-def test_load_table_config_table_mismatch_raises_value_error(temp_config_env):
+# Verify that a ValueError is raised when an enabled table has no config path, and
+# when the config file's table name doesn't match the requested table.
+@pytest.mark.parametrize(
+    "table_name,config_file,config_content",
+    [
+        pytest.param("no-config-table", None, None, id="missing-config-field"),
+        pytest.param(
+            "table-a",
+            "tables/table-a.yaml",
+            {"table": "table-b"},
+            id="table-mismatch",
+        ),
+    ],
+)
+def test_load_table_config_invalid_config_raises_value_error(
+    table_name, config_file, config_content, temp_config_env
+):
     config_path, manifest_path = temp_config_env
 
-    _write_manifest(manifest_path, "table-a", config_file="tables/table-a.yaml")
-    _write_yaml(config_path / "tables" / "table-a.yaml", {
-        "table": "table-b",
-    })
+    _write_manifest(manifest_path, table_name, config_file=config_file)
+
+    # config_content is None for the missing-config-field case, which has no config
+    # file to write in the first place.
+    if config_content is not None:
+        _write_yaml(config_path / config_file, config_content)
 
     with pytest.raises(ValueError):
-        load_table_config("table-a")
+        load_table_config(table_name)
 
 
-# test che verifica che venga sollevato un errore quando il file di configurazione della tabella non esiste
+# Verify that a FileNotFoundError is raised when the table's config file doesn't exist.
 def test_load_table_config_missing_file_raises_file_not_found(temp_config_env):
     _, manifest_path = temp_config_env
 
@@ -133,13 +131,13 @@ def test_load_table_config_missing_file_raises_file_not_found(temp_config_env):
         load_table_config("missing-file-table")
 
 
-# test che verifica che venga sollevato un errore quando il file manifest non esiste
+# Verify that a FileNotFoundError is raised when the manifest file doesn't exist.
 def test_load_manifest_missing_file_raises_file_not_found(temp_config_env):
     with pytest.raises(FileNotFoundError):
         load_manifest()
 
 
-# test che verifica che venga sollevato un errore quando il manifest contiene uno YAML non valido (non un dizionario)
+# Verify that a ValueError is raised when the manifest is invalid YAML (not a dict).
 def test_load_manifest_invalid_yaml_raises_value_error(temp_config_env):
     _, manifest_path = temp_config_env
 
