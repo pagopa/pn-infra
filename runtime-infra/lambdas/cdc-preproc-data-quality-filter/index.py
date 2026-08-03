@@ -179,17 +179,17 @@ def lambda_handler(event, context):
 
         except Exception as error:
             counters["failed"] += 1
-
+        
             logger.exception(
-                "Technical error during record processing.\n"
-                "EventID=%s "
-                "ErrorType=%s "
+                "PROCESSING_FAILED Technical error during record processing. "
+                "RecordID=%s, "
+                "ErrorType=%s, "
                 "Error=%s",
-                event_id,
+                record_id,
                 type(error).__name__,
                 str(error),
             )
-
+        
             output.append({
                 "recordId": record_id,
                 "result": "ProcessingFailed",
