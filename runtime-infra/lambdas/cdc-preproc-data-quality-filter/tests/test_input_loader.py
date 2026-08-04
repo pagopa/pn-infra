@@ -91,34 +91,29 @@ def test_load_manifest_returns_dict_with_tables(temp_config_env):
     assert "sample-table" in manifest["tables"]
 
 
-# Verify that a ValueError is raised when an enabled table has no config path, and
-# when the config file's table name doesn't match the requested table.
-@pytest.mark.parametrize(
-    "table_name,config_file,config_content",
-    [
-        pytest.param("no-config-table", None, None, id="missing-config-field"),
-        pytest.param(
-            "table-a",
-            "tables/table-a.yaml",
-            {"table": "table-b"},
-            id="table-mismatch",
-        ),
-    ],
-)
-def test_load_table_config_invalid_config_raises_value_error(
-    table_name, config_file, config_content, temp_config_env
-):
+# Verify that a ValueError is raised when an enabled table has no config path.
+def test_load_table_config_missing_config_field_raises_value_error(temp_config_env):
+    _, manifest_path = temp_config_env
+
+    _write_manifest(manifest_path, "no-config-table", config_file=None)
+
+    with pytest.raises(ValueError, match="Missing configuration path for table: no-config-table"):
+        load_table_config("no-config-table")
+
+
+# Verify that a ValueError is raised when the config file's table name doesn't
+# match the requested table.
+def test_load_table_config_table_mismatch_raises_value_error(temp_config_env):
     config_path, manifest_path = temp_config_env
 
-    _write_manifest(manifest_path, table_name, config_file=config_file)
+    _write_manifest(manifest_path, "table-a", config_file="tables/table-a.yaml")
+    _write_yaml(config_path / "tables/table-a.yaml", {"table": "table-b"})
 
-    # config_content is None for the missing-config-field case, which has no config
-    # file to write in the first place.
-    if config_content is not None:
-        _write_yaml(config_path / config_file, config_content)
-
-    with pytest.raises(ValueError):
-        load_table_config(table_name)
+    with pytest.raises(
+        ValueError,
+        match="Configuration table mismatch: expected table-a, found table-b",
+    ):
+        load_table_config("table-a")
 
 
 # Verify that a FileNotFoundError is raised when the table's config file doesn't exist.

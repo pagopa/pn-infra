@@ -1,7 +1,7 @@
 import base64
 import json
 
-from tests.factories.classes import Category, DQCaseSpec, DQTestCase, PayloadInput, Table
+from tests.utils.classes import Category, DQCaseSpec, DQTestCase, PayloadInput, Table
 
 
 def field(value):

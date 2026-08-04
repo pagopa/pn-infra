@@ -1,6 +1,6 @@
 import index
-from tests.factories.builders import encode_raw_data, encode_record_data
-from tests.factories.classes import LambdaContext
+from tests.utils.builders import encode_raw_data, encode_record_data
+from tests.utils.classes import LambdaContext
 
 
 def _record(record_id, payload):
@@ -36,7 +36,7 @@ def _stub_pipeline(monkeypatch, table_config, processing_layer=None):
         monkeypatch.setattr(
             index,
             "apply_filters",
-            lambda payload, processing_layer, filters: payload,
+            lambda payload, processing_layer, filters: {**payload, "filtered": True},
         )
 
 
@@ -108,9 +108,19 @@ def test_lambda_handler_dropped_when_table_config_missing(monkeypatch):
 
 
 # Verify that the "Ok" path composes the DQ result, filters, and metadata correctly
-# into the output.
+# into the output. apply_filters is stubbed to observably mutate the payload, so
+# this fails if lambda_handler stops calling it or drops its output.
 def test_lambda_handler_ok_flow_uses_dq_result_and_filters(monkeypatch):
-    _stub_pipeline(monkeypatch, table_config={"filters": []}, processing_layer="clean")
+    table_config = {"filters": ["some-filter"]}
+    apply_filters_calls = []
+
+    def fake_apply_filters(payload, processing_layer, filters):
+        apply_filters_calls.append((payload, processing_layer, filters))
+        return {**payload, "filtered": True}
+
+    monkeypatch.setattr(index, "load_table_config", lambda table_name: table_config)
+    monkeypatch.setattr(index, "execute_dq", lambda payload, config: _dq_result("clean"))
+    monkeypatch.setattr(index, "apply_filters", fake_apply_filters)
 
     payload = {"tableName": "some-table", "dynamodb": {}}
 
@@ -124,7 +134,11 @@ def test_lambda_handler_ok_flow_uses_dq_result_and_filters(monkeypatch):
             "PROCESSING_LAYER": "clean",
         }
     }
-    assert index.decode_payload(record["data"]) == payload
+    # apply_filters must be called with the decoded payload, the DQ processing
+    # layer, and the table's configured filters.
+    assert apply_filters_calls == [(payload, "clean", ["some-filter"])]
+    # the output must be apply_filters' return value, not the original payload.
+    assert index.decode_payload(record["data"]) == {**payload, "filtered": True}
 
 
 # Verify that a record routed to quarantine is logged at ERROR level, since the

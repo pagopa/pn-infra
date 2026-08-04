@@ -10,17 +10,31 @@ La configurazione è centralizzata e consente di definire controlli differenti p
 cdc-preproc-data-quality-filter/
 ├── __init__.py
 ├── index.py
+├── config.py
 ├── README.md
 ├── processor/
 │   ├── input_loader.py
 │   ├── dq_executor.py
 │   ├── payload_filter.py
 │   └── ddb_utils.py
-└── config/
-    ├── manifest.yaml
-    └── tables/
-        ├── pn-user-attributes.yaml
-        └── ...
+├── config/
+│   ├── manifest.yaml
+│   └── tables/
+│       ├── pn-user-attributes.yaml
+│       └── ...
+└── tests/
+    ├── conftest.py
+    ├── test_index.py
+    ├── test_dq_executor.py
+    ├── test_payload_filter.py
+    ├── test_ddb_utils.py
+    ├── requirements-test.txt
+    ├── test_input_loader.py
+    ├── test_tables.py
+    └── utils/
+        ├── builders.py
+        ├── classes.py
+        └── tables.py
 ```
 
 ## Flusso di elaborazione
@@ -212,6 +226,31 @@ In questo esempio, il controllo su `addresshash` viene eseguito soltanto per i r
 
 L'aggiunta di un nuovo tipo di controllo richiede l'implementazione del relativo handler in `processor/dq_executor.py`.
 
+## Logging
+
+Il file `config.py` centralizza la configurazione del logging della Lambda.
+
+La funzione `setup_logger` viene invocata a ogni invocazione (`lambda_handler`) e configura il logger radice con un formato compatibile con `lambda-alarms`:
+
+```text
+timestamp aws_request_id level message
+```
+
+Questo formato è richiesto dal metric filter:
+
+```text
+[w1, w2, w3="ERROR", w4]
+```
+
+Per questo motivo l'`aws_request_id` viene iniettato in ogni record di log tramite un filtro dedicato, e il logger va sempre riconfigurato a inizio invocazione (non in fase di import) per riflettere l'`aws_request_id` della richiesta corrente.
+
+Il logger (`logger`) esposto da `config.py` viene utilizzato in `index.py` per tracciare:
+
+- l'avvio dell'elaborazione del batch e il relativo numero di record;
+- il routing di ogni record (`clean`, `excluded` a livello `info`, `quarantine` a livello `error` con gli `errorCode` riscontrati);
+- gli errori tecnici non gestiti, con stacktrace (`logger.exception`) e prefisso `PROCESSING_FAILED`;
+- il riepilogo dei contatori a fine batch (`kept`, `dropped`, `clean`, `quarantine`, `excluded`, `failed`).
+
 ## Errori Data Quality
 
 Quando un record non supera uno o più controlli:
@@ -266,6 +305,10 @@ Il payload non viene modificato ulteriormente e non vengono aggiunti attributi t
 
 ## Responsabilità dei file
 
+### `config.py`
+
+Contiene la configurazione del logging della Lambda, descritta nella sezione [Logging](#logging).
+
 ### `index.py`
 
 Entry point della Lambda. Gestisce:
@@ -316,6 +359,40 @@ Contiene le funzioni comuni per:
 - leggere i valori tipizzati DynamoDB;
 - verificare la valorizzazione degli attributi;
 - rimuovere gli attributi dalle immagini.
+
+## Test
+
+La suite di test si trova in `tests/` ed è organizzata su due livelli.
+
+### Unit test
+
+`test_dq_executor.py`, `test_payload_filter.py`, `test_ddb_utils.py`, `test_input_loader.py` e `test_index.py` testano in isolamento le funzioni dei singoli moduli, con configurazioni e payload minimi costruiti ad-hoc per ogni caso. Verificano il comportamento di una funzione a parità di input, indipendentemente dal resto della Lambda.
+
+### Test di integrazione
+
+`test_tables.py` esegue `execute_dq` e `index.lambda_handler` caricando le configurazioni reali presenti in `config/tables` (tramite `load_table_config`), a partire da payload rappresentativi definiti in `tests/utils/tables.py`.
+
+- `test_execute_dq` verifica il routing (`clean`/`quarantine`/`excluded`) e gli `errorCode` prodotti dai controlli configurati per ciascuna tabella;
+- `test_lambda_handler` esegue un check end-to-end sull'intero flusso della Lambda (decodifica, caricamento config, controlli, filtri, encoding), confrontando l'output con quello atteso, incluso il payload filtrato e i metadati.
+
+Questo livello di test verifica quindi che la configurazione YAML delle tabelle sia coerente con il comportamento atteso, oltre all'integrazione tra i moduli `processor/` e `index.py`.
+
+Per aggiungere i casi d'uso di una nuova tabella:
+
+1. registrare la tabella in `Table` (`tests/utils/classes.py`);
+2. in `tests/utils/tables.py`, definire un `PayloadInput` con `keys`/`new_image`/`old_image` rappresentativi della tabella;
+3. costruire i casi con `dq_case(DQCaseSpec(...))`, uno per ciascun `Category` da coprire (`clean`, `quarantine`, `excluded`), valorizzando `errors`, `exclusion` o `removed_fields` in base all'esito atteso;
+4. aggiungere i `DQTestCase` risultanti alla lista `PAYLOADS`.
+
+`test_execute_dq` e `test_lambda_handler` iterano automaticamente su `PAYLOADS`: non richiedono modifiche per coprire i nuovi casi.
+
+### `tests/utils/`
+
+Contiene i dati e le utility condivise dai test:
+
+- `classes.py`: dataclass ed enum di supporto.
+- `builders.py`: funzioni per costruire payload DynamoDB, casi di test ed eventi Firehose.
+- `tables.py`: contiene l'elenco dei `PAYLOADS`, ovvero, i casi di test registrati per ciascuna tabella.
 
 ## Aggiunta di una nuova tabella
 
