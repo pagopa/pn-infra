@@ -91,18 +91,23 @@ Resources:
                   "width": 24,
                   "height": 6,
                   "properties": {
-                    "title": "PrivateLink and NLB errors",
-                    "view": "timeSeries",
+                    "title": "Lambda target group request totals",
+                    "view": "singleValue",
                     "region": "${AWS::Region}",
                     "period": 300,
                     "stat": "Sum",
+                    "sparkline": false,
+                    "setPeriodToTimeRange": true,
                     "metrics": [
-                      [ "AWS/PrivateLinkServices", "RstPacketsSent", "Service Id", "${RaddVpcEndpointServiceId}" ],
-                      [ "AWS/NetworkELB", "ClientTLSNegotiationErrorCount", "LoadBalancer", "${NlbDimension}" ],
-                      [ ".", "TargetTLSNegotiationErrorCount", ".", "." ],
-                      [ ".", "TCP_Client_Reset_Count", ".", "." ],
-                      [ ".", "TCP_ELB_Reset_Count", ".", "." ],
-                      [ ".", "TCP_Target_Reset_Count", ".", "." ]
+                      [ { "expression": "SUM(SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_2XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300))", "id": "target2xx", "visible": false } ],
+                      [ { "expression": "SUM(SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_3XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300))", "id": "target3xx", "visible": false } ],
+                      [ { "expression": "SUM(SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_4XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300))", "id": "target4xx", "visible": false } ],
+                      [ { "expression": "SUM(SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_5XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300))", "id": "target5xx", "visible": false } ],
+                      [ { "expression": "SUM(SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"LambdaInternalError\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300))", "id": "internal", "visible": false } ],
+                      [ { "expression": "SUM(SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"LambdaUserError\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300))", "id": "user", "visible": false } ],
+                      [ { "expression": "FILL(target2xx,0)+FILL(target3xx,0)", "id": "successful", "label": "Successful responses (2xx + 3xx)", "color": "2ca02c" } ],
+                      [ { "expression": "FILL(target4xx,0)+FILL(target5xx,0)+FILL(internal,0)+FILL(user,0)", "id": "failed", "label": "Errors (4xx + 5xx + invocation failures)", "color": "d62728" } ],
+                      [ { "expression": "successful+failed", "id": "total", "label": "Total target group requests", "color": "1f77b4" } ]
                     ]
                   }
                 },
@@ -113,17 +118,18 @@ Resources:
                   "width": 12,
                   "height": 6,
                   "properties": {
-                    "title": "Proxy invocations and errors",
+                    "title": "Lambda target group outcomes",
                     "view": "timeSeries",
                     "region": "${AWS::Region}",
                     "period": 300,
                     "stat": "Sum",
                     "metrics": [
-                      [ "AWS/Lambda", "Invocations", "FunctionName", "${ProjectName}-radd-alt-private-proxy" ],
-                      [ ".", "Errors", ".", "." ],
-                      [ ".", "Throttles", ".", "." ],
-                      [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"LambdaInternalError\" LoadBalancer=\"${AlbDimension}\" \"${ProjectName}-rpp-lambda-tg\"', 'Sum', 300)", "id": "internal", "label": "ALB LambdaInternalError" } ],
-                      [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"LambdaUserError\" LoadBalancer=\"${AlbDimension}\" \"${ProjectName}-rpp-lambda-tg\"', 'Sum', 300)", "id": "user", "label": "ALB LambdaUserError" } ]
+                      [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_2XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300)", "id": "target2xx", "label": "Successful responses (2xx)", "color": "2ca02c" } ],
+                      [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_3XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300)", "id": "target3xx", "label": "Redirect responses (3xx)", "color": "98df8a" } ],
+                      [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_4XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300)", "id": "target4xx", "label": "Client/API errors (4xx)", "color": "ff9896" } ],
+                      [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_5XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300)", "id": "target5xx", "label": "Server/backend errors (5xx)", "color": "d62728" } ],
+                      [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"LambdaInternalError\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300)", "id": "internal", "label": "ALB/Lambda internal failures", "color": "9467bd" } ],
+                      [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"LambdaUserError\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300)", "id": "user", "label": "Lambda response/invocation failures", "color": "8c564b" } ]
                     ]
                   }
                 },
