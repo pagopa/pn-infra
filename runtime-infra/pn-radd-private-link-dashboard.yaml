@@ -1,0 +1,207 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'CloudWatch dashboard for the RADD PrivateLink channel'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: 'Project name'
+
+  ApplicationLoadBalancerArn:
+    Type: String
+    Description: 'Application Load Balancer ARN'
+
+  RaddNetworkLoadBalancerArn:
+    Type: String
+    Description: 'RADD Network Load Balancer ARN'
+
+  RaddVpcEndpointServiceId:
+    Type: String
+    Description: 'RADD VPC endpoint service ID'
+
+  MetricNamespace:
+    Type: String
+    Default: Advanced
+    Description: 'CloudWatch custom metric namespace used by RADD'
+
+Resources:
+  RaddPrivateLinkDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub '${ProjectName}-Radd-PrivateLink'
+      DashboardBody:
+        Fn::Sub:
+          - |
+            {
+              "start": "-PT6H",
+              "periodOverride": "inherit",
+              "widgets": [
+                {
+                  "type": "text",
+                  "x": 0,
+                  "y": 0,
+                  "width": 24,
+                  "height": 2,
+                  "properties": {
+                    "markdown": "# RADD PrivateLink"
+                  }
+                },
+                {
+                  "type": "metric",
+                  "x": 0,
+                  "y": 2,
+                  "width": 12,
+                  "height": 6,
+                  "properties": {
+                    "title": "PrivateLink connections and traffic",
+                    "view": "timeSeries",
+                    "region": "${AWS::Region}",
+                    "period": 300,
+                    "stat": "Sum",
+                    "metrics": [
+                      [ "AWS/PrivateLinkServices", "ActiveConnections", "Service Id", "${RaddVpcEndpointServiceId}", { "stat": "Maximum" } ],
+                      [ ".", "NewConnections", ".", "." ],
+                      [ ".", "EndpointsCount", ".", ".", { "stat": "Maximum" } ],
+                      [ ".", "BytesProcessed", ".", "." ]
+                    ]
+                  }
+                },
+                {
+                  "type": "metric",
+                  "x": 12,
+                  "y": 2,
+                  "width": 12,
+                  "height": 6,
+                  "properties": {
+                    "title": "NLB TLS flows and traffic",
+                    "view": "timeSeries",
+                    "region": "${AWS::Region}",
+                    "period": 300,
+                    "stat": "Sum",
+                    "metrics": [
+                      [ "AWS/NetworkELB", "ActiveFlowCount_TLS", "LoadBalancer", "${NlbDimension}", { "stat": "Maximum" } ],
+                      [ ".", "NewFlowCount_TLS", ".", "." ],
+                      [ ".", "ProcessedBytes_TLS", ".", "." ]
+                    ]
+                  }
+                },
+                {
+                  "type": "metric",
+                  "x": 0,
+                  "y": 8,
+                  "width": 24,
+                  "height": 6,
+                  "properties": {
+                    "title": "Lambda target group request totals",
+                    "view": "singleValue",
+                    "region": "${AWS::Region}",
+                    "period": 300,
+                    "stat": "Sum",
+                    "sparkline": false,
+                    "setPeriodToTimeRange": true,
+                    "metrics": [
+                      [ { "expression": "SUM(SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_2XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300))", "id": "target2xx", "visible": false } ],
+                      [ { "expression": "SUM(SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_3XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300))", "id": "target3xx", "visible": false } ],
+                      [ { "expression": "SUM(SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_4XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300))", "id": "target4xx", "visible": false } ],
+                      [ { "expression": "SUM(SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_5XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300))", "id": "target5xx", "visible": false } ],
+                      [ { "expression": "SUM(SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"LambdaInternalError\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300))", "id": "internal", "visible": false } ],
+                      [ { "expression": "SUM(SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"LambdaUserError\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300))", "id": "user", "visible": false } ],
+                      [ { "expression": "FILL(target2xx,0)+FILL(target3xx,0)", "id": "successful", "label": "Successful responses (2xx + 3xx)" } ],
+                      [ { "expression": "FILL(target4xx,0)+FILL(target5xx,0)+FILL(internal,0)+FILL(user,0)", "id": "failed", "label": "Errors (4xx + 5xx + invocation failures)" } ],
+                      [ { "expression": "successful+failed", "id": "total", "label": "Total target group requests" } ]
+                    ]
+                  }
+                },
+                {
+                  "type": "metric",
+                  "x": 0,
+                  "y": 14,
+                  "width": 12,
+                  "height": 6,
+                  "properties": {
+                    "title": "Lambda target group outcomes",
+                    "view": "timeSeries",
+                    "region": "${AWS::Region}",
+                    "period": 300,
+                    "stat": "Sum",
+                    "metrics": [
+                      [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_2XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300)", "id": "target2xx", "label": "Successful responses (2xx)" } ],
+                      [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_3XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300)", "id": "target3xx", "label": "Redirect responses (3xx)" } ],
+                      [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_4XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300)", "id": "target4xx", "label": "Client/API errors (4xx)" } ],
+                      [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"HTTPCode_Target_5XX_Count\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300)", "id": "target5xx", "label": "Server/backend errors (5xx)" } ],
+                      [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"LambdaInternalError\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300)", "id": "internal", "label": "ALB/Lambda internal failures" } ],
+                      [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"LambdaUserError\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300)", "id": "user", "label": "Lambda response/invocation failures" } ]
+                    ]
+                  }
+                },
+                {
+                  "type": "metric",
+                  "x": 12,
+                  "y": 14,
+                  "width": 12,
+                  "height": 6,
+                  "properties": {
+                    "title": "Lambda duration",
+                    "view": "timeSeries",
+                    "region": "${AWS::Region}",
+                    "period": 300,
+                    "metrics": [
+                      [ "AWS/Lambda", "Duration", "FunctionName", "${ProjectName}-radd-alt-private-proxy", { "stat": "Average" } ],
+                      [ "...", { "stat": "p95" } ],
+                      [ "...", { "stat": "p99" } ]
+                    ]
+                  }
+                },
+                {
+                  "type": "metric",
+                  "x": 0,
+                  "y": 20,
+                  "width": 24,
+                  "height": 6,
+                  "properties": {
+                    "title": "RADD backend outcomes",
+                    "view": "timeSeries",
+                    "region": "${AWS::Region}",
+                    "period": 300,
+                    "stat": "Sum",
+                    "metrics": [
+                      [ "${MetricNamespace}", "${ProjectName}-radd-alt-private-proxy-backend-4xx" ],
+                      [ ".", "${ProjectName}-radd-alt-private-proxy-backend-5xx" ],
+                      [ ".", "${ProjectName}-radd-alt-private-proxy-rejected-path" ]
+                    ]
+                  }
+                },
+                {
+                  "type": "log",
+                  "x": 0,
+                  "y": 26,
+                  "width": 12,
+                  "height": 7,
+                  "properties": {
+                    "title": "Backend latency",
+                    "view": "timeSeries",
+                    "region": "${AWS::Region}",
+                    "query": "SOURCE '${ProxyLogGroupName}' | filter @message like /RADD private proxy forwarded request/ | parse @message /durationMs[^0-9]+(?<durationMs>[0-9]+)/ | stats avg(durationMs) as Average, pct(durationMs, 95) as P95, pct(durationMs, 99) as P99 by bin(5m)"
+                  }
+                },
+                {
+                  "type": "log",
+                  "x": 12,
+                  "y": 26,
+                  "width": 12,
+                  "height": 7,
+                  "properties": {
+                    "title": "Recent proxy errors",
+                    "view": "table",
+                    "region": "${AWS::Region}",
+                    "query": "SOURCE '${ProxyLogGroupName}' | fields @timestamp, @message | filter @message like /RADD private proxy backend 4xx response|RADD private proxy backend 5xx response|RADD private proxy backend forward failed|RADD private proxy rejected path/ | sort @timestamp desc | limit 100"
+                  }
+                }
+              ]
+            }
+          - AlbDimension: !Select [1, !Split ['loadbalancer/', !Ref ApplicationLoadBalancerArn]]
+            NlbDimension: !Select [1, !Split ['loadbalancer/', !Ref RaddNetworkLoadBalancerArn]]
+            ProxyLogGroupName: !Sub '/aws/lambda/${ProjectName}-radd-alt-private-proxy'
+
+Outputs:
+  DashboardName:
+    Value: !Ref RaddPrivateLinkDashboard
