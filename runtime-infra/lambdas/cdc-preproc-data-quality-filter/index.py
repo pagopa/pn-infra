@@ -196,21 +196,22 @@ def lambda_handler(event, context):
                 "data": original_data,
             })
 
-    logger.info(
-        "Batch processed. "
-        "Kept=%s, "
-        "Dropped=%s, "
-        "Clean=%s, "
-        "Quarantine=%s, "
-        "Excluded=%s, "
-        "Failed=%s",
-        counters["kept"],
-        counters["dropped"],
-        counters["clean"],
-        counters["quarantine"],
-        counters["excluded"],
-        counters["failed"],
-    )
+    if counters["kept"] > 0 or counters["failed"] > 0:
+        logger.info(
+            "Batch processed. "
+            "Kept=%s, "
+            "Dropped=%s, "
+            "Clean=%s, "
+            "Quarantine=%s, "
+            "Excluded=%s, "
+            "Failed=%s",
+            counters["kept"],
+            counters["dropped"],
+            counters["clean"],
+            counters["quarantine"],
+            counters["excluded"],
+            counters["failed"],
+        )
 
     return {
         "records": output
