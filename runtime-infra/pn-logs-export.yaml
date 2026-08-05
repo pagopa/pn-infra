@@ -178,6 +178,8 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
+        LogsKinesisSourceStreamArn: !Ref LogsKinesisSourceStreamArn
         SourceKinesisDataStreamArn: !Ref CdcKinesisSourceStreamArn
         SourceKinesisDataStreamKeyArn: !Ref CdcKinesisSourceStreamKeyArn
         LogsBucketName: !Ref LogsBucketName
@@ -201,6 +203,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
         SourceKinesisDataStreamArn: !Ref LogsKinesisSourceStreamArn
         SourceKinesisDataStreamKeyArn: !Ref LogsKinesisSourceStreamKeyArn
         LogsBucketName: !Ref LogsBucketName

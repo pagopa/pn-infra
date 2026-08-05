@@ -65,6 +65,15 @@ Parameters:
     Type: String
     Default: ""
     Description: S3 object key prefix for Lambda artifacts
+  
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: URL to load infrastructure model fragments from
+  
+  LogsKinesisSourceStreamArn:
+    Type: String
+    Default: ""
+    Description: Kinesis stream ARN used to export CloudWatch logs
 
 Conditions:
   ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
@@ -238,8 +247,6 @@ Resources:
 
   PreprocessingFilterLambda:
     Condition: CreatePreprocessingFirehose
-    DependsOn:
-      - PreprocessingLambdaLogGroup
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.12
@@ -251,16 +258,32 @@ Resources:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub '${LambdasBasePath}/cdc-preproc-data-quality-filter.zip'
       Role: !GetAtt PreprocessingFilterLambdaRole.Arn
+      LoggingConfig:
+        LogGroup: !GetAtt PreprocessingLambdaLogGroup.Outputs.LogGroupName
   
   PreprocessingLambdaLogGroup:
     Condition: CreatePreprocessingFirehose
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub '/aws/lambda/${ProjectName}-${PreprocessingStreamNamePrefix}-data-quality-filter'
-      RetentionInDays: 120
+    Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
-            
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub "${ProjectName}-${PreprocessingStreamNamePrefix}-data-quality-filter"
+        LogGroupRetention: 120
+        LogGroupPrefix: /aws/lambda
+        LogsKinesisSourceStreamArn: !Ref LogsKinesisSourceStreamArn
+  
+  PreprocessingFilterLambdaAlarms:
+    Condition: CreatePreprocessingFirehose
+    DependsOn:
+      - PreprocessingLambdaLogGroup
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref PreprocessingFilterLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   PreprocessingLogsKinesisDeliveryStreamPartitioned:
     Condition: CreatePreprocessingFirehose
@@ -293,7 +316,7 @@ Resources:
             Ref: PreprocessingDeliveryStreamLogGroupS3Destination
 
         Prefix: 
-          !Sub '${PreprocessingS3RootPrefix}/!{partitionKeyFromLambda:PROCESSING_LAYER}/TABLE_NAME=!{partitionKeyFromLambda:TABLE_NAME}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
+          !Sub '${PreprocessingS3RootPrefix}/!{partitionKeyFromLambda:PROCESSING_LAYER}/TABLE_NAME_!{partitionKeyFromLambda:TABLE_NAME}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
         ErrorOutputPrefix:
           !Sub 'errors/${PreprocessingS3RootPrefix}/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
 

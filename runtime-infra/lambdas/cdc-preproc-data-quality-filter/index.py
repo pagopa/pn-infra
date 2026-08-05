@@ -1,7 +1,7 @@
 import base64
 import json
-from datetime import datetime, timezone
 
+from config import logger, setup_logger
 from processor.input_loader import load_table_config
 from processor.dq_executor import execute_dq
 from processor.payload_filter import apply_filters
@@ -37,11 +37,14 @@ def build_metadata(table_name, processing_layer):
 
 
 def lambda_handler(event, context):
+    setup_logger(context.aws_request_id)
+
     records = event.get("records", [])
 
-    print(
+    logger.info(
         "Starting Firehose preprocessing Lambda. "
-        f"Processing {len(records)} records."
+        "Processing %s records.",
+        len(records),
     )
 
     output = []
@@ -58,9 +61,12 @@ def lambda_handler(event, context):
     for record in records:
         record_id = record.get("recordId")
         original_data = record.get("data")
+        event_id = None
 
         try:
             payload = decode_payload(original_data)
+
+            event_id = payload.get("eventID")
             table_name = payload.get("tableName")
 
             table_config = load_table_config(table_name)
@@ -102,32 +108,11 @@ def lambda_handler(event, context):
                     f"{processing_layer}"
                 )
 
-            if dq_errors:
-                print(
-                    "Data Quality checks failed. "
-                    f"RecordId={record_id}, "
-                    f"TableName={table_name}, "
-                    f"ImageSource={image_source}, "
-                    f"Errors={json.dumps(dq_errors)}"
-                )
-
-            if processing_layer == "excluded":
-                print(
-                    "Record excluded. "
-                    f"RecordId={record_id}, "
-                    f"TableName={table_name}, "
-                    f"ImageSource={image_source}, "
-                    f"Exclusion={dq_result.get('exclusion')}"
-                )
-
             filtered_payload = apply_filters(
                 payload=payload,
                 processing_layer=processing_layer,
                 filters=table_config.get("filters", []),
             )
-
-            counters["kept"] += 1
-            counters[processing_layer] += 1
 
             output.append({
                 "recordId": record_id,
@@ -139,33 +124,94 @@ def lambda_handler(event, context):
                 ),
             })
 
+            counters["kept"] += 1
+            counters[processing_layer] += 1
+
+            if processing_layer == "clean":
+                logger.info(
+                    "Record routed to clean. "
+                    "EventID=%s, "
+                    "Result=Ok, "
+                    "ProcessingLayer=%s, "
+                    "TableName=%s, "
+                    "ImageSource=%s",
+                    event_id,
+                    processing_layer,
+                    table_name,
+                    image_source,
+                )
+
+            elif processing_layer == "excluded":
+                logger.info(
+                    "Record routed to excluded. "
+                    "EventID=%s, "
+                    "Result=Ok, "
+                    "ProcessingLayer=%s, "
+                    "TableName=%s, "
+                    "ImageSource=%s, "
+                    "Exclusion=%s",
+                    event_id,
+                    processing_layer,
+                    table_name,
+                    image_source,
+                    dq_result.get("exclusion"),
+                )
+
+            elif processing_layer == "quarantine":
+                logger.error(
+                    "Record routed to quarantine. "
+                    "EventID=%s, "
+                    "Result=Ok, "
+                    "ProcessingLayer=%s, "
+                    "TableName=%s, "
+                    "ImageSource=%s, "
+                    "Errors=%s",
+                    event_id,
+                    processing_layer,
+                    table_name,
+                    image_source,
+                    json.dumps(
+                        dq_errors,
+                        separators=(",", ":"),
+                        ensure_ascii=False,
+                    ),
+                )     
+
         except Exception as error:
             counters["failed"] += 1
-
-            print(
-                "Technical error during record processing. "
-                f"RecordId={record_id}, "
-                f"ErrorType={type(error).__name__}, "
-                f"Error={str(error)}"
+        
+            logger.exception(
+                "PROCESSING_FAILED Technical error during record processing. "
+                "RecordID=%s, "
+                "ErrorType=%s, "
+                "Error=%s",
+                record_id,
+                type(error).__name__,
+                str(error),
             )
-
+        
             output.append({
                 "recordId": record_id,
                 "result": "ProcessingFailed",
                 "data": original_data,
             })
 
-    execution_time = datetime.now(timezone.utc).isoformat()
-
-    print(
-        f"Batch processed at {execution_time}. "
-        f"Kept={counters['kept']}, "
-        f"Dropped={counters['dropped']}, "
-        f"Clean={counters['clean']}, "
-        f"Quarantine={counters['quarantine']}, "
-        f"Excluded={counters['excluded']}, "
-        f"Failed={counters['failed']}"
-    )
+    if counters["kept"] > 0 or counters["failed"] > 0:
+        logger.info(
+            "Batch processed. "
+            "Kept=%s, "
+            "Dropped=%s, "
+            "Clean=%s, "
+            "Quarantine=%s, "
+            "Excluded=%s, "
+            "Failed=%s",
+            counters["kept"],
+            counters["dropped"],
+            counters["clean"],
+            counters["quarantine"],
+            counters["excluded"],
+            counters["failed"],
+        )
 
     return {
         "records": output

@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'CloudWatch Dashboard for pn-delivery SenderTaxId validation monitoring'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: 'Project name'
+  DeliveryB2BApiGatewayLogGroupName:
+    Type: String
+    Description: 'API Gateway access Log Group for pn-delivery B2B public API'
+
+Resources:
+  DeliverySenderTaxIdValidationDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub "${ProjectName}-delivery-sender-taxid-validation"
+      DashboardBody: !Sub |
+        {
+          "start": "-PT24H",
+          "periodOverride": "inherit",
+          "widgets": [
+            {
+              "type": "text",
+              "x": 0,
+              "y": 0,
+              "width": 24,
+              "height": 2,
+              "properties": {
+                "markdown": "# PN Delivery — SenderTaxId Validation Monitoring\nOperational proxy based on backend `403` responses returned by the pn-delivery B2B submission integrations. Use pn-delivery application logs to confirm the exact error code."
+              }
+            },
+            {
+              "type": "log",
+              "x": 0,
+              "y": 3,
+              "width": 24,
+              "height": 5,
+              "properties": {
+                "query": "SOURCE '${DeliveryB2BApiGatewayLogGroupName}' | fields @timestamp, httpMethod, resourcePath, path, status, functionResponseStatus, cxId | filter status = 403 | filter (functionResponseStatus = '403' or integrationServiceStatus = '403') | filter httpMethod = 'POST' | filter resourcePath like /\\/requests$/ | stats count() as Blocks by bin(1h), cxId",
+                "region": "${AWS::Region}",
+                "stacked": false,
+                "view": "timeSeries",
+                "title": "SenderTaxId validation blocks — aggregated in 1h intervals"
+              }
+            },
+            {
+              "type": "text",
+              "x": 0,
+              "y": 2,
+              "width": 24,
+              "height": 1,
+              "properties": {
+                "markdown": "## Block trend"
+              }
+            },
+            {
+              "type": "text",
+              "x": 0,
+              "y": 8,
+              "width": 24,
+              "height": 1,
+              "properties": {
+                "markdown": "## Distribution"
+              }
+            },
+            {
+              "type": "log",
+              "x": 0,
+              "y": 9,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "query": "SOURCE '${DeliveryB2BApiGatewayLogGroupName}' | fields @timestamp, httpMethod, resourcePath, path, status, functionResponseStatus, cxId | filter status = 403 | filter (functionResponseStatus = '403' or integrationServiceStatus = '403') | filter httpMethod = 'POST' | filter resourcePath like /\\/requests$/ | stats count() as ` ` by cxId | sort ` ` desc | limit 10",
+                "region": "${AWS::Region}",
+                "view": "pie",
+                "title": "Block distribution by cxId — top 10"
+              }
+            },
+            {
+              "type": "log",
+              "x": 12,
+              "y": 9,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "query": "SOURCE '${DeliveryB2BApiGatewayLogGroupName}' | fields @timestamp, httpMethod, resourcePath, path, status, functionResponseStatus, cxId | filter status = 403 | filter (functionResponseStatus = '403' or integrationServiceStatus = '403') | filter httpMethod = 'POST' | filter resourcePath like /\\/requests$/ | stats count() as Blocks by cxId | sort Blocks desc | limit 100",
+                "region": "${AWS::Region}",
+                "view": "table",
+                "title": "SenderTaxId validation blocks by cxId"
+              }
+            },
+            {
+              "type": "text",
+              "x": 0,
+              "y": 15,
+              "width": 24,
+              "height": 1,
+              "properties": {
+                "markdown": "## Operational detail"
+              }
+            },
+            {
+              "type": "log",
+              "x": 0,
+              "y": 16,
+              "width": 24,
+              "height": 5,
+              "properties": {
+                "query": "SOURCE '${DeliveryB2BApiGatewayLogGroupName}' | fields @timestamp, requestId, resourcePath, cxId, status, integrationServiceStatus, functionResponseStatus | filter status = 403 | filter (functionResponseStatus = '403' or integrationServiceStatus = '403') | filter httpMethod = 'POST' | filter resourcePath like /\\/requests$/ | sort @timestamp desc | limit 50",
+                "region": "${AWS::Region}",
+                "view": "table",
+                "title": "Latest blocked submissions"
+              }
+            }
+          ]
+        }
