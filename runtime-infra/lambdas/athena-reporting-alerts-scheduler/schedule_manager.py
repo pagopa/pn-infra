@@ -4,8 +4,10 @@ import json
 import os
 import sys
 import logging
+import socket
+import time
 import urllib.request
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 # Setup logging
 logger = logging.getLogger()
@@ -36,28 +38,70 @@ PROJECT_NAME = os.environ.get('PROJECT_NAME', 'pn')
 
 scheduler = boto3.client('scheduler')
 
+MAX_GIT_FETCH_ATTEMPTS = 3
+RETRYABLE_HTTP_STATUS_CODES = {408, 500, 502, 503, 504}
+GIT_FETCH_RETRY_DELAYS_SECONDS = (1, 2)
+GITHUB_RATE_LIMIT_RETRY_DELAY_SECONDS = 5
+
+
+def is_retryable_network_error(error):
+    """Return whether an urlopen error is a transient network failure."""
+    if isinstance(error, URLError):
+        return is_retryable_network_error(error.reason)
+
+    return isinstance(error, (TimeoutError, ConnectionError, socket.gaierror))
+
+
+def wait_before_git_fetch_retry(delay_seconds, error, attempt):
+    logger.warning(
+        "Git config fetch failed (%s) on attempt %s/%s; retrying in %s seconds",
+        error,
+        attempt,
+        MAX_GIT_FETCH_ATTEMPTS,
+        delay_seconds,
+    )
+    time.sleep(delay_seconds)
+
 
 def fetch_config_from_git():
     """Fetch query configuration from Git repository"""
     logger.info(f"Fetching config from Git: {CONFIG_GIT_URL}")
-    
-    try:
-        with urllib.request.urlopen(CONFIG_GIT_URL, timeout=10) as response:
-            content = response.read().decode('utf-8').strip()
-            
-            if not content:
-                raise ValueError("Git config file is empty")
-            
-            config = json.loads(content)
-            logger.info(f"Successfully fetched config with {len(config.get('queries', {}))} queries")
-            return config
-            
-    except HTTPError as e:
-        if e.code == 404:
-            raise FileNotFoundError(f"Config file not found at {CONFIG_GIT_URL}")
-        raise RuntimeError(f"Failed to fetch config from Git (HTTP {e.code}): {CONFIG_GIT_URL}")
-    except Exception as e:
-        raise RuntimeError(f"Failed to fetch config from Git: {e}")
+    rate_limit_retried = False
+
+    for attempt in range(1, MAX_GIT_FETCH_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(CONFIG_GIT_URL, timeout=10) as response:
+                content = response.read().decode('utf-8').strip()
+
+                if not content:
+                    raise ValueError("Git config file is empty")
+
+                config = json.loads(content)
+                logger.info(f"Successfully fetched config with {len(config.get('queries', {}))} queries")
+                return config
+
+        except HTTPError as error:
+            if error.code == 404:
+                raise FileNotFoundError(f"Config file not found at {CONFIG_GIT_URL}")
+
+            if error.code == 429 and not rate_limit_retried and attempt < MAX_GIT_FETCH_ATTEMPTS:
+                rate_limit_retried = True
+                wait_before_git_fetch_retry(GITHUB_RATE_LIMIT_RETRY_DELAY_SECONDS, error, attempt)
+                continue
+
+            if error.code in RETRYABLE_HTTP_STATUS_CODES and attempt < MAX_GIT_FETCH_ATTEMPTS:
+                wait_before_git_fetch_retry(GIT_FETCH_RETRY_DELAYS_SECONDS[attempt - 1], error, attempt)
+                continue
+
+            raise RuntimeError(f"Failed to fetch config from Git (HTTP {error.code}): {CONFIG_GIT_URL}")
+        except (URLError, TimeoutError, ConnectionError, socket.gaierror) as error:
+            if is_retryable_network_error(error) and attempt < MAX_GIT_FETCH_ATTEMPTS:
+                wait_before_git_fetch_retry(GIT_FETCH_RETRY_DELAYS_SECONDS[attempt - 1], error, attempt)
+                continue
+
+            raise RuntimeError(f"Failed to fetch config from Git: {error}")
+        except Exception as error:
+            raise RuntimeError(f"Failed to fetch config from Git: {error}")
 
 
 def list_existing_schedules():
@@ -238,7 +282,7 @@ def delete_schedule(schedule_name):
 def lambda_handler(event, context):
     """
     Main reconciliation loop handler
-    Triggered by EventBridge rate(5 minutes)
+    Triggered by the configured EventBridge schedule
     """
     setup_logger(context.aws_request_id)
     

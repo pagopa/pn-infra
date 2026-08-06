@@ -1,0 +1,151 @@
+version: "1.0"
+
+table: pn-UserAttributes
+imageSelection:
+  priority:
+    - NewImage
+    - OldImage
+    - Keys
+
+routing:
+  cleanStatus: clean
+  quarantineStatus: quarantine
+  excludedStatus: excluded
+
+exclusions:
+  - name: excluded_pk_prefix
+    type: starts_with_any
+    field: pk
+    values:
+      - "VA#"
+      - "VC#"
+
+checks:
+  - name: check_required_fields
+    description: User Attribute technical fields must not be null
+    type: required
+    fields:
+      - pk
+      - sk
+      - created
+      - lastModified
+    errorCode: DQ_REQUIRED_FIELDS
+
+  - name: check_invalid_user_attributes
+    description: User Attributes must be a Digital Domicile, Digital Address or Consent
+    type: starts_with_any
+    field: pk
+    values:
+      - "AB#"
+      - "CO#"
+    errorCode: DQ_INVALID_USER_ATTRIBUTES
+
+  - name: check_invalid_legal_courtesy
+    description: Digital Addresses and Domiciles sk must have the correct format
+    type: conditional
+    when:
+      field: pk
+      operator: starts_with
+      value: "AB#"
+    rules:
+      - type: starts_with_any
+        field: sk
+        values:
+          - "LEGAL#"
+          - "COURTESY#"
+    errorCode: DQ_INVALID_LEGAL_COURTESY
+
+  - name: check_addresshash_not_null
+    description: AddressHash must not be null for Digital Domiciles and Addresses
+    type: conditional
+    when:
+      field: pk
+      operator: starts_with
+      value: "AB#"
+    rules:
+      - type: required
+        fields:
+          - addresshash
+    errorCode: DQ_ADDRESSHASH_NOT_NULL
+
+  - name: check_invalid_digital_domiciles
+    description: Digital Domiciles must be PEC or SERCQ
+    type: conditional
+    when:
+      field: pk
+      operator: starts_with
+      value: "AB#"
+    rules:
+      - type: matches_regex
+        field: sk
+        pattern: "^(?:(?!LEGAL#).*|LEGAL#.*#(PEC|SERCQ))$"
+    errorCode: DQ_INVALID_DIGITAL_DOMICILES
+
+  - name: check_invalid_digital_addresses
+    description: Digital Addresses must be SMS, EMAIL or APPIO
+    type: conditional
+    when:
+      field: pk
+      operator: starts_with
+      value: "AB#"
+    rules:
+      - type: matches_regex
+        field: sk
+        pattern: "^(?:(?!COURTESY#).*|COURTESY#.*#(SMS|EMAIL|APPIO))$"
+    errorCode: DQ_INVALID_DIGITAL_ADDRESSES
+
+  - name: check_invalid_addresshash
+    description: AddressHash of APPIO Digital Address must be ENABLED or DISABLED
+    type: conditional
+    when:
+      field: sk
+      operator: matches_regex
+      pattern: "^COURTESY#.*#APPIO$"
+    rules:
+      - type: allowed_values
+        field: addresshash
+        values:
+          - "ENABLED"
+          - "DISABLED"
+    errorCode: DQ_INVALID_ADDRESSHASH
+
+  - name: check_accepted_not_null
+    description: Accepted field must not be null for Consents
+    type: conditional
+    when:
+      field: pk
+      operator: starts_with
+      value: "CO#"
+    rules:
+      - type: required
+        fields:
+          - accepted
+    errorCode: DQ_ACCEPTED_NOT_NULL
+
+  - name: check_invalid_consents
+    description: Consents must be TOS or DATAPRIVACY
+    type: conditional
+    when:
+      field: pk
+      operator: starts_with
+      value: "CO#"
+    rules:
+      - type: starts_with_any
+        field: sk
+        values:
+          - "TOS#"
+          - "DATAPRIVACY#"
+    errorCode: DQ_INVALID_CONSENTS
+
+filters:
+  - name: remove_addresshash
+    type: remove_fields
+    images:
+      - NewImage
+      - OldImage
+    fields:
+      - addresshash
+    applyTo:
+      - clean
+      - quarantine
+      - excluded

@@ -85,6 +85,16 @@ Parameters:
     Default: '-'
     Description: Application load balancer
 
+  RaddNetworkLoadBalancerArn:
+    Type: String
+    Default: '-'
+    Description: RADD Network Load Balancer ARN
+
+  RaddVpcEndpointServiceId:
+    Type: String
+    Default: '-'
+    Description: RADD VPC endpoint service ID
+
   ApplicationLoadBalancerAwsDns: 
     Type: String
     Default: '-'
@@ -134,13 +144,21 @@ Parameters:
     Type: String
   AlarmSNSTopicName:
     Type: String
+  WarningSNSTopicArn:
+    Type: String
+  WarningSNSTopicName:
+    Type: String
+  WarningDispatcherName:
+    Type: String
+  WarningDispatcherQueueArn:
+    Type: String
   EcsDefaultSecurityGroup:
     Type: String
   LogsBucketKmsKeyArn:
     Type: String
   LogsBucketName:
     Type: String
-  SafeStorageAccountId:
+  ConfidentialInfoAccountId:
     Type: String
   CdcKinesisStreamName:
     Type: String
@@ -356,6 +374,7 @@ Conditions:
   IsSpotAllowedEnvironment: !Or
     - !Equals [!Ref EnvironmentType, "dev"]
     - !Equals [!Ref EnvironmentType, "test"]
+    - !Equals [!Ref EnvironmentType, "uat"]
     - !Equals [!Ref EnvironmentType, "hotfix"]
 
   HasDataLakeAccountId1RoleName: !And [ !Not [ !Equals [ !Ref DataLakeAccountId1, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1, '' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1RoleName, '-' ] ], !Not [ !Equals [ !Ref DataLakeAccountId1RoleName, '' ] ] ]
@@ -438,7 +457,7 @@ Resources:
         LogsBucketKmsKeyArn: !Ref LogsBucketKmsKeyArn
         DataLakeAccountId1: !Ref DataLakeAccountId1
         DataLakeAccountId2: !Ref DataLakeAccountId2
-        SafeStorageAccountId: !Ref SafeStorageAccountId
+        ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
         BucketSuffix: !Ref BucketSuffix
         MoreBucketResourcePolicyStatements:
           Fn::Sub:
@@ -663,14 +682,26 @@ Outputs:
   # pass-though parameters
   ApplicationLoadBalancerArn:
     Value: !Ref ApplicationLoadBalancerArn
+  RaddNetworkLoadBalancerArn:
+    Value: !Ref RaddNetworkLoadBalancerArn
+  RaddVpcEndpointServiceId:
+    Value: !Ref RaddVpcEndpointServiceId
   AlarmSNSTopicArn:
     Value: !Ref AlarmSNSTopicArn
   AlarmSNSTopicName:
     Value: !Ref AlarmSNSTopicName
+  WarningSNSTopicArn:
+    Value: !Ref WarningSNSTopicArn
+  WarningSNSTopicName:
+    Value: !Ref WarningSNSTopicName
+  WarningDispatcherName:
+    Value: !Ref WarningDispatcherName
+  WarningDispatcherQueueArn:
+    Value: !Ref WarningDispatcherQueueArn
   EcsDefaultSecurityGroup:
     Value: !Ref EcsDefaultSecurityGroup
-  SafeStorageAccountId:
-    Value: !Ref SafeStorageAccountId
+  ConfidentialInfoAccountId:
+    Value: !Ref ConfidentialInfoAccountId
   LogsBucketKmsKeyArn:
     Value: !Ref LogsBucketKmsKeyArn
   LogsBucketName:

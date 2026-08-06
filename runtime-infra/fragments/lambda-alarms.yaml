@@ -17,6 +17,10 @@ Parameters:
   EvaluationPeriods:
     Type: Number
     Default: 60
+
+  Period:
+    Type: Number
+    Default: 60
   
   FilterPattern:
     Type: String
@@ -92,7 +96,7 @@ Resources:
             Metric:
               MetricName: !Sub ${FunctionName}-ErrorMetric
               Namespace: ErrorFatalLogs
-            Period: 60
+            Period: !Ref Period
             Stat: Sum
           ReturnData: False
         - Id: m2
@@ -103,7 +107,7 @@ Resources:
                   Value: !Ref FunctionName
               Namespace: AWS/Lambda
               MetricName: Errors
-            Period: 60
+            Period: !Ref Period
             Stat: Sum
           ReturnData: False
         - Id: e1

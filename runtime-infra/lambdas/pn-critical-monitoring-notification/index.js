@@ -81,7 +81,7 @@ async function processRecord(record) {
     codiceOggetto: analogMailInfo.registeredLetterCode,
     recapitista: analogMailInfo.courier,
     cap: analogMailInfo.zip,
-    timestamp: analogMailInfo.clientRequestTimeStamp,
+    timestamp: analogMailInfo.timestamp,
     paId: senderPaId
   };
 }

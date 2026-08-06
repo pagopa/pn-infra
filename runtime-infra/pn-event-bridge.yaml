@@ -8,8 +8,8 @@ Parameters:
     Description: 'Usually pn can be pnXYZ where XYZ are the feature number, useful to create
       experimental environments without crash official development environment'
 
-  SafeStorageAccountId:
-    Description: "SafeStorage AWS Account id. Useful to grant rights to send feedback to EventBus"
+  ConfidentialInfoAccountId:
+    Description: "Confidential Info AWS Account id. Useful to grant rights to send feedback to EventBus"
     Default: "-"
     Type: String
   
@@ -61,9 +61,6 @@ Parameters:
     Type: String
 #  LogsBucketKmsKeyArn:
 #    Type: String
-  ConfidentialInfoAccountId:
-    Default: ''
-    Type: String
   HelpdeskAccountId:
     Default: ''
     Type: String
@@ -240,8 +237,7 @@ Parameters:
     Type: String
 
 Conditions:
-  HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, '-' ]]
-  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '' ]]
+  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, '-' ]]
 
 Resources:
 
@@ -260,14 +256,14 @@ Resources:
   # Allow access from partner system
   PnCoreEventBusSafeStoreAccessPolicy: 
     Type: AWS::Events::EventBusPolicy
-    Condition: HasStorageStorageAccountId
+    Condition: HasConfidentialInfoAccountId
     Properties: 
       EventBusName: !Ref PnCoreEventBus
       StatementId: "AllowEventPutBySafeStorage"
       Statement: 
         Effect: "Allow"
         Principal: 
-            AWS: !Sub "arn:aws:iam::${SafeStorageAccountId}:root"
+            AWS: !Sub "arn:aws:iam::${ConfidentialInfoAccountId}:root"
         Action: "events:PutEvents"
         Resource: !GetAtt "PnCoreEventBus.Arn"
 

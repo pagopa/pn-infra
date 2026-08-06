@@ -15,7 +15,7 @@ Parameters:
   ConfinfoDynamoDbExportBucketName:
     Type: String
     Description: Name of the Confinfo data-monitoring bucket
-  SafeStorageAccountId:
+  ConfidentialInfoAccountId:
     Type: String
     Description: "Confinfo AWS Account id"
   ConfinfoLogsBucketSuffix:
@@ -141,7 +141,7 @@ Resources:
             - Name: keys
               Type: 'struct<requestid:struct<s:string>>'
             - Name: newimage
-              Type: 'struct<xpagopaextchcxid:struct<s:string>,clientrequesttimestamp:struct<s:string>,eventslist:struct<l:array<struct<m:struct<digprogrstatus:struct<null:boolean>,inserttimestamp:struct<s:string>,paperprogrstatus:struct<m:struct<attachments:struct<l:array<struct<m:struct<date:struct<s:string>,documenttype:struct<s:string>,id:struct<s:string>,sha256:struct<s:string>,uri:struct<s:string>>>>>,clientrequesttimestamp:struct<s:string,null:boolean>,courier:struct<s:string,null:boolean>,deliveryfailurecause:struct<null:boolean>,discoveredaddress:struct<null:boolean>,iun:struct<s:string,null:boolean>,producttype:struct<s:string,null:boolean>,registeredlettercode:struct<s:string,null:boolean>,status:struct<s:string>,statuscode:struct<s:string,null:boolean>,statusdatetime:struct<s:string>,statusdescription:struct<s:string,null:boolean>>>>>>>,lastupdatetimestamp:struct<s:string>,paperrequestmetadata:struct<m:struct<duplicatecheckpassthrough:struct<null:boolean>,isopenreworkrequest:struct<null:boolean>,iun:struct<null:boolean>,printtype:struct<s:string>,producttype:struct<s:string>,requestpaid:struct<s:string>,vas:struct<null:boolean>>>,requesthash:struct<s:string>,requestid:struct<s:string>,requesttimestamp:struct<s:string>,statusrequest:struct<s:string>,version:struct<n:string>>'
+              Type: 'struct<xpagopaextchcxid:struct<s:string>,clientrequesttimestamp:struct<s:string>,eventslist:struct<l:array<struct<m:struct<digprogrstatus:struct<null:boolean>,inserttimestamp:struct<s:string>,paperprogrstatus:struct<m:struct<attachments:struct<l:array<struct<m:struct<date:struct<s:string>,documenttype:struct<s:string>,id:struct<s:string>,sha256:struct<s:string>,uri:struct<s:string>>>>>,clientrequesttimestamp:struct<s:string,null:boolean>,courier:struct<s:string,null:boolean>,deliveryfailurecause:struct<s:string,null:boolean>,discoveredaddress:struct<null:boolean>,isduplicate:struct<bool:boolean,null:boolean>,iun:struct<s:string,null:boolean>,producttype:struct<s:string,null:boolean>,registeredlettercode:struct<s:string,null:boolean>,status:struct<s:string>,statuscode:struct<s:string,null:boolean>,statusdatetime:struct<s:string>,statusdescription:struct<s:string,null:boolean>>>>>>>,lastupdatetimestamp:struct<s:string>,paperrequestmetadata:struct<m:struct<duplicatecheckpassthrough:struct<null:boolean>,isopenreworkrequest:struct<null:boolean>,iun:struct<null:boolean>,printtype:struct<s:string>,producttype:struct<s:string>,requestpaid:struct<s:string>,vas:struct<null:boolean>>>,requesthash:struct<s:string>,requestid:struct<s:string>,requesttimestamp:struct<s:string>,statusrequest:struct<s:string>,version:struct<n:string>>'
           Location: !Sub 's3://${ConfinfoDynamoDbExportBucketName}/pn-EcRichiesteMetadati/incremental2024/'
           InputFormat: org.apache.hadoop.mapred.TextInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
@@ -161,7 +161,7 @@ Resources:
         GlueTableName: pn_ss_tags
         GlueDatabaseName: !Ref ConfinfoExportDatabase
         LogsBucketName: ''
-        ConfinfoLogsBucketName: !Sub 'pn-logs-bucket-${AWS::Region}-${SafeStorageAccountId}-${ConfinfoLogsBucketSuffix}'
+        ConfinfoLogsBucketName: !Sub 'pn-logs-bucket-${AWS::Region}-${ConfidentialInfoAccountId}-${ConfinfoLogsBucketSuffix}'
         GlueServiceRoleArn: ''
         ProjectName: !Ref ProjectName
         BucketSuffix: !Ref AthenaResultBucketSuffix
@@ -294,6 +294,8 @@ Resources:
               Type: int
             - Name: write_timestamp_micros
               Type: bigint
+            - Name: events_list
+              Type: 'array<struct<insert_timestamp:string,client_request_timestamp:string,courier:string,iun:string,product_type:string,registered_letter_code:string,status:string,status_code:string,status_datetime:string,status_description:string,delivery_failure_cause:string,is_duplicate:boolean,attachments:array<struct<id:string,document_type:string,uri:string,sha256:string,date:string>>>>'
             - Name: p_year
               Type: string
             - Name: p_month
@@ -311,7 +313,7 @@ Resources:
               Fn::Sub:
                 - |
                   {
-                    "originalSql": "SELECT newimage.requestid.s as request_id, newimage.xpagopaextchcxid.s as cx_id, newimage.statusrequest.s as status_request, newimage.requesttimestamp.s as request_timestamp, newimage.lastupdatetimestamp.s as last_update_timestamp, newimage.clientrequesttimestamp.s as client_request_timestamp, newimage.requesthash.s as request_hash, newimage.paperrequestmetadata.m.printtype.s as paper_print_type, newimage.paperrequestmetadata.m.producttype.s as paper_product_type, newimage.paperrequestmetadata.m.requestpaid.s as paper_request_paid, CAST(newimage.version.n AS int) as version, CAST(metadata.writetimestampmicros.n AS bigint) as write_timestamp_micros, p_year, p_month, p_day, concat(p_year, p_month, p_day) as export_date FROM ${DatabaseName}.${TableName}",
+                    "originalSql": "SELECT newimage.requestid.s as request_id, newimage.xpagopaextchcxid.s as cx_id, newimage.statusrequest.s as status_request, newimage.requesttimestamp.s as request_timestamp, newimage.lastupdatetimestamp.s as last_update_timestamp, newimage.clientrequesttimestamp.s as client_request_timestamp, newimage.requesthash.s as request_hash, newimage.paperrequestmetadata.m.printtype.s as paper_print_type, newimage.paperrequestmetadata.m.producttype.s as paper_product_type, newimage.paperrequestmetadata.m.requestpaid.s as paper_request_paid, CAST(newimage.version.n AS int) as version, CAST(metadata.writetimestampmicros.n AS bigint) as write_timestamp_micros, transform(newimage.eventslist.l, (elem0) -> cast(row(elem0.m.inserttimestamp.s, elem0.m.paperprogrstatus.m.clientrequesttimestamp.s, elem0.m.paperprogrstatus.m.courier.s, elem0.m.paperprogrstatus.m.iun.s, elem0.m.paperprogrstatus.m.producttype.s, elem0.m.paperprogrstatus.m.registeredlettercode.s, elem0.m.paperprogrstatus.m.status.s, elem0.m.paperprogrstatus.m.statuscode.s, elem0.m.paperprogrstatus.m.statusdatetime.s, elem0.m.paperprogrstatus.m.statusdescription.s, elem0.m.paperprogrstatus.m.deliveryfailurecause.s, elem0.m.paperprogrstatus.m.isduplicate.bool, transform(elem0.m.paperprogrstatus.m.attachments.l, (elem1) -> cast(row(elem1.m.id.s, elem1.m.documenttype.s, elem1.m.uri.s, elem1.m.sha256.s, elem1.m.date.s) AS row(\"id\" varchar, \"document_type\" varchar, \"uri\" varchar, \"sha256\" varchar, \"date\" varchar)))) AS row(\"insert_timestamp\" varchar, \"client_request_timestamp\" varchar, \"courier\" varchar, \"iun\" varchar, \"product_type\" varchar, \"registered_letter_code\" varchar, \"status\" varchar, \"status_code\" varchar, \"status_datetime\" varchar, \"status_description\" varchar, \"delivery_failure_cause\" varchar, \"is_duplicate\" boolean, \"attachments\" array(row(\"id\" varchar, \"document_type\" varchar, \"uri\" varchar, \"sha256\" varchar, \"date\" varchar))))) as events_list, p_year, p_month, p_day, concat(p_year, p_month, p_day) as export_date FROM ${DatabaseName}.${TableName}",
                     "catalog": "awsdatacatalog",
                     "schema": "${DatabaseName}",
                     "columns": [
@@ -327,6 +329,7 @@ Resources:
                       {"name": "paper_request_paid", "type": "varchar"},
                       {"name": "version", "type": "integer"},
                       {"name": "write_timestamp_micros", "type": "bigint"},
+                      {"name": "events_list", "type": "array(row(\"insert_timestamp\" varchar, \"client_request_timestamp\" varchar, \"courier\" varchar, \"iun\" varchar, \"product_type\" varchar, \"registered_letter_code\" varchar, \"status\" varchar, \"status_code\" varchar, \"status_datetime\" varchar, \"status_description\" varchar, \"delivery_failure_cause\" varchar, \"is_duplicate\" boolean, \"attachments\" array(row(\"id\" varchar, \"document_type\" varchar, \"uri\" varchar, \"sha256\" varchar, \"date\" varchar))))"},
                       {"name": "p_year", "type": "varchar"},
                       {"name": "p_month", "type": "varchar"},
                       {"name": "p_day", "type": "varchar"},
@@ -346,7 +349,7 @@ Resources:
       DatabaseInput:
         Name: !Sub 'address_manager_tracing_link_${AddressManagerTracingLinkSuffix}'
         TargetDatabase:
-          CatalogId: !Sub '${SafeStorageAccountId}:s3tablescatalog/${ConfinfoAddressManagerTableBucketName}'
+          CatalogId: !Sub '${ConfidentialInfoAccountId}:s3tablescatalog/${ConfinfoAddressManagerTableBucketName}'
           DatabaseName: address_manager_tracing
 
   AddressManagerTracingLFDescribeAdminCore:

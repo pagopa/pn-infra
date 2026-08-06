@@ -84,7 +84,7 @@ Parameters:
     Type: String
     Description: ARN of the SNS topic for alarms
 
-  SafeStorageAccountId: 
+  ConfidentialInfoAccountId: 
     Type: String
     Default: '-'
     
@@ -137,10 +137,29 @@ Parameters:
   LogIngestionReservedConcurrentExecution:
     Type: Number
     Default: 25
+    
+  PreprocessingStreamNamePrefix:
+    Type: String
+    Default: ""
+    Description: Stream name prefix for preprocessing Firehose, used to isolate it from active streams
+    
+  PreprocessingEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Enable preprocessing Firehose for CDC records
+  
+  PreprocessingS3RootPrefix:
+    Type: String
+    Default: ""
+    Description: Root S3 prefix used to isolate CDC preprocessing test data from active paths
+
 
 Conditions:
   HasOpenSearchExport: !Not [ !Equals [ !Ref OpenSearchClusterEndpoint, "" ] ]
-  HasStorageStorageAccountId: !Not [ !Equals [ !Ref SafeStorageAccountId, "-" ] ]
+  HasConfidentialInfoAccountId: !Not [ !Equals [ !Ref ConfidentialInfoAccountId, "-" ] ]
   IsUatEnvironment: !Equals [ !Ref EnvironmentType, "uat" ]
   IsProdEnvironment: !Equals [ !Ref EnvironmentType, "prod" ]
   IsOpensearchIngestionEnabled: !Equals  [true, !Ref OpensearchIngestionEnabled]
@@ -159,6 +178,8 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
+        LogsKinesisSourceStreamArn: !Ref LogsKinesisSourceStreamArn
         SourceKinesisDataStreamArn: !Ref CdcKinesisSourceStreamArn
         SourceKinesisDataStreamKeyArn: !Ref CdcKinesisSourceStreamKeyArn
         LogsBucketName: !Ref LogsBucketName
@@ -166,6 +187,13 @@ Resources:
         StreamNamePrefix: 'cdcTos3'
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         StreamContent: DYNAMO_CDC
+        
+        PreprocessingStreamNamePrefix: !Ref PreprocessingStreamNamePrefix
+        LambdasBucketName: !Ref LambdasBucketName
+        LambdasBasePath: !Ref LambdasBasePath
+        PreprocessingEnabled: !Ref PreprocessingEnabled
+        PreprocessingS3RootPrefix: !Ref PreprocessingS3RootPrefix
+
 
   ###             Export CloudWatch Logs to Log saving bucket             ###
   ###########################################################################
@@ -175,6 +203,7 @@ Resources:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/kinesis-source-stream-to-logs-bucket.yaml"
       Parameters:
         ProjectName: !Ref ProjectName
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
         SourceKinesisDataStreamArn: !Ref LogsKinesisSourceStreamArn
         SourceKinesisDataStreamKeyArn: !Ref LogsKinesisSourceStreamKeyArn
         LogsBucketName: !Ref LogsBucketName
@@ -267,7 +296,7 @@ Resources:
   ###########################################################################
   SafestorageLogger:
     Type: AWS::CloudFormation::Stack
-    Condition: HasStorageStorageAccountId
+    Condition: HasConfidentialInfoAccountId
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/safestorage-logger.yaml"
       Parameters:
@@ -277,7 +306,7 @@ Resources:
         LambdaS3Key: !Sub "${LambdasBasePath}/safestorage-logger.zip"
         LambdaMemory: !Ref SafestorageLoggerLambdaMemory
         BatchSize: !Ref SafestorageLoggerBatchSize
-        SafeStorageAccountId: !Ref SafeStorageAccountId
+        ConfidentialInfoAccountId: !Ref ConfidentialInfoAccountId
         LambdaName: !Ref SafestorageLoggerLogGroupName
         QueueName: !Sub '${ProjectName}-new-safestorage-cloudtrail-file'
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn

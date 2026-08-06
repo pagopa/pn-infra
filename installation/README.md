@@ -323,7 +323,7 @@ Modificare i seguenti parametri:
   - __WebApiCertificateArn__: ARN del certificato per il DNS webapi.\<nome-ambiente\>.pn.pagopa.it
   - __IoApiCertificateArn__: ARN del certificato per il DNS api-io.\<nome-ambiente\>.pn.pagopa.it
   - __HostedZoneId__: l'id della zona DNS \<nome_ambiente\>.pn.pagopa.it
-  - __SafeStorageAccountId__: l'id dell'account AWS in cui si trovano safe-storage ed external channel
+  - __ConfidentialInfoAccountId__: l'id dell'account AWS in cui si trovano safe-storage ed external channel
 - File `pn-user-attributes/scripts/aws/cfn/microservice-<nome_ambiente>-cfg.json`
   - __ExternalChannelBasePath__: l'url di external-channel per lo specifico ambiente
 
