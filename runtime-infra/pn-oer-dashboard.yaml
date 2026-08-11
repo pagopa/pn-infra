@@ -41,6 +41,55 @@ Parameters:
     Default: ''
     Description: 'Logs Bucket Name'
 
+  OERLambdasConfigurationEnabled:
+    Type: String
+    Description: Enable or Disable the configuration of OER Lambdas
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  LambdaOERSlaValidationMonitoringTimeout:
+    Type: Number
+    Description: Timeout in seconds for the Lambda OER SLA Validation Monitoring function
+    Default: 300
+
+  LambdaOERSlaValidationMonitoringMemorySize:
+    Type: Number
+    Description: Memory size for the Lambda OER SLA Validation Monitoring function
+    Default: 256
+
+  LambdaOERSlaValidationMonitoringReservedConcurrentExecutions:
+    Type: Number
+    Description: Reserved concurrent executions for the Lambda OER SLA Validation Monitoring function
+    Default: 5
+
+  AthenaWorkgroup:
+    Type: String
+    Description: Athena Workgroup for OER SLA Validation Monitoring
+    Default: 'primary'
+
+  AthenaDatabase:
+    Type: String
+    Description: Athena Database for OER SLA Validation Monitoring
+    Default: 'cdc_analytics_database'
+
+  LambdaJSRuntime:
+    Type: String
+    Description: Node.js runtime for Lambda functions
+    Default: 'nodejs24.x'
+
+  LambdasBucketName:
+    Type: String
+    Description: S3 bucket name where Lambda code is stored
+    
+  LambdasBasePath:
+    Type: String
+    Description: Base path in the S3 bucket where Lambda code is stored
+
+Conditions:
+  IsOERLambdasConfigurationEnabled: !And [ !Equals [!Ref OERLambdasConfigurationEnabled, 'true' ], !Not [ !Equals [!Ref ConfidentialInfoAccountId, '' ] ] ]
+
 Resources:
 
   StorageFunction:
@@ -462,6 +511,77 @@ Resources:
             OpenSearchArn: !Ref OpenSearchArn
             LogsBucketName: !Ref LogsBucketName
 
+  OERSlaValidationMonitoringLambda:
+    Type: AWS::Lambda::Function
+    Condition: IsOERLambdasConfigurationEnabled
+    Properties:
+      Runtime: !Ref LambdaJSRuntime
+      Timeout: !Ref LambdaOERSlaValidationMonitoringTimeout
+      MemorySize: !Ref LambdaOERSlaValidationMonitoringMemorySize
+      ReservedConcurrentExecutions: !Ref LambdaOERSlaValidationMonitoringReservedConcurrentExecutions
+      Handler: index.handler
+      FunctionName: oer-sla-validation-monitoring-lambda
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/oer-sla-violation-monitoring.zip
+      Environment:
+        Variables:
+          ATHENA_WORKGROUP: !Ref AthenaWorkgroup
+          ATHENA_DATABASE: !Ref AthenaDatabase
+          ATHENA_OUTPUT_LOCATION: !Sub arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
+      Role:
+        Fn::GetAtt:
+          - OerSlaValidationMonitoringLambdaRole
+          - Arn
+
+  OerSlaValidationMonitoringLambdaRole:
+    Type: AWS::IAM::Role
+    Condition: IsOERLambdasConfigurationEnabled
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: OERSlaValidationMonitoringLambdaPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                  - s3:GetBucketVersioning
+                Resource:
+                  - !Sub arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
+                  - !Sub arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001/*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream  
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/oer-sla-validation-monitoring-lambda:*
+              - Effect: Allow
+                Action:
+                  - athena:StartQueryExecution
+                  - athena:GetQueryExecution
+                  - athena:GetQueryResults
+                  - athena:GetWorkGroup
+                Resource:
+                  - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/*
+              - Effect: Allow
+                Action:
+                  - glue:GetDatabase
+                  - glue:GetTable
+                  - glue:GetPartitions
+                Resource:
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/*
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/*/*
 Outputs:
   Version:
     Value: !Ref Version
