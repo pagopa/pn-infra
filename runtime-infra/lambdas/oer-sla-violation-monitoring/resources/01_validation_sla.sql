@@ -57,7 +57,7 @@ SELECT
     COALESCE(o.ha_request_refused, 0) AS ha_request_refused,
     v.ts_validate,
     o.ts_outcome,
-    date_diff('second', v.ts_validate, o.ts_outcome) AS diff_seconds
+    date_diff('hour', v.ts_validate, current_timestamp) AS diff_hour
 FROM validates v
 LEFT JOIN outcomes o ON v.iun = o.iun
 WHERE o.iun IS NULL;

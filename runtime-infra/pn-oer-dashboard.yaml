@@ -87,6 +87,18 @@ Parameters:
     Type: String
     Description: Base path in the S3 bucket where Lambda code is stored
 
+  LogsBucketKmsKeyArn:
+    Type: String
+    Description: KMS Key ARN for the logs bucket
+
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: Base URL for the CloudFormation template bucket
+
+  LogRetention:
+    Type: Number
+    Description: Log retention period in days
+
 Conditions:
   IsOERLambdasConfigurationEnabled: !And [ !Equals [!Ref OERLambdasConfigurationEnabled, 'true' ], !Not [ !Equals [!Ref ConfidentialInfoAccountId, '' ] ] ]
 
@@ -533,6 +545,8 @@ Resources:
         Fn::GetAtt:
           - OerSlaValidationMonitoringLambdaRole
           - Arn
+      LoggingConfig:
+        LogFormat: JSON
 
   OerSlaValidationMonitoringLambdaRole:
     Type: AWS::IAM::Role
@@ -560,6 +574,8 @@ Resources:
                 Resource:
                   - !Sub arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
                   - !Sub arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001/*
+                  - !Sub arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001
+                  - !Sub arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001/*
               - Effect: Allow
                 Action:
                   - logs:CreateLogStream  
@@ -582,6 +598,26 @@ Resources:
                   - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
                   - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/*
                   - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/*/*
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                Resource:
+                  - !Sub "${LogsBucketKmsKeyArn}"
+
+  OidcLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: 'oer-sla-validation-monitoring-lambda'
+        LogGroupPrefix: '/aws/lambda'
+        LogGroupRetention: !Ref LogRetention
+
+
+
 Outputs:
   Version:
     Value: !Ref Version
