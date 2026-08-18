@@ -555,7 +555,7 @@ Resources:
       MemorySize: !Ref LambdaOERSlaValidationMonitoringMemorySize
       ReservedConcurrentExecutions: !Ref LambdaOERSlaValidationMonitoringReservedConcurrentExecutions
       Handler: index.handler
-      FunctionName: oer-sla-validation-monitoring-lambda
+      FunctionName: oer-sla-monitoring-lambda
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/oer-sla-violation-monitoring.zip
@@ -603,7 +603,7 @@ Resources:
                 Action:
                   - logs:CreateLogStream  
                   - logs:PutLogEvents
-                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/oer-sla-validation-monitoring-lambda:*
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/oer-sla-monitoring-lambda:*
               - Effect: Allow
                 Action:
                   - athena:StartQueryExecution
