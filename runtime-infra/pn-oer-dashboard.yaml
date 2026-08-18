@@ -64,6 +64,19 @@ Parameters:
     Description: Reserved concurrent executions for the Lambda OER SLA Validation Monitoring function
     Default: 5
 
+  LambdaOERSlaMonitoringCronExpression:
+    Type: String
+    Description: Cron expression for OER SLA Monitoring EventBridge Scheduler
+    Default: 'cron(15 * * * ? *)'
+
+  LambdaOERSlaMonitoringScheduleState:
+    Type: String
+    Description: Enable or disable the OER SLA Monitoring scheduler
+    Default: ENABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+
   AthenaWorkgroup:
     Type: String
     Description: Athena Workgroup for OER SLA Validation Monitoring
@@ -98,6 +111,15 @@ Parameters:
   LogRetention:
     Type: Number
     Description: Log retention period in days
+
+  AlarmSNSTopicArn:
+    Type: String
+    Description: SNS Topic ARN for alarms
+
+  OERSlaInputParameters:
+    Type: String
+    Description: Input parameters for the OER SLA Monitoring Lambda function
+    Default: '{"queryFiles":["01_validation_sla.sql","02_pec_sla.sql"]}'
 
 Conditions:
   IsOERLambdasConfigurationEnabled: !And [ !Equals [!Ref OERLambdasConfigurationEnabled, 'true' ], !Not [ !Equals [!Ref ConfidentialInfoAccountId, '' ] ] ]
@@ -523,7 +545,7 @@ Resources:
             OpenSearchArn: !Ref OpenSearchArn
             LogsBucketName: !Ref LogsBucketName
 
-  OERSlaValidationMonitoringLambda:
+  OERSlaMonitoringLambda:
     Type: AWS::Lambda::Function
     Condition: IsOERLambdasConfigurationEnabled
     Properties:
@@ -543,12 +565,12 @@ Resources:
           ATHENA_OUTPUT_LOCATION: !Sub pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
       Role:
         Fn::GetAtt:
-          - OerSlaValidationMonitoringLambdaRole
+          - OERSlaMonitoringLambdaRole
           - Arn
       LoggingConfig:
         LogFormat: JSON
 
-  OerSlaValidationMonitoringLambdaRole:
+  OERSlaMonitoringLambdaRole:
     Type: AWS::IAM::Role
     Condition: IsOERLambdasConfigurationEnabled
     Properties:
@@ -560,7 +582,7 @@ Resources:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: OERSlaValidationMonitoringLambdaPolicy
+        - PolicyName: OERSlaMonitoringLambdaPolicy
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -617,18 +639,63 @@ Resources:
 
 
 
-  OERSlaValidationMonitoringLambdaLogGroup:
+  OERSlaMonitoringLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
       Parameters:
-        LogGroupName: 'oer-sla-validation-monitoring-lambda'
+        LogGroupName: 'oer-sla-monitoring-lambda'
         LogGroupPrefix: '/aws/lambda'
         LogGroupRetention: !Ref LogRetention
 
+  OERSlaMonitoringLambdaAlarms:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: oer-sla-monitoring-lambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
+  OERSlaValidationMonitoringSchedulerRole:
+    Type: AWS::IAM::Role
+    Condition: IsOERLambdasConfigurationEnabled
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: InvokeOERSlaMonitoringLambda
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt OERSlaMonitoringLambda.Arn
+
+  OERSlaValidationMonitoringSchedule:
+    Type: AWS::Scheduler::Schedule
+    Condition: IsOERLambdasConfigurationEnabled
+    Properties:
+      Name: pn-oer-sla-monitoring-scheduler
+      Description: "Schedule to trigger OER SLA Monitoring Lambda"
+      ScheduleExpression: !Ref LambdaOERSlaMonitoringCronExpression
+      ScheduleExpressionTimezone: Europe/Rome
+      State: !Ref LambdaOERSlaMonitoringScheduleState
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt OERSlaMonitoringLambda.Arn
+        RoleArn: !GetAtt OERSlaValidationMonitoringSchedulerRole.Arn
+        Input: !Ref OERSlaInputParameters
 
 Outputs:
   Version:
