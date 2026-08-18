@@ -1,6 +1,7 @@
 const { AthenaClient, StartQueryExecutionCommand, GetQueryExecutionCommand, GetQueryResultsCommand } = require("@aws-sdk/client-athena");
 
 const client = new AthenaClient();
+const RESULT_PAGE_SIZE = 1000;
 
 async function startQueryExecution(workgroup, queryString, database, outputLocation) {
   const input = {
@@ -87,7 +88,45 @@ async function getQueryResultsPaginated(queryExecutionId) {
   return rows;
 }
 
-async function queryExecution(workgroup, query, database, outputLocation) {
+async function processQueryResultsPaginated(queryExecutionId, onRow) {
+  let nextToken;
+  let columnInfo = [];
+  let pageIndex = 0;
+  let rowCount = 0;
+
+  do {
+    const input = {
+      QueryExecutionId: queryExecutionId,
+      NextToken: nextToken,
+      MaxResults: RESULT_PAGE_SIZE,
+    };
+
+    const response = await client.send(new GetQueryResultsCommand(input));
+    const resultSet = response.ResultSet || {};
+    columnInfo = resultSet.ResultSetMetadata ? resultSet.ResultSetMetadata.ColumnInfo || [] : columnInfo;
+    const pageRows = resultSet.Rows || [];
+
+    for (let rowIdx = 0; rowIdx < pageRows.length; rowIdx++) {
+      const row = pageRows[rowIdx];
+      if (pageIndex === 0 && rowIdx === 0 && isHeaderRow(row, columnInfo)) {
+        continue;
+      }
+
+      const mappedRow = mapRowToObject(row, columnInfo);
+      if (onRow) {
+        await onRow(mappedRow);
+      }
+      rowCount += 1;
+    }
+
+    nextToken = response.NextToken;
+    pageIndex += 1;
+  } while (nextToken);
+
+  return rowCount;
+}
+
+async function queryExecutionWithRowProcessor(workgroup, query, database, outputLocation, onRow) {
   const queryExecutionId = await startQueryExecution(workgroup, query, database, outputLocation);
   let queryExecution;
   let fileResult;
@@ -106,26 +145,53 @@ async function queryExecution(workgroup, query, database, outputLocation) {
     await new Promise(resolve => setTimeout(resolve, 3000));
   }
 
-  const rows = await getQueryResultsPaginated(queryExecutionId);
-  console.log(`Query ${queryExecutionId} result rows: ${rows.length}`);
+  const rowCount = await processQueryResultsPaginated(queryExecutionId, async (row) => {
+    if (onRow) {
+      await onRow(row, { queryExecutionId });
+    }
+  });
+
+  console.log(`Query ${queryExecutionId} result rows: ${rowCount}`);
 
   return {
     queryExecutionId,
     outputLocation: fileResult,
-    rows,
-    rowCount: rows.length,
+    rowCount,
     dataScannedInBytes: queryExecution.Statistics ? queryExecution.Statistics.DataScannedInBytes : undefined,
+  };
+}
+
+async function queryExecution(workgroup, query, database, outputLocation) {
+  const rows = [];
+  const baseResult = await queryExecutionWithRowProcessor(
+    workgroup,
+    query,
+    database,
+    outputLocation,
+    async (row) => {
+      rows.push(row);
+    }
+  );
+
+  return {
+    ...baseResult,
+    rows,
   };
 }
 
 async function queryExecutionParallel(queryInputs) {
   return Promise.all(
     queryInputs.map(async (queryInput, idx) => {
-      const result = await queryExecution(
+      const executeQuery = typeof queryInput.onRow === 'function'
+        ? queryExecutionWithRowProcessor
+        : queryExecution;
+
+      const result = await executeQuery(
         queryInput.workgroup,
         queryInput.query,
         queryInput.database,
-        queryInput.outputLocation
+        queryInput.outputLocation,
+        queryInput.onRow
       );
 
       return {
@@ -140,4 +206,5 @@ module.exports = {
   queryExecution,
   queryExecutionParallel,
   getQueryResultsPaginated,
+  queryExecutionWithRowProcessor,
 };

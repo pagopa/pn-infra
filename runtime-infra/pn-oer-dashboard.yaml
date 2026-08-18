@@ -67,7 +67,7 @@ Parameters:
   AthenaWorkgroup:
     Type: String
     Description: Athena Workgroup for OER SLA Validation Monitoring
-    Default: 'primary'
+    Default: 'cdc_analytics_workgroup'
 
   AthenaDatabase:
     Type: String
@@ -540,7 +540,7 @@ Resources:
         Variables:
           ATHENA_WORKGROUP: !Ref AthenaWorkgroup
           ATHENA_DATABASE: !Ref AthenaDatabase
-          ATHENA_OUTPUT_LOCATION: !Sub arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
+          ATHENA_OUTPUT_LOCATION: !Sub pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
       Role:
         Fn::GetAtt:
           - OerSlaValidationMonitoringLambdaRole
@@ -604,6 +604,18 @@ Resources:
                   - kms:DescribeKey
                 Resource:
                   - !Sub "${LogsBucketKmsKeyArn}"
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:PutParameter
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/pn-infra-monitoring/oer-sla-validation-monitoring/*
+
+
 
   OERSlaValidationMonitoringLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
