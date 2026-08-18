@@ -1,10 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const { queryExecutionParallel } = require('./lib/athena');
-const { buildMetricNameFromQueryName, putBusinessMetrics } = require('./lib/cloudwatch');
+const { buildMetricNameFromQueryName, putBusinessMetric } = require('./lib/cloudwatch');
 const { getOrCreateStartTimeParameter, updateStartTimeParameter } = require('./lib/ssm');
-
-const METRIC_BATCH_SIZE = 20;
 
 function loadQueryFromResources(fileName) {
   if (typeof fileName !== 'string' || fileName.trim().length === 0) {
@@ -129,6 +127,7 @@ function buildInsightsLog(metricName, resultName, queryExecutionId, row) {
     query_name: resultName,
     query_execution_id: queryExecutionId,
     iun: row.iun ?? null,
+    requestId: row.timelineElementId ?? null,
     diff_hours: toNumberOrNull(diffHoursValue),
   };
 }
@@ -137,39 +136,24 @@ const handler = async (event = {}) => {
   const config = getRequiredConfig();
   const queryInputs = await normalizeQueryInputs(event, config);
   const queryInputByName = new Map(queryInputs.map((item) => [item.name, item]));
-  const metricBuffers = new Map(queryInputs.map((item) => [item.name, []]));
 
-  const queryInputsWithHandlers = queryInputs.map((queryInput) => ({
-    ...queryInput,
-    onRow: async (row, executionContext) => {
-      const metricName = queryInput.metricName;
-      const logRecord = buildInsightsLog(metricName, queryInput.name, executionContext.queryExecutionId, row);
-      console.log(JSON.stringify(logRecord));
+  console.log(`Executing ${queryInputs.length} Athena query(ies) in parallel`);
 
-      const metricValue = toNumberOrNull(row.diff_hours ?? row.diff_hour) ?? 0;
-      const buffer = metricBuffers.get(queryInput.name);
-      buffer.push(metricValue);
-
-      if (buffer.length >= METRIC_BATCH_SIZE) {
-        await putBusinessMetrics(metricName, buffer.splice(0, buffer.length));
-      }
-    }
-  }));
-
-  console.log(`Executing ${queryInputsWithHandlers.length} Athena query(ies) in parallel`);
-
-  const results = await queryExecutionParallel(queryInputsWithHandlers);
+  const results = await queryExecutionParallel(queryInputs);
 
   for (const result of results) {
     const queryContext = queryInputByName.get(result.name);
     const metricName = queryContext ? queryContext.metricName : buildMetricNameFromQueryName(result.name);
-    const pendingMetrics = metricBuffers.get(result.name) || [];
 
     console.log(`Result for ${result.name} - queryExecutionId: ${result.queryExecutionId}`);
     console.log(`Rows (${result.rowCount}):`);
 
-    if (pendingMetrics.length > 0) {
-      await putBusinessMetrics(metricName, pendingMetrics.splice(0, pendingMetrics.length));
+    for (const row of result.rows) {
+      const logRecord = buildInsightsLog(metricName, result.name, result.queryExecutionId, row);
+      console.log(JSON.stringify(logRecord));
+
+      const metricValue = toNumberOrNull(row.diff_hours ?? row.diff_hour) ?? 0;
+      await putBusinessMetric(metricName, metricValue);
     }
 
     if (queryContext && result.rowCount > 0) {
