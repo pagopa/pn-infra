@@ -698,6 +698,45 @@ Resources:
         RoleArn: !GetAtt OERSlaValidationMonitoringSchedulerRole.Arn
         Input: !Ref OERSlaInputParameters
 
+  InValidationNotificationMetricFilter:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: ''
+        HasAlarm: false
+        HasOncall: false
+        MetricName: 'in_validation'
+        MetricNamespace: SEND/BusinessMetric
+        LogGroupName: "/aws/ecs/pn-delivery"
+        FilterPattern: '"{ $.aud_type = \"AUD_NT_TIMELINE\" && $.message = \"*SUCCESS - sendNewNotification*\" }"'
+
+  AcceptedNotificationMetricFilter:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: ''
+        HasAlarm: false
+        HasOncall: false
+        MetricName: 'accepted'
+        MetricNamespace: SEND/BusinessMetric
+        LogGroupName: "/aws/ecs/pn-timeline-service"
+        FilterPattern: '"{ $.aud_type = \"AUD_NT_TIMELINE\" && $.message = \"*SUCCESS*\" && $.message = \"*REQUEST_ACCEPTED*\" }"'
+
+  RefusedNotificationMetricFilter:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: ''
+        HasAlarm: false
+        HasOncall: false
+        MetricName: 'refused'
+        MetricNamespace: SEND/BusinessMetric
+        LogGroupName: "/aws/ecs/pn-timeline-service"
+        FilterPattern: '"{ $.aud_type = \"AUD_NT_TIMELINE\" && $.message = \"*SUCCESS*\" && $.message = \"*REQUEST_REFUSED*\" }"'
+
 Outputs:
   Version:
     Value: !Ref Version
