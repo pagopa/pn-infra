@@ -112,6 +112,21 @@ Parameters:
     Type: Number
     Description: Log retention period in days
 
+  InValidationFilterPattern:
+    Type: String
+    Description: Filter pattern for the "in_validation" metric
+    Default: '"{ $.aud_type = "AUD_NT_TIMELINE" && $.message = "*SUCCESS - sendNewNotification*" }"'
+
+  AcceptedFilterPattern:
+    Type: String
+    Description: Filter pattern for the "accepted" metric
+    Default: '"{ $.aud_type = "AUD_NT_TIMELINE" && $.message = "*SUCCESS*" && $.message = "*REQUEST_ACCEPTED*" }"'
+
+  RefusedFilterPattern:
+    Type: String
+    Description: Filter pattern for the "refused" metric
+    Default: '"{ $.aud_type = "AUD_NT_TIMELINE" && $.message = "*SUCCESS*" && $.message = "*REQUEST_REFUSED*" }"'
+
   #AlarmSNSTopicArn:
   #  Type: String
   #  Description: SNS Topic ARN for alarms
@@ -707,9 +722,9 @@ Resources:
         HasAlarm: false
         HasOncall: false
         MetricName: 'in_validation'
-        MetricNamespace: SEND/BusinessMetric
+        MetricNamespace: SEND/BusinessMetrics
         LogGroupName: "/aws/ecs/pn-delivery"
-        FilterPattern: '"{ $.aud_type = \"AUD_NT_TIMELINE\" && $.message = \"*SUCCESS - sendNewNotification*\" }"'
+        FilterPattern: !Ref InValidationFilterPattern
         ComparisonOperator: 'GreaterThanOrEqualToThreshold'
         OncallComparisonOperator: 'GreaterThanOrEqualToThreshold'
         OncallStatistic: 'Sum'
@@ -724,9 +739,9 @@ Resources:
         HasAlarm: false
         HasOncall: false
         MetricName: 'accepted'
-        MetricNamespace: SEND/BusinessMetric
+        MetricNamespace: SEND/BusinessMetrics
         LogGroupName: "/aws/ecs/pn-timeline-service"
-        FilterPattern: '"{ $.aud_type = \"AUD_NT_TIMELINE\" && $.message = \"*SUCCESS*\" && $.message = \"*REQUEST_ACCEPTED*\" }"'
+        FilterPattern: !Ref AcceptedFilterPattern
         ComparisonOperator: 'GreaterThanOrEqualToThreshold'
         OncallComparisonOperator: 'GreaterThanOrEqualToThreshold'
         OncallStatistic: 'Sum'
@@ -741,9 +756,9 @@ Resources:
         HasAlarm: false
         HasOncall: false
         MetricName: 'refused'
-        MetricNamespace: SEND/BusinessMetric
+        MetricNamespace: SEND/BusinessMetrics
         LogGroupName: "/aws/ecs/pn-timeline-service"
-        FilterPattern: '"{ $.aud_type = \"AUD_NT_TIMELINE\" && $.message = \"*SUCCESS*\" && $.message = \"*REQUEST_REFUSED*\" }"'
+        FilterPattern: !Ref RefusedFilterPattern
         ComparisonOperator: 'GreaterThanOrEqualToThreshold'
         OncallComparisonOperator: 'GreaterThanOrEqualToThreshold'
         OncallStatistic: 'Sum'
