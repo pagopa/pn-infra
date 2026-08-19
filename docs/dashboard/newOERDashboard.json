@@ -1,0 +1,284 @@
+{
+    "widgets": [
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 1,
+            "width": 10,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ "SEND/BusinessMetrics", "ACCEPTED", { "stat": "Sum", "color": "#2ca02c", "label": "Approvate (ACCEPTED)", "id": "m1" } ],
+                    [ ".", "REFUSED", { "stat": "Sum", "color": "#d62728", "label": "Rifiutate (REFUSED)", "id": "m2" } ],
+                    [ ".", "IN_VALIDATION", { "stat": "Sum", "color": "#1f77b4", "label": "Ingressi in Validazione", "id": "m3" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "eu-south-1",
+                "title": "Volumi Giornalieri (Settimanale): In validazione vs Accettate/Rifiutate",
+                "period": 86400,
+                "yAxis": {
+                    "left": {
+                        "showUnits": false,
+                        "label": "Totale Notifiche"
+                    }
+                },
+                "start": "-PT168H",
+                "end": "P0D"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 6,
+            "width": 10,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ "SEND/BusinessMetrics", "ACCEPTED", { "id": "m1", "label": "Approvate (ACCEPTED)", "color": "#2ca02c", "region": "eu-south-1" } ],
+                    [ ".", "REFUSED", { "id": "m2", "label": "Rifiutate (REFUSED)", "color": "#d62728", "region": "eu-south-1" } ],
+                    [ ".", "IN_VALIDATION", { "id": "m3", "label": "Ingressi in Validazione", "color": "#1f77b4", "region": "eu-south-1" } ]
+                ],
+                "view": "bar",
+                "stacked": true,
+                "region": "eu-south-1",
+                "title": "Volumi Giornalieri",
+                "period": 86400,
+                "yAxis": {
+                    "left": {
+                        "showUnits": false,
+                        "label": "Totale Notifiche"
+                    }
+                },
+                "stat": "Sum",
+                "start": "-PT24H",
+                "end": "P0D"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 12,
+            "width": 5,
+            "height": 3,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "m3 - (m1 + m2)", "label": "Notifiche Bloccate / In Lavorazione", "id": "e1", "color": "#ff7f0e" } ],
+                    [ "SEND/BusinessMetrics", "IN_VALIDATION", { "id": "m3", "visible": false, "stat": "Sum" } ],
+                    [ ".", "ACCEPTED", { "id": "m1", "visible": false, "stat": "Sum" } ],
+                    [ ".", "REFUSED", { "id": "m2", "visible": false, "stat": "Sum" } ]
+                ],
+                "view": "singleValue",
+                "region": "eu-south-1",
+                "title": "Disallineamento (Backlog)",
+                "period": 604800,
+                "setPeriodToTimeRange": true,
+                "sparkline": false,
+                "start": "-PT24H",
+                "end": "P0D"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 5,
+            "y": 12,
+            "width": 5,
+            "height": 3,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "100 * m1 / (m1 + m2)", "label": "Approval Rate %", "id": "e2", "color": "#2ca02c" } ],
+                    [ "SEND/BusinessMetrics", "ACCEPTED", { "id": "m1", "visible": false, "stat": "Sum" } ],
+                    [ ".", "REFUSED", { "id": "m2", "visible": false, "stat": "Sum" } ]
+                ],
+                "view": "singleValue",
+                "region": "eu-south-1",
+                "title": "SLA Approvazione %",
+                "period": 604800,
+                "setPeriodToTimeRange": true,
+                "sparkline": false,
+                "start": "-PT24H",
+                "end": "P0D"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 10,
+            "y": 1,
+            "width": 7,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ "SEND/BusinessMetrics", "validation_sla", { "region": "eu-south-1", "stat": "Maximum" } ]
+                ],
+                "view": "gauge",
+                "region": "eu-south-1",
+                "title": "SLA Validazione Notifiche (0-24h)",
+                "period": 60,
+                "start": "-PT1H",
+                "yAxis": {
+                    "left": {
+                        "min": 0,
+                        "max": 24
+                    }
+                },
+                "annotations": {
+                    "horizontal": [
+                        [
+                            {
+                                "color": "#69ae34",
+                                "label": "0h",
+                                "value": 0
+                            },
+                            {
+                                "value": 4,
+                                "label": "4h"
+                            }
+                        ],
+                        [
+                            {
+                                "color": "#ff7f0e",
+                                "label": "4h",
+                                "value": 4
+                            },
+                            {
+                                "value": 8,
+                                "label": "8h"
+                            }
+                        ],
+                        [
+                            {
+                                "color": "#d62728",
+                                "label": "8h",
+                                "value": 8
+                            },
+                            {
+                                "value": 24,
+                                "label": "24h"
+                            }
+                        ]
+                    ]
+                },
+                "singleValueFullPrecision": false,
+                "liveData": true,
+                "legend": {
+                    "position": "hidden"
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 17,
+            "y": 1,
+            "width": 7,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ "SEND/BusinessMetrics", "pec_sla", { "region": "eu-south-1", "stat": "Maximum" } ]
+                ],
+                "view": "gauge",
+                "region": "eu-south-1",
+                "title": "SLA Invio PEC (0-48h)",
+                "period": 60,
+                "start": "-PT1H",
+                "yAxis": {
+                    "left": {
+                        "min": 0,
+                        "max": 48
+                    }
+                },
+                "annotations": {
+                    "horizontal": [
+                        [
+                            {
+                                "color": "#69ae34",
+                                "label": "0h",
+                                "value": 0
+                            },
+                            {
+                                "value": 12,
+                                "label": "12h"
+                            }
+                        ],
+                        [
+                            {
+                                "color": "#ff7f0e",
+                                "label": "12h",
+                                "value": 12
+                            },
+                            {
+                                "value": 24,
+                                "label": "24h"
+                            }
+                        ],
+                        [
+                            {
+                                "color": "#d62728",
+                                "label": "24h",
+                                "value": 24
+                            },
+                            {
+                                "value": 48,
+                                "label": "48h"
+                            }
+                        ]
+                    ]
+                },
+                "singleValueFullPrecision": false,
+                "liveData": true,
+                "legend": {
+                    "position": "hidden"
+                }
+            }
+        },
+        {
+            "type": "log",
+            "x": 10,
+            "y": 7,
+            "width": 7,
+            "height": 8,
+            "properties": {
+                "start": "-PT1H",
+                "query": "SOURCE \"arn:aws:logs:eu-south-1:<account_core_id>:log-group:/aws/lambda/oer-sla-validation-monitoring-lambda\" |\nfields @timestamp, message\n| filter message like /validation_sla/\n| parse message '\"diff_hours\":*}' as diff_hours\n| parse message '\"iun\":\"*\"' as iun\n| stats max(diff_hours) as max_diff_hours by iun\n| sort max_diff_hours desc",
+                "region": "eu-south-1",
+                "stacked": false,
+                "view": "table",
+                "title": "Log group: oer-sla-validation-monitoring-lambda"
+            }
+        },
+        {
+            "type": "log",
+            "x": 17,
+            "y": 7,
+            "width": 7,
+            "height": 8,
+            "properties": {
+                "start": "-PT1H",
+                "query": "SOURCE \"arn:aws:logs:eu-south-1:<account_core_id>:log-group:/aws/lambda/oer-sla-validation-monitoring-lambda\" |\nfields @timestamp, message\n| filter message like /pec_sla/\n| parse message '\"requestId\":\"*\"' as requestId\n| parse message '\"diff_hours\":*}' as diff_hours\n| stats max(diff_hours) as max_diff_hours by requestId\n| sort max_diff_hours desc",
+                "region": "eu-south-1",
+                "stacked": false,
+                "view": "table",
+                "title": "Log group: oer-sla-validation-monitoring-lambda"
+            }
+        },
+        {
+            "type": "text",
+            "x": 0,
+            "y": 0,
+            "width": 24,
+            "height": 1,
+            "properties": {
+                "markdown": "# SEND: Area Business"
+            }
+        },
+        {
+            "type": "text",
+            "x": 0,
+            "y": 15,
+            "width": 24,
+            "height": 1,
+            "properties": {
+                "markdown": "# SEND: Area Tecnico / Infrastruttura"
+            }
+        }
+    ]
+}
