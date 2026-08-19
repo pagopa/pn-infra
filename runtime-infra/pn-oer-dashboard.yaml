@@ -710,6 +710,10 @@ Resources:
         MetricNamespace: SEND/BusinessMetric
         LogGroupName: "/aws/ecs/pn-delivery"
         FilterPattern: '"{ $.aud_type = \"AUD_NT_TIMELINE\" && $.message = \"*SUCCESS - sendNewNotification*\" }"'
+        ComparisonOperator: 'GreaterThanOrEqualToThreshold'
+        OncallComparisonOperator: 'GreaterThanOrEqualToThreshold'
+        OncallStatistic: 'Sum'
+        Statistic: 'Sum'
 
   AcceptedNotificationMetricFilter:
     Type: AWS::CloudFormation::Stack
@@ -723,6 +727,10 @@ Resources:
         MetricNamespace: SEND/BusinessMetric
         LogGroupName: "/aws/ecs/pn-timeline-service"
         FilterPattern: '"{ $.aud_type = \"AUD_NT_TIMELINE\" && $.message = \"*SUCCESS*\" && $.message = \"*REQUEST_ACCEPTED*\" }"'
+        ComparisonOperator: 'GreaterThanOrEqualToThreshold'
+        OncallComparisonOperator: 'GreaterThanOrEqualToThreshold'
+        OncallStatistic: 'Sum'
+        Statistic: 'Sum'
 
   RefusedNotificationMetricFilter:
     Type: AWS::CloudFormation::Stack
@@ -736,6 +744,10 @@ Resources:
         MetricNamespace: SEND/BusinessMetric
         LogGroupName: "/aws/ecs/pn-timeline-service"
         FilterPattern: '"{ $.aud_type = \"AUD_NT_TIMELINE\" && $.message = \"*SUCCESS*\" && $.message = \"*REQUEST_REFUSED*\" }"'
+        ComparisonOperator: 'GreaterThanOrEqualToThreshold'
+        OncallComparisonOperator: 'GreaterThanOrEqualToThreshold'
+        OncallStatistic: 'Sum'
+        Statistic: 'Sum'
 
 Outputs:
   Version:
