@@ -156,6 +156,11 @@ Parameters:
     Type: String
     Default: ""
 
+  ApiGatewayWidgets:
+    Type: String
+    Description: Additional API Gateway widgets JSON appended to OER dashboard
+    Default: ""
+
 Conditions:
   IsOERLambdasConfigurationEnabled: !And [ !Equals [!Ref OERLambdasConfigurationEnabled, 'true' ], !Not [ !Equals [!Ref ConfidentialInfoAccountId, '' ] ] ]
 
@@ -1255,6 +1260,7 @@ Resources:
                     }
                 }
             }
+            ${ApiGatewayWidgets}
           ]
         }
     
