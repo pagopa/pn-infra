@@ -138,7 +138,12 @@ Parameters:
 
   GatewayApisIntendedUsage:
     Type: String
-    Default: "-B2B,-B2BPG-,-WEB-,-IO-"
+    Default: "-B2B-,-B2BPG-,-WEB-,-IO-"
+
+  MaxAPIGatewayDetailWidgets:
+    Type: Number
+    Default: 0
+    Description: "Maximum number of detailed API widgets to display on the dashboard"
 
 Conditions:
   IsOERLambdasConfigurationEnabled: !And [ !Equals [!Ref OERLambdasConfigurationEnabled, 'true' ], !Not [ !Equals [!Ref ConfidentialInfoAccountId, '' ] ] ]
@@ -845,7 +850,7 @@ Resources:
                         [ ".", "REFUSED", { "id": "m2", "visible": false, "stat": "Sum" } ]
                     ],
                     "view": "singleValue",
-                    "region": "eu-south-1",
+                    "region": "${AWS::Region}",
                     "title": "Disallineamento (Backlog)",
                     "period": 604800,
                     "setPeriodToTimeRange": true,
@@ -867,7 +872,7 @@ Resources:
                         [ ".", "REFUSED", { "id": "m2", "visible": false, "stat": "Sum" } ]
                     ],
                     "view": "singleValue",
-                    "region": "eu-south-1",
+                    "region": "${AWS::Region}",
                     "title": "SLA Approvazione %",
                     "period": 604800,
                     "setPeriodToTimeRange": true,
@@ -884,10 +889,10 @@ Resources:
                 "height": 6,
                 "properties": {
                     "metrics": [
-                        [ "SEND/BusinessMetrics", "validation_sla", { "region": "eu-south-1", "stat": "Maximum" } ]
+                        [ "SEND/BusinessMetrics", "validation_sla", { "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "gauge",
-                    "region": "eu-south-1",
+                    "region": "${AWS::Region}",
                     "title": "SLA Validazione Notifiche (0-24h)",
                     "period": 60,
                     "start": "-PT1H",
@@ -949,10 +954,10 @@ Resources:
                 "height": 6,
                 "properties": {
                     "metrics": [
-                        [ "SEND/BusinessMetrics", "pec_sla", { "region": "eu-south-1", "stat": "Maximum" } ]
+                        [ "SEND/BusinessMetrics", "pec_sla", { "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "gauge",
-                    "region": "eu-south-1",
+                    "region": "${AWS::Region}",
                     "title": "SLA Invio PEC (0-48h)",
                     "period": 60,
                     "start": "-PT1H",
@@ -1015,7 +1020,7 @@ Resources:
                 "properties": {
                     "start": "-PT1H",
                     "query": "SOURCE \"arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/oer-sla-validation-monitoring-lambda\" |\nfields @timestamp, message\n| filter message like /validation_sla/\n| parse message '\"diff_hours\":*}' as diff_hours\n| parse message '\"iun\":\"*\"' as iun\n| stats max(diff_hours) as max_diff_hours by iun\n| sort max_diff_hours desc",
-                    "region": "eu-south-1",
+                    "region": "${AWS::Region}",
                     "stacked": false,
                     "view": "table",
                     "title": "Log group: oer-sla-validation-monitoring-lambda"
@@ -1030,7 +1035,7 @@ Resources:
                 "properties": {
                     "start": "-PT1H",
                     "query": "SOURCE \"arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/oer-sla-validation-monitoring-lambda\" |\nfields @timestamp, message\n| filter message like /pec_sla/\n| parse message '\"requestId\":\"*\"' as requestId\n| parse message '\"diff_hours\":*}' as diff_hours\n| stats max(diff_hours) as max_diff_hours by requestId\n| sort max_diff_hours desc",
-                    "region": "eu-south-1",
+                    "region": "${AWS::Region}",
                     "stacked": false,
                     "view": "table",
                     "title": "Log group: oer-sla-validation-monitoring-lambda"
@@ -1065,6 +1070,7 @@ Resources:
                 Parameters:
                   Region: !Sub ${AWS::Region}
                   GatewayApisIntendedUsage: !Ref GatewayApisIntendedUsage
+                  MaxAPIGatewayDetailWidgets: !Ref MaxAPIGatewayDetailWidgets
     
 Outputs:
   Version:

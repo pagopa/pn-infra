@@ -1898,22 +1898,20 @@ Resources:
           import boto3
           import json
           import re
-
-          MAX_DETAIL_WIDGETS = 3
-
+          import math
 
           def _parse_filters(value):
               if not value:
                   return []
               raw = re.findall(r"'([^']+)'", value)
               if raw:
-                  return list(dict.fromkeys([x.strip().upper() for x in raw if x and x.strip()]))
-              fallback = [x.strip().upper() for x in value.split(',') if x and x.strip()]
+                  return list(dict.fromkeys([x.strip() for x in raw if x and x.strip()]))
+              fallback = [x.strip() for x in value.split(',') if x and x.strip()]
               return list(dict.fromkeys(fallback))
 
 
           def _label_from_selector(selector):
-              normalized = selector.strip().strip('-').strip().upper()
+              normalized = selector.strip().strip('-').strip()
               return normalized if normalized else "API"
 
 
@@ -1946,13 +1944,17 @@ Resources:
 
               filtered = []
               for api_name in all_api_names:
-                  upper_name = api_name.upper()
                   for selector in selectors:
-                      token = selector.upper()
+                      token = selector.strip()
+                      if not token:
+                          continue
+
                       if '-' in token:
-                          match = token in upper_name
+                          # If selector already contains hyphens, match it as-is in the API name.
+                          match = token in api_name
                       else:
-                          match = f"-{token}-" in upper_name
+                          # Otherwise, enforce full segment matching between hyphens.
+                          match = f"-{token}-" in api_name
 
                       if match:
                           filtered.append(api_name)
@@ -1961,9 +1963,17 @@ Resources:
               return filtered
 
 
-          def _build_category_widgets(category_label, apis, y_base, region):
+          def _parse_max_detail_widgets(value, default_value=3):
+              try:
+                  parsed = int(value)
+              except (TypeError, ValueError):
+                  return default_value
+              return max(0, parsed)
+
+
+          def _build_category_widgets(category_label, apis, y_base, region, max_detail_widgets):
               if not apis:
-                  return []
+                  return [], 0
 
               metrics_worst = []
               metrics_ts = []
@@ -2053,13 +2063,21 @@ Resources:
                   }
               })
 
-              x_positions = [0, 8, 16]
-              for i, api_name in enumerate(apis[:MAX_DETAIL_WIDGETS]):
+              detail_count = min(len(apis), max_detail_widgets)
+              columns = 3
+              detail_row_height = 5
+              detail_start_y = y_base + 7
+
+              for i, api_name in enumerate(apis[:detail_count]):
+                  row = i // columns
+                  col = i % columns
+                  x_position = col * 8
+                  y_position = detail_start_y + (row * detail_row_height)
                   short_title = api_name[3:] if api_name.startswith('pn-') else api_name
                   widgets.append({
                       "type": "metric",
-                      "x": x_positions[i],
-                      "y": y_base + 7,
+                      "x": x_position,
+                      "y": y_position,
                       "width": 8,
                       "height": 5,
                       "properties": {
@@ -2081,14 +2099,17 @@ Resources:
                       }
                   })
 
-              return widgets
+              detail_rows = int(math.ceil(detail_count / columns)) if detail_count > 0 else 0
+              consumed_height = 8 + (detail_rows * detail_row_height)
+              return widgets, consumed_height
 
 
           def lambda_handler(event, context):
               params = event.get("params", {})
               region = params.get("Region", "eu-south-1")
               intended_usage = params.get("GatewayApisIntendedUsage", "-B2B-,-B2BPG-,-WEB-,-IO-")
-
+              max_detail_widgets = _parse_max_detail_widgets(params.get("MaxAPIGatewayDetailWidgets", 3))
+              
               all_api_names = _list_rest_api_names()
 
               selectors = _parse_filters(intended_usage)
@@ -2103,10 +2124,10 @@ Resources:
               y_base = 16
               generated_widgets = []
               for label, apis in categories:
-                  widgets = _build_category_widgets(label, apis, y_base, region)
+                  widgets, consumed_height = _build_category_widgets(label, apis, y_base, region, max_detail_widgets)
                   if widgets:
                       generated_widgets.extend(widgets)
-                      y_base += 13
+                      y_base += consumed_height
 
               fragment = ""
               if generated_widgets:
