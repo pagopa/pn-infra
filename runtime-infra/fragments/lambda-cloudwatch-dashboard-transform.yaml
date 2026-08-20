@@ -1849,3 +1849,230 @@ Resources:
       Principal: 'cloudformation.amazonaws.com'
       SourceAccount: !Ref AWS::AccountId
       SourceArn: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*
+
+  OerDashboardApiWidgetsMacroV2:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Description: Generate dynamic API Gateway widgets for OER dashboard from compact API lists.
+      FunctionName: !GetAtt OerDashboardApiWidgetsFunctionV2.Arn
+      Name: OerDashboardApiWidgetsTransformV2
+
+  OerDashboardApiWidgetsExecutionRoleV2:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: OerDashboardApiWidgetsLogsV2
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/*:*'
+
+  OerDashboardApiWidgetsFunctionLogGroupV2:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${OerDashboardApiWidgetsFunctionV2}"
+      RetentionInDays: 14
+
+  OerDashboardApiWidgetsFunctionV2:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import json
+          import re
+
+          MAX_DETAIL_WIDGETS = 3
+
+
+          def _parse_apis(value):
+              if not value:
+                  return []
+              raw = re.findall(r"'([^']+)'", value)
+              if raw:
+                  return list(dict.fromkeys([x.strip() for x in raw if x and x.strip()]))
+              fallback = [x.strip() for x in value.split(',') if x and x.strip()]
+              return list(dict.fromkeys(fallback))
+
+
+          def _build_category_widgets(category_label, apis, y_base, region):
+              if not apis:
+                  return []
+
+              metrics_worst = []
+              metrics_ts = []
+              metric_ids = []
+
+              for idx, api_name in enumerate(apis, start=1):
+                  metric_id = f"m{idx}"
+                  metric_ids.append(metric_id)
+                  metrics_worst.append([
+                      "AWS/ApiGateway",
+                      "Latency",
+                      "ApiName",
+                      api_name,
+                      {
+                          "stat": "p95",
+                          "id": metric_id,
+                          "visible": False
+                      }
+                  ])
+                  metrics_ts.append([
+                      "AWS/ApiGateway",
+                      "Latency",
+                      "ApiName",
+                      api_name,
+                      {
+                          "stat": "p95",
+                          "label": api_name,
+                          "id": metric_id
+                      }
+                  ])
+
+              widgets = []
+              widgets.append({
+                  "type": "text",
+                  "x": 0,
+                  "y": y_base,
+                  "width": 24,
+                  "height": 1,
+                  "properties": {
+                      "markdown": f"# OER - {category_label} API Gateway"
+                  }
+              })
+
+              worst_expr = f"MAX([{','.join(metric_ids)}])"
+              widgets.append({
+                  "type": "metric",
+                  "x": 0,
+                  "y": y_base + 1,
+                  "width": 8,
+                  "height": 6,
+                  "properties": {
+                      "metrics": [[{
+                          "expression": worst_expr,
+                          "label": f"{category_label} P95 - Worst API",
+                          "id": "e1"
+                      }]] + metrics_worst,
+                      "view": "singleValue",
+                      "region": region,
+                      "title": f"{category_label} P95 - Worst API",
+                      "period": 300,
+                      "setPeriodToTimeRange": True,
+                      "singleValueFullPrecision": False
+                  }
+              })
+
+              widgets.append({
+                  "type": "metric",
+                  "x": 8,
+                  "y": y_base + 1,
+                  "width": 16,
+                  "height": 6,
+                  "properties": {
+                      "metrics": metrics_ts,
+                      "view": "timeSeries",
+                      "region": region,
+                      "title": f"{category_label} API Latency - P95",
+                      "period": 300,
+                      "yAxis": {
+                          "left": {
+                              "label": "Latency (ms)",
+                              "showUnits": False
+                          }
+                      },
+                      "legend": {
+                          "position": "bottom"
+                      }
+                  }
+              })
+
+              x_positions = [0, 8, 16]
+              for i, api_name in enumerate(apis[:MAX_DETAIL_WIDGETS]):
+                  short_title = api_name[3:] if api_name.startswith('pn-') else api_name
+                  widgets.append({
+                      "type": "metric",
+                      "x": x_positions[i],
+                      "y": y_base + 7,
+                      "width": 8,
+                      "height": 5,
+                      "properties": {
+                          "metrics": [[
+                              "AWS/ApiGateway",
+                              "Latency",
+                              "ApiName",
+                              api_name,
+                              {
+                                  "stat": "p95",
+                                  "label": "P95"
+                              }
+                          ]],
+                          "view": "singleValue",
+                          "region": region,
+                          "title": f"{short_title} - P95",
+                          "period": 300,
+                          "setPeriodToTimeRange": True
+                      }
+                  })
+
+              return widgets
+
+
+          def lambda_handler(event, context):
+              params = event.get("params", {})
+              region = params.get("Region", "eu-south-1")
+
+              categories = [
+                  ("BACKOFFICE", _parse_apis(params.get("BackofficeApis", ""))),
+                  ("B2B", _parse_apis(params.get("B2BApis", ""))),
+                  ("B2BPG", _parse_apis(params.get("B2BPGApis", ""))),
+                  ("WEB", _parse_apis(params.get("WEBApis", ""))),
+                  ("IO", _parse_apis(params.get("IOApis", ""))),
+              ]
+
+              y_base = 35
+              generated_widgets = []
+              for label, apis in categories:
+                  widgets = _build_category_widgets(label, apis, y_base, region)
+                  if widgets:
+                      generated_widgets.extend(widgets)
+                      y_base += 13
+
+              fragment = ""
+              if generated_widgets:
+                  fragment = "," + ",".join(json.dumps(w, separators=(",", ":")) for w in generated_widgets)
+
+              return {
+                  "requestId": event.get("requestId", ""),
+                  "status": "success",
+                  "fragment": fragment
+              }
+      Handler: index.lambda_handler
+      Runtime: python3.12
+      Role: !GetAtt OerDashboardApiWidgetsExecutionRoleV2.Arn
+
+  OerDashboardApiWidgetsFunctionPermissionsV2:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt OerDashboardApiWidgetsFunctionV2.Arn
+      Principal: 'cloudformation.amazonaws.com'
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*

@@ -156,11 +156,6 @@ Parameters:
     Type: String
     Default: ""
 
-  ApiGatewayWidgets:
-    Type: String
-    Description: Additional API Gateway widgets JSON appended to OER dashboard
-    Default: ""
-
 Conditions:
   IsOERLambdasConfigurationEnabled: !And [ !Equals [!Ref OERLambdasConfigurationEnabled, 'true' ], !Not [ !Equals [!Ref ConfidentialInfoAccountId, '' ] ] ]
 
@@ -792,9 +787,11 @@ Resources:
     Type: AWS::CloudWatch::Dashboard
     Properties:
       DashboardName: pn-oer-dashboard-draft
-      DashboardBody: !Sub |
-        {
-          "widgets": [
+      DashboardBody:
+        Fn::Sub:
+          - |
+            {
+              "widgets": [
             {
                 "type": "metric",
                 "x": 0,
@@ -1260,9 +1257,19 @@ Resources:
                     }
                 }
             }
-            ${ApiGatewayWidgets}
-          ]
-        }
+            ${GeneratedApiGatewayWidgets}
+              ]
+            }
+          - GeneratedApiGatewayWidgets:
+              Fn::Transform:
+                Name: OerDashboardApiWidgetsTransformV2
+                Parameters:
+                  Region: !Sub ${AWS::Region}
+                  BackofficeApis: !Ref BackofficeApis
+                  B2BApis: !Ref B2BApis
+                  B2BPGApis: !Ref B2BPGApis
+                  WEBApis: !Ref WEBApis
+                  IOApis: !Ref IOApis
     
 Outputs:
   Version:
