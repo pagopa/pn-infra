@@ -1876,14 +1876,13 @@ Resources:
               - Effect: Allow
                 Action:
                   - logs:CreateLogGroup
-                Resource:
-                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/*'
-              - Effect: Allow
-                Action:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource:
-                  - !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/*:*'
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - apigateway:GET
+                Resource: "*"
 
   OerDashboardApiWidgetsFunctionLogGroupV2:
     Type: AWS::Logs::LogGroup
@@ -1896,20 +1895,70 @@ Resources:
     Properties:
       Code:
         ZipFile: |
+          import boto3
           import json
           import re
 
           MAX_DETAIL_WIDGETS = 3
 
 
-          def _parse_apis(value):
+          def _parse_filters(value):
               if not value:
                   return []
               raw = re.findall(r"'([^']+)'", value)
               if raw:
-                  return list(dict.fromkeys([x.strip() for x in raw if x and x.strip()]))
-              fallback = [x.strip() for x in value.split(',') if x and x.strip()]
+                  return list(dict.fromkeys([x.strip().upper() for x in raw if x and x.strip()]))
+              fallback = [x.strip().upper() for x in value.split(',') if x and x.strip()]
               return list(dict.fromkeys(fallback))
+
+
+          def _label_from_selector(selector):
+              normalized = selector.strip().strip('-').strip().upper()
+              return normalized if normalized else "API"
+
+
+          def _list_rest_api_names():
+              apigw = boto3.client("apigateway")
+              api_names = []
+              position = None
+
+              while True:
+                  kwargs = {"limit": 500}
+                  if position:
+                      kwargs["position"] = position
+
+                  response = apigw.get_rest_apis(**kwargs)
+                  for item in response.get("items", []):
+                      name = item.get("name")
+                      if name:
+                          api_names.append(name)
+
+                  position = response.get("position")
+                  if not position:
+                      break
+
+              return sorted(list(dict.fromkeys(api_names)))
+
+
+          def _filter_apis(all_api_names, selectors):
+              if not selectors:
+                  return []
+
+              filtered = []
+              for api_name in all_api_names:
+                  upper_name = api_name.upper()
+                  for selector in selectors:
+                      token = selector.upper()
+                      if '-' in token:
+                          match = token in upper_name
+                      else:
+                          match = f"-{token}-" in upper_name
+
+                      if match:
+                          filtered.append(api_name)
+                          break
+
+              return filtered
 
 
           def _build_category_widgets(category_label, apis, y_base, region):
@@ -2038,16 +2087,20 @@ Resources:
           def lambda_handler(event, context):
               params = event.get("params", {})
               region = params.get("Region", "eu-south-1")
+              intended_usage = params.get("GatewayApisIntendedUsage", "-B2B-,-B2BPG-,-WEB-,-IO-")
 
+              all_api_names = _list_rest_api_names()
+
+              selectors = _parse_filters(intended_usage)
               categories = [
-                  ("BACKOFFICE", _parse_apis(params.get("BackofficeApis", ""))),
-                  ("B2B", _parse_apis(params.get("B2BApis", ""))),
-                  ("B2BPG", _parse_apis(params.get("B2BPGApis", ""))),
-                  ("WEB", _parse_apis(params.get("WEBApis", ""))),
-                  ("IO", _parse_apis(params.get("IOApis", ""))),
+                  (
+                      _label_from_selector(selector),
+                      _filter_apis(all_api_names, [selector])
+                  )
+                  for selector in selectors
               ]
 
-              y_base = 35
+              y_base = 16
               generated_widgets = []
               for label, apis in categories:
                   widgets = _build_category_widgets(label, apis, y_base, region)

@@ -136,25 +136,9 @@ Parameters:
     Description: Input parameters for the OER SLA Monitoring Lambda function
     Default: '{"queryFiles":["01_validation_sla.sql","02_pec_sla.sql"]}'
 
-  BackofficeApis:
+  GatewayApisIntendedUsage:
     Type: String
-    Default: ""
-
-  B2BApis:
-    Type: String
-    Default: ""
-
-  B2BPGApis:
-    Type: String
-    Default: ""
-
-  WEBApis:
-    Type: String
-    Default: ""
-
-  IOApis:
-    Type: String
-    Default: ""
+    Default: "-B2B,-B2BPG-,-WEB-,-IO-"
 
 Conditions:
   IsOERLambdasConfigurationEnabled: !And [ !Equals [!Ref OERLambdasConfigurationEnabled, 'true' ], !Not [ !Equals [!Ref ConfidentialInfoAccountId, '' ] ] ]
@@ -1071,191 +1055,6 @@ Resources:
                 "properties": {
                     "markdown": "# SEND: Area Tecnico / Infrastruttura"
                 }
-            },
-            {
-                "type": "text",
-                "x": 0,
-                "y": 16,
-                "width": 24,
-                "height": 1,
-                "properties": {
-                    "markdown": "# API Gateway: Latency e Integration Latency per API"
-                }
-            },
-
-            {
-                "type": "metric",
-                "x": 0,
-                "y": 17,
-                "width": 12,
-                "height": 6,
-                "properties": {
-                    "metrics": [
-                        [
-                            {
-                                "expression": "SELECT AVG(Latency) FROM SCHEMA(\"AWS/ApiGateway\", ApiName) WHERE ApiName IN (${BackofficeApis})",
-                                "label": "Latency",
-                                "id": "backoffice_latency"
-                            }
-                        ],
-                        [
-                            {
-                                "expression": "SELECT AVG(IntegrationLatency) FROM SCHEMA(\"AWS/ApiGateway\", ApiName) WHERE ApiName IN (${BackofficeApis})",
-                                "label": "IntegrationLatency",
-                                "id": "backoffice_integration_latency"
-                            }
-                        ]
-                    ],
-                    "view": "timeSeries",
-                    "region": "${AWS::Region}",
-                    "title": "BACKOFFICE - Latency",
-                    "period": 300,
-                    "yAxis": {
-                        "left": {
-                            "label": "Latency (ms)"
-                        }
-                    }
-                }
-            },
-
-            {
-                "type": "metric",
-                "x": 12,
-                "y": 17,
-                "width": 12,
-                "height": 6,
-                "properties": {
-                    "metrics": [
-                        [
-                            {
-                                "expression": "SELECT AVG(Latency) FROM SCHEMA(\"AWS/ApiGateway\", ApiName) WHERE ApiName IN (${B2BApis})",
-                                "label": "Latency",
-                                "id": "b2b_latency"
-                            }
-                        ],
-                        [
-                            {
-                                "expression": "SELECT AVG(IntegrationLatency) FROM SCHEMA(\"AWS/ApiGateway\", ApiName) WHERE ApiName IN (${B2BApis})",
-                                "label": "IntegrationLatency",
-                                "id": "b2b_integration_latency"
-                            }
-                        ]
-                    ],
-                    "view": "timeSeries",
-                    "region": "${AWS::Region}",
-                    "title": "B2B - Latency",
-                    "period": 300,
-                    "yAxis": {
-                        "left": {
-                            "label": "Latency (ms)"
-                        }
-                    }
-                }
-            },
-
-            {
-                "type": "metric",
-                "x": 0,
-                "y": 23,
-                "width": 12,
-                "height": 6,
-                "properties": {
-                    "metrics": [
-                        [
-                            {
-                                "expression": "SELECT AVG(Latency) FROM SCHEMA(\"AWS/ApiGateway\", ApiName) WHERE ApiName IN (${WEBApis})",
-                                "label": "Latency",
-                                "id": "web_latency"
-                            }
-                        ],
-                        [
-                            {
-                                "expression": "SELECT AVG(IntegrationLatency) FROM SCHEMA(\"AWS/ApiGateway\", ApiName) WHERE ApiName IN (${WEBApis})",
-                                "label": "IntegrationLatency",
-                                "id": "web_integration_latency"
-                            }
-                        ]
-                    ],
-                    "view": "timeSeries",
-                    "region": "${AWS::Region}",
-                    "title": "WEB - Latency",
-                    "period": 300,
-                    "yAxis": {
-                        "left": {
-                            "label": "Latency (ms)"
-                        }
-                    }
-                }
-            },
-
-            {
-                "type": "metric",
-                "x": 12,
-                "y": 23,
-                "width": 12,
-                "height": 6,
-                "properties": {
-                    "metrics": [
-                        [
-                            {
-                                "expression": "SELECT AVG(Latency) FROM SCHEMA(\"AWS/ApiGateway\", ApiName) WHERE ApiName IN (${IOApis})",
-                                "label": "Latency",
-                                "id": "io_latency"
-                            }
-                        ],
-                        [
-                            {
-                                "expression": "SELECT AVG(IntegrationLatency) FROM SCHEMA(\"AWS/ApiGateway\", ApiName) WHERE ApiName IN (${IOApis})",
-                                "label": "IntegrationLatency",
-                                "id": "io_integration_latency"
-                            }
-                        ]
-                    ],
-                    "view": "timeSeries",
-                    "region": "${AWS::Region}",
-                    "title": "IO - Latency",
-                    "period": 300,
-                    "yAxis": {
-                        "left": {
-                            "label": "Latency (ms)"
-                        }
-                    }
-                }
-            },
-
-            {
-                "type": "metric",
-                "x": 0,
-                "y": 29,
-                "width": 12,
-                "height": 6,
-                "properties": {
-                    "metrics": [
-                        [
-                            {
-                                "expression": "SELECT AVG(Latency) FROM SCHEMA(\"AWS/ApiGateway\", ApiName) WHERE ApiName IN (${B2BPGApis})",
-                                "label": "Latency",
-                                "id": "b2bpg_latency"
-                            }
-                        ],
-                        [
-                            {
-                                "expression": "SELECT AVG(IntegrationLatency) FROM SCHEMA(\"AWS/ApiGateway\", ApiName) WHERE ApiName IN (${B2BPGApis})",
-                                "label": "IntegrationLatency",
-                                "id": "b2bpg_integration_latency"
-                            }
-                        ]
-                    ],
-                    "view": "timeSeries",
-                    "region": "${AWS::Region}",
-                    "title": "B2BPG - Latency",
-                    "period": 300,
-                    "yAxis": {
-                        "left": {
-                            "label": "Latency (ms)"
-                        }
-                    }
-                }
             }
             ${GeneratedApiGatewayWidgets}
               ]
@@ -1265,11 +1064,7 @@ Resources:
                 Name: OerDashboardApiWidgetsTransformV2
                 Parameters:
                   Region: !Sub ${AWS::Region}
-                  BackofficeApis: !Ref BackofficeApis
-                  B2BApis: !Ref B2BApis
-                  B2BPGApis: !Ref B2BPGApis
-                  WEBApis: !Ref WEBApis
-                  IOApis: !Ref IOApis
+                  GatewayApisIntendedUsage: !Ref GatewayApisIntendedUsage
     
 Outputs:
   Version:
