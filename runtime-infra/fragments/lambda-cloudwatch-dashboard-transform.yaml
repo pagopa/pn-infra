@@ -1944,17 +1944,22 @@ Resources:
 
               filtered = []
               for api_name in all_api_names:
+                  normalized_api = f"-{api_name.strip('-')}-"
                   for selector in selectors:
                       token = selector.strip()
                       if not token:
                           continue
 
-                      if '-' in token:
-                          # If selector already contains hyphens, match it as-is in the API name.
+                      if token.startswith('-') and token.endswith('-'):
+                          # Selector wrapped in hyphens means exact segment match.
+                          core = token.strip('-')
+                          match = bool(core) and f"-{core}-" in normalized_api
+                      elif '-' in token:
+                          # Selector with internal hyphens keeps substring behavior.
                           match = token in api_name
                       else:
-                          # Otherwise, enforce full segment matching between hyphens.
-                          match = f"-{token}-" in api_name
+                          # Plain selector also matches as a full segment.
+                          match = f"-{token}-" in normalized_api
 
                       if match:
                           filtered.append(api_name)
