@@ -77,6 +77,14 @@ Parameters:
       - ENABLED
       - DISABLED
 
+  EcsTaskDeltaMetricsScheduleState:
+    Type: String
+    Description: Enable or disable the ECS task delta metrics scheduler
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+
   AthenaWorkgroup:
     Type: String
     Description: Athena Workgroup for OER SLA Validation Monitoring
@@ -1075,10 +1083,153 @@ Resources:
                 "properties": {
                     "markdown": "# SEND: Area Tecnico / Infrastruttura"
                 }
+            },
+            {
+              "type": "text",
+              "width": 24,
+              "height": 1,
+              "properties": {
+                "markdown": "## API Gateway, Downstream e SQS"
+              }
             }
             ${GeneratedApiGatewayWidgets}
             ${GeneratedDownstreamErrorWidgets}
             ${GeneratedSqsWidgets}
+            ,
+            {
+              "type": "text",
+              "width": 24,
+              "height": 1,
+              "properties": {
+                "markdown": "# SEND: Throttling e Capacity"
+              }
+            },
+            {
+                "type": "metric",
+                "width": 12,
+                "height": 6,
+                "properties": {
+                    "metrics": [
+                        [ { "expression": "SELECT SUM(Throttles) FROM SCHEMA(\"AWS/Lambda\", FunctionName) GROUP BY FunctionName", "label": "Lambda Throttles", "id": "q1" } ]
+                    ],
+                    "view": "timeSeries",
+                    "stacked": false,
+                    "region": "eu-south-1",
+                    "stat": "Sum",
+                    "period": 300,
+                    "start": "-PT168H",
+                    "end": "P0D",
+                    "title": "Lambda - Throttles"
+                }
+                },
+                {
+                    "type": "metric",
+                    "width": 12,
+                    "height": 6,
+                    "properties": {
+                        "metrics": [
+                            [ { "expression": "SELECT SUM(ThrottledRules) FROM SCHEMA(\"AWS/Events\", RuleName) GROUP BY RuleName", "label": "Throttled Rules", "id": "q1" } ]
+                        ],
+                        "view": "timeSeries",
+                        "stacked": false,
+                        "region": "eu-south-1",
+                        "stat": "Sum",
+                        "period": 300,
+                        "start": "-PT168H",
+                        "end": "P0D",
+                        "title": "EventBridge - Throttled Rules"
+                    }
+                },
+                {
+                    "type": "metric",
+                    "width": 12,
+                    "height": 6,
+                    "properties": {
+                        "metrics": [
+                            [ { "expression": "SELECT SUM(ReadThrottleEvents) FROM SCHEMA(\"AWS/DynamoDB\", TableName) GROUP BY TableName", "label": "ReadThrottleEvents", "id": "q1" } ]
+                        ],
+                        "view": "timeSeries",
+                        "stacked": false,
+                        "region": "eu-south-1",
+                        "stat": "Sum",
+                        "period": 300,
+                        "start": "-PT168H",
+                        "end": "P0D",
+                        "title": "DynamoDB - Read Throttles"
+                    }
+                },
+                {
+                    "type": "metric",
+                    "width": 12,
+                    "height": 6,
+                    "properties": {
+                        "metrics": [
+                            [ { "expression": "SELECT SUM(WriteThrottleEvents) FROM SCHEMA(\"AWS/DynamoDB\", TableName) GROUP BY TableName", "label": "WriteThrottleEvents", "id": "q1" } ]
+                        ],
+                        "view": "timeSeries",
+                        "stacked": false,
+                        "region": "eu-south-1",
+                        "stat": "Sum",
+                        "period": 300,
+                        "start": "-PT168H",
+                        "end": "P0D",
+                        "title": "DynamoDB - Write Throttles"
+                    }
+                },
+                {
+                    "type": "metric",
+                    "width": 12,
+                    "height": 6,
+                    "properties": {
+                        "metrics": [
+                            [ { "expression": "SELECT SUM(ThrottledRequests) FROM \"AWS/SSM\"", "label": "ThrottledRequests", "id": "q1" } ]
+                        ],
+                        "view": "timeSeries",
+                        "stacked": false,
+                        "region": "eu-south-1",
+                        "stat": "Sum",
+                        "period": 300,
+                        "start": "-PT168H",
+                        "end": "P0D",
+                        "title": "Parameter Store - Throttled Requests"
+                    }
+                },
+                {
+                    "type": "metric",
+                    "width": 12,
+                    "height": 6,
+                    "properties": {
+                        "metrics": [
+                            [ { "expression": "SELECT SUM(ThrottledRequests) FROM \"AWS/SecretsManager\"", "label": "ThrottledRequests", "id": "q1" } ]
+                        ],
+                        "view": "timeSeries",
+                        "stacked": false,
+                        "region": "eu-south-1",
+                        "stat": "Sum",
+                        "period": 300,
+                        "start": "-PT168H",
+                        "end": "P0D",
+                        "title": "Secrets Manager - Throttled Requests"
+                    }
+                },
+                {
+                    "type": "metric",
+                    "width": 24,
+                    "height": 6,
+                    "properties": {
+                        "metrics": [
+                            [ { "expression": "SELECT MAX(ExtraRunningTasksByTaskFamily) FROM \"OER/ECSCapacity\"", "label": "ExtraRunningTasks", "id": "q1" } ]
+                        ],
+                        "view": "timeSeries",
+                        "stacked": false,
+                        "region": "eu-south-1",
+                        "stat": "Maximum",
+                        "period": 300,
+                        "start": "-PT168H",
+                        "end": "P0D",
+                        "title": "ECS Capacity - Extra Running Tasks"
+                    }
+                }
               ]
             }
           - GeneratedApiGatewayWidgets:
@@ -1101,6 +1252,165 @@ Resources:
                   Region: !Sub ${AWS::Region}
                   SqsDlqExcludeQueueNames: !Ref SqsDlqExcludeQueueNames
                   SqsQueueExcludeQueueNames: !Ref SqsQueueExcludeQueueNames
+
+  OerEcsTaskDeltaMetricsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: OerEcsTaskDeltaMetricsPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/pn-oer-ecs-task-delta-metrics:*
+              - Effect: Allow
+                Action:
+                  - ecs:ListClusters
+                  - ecs:ListServices
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecs:DescribeServices
+                Resource:
+                  - !Sub arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/*
+                  - !Sub arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:service/*
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: OER/ECSCapacity
+
+  OerEcsTaskDeltaMetricsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Collect ECS service desired/running tasks and publish custom delta metrics by task definition family.
+      FunctionName: pn-oer-ecs-task-delta-metrics
+      Handler: index.lambda_handler
+      Runtime: python3.12
+      Timeout: 120
+      MemorySize: 256
+      Role: !GetAtt OerEcsTaskDeltaMetricsRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+
+          NAMESPACE = "OER/ECSCapacity"
+
+
+          def _task_family(task_definition_arn):
+              # Example ARN suffix: task-definition/family-name:42
+              suffix = task_definition_arn.split("/")[-1]
+              return suffix.split(":")[0]
+
+
+          def _chunk(items, size):
+              for i in range(0, len(items), size):
+                  yield items[i:i + size]
+
+
+          def lambda_handler(event, context):
+              ecs = boto3.client("ecs")
+              cw = boto3.client("cloudwatch")
+
+              cluster_arns = []
+              paginator = ecs.get_paginator("list_clusters")
+              for page in paginator.paginate():
+                  cluster_arns.extend(page.get("clusterArns", []))
+
+              families = {}
+
+              for cluster_arn in cluster_arns:
+                  service_arns = []
+                  services_paginator = ecs.get_paginator("list_services")
+                  for page in services_paginator.paginate(cluster=cluster_arn):
+                      service_arns.extend(page.get("serviceArns", []))
+
+                  for batch in _chunk(service_arns, 10):
+                      if not batch:
+                          continue
+                      response = ecs.describe_services(cluster=cluster_arn, services=batch)
+
+                      for service in response.get("services", []):
+                          desired = int(service.get("desiredCount", 0))
+                          running = int(service.get("runningCount", 0))
+                          family = _task_family(service.get("taskDefinition", "unknown:0"))
+
+                          bucket = families.setdefault(family, {"desired": 0, "running": 0})
+                          bucket["desired"] += desired
+                          bucket["running"] += running
+
+              metric_data = []
+              for family, counts in families.items():
+                  desired = counts["desired"]
+                  running = counts["running"]
+                  extra = max(0, running - desired)
+                  dimensions = [{"Name": "TaskDefinitionFamily", "Value": family}]
+
+                  metric_data.append({
+                      "MetricName": "MinTasksByTaskFamily",
+                      "Dimensions": dimensions,
+                      "Value": float(desired),
+                      "Unit": "Count"
+                  })
+                  metric_data.append({
+                      "MetricName": "RunningTasksByTaskFamily",
+                      "Dimensions": dimensions,
+                      "Value": float(running),
+                      "Unit": "Count"
+                  })
+                  metric_data.append({
+                      "MetricName": "ExtraRunningTasksByTaskFamily",
+                      "Dimensions": dimensions,
+                      "Value": float(extra),
+                      "Unit": "Count"
+                  })
+
+              for batch in _chunk(metric_data, 20):
+                  cw.put_metric_data(Namespace=NAMESPACE, MetricData=batch)
+
+              return {
+                  "publishedFamilies": len(families),
+                  "publishedMetrics": len(metric_data)
+              }
+
+  OerEcsTaskDeltaMetricsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${OerEcsTaskDeltaMetricsFunction}
+      RetentionInDays: !Ref LogRetention
+
+  OerEcsTaskDeltaMetricsScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Trigger ECS task delta metrics Lambda every minute.
+      ScheduleExpression: rate(1 minute)
+      State: !Ref EcsTaskDeltaMetricsScheduleState
+      Targets:
+        - Arn: !GetAtt OerEcsTaskDeltaMetricsFunction.Arn
+          Id: OerEcsTaskDeltaMetricsTarget
+
+  OerEcsTaskDeltaMetricsInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OerEcsTaskDeltaMetricsFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt OerEcsTaskDeltaMetricsScheduleRule.Arn
 
 Outputs:
   Version:
