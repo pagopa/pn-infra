@@ -1865,8 +1865,10 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: [lambda.amazonaws.com]
-            Action: ['sts:AssumeRole']
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
       Path: /
       Policies:
         - PolicyName: OerDashboardApiWidgetsLogsV2
@@ -1875,15 +1877,14 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: "*"
+                Resource:
+                                    - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*OerDashboardApiWidgetsFunctionV2:*'
               - Effect: Allow
                 Action:
                   - apigateway:GET
                 Resource: "*"
-
   OerDashboardApiWidgetsFunctionLogGroupV2:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -2056,6 +2057,7 @@ Resources:
                       "metrics": metrics_ts,
                       "view": "timeSeries",
                       "start": "-PT168H",
+                      "end": "P0D",
                       "region": region,
                       "title": f"{category_label} API Latency - P95",
                       "period": 300,
@@ -2103,6 +2105,8 @@ Resources:
                           "region": region,
                           "title": f"{short_title} - P95",
                           "period": 300,
+                          "start": "-PT168H",
+                          "end": "P0D",
                           "setPeriodToTimeRange": True
                       }
                   })
@@ -2354,8 +2358,10 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: [lambda.amazonaws.com]
-            Action: ['sts:AssumeRole']
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
       Path: /
       Policies:
         - PolicyName: OerSqsWidgetsPolicyV2
@@ -2364,15 +2370,14 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: "*"
+                Resource:
+                                    - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*OerSqsWidgetsFunctionV2:*'
               - Effect: Allow
                 Action:
                   - cloudwatch:ListMetrics
                 Resource: "*"
-
   OerSqsWidgetsFunctionLogGroupV2:
     Type: AWS::Logs::LogGroup
     Properties:
