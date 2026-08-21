@@ -150,6 +150,16 @@ Parameters:
     Default: ""
     Description: "Semicolon separated mapping DownstreamName=MetricPrefix (suffix -downstream-detection is added automatically when missing)"
 
+  SqsDlqExcludeQueueNames:
+    Type: String
+    Default: ""
+    Description: "Comma separated SQS queue names to exclude from DLQ widget"
+
+  SqsQueueExcludeQueueNames:
+    Type: String
+    Default: ""
+    Description: "Comma separated SQS queue names to exclude from non-DLQ widget"
+
 Conditions:
   IsOERLambdasConfigurationEnabled: !And [ !Equals [!Ref OERLambdasConfigurationEnabled, 'true' ], !Not [ !Equals [!Ref ConfidentialInfoAccountId, '' ] ] ]
 
@@ -1068,6 +1078,7 @@ Resources:
             }
             ${GeneratedApiGatewayWidgets}
             ${GeneratedDownstreamErrorWidgets}
+            ${GeneratedSqsWidgets}
               ]
             }
           - GeneratedApiGatewayWidgets:
@@ -1083,6 +1094,13 @@ Resources:
                 Parameters:
                   Region: !Sub ${AWS::Region}
                   DownstreamMetricMap: !Ref DownstreamMetricMap
+            GeneratedSqsWidgets:
+              Fn::Transform:
+                Name: OerSqsWidgetsTransformV2
+                Parameters:
+                  Region: !Sub ${AWS::Region}
+                  SqsDlqExcludeQueueNames: !Ref SqsDlqExcludeQueueNames
+                  SqsQueueExcludeQueueNames: !Ref SqsQueueExcludeQueueNames
 
 Outputs:
   Version:
