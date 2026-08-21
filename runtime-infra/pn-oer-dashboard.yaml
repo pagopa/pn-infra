@@ -145,6 +145,11 @@ Parameters:
     Default: 0
     Description: "Maximum number of detailed API widgets to display on the dashboard"
 
+  DownstreamMetricMap:
+    Type: String
+    Default: ""
+    Description: "Semicolon separated mapping DownstreamName=MetricPrefix (suffix -downstream-detection is added automatically when missing)"
+
 Conditions:
   IsOERLambdasConfigurationEnabled: !And [ !Equals [!Ref OERLambdasConfigurationEnabled, 'true' ], !Not [ !Equals [!Ref ConfidentialInfoAccountId, '' ] ] ]
 
@@ -1062,6 +1067,7 @@ Resources:
                 }
             }
             ${GeneratedApiGatewayWidgets}
+            ${GeneratedDownstreamErrorWidgets}
               ]
             }
           - GeneratedApiGatewayWidgets:
@@ -1071,7 +1077,13 @@ Resources:
                   Region: !Sub ${AWS::Region}
                   GatewayApisIntendedUsage: !Ref GatewayApisIntendedUsage
                   MaxAPIGatewayDetailWidgets: !Ref MaxAPIGatewayDetailWidgets
-    
+            GeneratedDownstreamErrorWidgets:
+              Fn::Transform:
+                Name: OerDownstreamErrorWidgetsTransformV1
+                Parameters:
+                  Region: !Sub ${AWS::Region}
+                  DownstreamMetricMap: !Ref DownstreamMetricMap
+
 Outputs:
   Version:
     Value: !Ref Version
