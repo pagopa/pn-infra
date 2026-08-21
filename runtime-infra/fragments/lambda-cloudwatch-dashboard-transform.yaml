@@ -1849,3 +1849,307 @@ Resources:
       Principal: 'cloudformation.amazonaws.com'
       SourceAccount: !Ref AWS::AccountId
       SourceArn: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*
+
+  OerDashboardApiWidgetsMacroV2:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Description: Generate dynamic API Gateway widgets for OER dashboard from compact API lists.
+      FunctionName: !GetAtt OerDashboardApiWidgetsFunctionV2.Arn
+      Name: OerDashboardApiWidgetsTransformV2
+
+  OerDashboardApiWidgetsExecutionRoleV2:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: OerDashboardApiWidgetsLogsV2
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - apigateway:GET
+                Resource: "*"
+
+  OerDashboardApiWidgetsFunctionLogGroupV2:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${OerDashboardApiWidgetsFunctionV2}"
+      RetentionInDays: 14
+
+  OerDashboardApiWidgetsFunctionV2:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import re
+          import math
+
+          def _parse_filters(value):
+              if not value:
+                  return []
+              raw = re.findall(r"'([^']+)'", value)
+              if raw:
+                  return list(dict.fromkeys([x.strip() for x in raw if x and x.strip()]))
+              fallback = [x.strip() for x in value.split(',') if x and x.strip()]
+              return list(dict.fromkeys(fallback))
+
+
+          def _label_from_selector(selector):
+              normalized = selector.strip().strip('-').strip()
+              return normalized if normalized else "API"
+
+
+          def _list_rest_api_names():
+              apigw = boto3.client("apigateway")
+              api_names = []
+              position = None
+
+              while True:
+                  kwargs = {"limit": 500}
+                  if position:
+                      kwargs["position"] = position
+
+                  response = apigw.get_rest_apis(**kwargs)
+                  for item in response.get("items", []):
+                      name = item.get("name")
+                      if name:
+                          api_names.append(name)
+
+                  position = response.get("position")
+                  if not position:
+                      break
+
+              return sorted(list(dict.fromkeys(api_names)))
+
+
+          def _filter_apis(all_api_names, selectors):
+              if not selectors:
+                  return []
+
+              filtered = []
+              for api_name in all_api_names:
+                  for selector in selectors:
+                      token = selector.strip()
+                      if not token:
+                          continue
+
+                      if '-' in token:
+                          # If selector already contains hyphens, match it as-is in the API name.
+                          match = token in api_name
+                      else:
+                          # Otherwise, enforce full segment matching between hyphens.
+                          match = f"-{token}-" in api_name
+
+                      if match:
+                          filtered.append(api_name)
+                          break
+
+              return filtered
+
+
+          def _parse_max_detail_widgets(value, default_value=3):
+              try:
+                  parsed = int(value)
+              except (TypeError, ValueError):
+                  return default_value
+              return max(0, parsed)
+
+
+          def _build_category_widgets(category_label, apis, y_base, region, max_detail_widgets):
+              if not apis:
+                  return [], 0
+
+              metrics_worst = []
+              metrics_ts = []
+              metric_ids = []
+
+              for idx, api_name in enumerate(apis, start=1):
+                  metric_id = f"m{idx}"
+                  metric_ids.append(metric_id)
+                  metrics_worst.append([
+                      "AWS/ApiGateway",
+                      "Latency",
+                      "ApiName",
+                      api_name,
+                      {
+                          "stat": "p95",
+                          "id": metric_id,
+                          "visible": False
+                      }
+                  ])
+                  metrics_ts.append([
+                      "AWS/ApiGateway",
+                      "Latency",
+                      "ApiName",
+                      api_name,
+                      {
+                          "stat": "p95",
+                          "label": api_name,
+                          "id": metric_id
+                      }
+                  ])
+
+              widgets = []
+              widgets.append({
+                  "type": "text",
+                  "x": 0,
+                  "y": y_base,
+                  "width": 24,
+                  "height": 1,
+                  "properties": {
+                      "markdown": f"# OER - {category_label} API Gateway"
+                  }
+              })
+
+              worst_expr = f"MAX([{','.join(metric_ids)}])"
+              widgets.append({
+                  "type": "metric",
+                  "x": 0,
+                  "y": y_base + 1,
+                  "width": 8,
+                  "height": 6,
+                  "properties": {
+                      "metrics": [[{
+                          "expression": worst_expr,
+                          "label": f"{category_label} P95 - Worst API",
+                          "id": "e1"
+                      }]] + metrics_worst,
+                      "view": "singleValue",
+                      "region": region,
+                      "title": f"{category_label} P95 - Worst API",
+                      "period": 300,
+                      "start": "-PT168H",
+                      "end": "P0D",
+                      "setPeriodToTimeRange": True,
+                      "singleValueFullPrecision": False
+                  }
+              })
+
+              widgets.append({
+                  "type": "metric",
+                  "x": 8,
+                  "y": y_base + 1,
+                  "width": 16,
+                  "height": 6,
+                  "properties": {
+                      "metrics": metrics_ts,
+                      "view": "timeSeries",
+                      "start": "-PT168H",
+                      "region": region,
+                      "title": f"{category_label} API Latency - P95",
+                      "period": 300,
+                      "yAxis": {
+                          "left": {
+                              "label": "Latency (ms)",
+                              "showUnits": False
+                          }
+                      },
+                      "legend": {
+                          "position": "bottom"
+                      }
+                  }
+              })
+
+              detail_count = min(len(apis), max_detail_widgets)
+              columns = 3
+              detail_row_height = 5
+              detail_start_y = y_base + 7
+
+              for i, api_name in enumerate(apis[:detail_count]):
+                  row = i // columns
+                  col = i % columns
+                  x_position = col * 8
+                  y_position = detail_start_y + (row * detail_row_height)
+                  short_title = api_name[3:] if api_name.startswith('pn-') else api_name
+                  widgets.append({
+                      "type": "metric",
+                      "x": x_position,
+                      "y": y_position,
+                      "width": 8,
+                      "height": 5,
+                      "properties": {
+                          "metrics": [[
+                              "AWS/ApiGateway",
+                              "Latency",
+                              "ApiName",
+                              api_name,
+                              {
+                                  "stat": "p95",
+                                  "label": "P95"
+                              }
+                          ]],
+                          "view": "singleValue",
+                          "region": region,
+                          "title": f"{short_title} - P95",
+                          "period": 300,
+                          "setPeriodToTimeRange": True
+                      }
+                  })
+
+              detail_rows = int(math.ceil(detail_count / columns)) if detail_count > 0 else 0
+              consumed_height = 8 + (detail_rows * detail_row_height)
+              return widgets, consumed_height
+
+
+          def lambda_handler(event, context):
+              params = event.get("params", {})
+              region = params.get("Region", "eu-south-1")
+              intended_usage = params.get("GatewayApisIntendedUsage", "-B2B-,-B2BPG-,-WEB-,-IO-")
+              max_detail_widgets = _parse_max_detail_widgets(params.get("MaxAPIGatewayDetailWidgets", 3))
+              
+              all_api_names = _list_rest_api_names()
+
+              selectors = _parse_filters(intended_usage)
+              categories = [
+                  (
+                      _label_from_selector(selector),
+                      _filter_apis(all_api_names, [selector])
+                  )
+                  for selector in selectors
+              ]
+
+              y_base = 16
+              generated_widgets = []
+              for label, apis in categories:
+                  widgets, consumed_height = _build_category_widgets(label, apis, y_base, region, max_detail_widgets)
+                  if widgets:
+                      generated_widgets.extend(widgets)
+                      y_base += consumed_height
+
+              fragment = ""
+              if generated_widgets:
+                  fragment = "," + ",".join(json.dumps(w, separators=(",", ":")) for w in generated_widgets)
+
+              return {
+                  "requestId": event.get("requestId", ""),
+                  "status": "success",
+                  "fragment": fragment
+              }
+      Handler: index.lambda_handler
+      Runtime: python3.12
+      Role: !GetAtt OerDashboardApiWidgetsExecutionRoleV2.Arn
+
+  OerDashboardApiWidgetsFunctionPermissionsV2:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt OerDashboardApiWidgetsFunctionV2.Arn
+      Principal: 'cloudformation.amazonaws.com'
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*
