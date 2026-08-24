@@ -25,21 +25,16 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
 
         if (dbRes.Item && dbRes.Item.backoffice_tags) {
             const tags = dbRes.Item.backoffice_tags.S;
-            const expectedIdpIdForValidation = expectedIdpId;
             
             console.log(`Found roles for sub=${userName}: ${tags}`);
 
-            if (!expectedIdpIdForValidation) {
-                const msg = `SECURITY ALERT: EXPECTED_IDPID is not configured for sub=${userName}; authentication blocked`;
-                console.warn(msg);
-                throw new Error(msg);
+            if (!expectedIdpId) {
+                throw new Error(`SECURITY ALERT: EXPECTED_IDPID is not configured for sub=${userName}; authentication blocked`);
             }
 
             const identitiesStr = (event.request.userAttributes && event.request.userAttributes.identities) || "";
-            if (!identitiesStr.includes(expectedIdpIdForValidation)) {
-                const msg = `SECURITY ALERT: User with sub=${userName} attempted login with an invalid IdP issuer; authentication blocked`;
-                console.warn(msg);
-                throw new Error(msg);
+            if (!identitiesStr.includes(expectedIdpId)) {
+                throw new Error(`SECURITY ALERT: User with sub=${userName} attempted login with an invalid IdP issuer; authentication blocked`);
             }
 
             // 1. PERSIST USER ROLE TAGS IN COGNITO ATTRIBUTES
@@ -108,8 +103,6 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
         return event;
     } catch (err) {
         // Critical exception - operational log only
-        console.error(`Exception during syncUserRoles: ${err.message}`);
-
         console.error("Error in syncUserRoles:", err);
         throw err;
     }
