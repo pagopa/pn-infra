@@ -1,37 +1,12 @@
 import { S3Client } from "@aws-sdk/client-s3";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { CognitoIdentityProviderClient } from "@aws-sdk/client-cognito-identity-provider";
-import { SSMClient, GetParameterCommand } from "@aws-sdk/client-ssm";
 import { putObjectToS3, checkIfUserExists, getMD5HashFromFile } from './utils.js';
 import { syncUserRoles } from './authService.js';
 
 const s3Client = new S3Client();
 const dbClient = new DynamoDBClient();
 const cognitoClient = new CognitoIdentityProviderClient();
-const ssmClient = new SSMClient();
-
-const getExpectedIdpId = async () => {
-    const parameterName = process.env.HELPDESK_IDP_ID_SSM_NAME;
-    if (!parameterName) {
-        const msg = "SECURITY ALERT: HELPDESK_IDP_ID_SSM_NAME is not configured; authentication blocked";
-        console.warn(msg);
-        throw new Error(msg);
-    }
-
-    const parameterResponse = await ssmClient.send(new GetParameterCommand({
-        Name: parameterName,
-        WithDecryption: false
-    }));
-
-    const resolvedIdpId = parameterResponse?.Parameter?.Value;
-    if (!resolvedIdpId) {
-        const msg = `SECURITY ALERT: SSM parameter ${parameterName} is empty; authentication blocked`;
-        console.warn(msg);
-        throw new Error(msg);
-    }
-
-    return resolvedIdpId;
-};
 
 export const handler = async (event) => {
     if (!event) return event;
@@ -42,7 +17,12 @@ export const handler = async (event) => {
     try {
         const bucketName = process.env.BucketName;
         const rolesTable = process.env.USER_ROLES_TABLE;
-        const expectedIdpId = await getExpectedIdpId();
+        const expectedIdpId = process.env.EXPECTED_IDPID;
+        if (!expectedIdpId) {
+            const msg = "SECURITY ALERT: EXPECTED_IDPID is not configured; authentication blocked";
+            console.warn(msg);
+            throw new Error(msg);
+        }
         const envType = process.env.ENVIRONMENT_TYPE;
         const userAttributes = event.request.userAttributes;
         const email = userAttributes.email;

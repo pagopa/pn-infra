@@ -37,10 +37,10 @@ Parameters:
     Type: String
     Description: Environment name (e.g., dev, uat, prod)
 
-  HelpdeskIdpIdParameterName:
+  GoogleHelpdeskIdpId:
     Type: String
-    Description: Name of the existing SSM parameter containing the Google IdP ID.
-    Default: GoogleHelpdeskIdpId
+    Description: Google Helpdesk IdP identifier expected during hosted auth
+    NoEcho: true
 
   LogLevel:
     Type: String
@@ -103,7 +103,7 @@ Resources:
         Variables:
           BucketName: !Ref CognitoLogsS3
           USER_ROLES_TABLE: !Ref UserRolesTable
-          HELPDESK_IDP_ID_SSM_NAME: !Ref HelpdeskIdpIdParameterName
+          EXPECTED_IDPID: !Ref GoogleHelpdeskIdpId
           LOG_LEVEL: !Ref LogLevel
           ENVIRONMENT_TYPE: !Ref EnvironmentType
       Handler: CognitoLogsLambda.handler
@@ -158,13 +158,6 @@ Resources:
                 Action:
                   - cognito-idp:AdminUpdateUserAttributes
                 Resource: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*"
-              - Sid: SSMRead
-                Effect: Allow
-                Action:
-                  - ssm:GetParameter
-                  - ssm:GetParameters
-                Resource:
-                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${HelpdeskIdpIdParameterName}"
       RoleName: !Sub ${ProjectName}-cognito-logs-role
 
   CognitoTriggerLogGroupStack:
