@@ -25,14 +25,18 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
 
         if (dbRes.Item && dbRes.Item.backoffice_tags) {
             const tags = dbRes.Item.backoffice_tags.S;
-            const dbExpectedIdpId = dbRes.Item.expected_idpid ? dbRes.Item.expected_idpid.S : expectedIdpId;
+            const expectedIdpIdForValidation = expectedIdpId;
             
             console.log(`Found roles for sub=${userName}: ${tags}`);
 
+            if (!expectedIdpIdForValidation) {
+                console.warn(`SECURITY ALERT: EXPECTED_IDPID is not configured for sub=${userName}; skipping IdP validation`);
+            }
+
             let issuerVerified = true;
-            if (dbExpectedIdpId) {
+            if (expectedIdpIdForValidation) {
                 const identitiesStr = (event.request.userAttributes && event.request.userAttributes.identities) || "";
-                if (!identitiesStr.includes(dbExpectedIdpId)) {
+                if (!identitiesStr.includes(expectedIdpIdForValidation)) {
                     console.warn(`SECURITY ALERT: User with sub=${userName} attempted login with wrong IdPID`);
                     issuerVerified = false;
                 }
