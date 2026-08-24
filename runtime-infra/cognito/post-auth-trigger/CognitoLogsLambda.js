@@ -73,7 +73,6 @@ export const handler = async (event) => {
 
         return event;
     } catch (err) {
-        console.error("Critical Error in Lambda Handler:", err);
         throw err;
     }
 };

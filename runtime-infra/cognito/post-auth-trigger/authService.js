@@ -102,8 +102,6 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
         
         return event;
     } catch (err) {
-        // Critical exception - operational log only
-        console.error("Error in syncUserRoles:", err);
         throw err;
     }
 };
