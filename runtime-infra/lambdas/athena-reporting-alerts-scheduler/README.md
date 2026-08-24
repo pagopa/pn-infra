@@ -9,7 +9,7 @@ Automatically creates, updates, and deletes EventBridge Schedules based on query
 ## Architecture
 
 ```
-EventBridge (rate 5 min) → Scheduler Lambda
+EventBridge (configured rate) → Scheduler Lambda
                               ↓
                          1. Fetch reporting-alerts-config.json
                          2. List existing Schedules
@@ -23,7 +23,7 @@ EventBridge (rate 5 min) → Scheduler Lambda
 
 ## Reconciliation Logic
 
-Every 5 minutes:
+At each configured invocation:
 1. Fetch desired state from Git (with SHA embedded in URL)
 2. Get current state from EventBridge Schedule Group
 3. Calculate diff: CREATE, UPDATE, DELETE

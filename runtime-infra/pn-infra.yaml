@@ -85,6 +85,16 @@ Parameters:
     Default: '-'
     Description: Application load balancer
 
+  RaddNetworkLoadBalancerArn:
+    Type: String
+    Default: '-'
+    Description: RADD Network Load Balancer ARN
+
+  RaddVpcEndpointServiceId:
+    Type: String
+    Default: '-'
+    Description: RADD VPC endpoint service ID
+
   ApplicationLoadBalancerAwsDns: 
     Type: String
     Default: '-'
@@ -133,6 +143,14 @@ Parameters:
   AlarmSNSTopicArn:
     Type: String
   AlarmSNSTopicName:
+    Type: String
+  WarningSNSTopicArn:
+    Type: String
+  WarningSNSTopicName:
+    Type: String
+  WarningDispatcherName:
+    Type: String
+  WarningDispatcherQueueArn:
     Type: String
   EcsDefaultSecurityGroup:
     Type: String
@@ -664,10 +682,22 @@ Outputs:
   # pass-though parameters
   ApplicationLoadBalancerArn:
     Value: !Ref ApplicationLoadBalancerArn
+  RaddNetworkLoadBalancerArn:
+    Value: !Ref RaddNetworkLoadBalancerArn
+  RaddVpcEndpointServiceId:
+    Value: !Ref RaddVpcEndpointServiceId
   AlarmSNSTopicArn:
     Value: !Ref AlarmSNSTopicArn
   AlarmSNSTopicName:
     Value: !Ref AlarmSNSTopicName
+  WarningSNSTopicArn:
+    Value: !Ref WarningSNSTopicArn
+  WarningSNSTopicName:
+    Value: !Ref WarningSNSTopicName
+  WarningDispatcherName:
+    Value: !Ref WarningDispatcherName
+  WarningDispatcherQueueArn:
+    Value: !Ref WarningDispatcherQueueArn
   EcsDefaultSecurityGroup:
     Value: !Ref EcsDefaultSecurityGroup
   ConfidentialInfoAccountId:
