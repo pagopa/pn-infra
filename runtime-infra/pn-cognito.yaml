@@ -37,11 +37,6 @@ Parameters:
     Type: String
     Description: Environment name (e.g., dev, uat, prod)
 
-  GoogleHelpdeskIdpId:
-    Type: String
-    Description: Google Helpdesk IdP identifier expected during hosted auth
-    NoEcho: true
-
   LogLevel:
     Type: String
     Description: Log level for the Lambda trigger (e.g., INFO, DEBUG)
@@ -103,7 +98,7 @@ Resources:
         Variables:
           BucketName: !Ref CognitoLogsS3
           USER_ROLES_TABLE: !Ref UserRolesTable
-          EXPECTED_IDPID: !Ref GoogleHelpdeskIdpId
+          EXPECTED_IDPID: '{{resolve:ssm:GoogleHelpdeskIdpId}}'
           LOG_LEVEL: !Ref LogLevel
           ENVIRONMENT_TYPE: !Ref EnvironmentType
       Handler: CognitoLogsLambda.handler
