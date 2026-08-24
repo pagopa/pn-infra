@@ -30,50 +30,48 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
             console.log(`Found roles for sub=${userName}: ${tags}`);
 
             if (!expectedIdpIdForValidation) {
-                console.warn(`SECURITY ALERT: EXPECTED_IDPID is not configured for sub=${userName}; skipping IdP validation`);
+                const msg = `SECURITY ALERT: EXPECTED_IDPID is not configured for sub=${userName}; authentication blocked`;
+                console.warn(msg);
+                throw new Error(msg);
             }
 
-            let issuerVerified = true;
-            if (expectedIdpIdForValidation) {
-                const identitiesStr = (event.request.userAttributes && event.request.userAttributes.identities) || "";
-                if (!identitiesStr.includes(expectedIdpIdForValidation)) {
-                    console.warn(`SECURITY ALERT: User with sub=${userName} attempted login with wrong IdPID`);
-                    issuerVerified = false;
-                }
+            const identitiesStr = (event.request.userAttributes && event.request.userAttributes.identities) || "";
+            if (!identitiesStr.includes(expectedIdpIdForValidation)) {
+                const msg = `SECURITY ALERT: User with sub=${userName} attempted login with an invalid IdP issuer; authentication blocked`;
+                console.warn(msg);
+                throw new Error(msg);
             }
 
-            if (issuerVerified) {
-                // 1. DATABASE UPDATE (for Amplify SDK reading from user)
-                console.log(`Updating Cognito DB for user sub=${userName} with tags: ${tags}`);
-                await cognitoClient.send(new AdminUpdateUserAttributesCommand({
-                    UserPoolId: userPoolId,
-                    Username: userName,
-                    UserAttributes: [
-                        { Name: 'custom:backoffice_tags', Value: tags },
-                        { Name: 'email_verified', Value: 'true' }
-                    ]
-                }));
+            // 1. DATABASE UPDATE (for Amplify SDK reading from user)
+            console.log(`Updating Cognito DB for user sub=${userName} with tags: ${tags}`);
+            await cognitoClient.send(new AdminUpdateUserAttributesCommand({
+                UserPoolId: userPoolId,
+                Username: userName,
+                UserAttributes: [
+                    { Name: 'custom:backoffice_tags', Value: tags },
+                    { Name: 'email_verified', Value: 'true' }
+                ]
+            }));
 
-                // 2. TOKEN OVERRIDE V2 FORMAT (atomic population)
-                event.response = {
-                    claimsAndScopeOverrideDetails: {
-                        idTokenGeneration: {
-                            claimsToAddOrOverride: {
-                                "custom:backoffice_tags": tags,
-                                "email_verified": "true"
-                            }
-                        },
-                        accessTokenGeneration: {
-                            claimsToAddOrOverride: {
-                                "custom:backoffice_tags": tags
-                            }
+            // 2. TOKEN OVERRIDE V2 FORMAT (atomic population)
+            event.response = {
+                claimsAndScopeOverrideDetails: {
+                    idTokenGeneration: {
+                        claimsToAddOrOverride: {
+                            "custom:backoffice_tags": tags,
+                            "email_verified": "true"
+                        }
+                    },
+                    accessTokenGeneration: {
+                        claimsToAddOrOverride: {
+                            "custom:backoffice_tags": tags
                         }
                     }
-                };
-                
-                // AUDIT LOG: AFTER (login successful)
-                auditLog(`AFTER - User logged in and roles synchronized - sub=${userName} roles=${tags}`, aud_type, aud_orig, userName);
-            }
+                }
+            };
+            
+            // AUDIT LOG: AFTER (login successful)
+            auditLog(`AFTER - User logged in and roles synchronized - sub=${userName} roles=${tags}`, aud_type, aud_orig, userName);
         } else {
             // DEPROVISIONING: User not in DynamoDB (or no tags)
             console.warn(`DEPROVISIONING: User with sub=${userName} not found in DynamoDB. Stripping all roles`);
