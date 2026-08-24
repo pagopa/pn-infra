@@ -1,0 +1,526 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Scheduled Prowler scans for the core and confinfo accounts, with reports exposed in QuickSight.
+
+Parameters:
+  EnvironmentType:
+    Type: String
+    AllowedValues: [dev, hotfix]
+  AccountType:
+    Type: String
+    AllowedValues: [core, confinfo]
+  PnCoreAwsAccountId:
+    Type: String
+    Default: ''
+  ConfidentialInfoAccountId:
+    Type: String
+    Default: ''
+  ProwlerVersion:
+    Type: String
+    Default: '5.4.0'
+  ScheduleExpression:
+    Type: String
+    Default: cron(0 5 1 1,7 ? *)
+    Description: EventBridge expression; defaults to 05:00 UTC on January 1 and July 1.
+  ScheduleState:
+    Type: String
+    Default: ENABLED
+    AllowedValues: [ENABLED, DISABLED]
+  ReportsRetentionDays:
+    Type: Number
+    Default: 548
+    MinValue: 365
+  EnableQuickSightResources:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+
+Rules:
+  RequirePeerAccountId:
+    Assertions:
+      - Assert: !Or
+          - !And
+            - !Equals [!Ref AccountType, core]
+            - !Not [!Equals [!Ref ConfidentialInfoAccountId, '']]
+          - !And
+            - !Equals [!Ref AccountType, confinfo]
+            - !Not [!Equals [!Ref PnCoreAwsAccountId, '']]
+        AssertDescription: Core requires ConfidentialInfoAccountId; confinfo requires PnCoreAwsAccountId.
+
+Conditions:
+  IsCoreAccount: !Equals [!Ref AccountType, core]
+  CreateQuickSightResources: !And
+    - !Condition IsCoreAccount
+    - !Equals [!Ref EnableQuickSightResources, 'true']
+
+Resources:
+  ProwlerScanRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub pn-prowler-scan-${EnvironmentType}
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !If
+                - IsCoreAccount
+                - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
+                - !Sub arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root
+            Action: sts:AssumeRole
+            Condition:
+              ArnEquals:
+                aws:PrincipalArn: !If
+                  - IsCoreAccount
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/pn-prowler-codebuild-${EnvironmentType}
+                  - !Sub arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-prowler-codebuild-${EnvironmentType}
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/SecurityAudit
+        - arn:aws:iam::aws:policy/job-function/ViewOnlyAccess
+
+  ReportsBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsCoreAccount
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub pn-prowler-reports-${AWS::Region}-${AWS::AccountId}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: RetainAuditHistory
+            Status: Enabled
+            ExpirationInDays: !Ref ReportsRetentionDays
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+
+  ReportsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: IsCoreAccount
+    Properties:
+      Bucket: !Ref ReportsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt ReportsBucket.Arn
+              - !Sub ${ReportsBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  ProwlerCodeBuildRole:
+    Type: AWS::IAM::Role
+    Condition: IsCoreAccount
+    Properties:
+      RoleName: !Sub pn-prowler-codebuild-${EnvironmentType}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RunProwler
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sts:AssumeRole
+                Resource:
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/pn-prowler-scan-${EnvironmentType}
+                  - !Sub arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:role/pn-prowler-scan-${EnvironmentType}
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                Resource: !GetAtt ReportsBucket.Arn
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub ${ReportsBucket.Arn}/*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  ProwlerCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Condition: IsCoreAccount
+    Properties:
+      Name: !Sub pn-prowler-${EnvironmentType}
+      Description: !Sub Prowler scan of the ${EnvironmentType} core and confinfo accounts
+      ServiceRole: !GetAtt ProwlerCodeBuildRole.Arn
+      ConcurrentBuildLimit: 1
+      TimeoutInMinutes: 120
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Source:
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                python: 3.12
+              commands:
+                - pip install --disable-pip-version-check --no-cache-dir "prowler==${PROWLER_VERSION}"
+            build:
+              commands:
+                - RUN_DATE=$(date -u +%Y/%m/%d/%H%M%S)
+                - |
+                  for TARGET in core confinfo; do
+                    if [[ "$TARGET" == "core" ]]; then
+                      ACCOUNT_ID="$CORE_ACCOUNT_ID"
+                    else
+                      ACCOUNT_ID="$CONFINFO_ACCOUNT_ID"
+                    fi
+                    prowler aws \
+                      --role "arn:${AWS_PARTITION}:iam::${ACCOUNT_ID}:role/pn-prowler-scan-${ENVIRONMENT_TYPE}" \
+                      --session-duration 3600 \
+                      --output-formats csv json-ocsf html \
+                      --output-directory "reports/${ENVIRONMENT_TYPE}/${RUN_DATE}/${TARGET}" \
+                      --output-filename "prowler-${TARGET}" \
+                      --output-bucket-no-assume "$REPORTS_BUCKET" \
+                      --ignore-exit-code-3 \
+                      --no-color
+                  done
+      Environment:
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Type: LINUX_CONTAINER
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: PROWLER_VERSION
+            Type: PLAINTEXT
+            Value: !Ref ProwlerVersion
+          - Name: ENVIRONMENT_TYPE
+            Type: PLAINTEXT
+            Value: !Ref EnvironmentType
+          - Name: CORE_ACCOUNT_ID
+            Type: PLAINTEXT
+            Value: !Ref AWS::AccountId
+          - Name: CONFINFO_ACCOUNT_ID
+            Type: PLAINTEXT
+            Value: !Ref ConfidentialInfoAccountId
+          - Name: REPORTS_BUCKET
+            Type: PLAINTEXT
+            Value: !Ref ReportsBucket
+          - Name: AWS_PARTITION
+            Type: PLAINTEXT
+            Value: !Ref AWS::Partition
+
+  ProwlerScheduleRole:
+    Type: AWS::IAM::Role
+    Condition: IsCoreAccount
+    Properties:
+      RoleName: !Sub pn-prowler-scheduler-${EnvironmentType}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: StartProwlerBuild
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: codebuild:StartBuild
+                Resource: !GetAtt ProwlerCodeBuildProject.Arn
+
+  ProwlerSchedule:
+    Type: AWS::Events::Rule
+    Condition: IsCoreAccount
+    Properties:
+      Name: !Sub pn-prowler-${EnvironmentType}
+      Description: Starts the scheduled core and confinfo Prowler scan
+      ScheduleExpression: !Ref ScheduleExpression
+      State: !Ref ScheduleState
+      Targets:
+        - Arn: !GetAtt ProwlerCodeBuildProject.Arn
+          Id: ProwlerCodeBuild
+          RoleArn: !GetAtt ProwlerScheduleRole.Arn
+
+  ProwlerDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsCoreAccount
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub pn_prowler_${EnvironmentType}
+        Description: Prowler findings from the core and confinfo accounts
+
+  ProwlerFindingsTable:
+    Type: AWS::Glue::Table
+    Condition: IsCoreAccount
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref ProwlerDatabase
+      TableInput:
+        Name: findings
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          classification: csv
+          skip.header.line.count: '1'
+        StorageDescriptor:
+          Location: !Sub s3://${ReportsBucket}/reports/
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          SerdeInfo:
+            SerializationLibrary: org.apache.hadoop.hive.serde2.OpenCSVSerde
+            Parameters:
+              separatorChar: ';'
+              quoteChar: '"'
+              escapeChar: '\\'
+          Columns:
+            - {Name: auth_method, Type: string}
+            - {Name: finding_timestamp, Type: string}
+            - {Name: account_uid, Type: string}
+            - {Name: account_name, Type: string}
+            - {Name: account_email, Type: string}
+            - {Name: account_organization_uid, Type: string}
+            - {Name: account_organization_name, Type: string}
+            - {Name: account_tags, Type: string}
+            - {Name: finding_uid, Type: string}
+            - {Name: provider, Type: string}
+            - {Name: check_id, Type: string}
+            - {Name: check_title, Type: string}
+            - {Name: check_type, Type: string}
+            - {Name: status, Type: string}
+            - {Name: status_extended, Type: string}
+            - {Name: muted, Type: string}
+            - {Name: service_name, Type: string}
+            - {Name: subservice_name, Type: string}
+            - {Name: severity, Type: string}
+            - {Name: resource_type, Type: string}
+            - {Name: resource_uid, Type: string}
+            - {Name: resource_name, Type: string}
+            - {Name: resource_details, Type: string}
+            - {Name: resource_tags, Type: string}
+            - {Name: partition_name, Type: string}
+            - {Name: region, Type: string}
+            - {Name: description, Type: string}
+            - {Name: risk, Type: string}
+            - {Name: related_url, Type: string}
+            - {Name: remediation_recommendation_text, Type: string}
+            - {Name: remediation_recommendation_url, Type: string}
+            - {Name: remediation_code_nativeiac, Type: string}
+            - {Name: remediation_code_terraform, Type: string}
+            - {Name: remediation_code_cli, Type: string}
+            - {Name: remediation_code_other, Type: string}
+            - {Name: compliance, Type: string}
+            - {Name: categories, Type: string}
+            - {Name: depends_on, Type: string}
+            - {Name: related_to, Type: string}
+            - {Name: notes, Type: string}
+            - {Name: prowler_version, Type: string}
+            - {Name: additional_urls, Type: string}
+            - {Name: account_ou_uid, Type: string}
+            - {Name: account_ou_name, Type: string}
+
+  AthenaResultsBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsCoreAccount
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub pn-prowler-athena-${AWS::Region}-${AWS::AccountId}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  ProwlerAthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Condition: IsCoreAccount
+    Properties:
+      Name: !Sub pn-prowler-${EnvironmentType}
+      State: ENABLED
+      WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: true
+        PublishCloudWatchMetricsEnabled: true
+        ResultConfiguration:
+          OutputLocation: !Sub s3://${AthenaResultsBucket}/results/
+
+  QuickSightServiceRolePolicy:
+    Type: AWS::IAM::RolePolicy
+    Condition: CreateQuickSightResources
+    Properties:
+      RoleName: aws-quicksight-service-role-v0
+      PolicyName: !Sub ProwlerReportsAccess-${EnvironmentType}
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetBucketLocation
+              - s3:ListBucket
+            Resource:
+              - !GetAtt ReportsBucket.Arn
+              - !GetAtt AthenaResultsBucket.Arn
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:AbortMultipartUpload
+            Resource:
+              - !Sub ${ReportsBucket.Arn}/*
+              - !Sub ${AthenaResultsBucket.Arn}/*
+
+  ProwlerQuickSightDataSource:
+    Type: AWS::QuickSight::DataSource
+    Condition: CreateQuickSightResources
+    DependsOn: QuickSightServiceRolePolicy
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DataSourceId: !Sub pn-prowler-${EnvironmentType}
+      Name: !Sub Prowler ${EnvironmentType}
+      Type: ATHENA
+      DataSourceParameters:
+        AthenaParameters:
+          WorkGroup: !Ref ProwlerAthenaWorkGroup
+
+  ProwlerQuickSightDataSet:
+    Type: AWS::QuickSight::DataSet
+    Condition: CreateQuickSightResources
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DataSetId: !Sub pn-prowler-findings-${EnvironmentType}
+      Name: !Sub Prowler findings ${EnvironmentType}
+      ImportMode: DIRECT_QUERY
+      PhysicalTableMap:
+        FindingsSql:
+          CustomSql:
+            DataSourceArn: !GetAtt ProwlerQuickSightDataSource.Arn
+            Name: ProwlerFindings
+            SqlQuery: !Sub |
+              SELECT
+                try(from_iso8601_timestamp(finding_timestamp)) AS finding_time,
+                account_uid,
+                account_name,
+                check_id,
+                check_title,
+                status,
+                status_extended,
+                service_name,
+                severity,
+                resource_type,
+                resource_uid,
+                resource_name,
+                region,
+                description,
+                risk,
+                remediation_recommendation_text,
+                remediation_recommendation_url,
+                compliance,
+                prowler_version
+              FROM "pn_prowler_${EnvironmentType}"."findings"
+              WHERE provider = 'aws'
+            Columns:
+              - {Name: finding_time, Type: DATETIME}
+              - {Name: account_uid, Type: STRING}
+              - {Name: account_name, Type: STRING}
+              - {Name: check_id, Type: STRING}
+              - {Name: check_title, Type: STRING}
+              - {Name: status, Type: STRING}
+              - {Name: status_extended, Type: STRING}
+              - {Name: service_name, Type: STRING}
+              - {Name: severity, Type: STRING}
+              - {Name: resource_type, Type: STRING}
+              - {Name: resource_uid, Type: STRING}
+              - {Name: resource_name, Type: STRING}
+              - {Name: region, Type: STRING}
+              - {Name: description, Type: STRING}
+              - {Name: risk, Type: STRING}
+              - {Name: remediation_recommendation_text, Type: STRING}
+              - {Name: remediation_recommendation_url, Type: STRING}
+              - {Name: compliance, Type: STRING}
+              - {Name: prowler_version, Type: STRING}
+      LogicalTableMap:
+        Findings:
+          Alias: Prowler findings
+          Source:
+            PhysicalTableId: FindingsSql
+
+  ProwlerQuickSightDashboard:
+    Type: AWS::QuickSight::Dashboard
+    Condition: CreateQuickSightResources
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DashboardId: !Sub pn-prowler-${EnvironmentType}
+      Name: !Sub Prowler ${EnvironmentType}
+      Definition:
+        DataSetIdentifierDeclarations:
+          - Identifier: ProwlerFindings
+            DataSetArn: !GetAtt ProwlerQuickSightDataSet.Arn
+        Sheets:
+          - SheetId: findings
+            Name: Findings
+            Visuals:
+              - TableVisual:
+                  VisualId: findings-table
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText:
+                      PlainText: Prowler findings
+                  ChartConfiguration:
+                    FieldWells:
+                      TableAggregatedFieldWells:
+                        GroupBy:
+                          - CategoricalDimensionField:
+                              FieldId: account-name
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_name}
+                          - CategoricalDimensionField:
+                              FieldId: severity
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: severity}
+                          - CategoricalDimensionField:
+                              FieldId: status
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: status}
+                          - CategoricalDimensionField:
+                              FieldId: service-name
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: service_name}
+                          - CategoricalDimensionField:
+                              FieldId: check-title
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: check_title}
+                          - CategoricalDimensionField:
+                              FieldId: resource-name
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: resource_name}
+
+Outputs:
+  ProwlerScanRoleArn:
+    Value: !GetAtt ProwlerScanRole.Arn
+  ReportsBucketName:
+    Condition: IsCoreAccount
+    Value: !Ref ReportsBucket
+  ProwlerCodeBuildProjectName:
+    Condition: IsCoreAccount
+    Value: !Ref ProwlerCodeBuildProject
+  ProwlerQuickSightDashboardArn:
+    Condition: CreateQuickSightResources
+    Value: !GetAtt ProwlerQuickSightDashboard.Arn
