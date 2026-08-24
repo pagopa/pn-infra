@@ -37,10 +37,10 @@ Parameters:
     Type: String
     Description: Environment name (e.g., dev, uat, prod)
 
-  GoogleHelpdeskIdpId:
+  HelpdeskIdpIdParameterName:
     Type: String
-    Description: Google IdP ID parameter used for Helpdesk SSO validation.
-    NoEcho: true
+    Description: Google IdP ID used for Helpdesk SSO validation.
+    Default: ""
 
   LogLevel:
     Type: String
@@ -103,7 +103,7 @@ Resources:
         Variables:
           BucketName: !Ref CognitoLogsS3
           USER_ROLES_TABLE: !Ref UserRolesTable
-          EXPECTED_IDPID: !Ref GoogleHelpdeskIdpId
+          EXPECTED_IDPID: !Ref HelpdeskIdpIdParameterName
           LOG_LEVEL: !Ref LogLevel
           ENVIRONMENT_TYPE: !Ref EnvironmentType
       Handler: CognitoLogsLambda.handler
