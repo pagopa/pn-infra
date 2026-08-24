@@ -42,8 +42,8 @@ export const syncUserRoles = async (dbClient, cognitoClient, params) => {
                 throw new Error(msg);
             }
 
-            // 1. DATABASE UPDATE (for Amplify SDK reading from user)
-            console.log(`Updating Cognito DB for user sub=${userName} with tags: ${tags}`);
+            // 1. PERSIST USER ROLE TAGS IN COGNITO ATTRIBUTES
+            console.log(`Updating Cognito user attributes for sub=${userName} with tags: ${tags}`);
             await cognitoClient.send(new AdminUpdateUserAttributesCommand({
                 UserPoolId: userPoolId,
                 Username: userName,
