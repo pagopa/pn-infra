@@ -600,6 +600,12 @@ Resources:
                 prowler_version
               FROM "pn_prowler_${EnvironmentType}"."findings"
               WHERE provider = 'aws'
+                AND "$path" = (
+                  SELECT max("$path")
+                  FROM "pn_prowler_${EnvironmentType}"."findings"
+                  WHERE provider = 'aws'
+                    AND "$path" LIKE '%/findings/${EnvironmentType}/%/prowler.csv'
+                )
             Columns:
               - {Name: finding_time, Type: DATETIME}
               - {Name: account_uid, Type: STRING}
