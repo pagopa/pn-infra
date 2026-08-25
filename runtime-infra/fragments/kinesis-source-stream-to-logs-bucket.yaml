@@ -68,6 +68,7 @@ Parameters:
   
   TemplateBucketBaseUrl:
     Type: String
+    Default: ""
     Description: URL to load infrastructure model fragments from
   
   LogsKinesisSourceStreamArn:
@@ -85,8 +86,7 @@ Conditions:
   CreatePreprocessingFirehose: !And
     - !Condition ExportLogs
     - !Condition IsPreprocessingEnabled
-
-
+  
 Resources:
 
   ###########################################################################
