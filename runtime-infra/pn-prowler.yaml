@@ -215,7 +215,9 @@ Resources:
                 python: 3.12
               commands:
                 - mkdir -p /tmp/prowler-package
-                - pip download --disable-pip-version-check --no-deps --only-binary=:all: --dest /tmp/prowler-package "prowler==${PROWLER_VERSION}"
+                - >-
+                  pip download --disable-pip-version-check --no-deps --only-binary=:all:
+                  --dest /tmp/prowler-package "prowler==${PROWLER_VERSION}"
                 - PROWLER_WHEEL=$(find /tmp/prowler-package -maxdepth 1 -type f -name '*.whl' -print -quit)
                 - test -n "$PROWLER_WHEEL"
                 - echo "${PROWLER_PACKAGE_SHA256}  ${PROWLER_WHEEL}" | sha256sum --check --strict
