@@ -577,7 +577,11 @@ Resources:
               SELECT
                 try(from_iso8601_timestamp(finding_timestamp)) AS finding_time,
                 account_uid,
-                account_name,
+                CASE
+                  WHEN account_uid = '${AWS::AccountId}' THEN 'core'
+                  WHEN account_uid = '${ConfidentialInfoAccountId}' THEN 'confinfo'
+                  ELSE account_uid
+                END AS account_label,
                 check_id,
                 check_title,
                 status,
@@ -599,7 +603,7 @@ Resources:
             Columns:
               - {Name: finding_time, Type: DATETIME}
               - {Name: account_uid, Type: STRING}
-              - {Name: account_name, Type: STRING}
+              - {Name: account_label, Type: STRING}
               - {Name: check_id, Type: STRING}
               - {Name: check_title, Type: STRING}
               - {Name: status, Type: STRING}
@@ -633,9 +637,64 @@ Resources:
         DataSetIdentifierDeclarations:
           - Identifier: ProwlerFindings
             DataSetArn: !GetAtt ProwlerQuickSightDataSet.Arn
+        FilterGroups:
+          - FilterGroupId: findings-filters
+            CrossDataset: SINGLE_DATASET
+            Status: ENABLED
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: findings
+                    Scope: ALL_VISUALS
+            Filters:
+              - CategoryFilter:
+                  FilterId: account-filter
+                  Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_label}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: EQUALS
+                      SelectAllOptions: FILTER_ALL_VALUES
+                      NullOption: NON_NULLS_ONLY
+              - CategoryFilter:
+                  FilterId: region-filter
+                  Column: {DataSetIdentifier: ProwlerFindings, ColumnName: region}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: EQUALS
+                      SelectAllOptions: FILTER_ALL_VALUES
+                      NullOption: NON_NULLS_ONLY
         Sheets:
           - SheetId: findings
             Name: Findings
+            FilterControls:
+              - Dropdown:
+                  FilterControlId: account-filter-control
+                  SourceFilterId: account-filter
+                  Title: Account
+                  Type: MULTI_SELECT
+                  CommitMode: AUTO
+              - Dropdown:
+                  FilterControlId: region-filter-control
+                  SourceFilterId: region-filter
+                  Title: Regione
+                  Type: MULTI_SELECT
+                  CommitMode: AUTO
+            SheetControlLayouts:
+              - Configuration:
+                  GridLayout:
+                    Elements:
+                      - ElementId: account-filter-control
+                        ElementType: FILTER_CONTROL
+                        ColumnIndex: 0
+                        ColumnSpan: 18
+                        RowIndex: 0
+                        RowSpan: 1
+                      - ElementId: region-filter-control
+                        ElementType: FILTER_CONTROL
+                        ColumnIndex: 18
+                        ColumnSpan: 18
+                        RowIndex: 0
+                        RowSpan: 1
             Layouts:
               - Configuration:
                   GridLayout:
@@ -722,6 +781,10 @@ Resources:
                           - CategoricalDimensionField:
                               FieldId: severity-category
                               Column: {DataSetIdentifier: ProwlerFindings, ColumnName: severity}
+                        SmallMultiples:
+                          - CategoricalDimensionField:
+                              FieldId: severity-account
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_label}
                         Values:
                           - CategoricalMeasureField:
                               FieldId: severity-findings-count
@@ -740,6 +803,10 @@ Resources:
                           - CategoricalDimensionField:
                               FieldId: status-category
                               Column: {DataSetIdentifier: ProwlerFindings, ColumnName: status}
+                        SmallMultiples:
+                          - CategoricalDimensionField:
+                              FieldId: status-account
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_label}
                         Values:
                           - CategoricalMeasureField:
                               FieldId: status-findings-count
@@ -760,6 +827,10 @@ Resources:
                           - CategoricalDimensionField:
                               FieldId: service-category
                               Column: {DataSetIdentifier: ProwlerFindings, ColumnName: service_name}
+                        Colors:
+                          - CategoricalDimensionField:
+                              FieldId: service-account-color
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_label}
                         Values:
                           - CategoricalMeasureField:
                               FieldId: service-findings-count
@@ -779,7 +850,7 @@ Resources:
                         Category:
                           - CategoricalDimensionField:
                               FieldId: account-category
-                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_name}
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_label}
                         Values:
                           - CategoricalMeasureField:
                               FieldId: account-findings-count
@@ -797,7 +868,10 @@ Resources:
                         GroupBy:
                           - CategoricalDimensionField:
                               FieldId: account-name
-                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_name}
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_label}
+                          - CategoricalDimensionField:
+                              FieldId: account-uid
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_uid}
                           - CategoricalDimensionField:
                               FieldId: severity
                               Column: {DataSetIdentifier: ProwlerFindings, ColumnName: severity}
