@@ -655,8 +655,6 @@ Resources:
                     VisualIds:
                       - total-findings
                       - distinct-resources
-                      - findings-by-severity
-                      - findings-by-status
                       - findings-by-service
                       - findings-by-account
                       - findings-table
@@ -672,6 +670,23 @@ Resources:
               - CategoryFilter:
                   FilterId: region-filter
                   Column: {DataSetIdentifier: ProwlerFindings, ColumnName: region}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      SelectAllOptions: FILTER_ALL_VALUES
+                      NullOption: NON_NULLS_ONLY
+              - CategoryFilter:
+                  FilterId: status-filter
+                  Column: {DataSetIdentifier: ProwlerFindings, ColumnName: status}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      CategoryValues:
+                        - FAIL
+                      NullOption: NON_NULLS_ONLY
+              - CategoryFilter:
+                  FilterId: severity-filter
+                  Column: {DataSetIdentifier: ProwlerFindings, ColumnName: severity}
                   Configuration:
                     FilterListConfiguration:
                       MatchOperator: CONTAINS
@@ -693,6 +708,18 @@ Resources:
                   Title: Regione
                   Type: MULTI_SELECT
                   CommitMode: AUTO
+              - Dropdown:
+                  FilterControlId: status-filter-control
+                  SourceFilterId: status-filter
+                  Title: Stato
+                  Type: MULTI_SELECT
+                  CommitMode: AUTO
+              - Dropdown:
+                  FilterControlId: severity-filter-control
+                  SourceFilterId: severity-filter
+                  Title: Severity
+                  Type: MULTI_SELECT
+                  CommitMode: AUTO
             SheetControlLayouts:
               - Configuration:
                   GridLayout:
@@ -708,6 +735,18 @@ Resources:
                         ColumnIndex: 6
                         ColumnSpan: 6
                         RowIndex: 0
+                        RowSpan: 1
+                      - ElementId: status-filter-control
+                        ElementType: FILTER_CONTROL
+                        ColumnIndex: 0
+                        ColumnSpan: 6
+                        RowIndex: 1
+                        RowSpan: 1
+                      - ElementId: severity-filter-control
+                        ElementType: FILTER_CONTROL
+                        ColumnIndex: 6
+                        ColumnSpan: 6
+                        RowIndex: 1
                         RowSpan: 1
             Layouts:
               - Configuration:
@@ -789,6 +828,20 @@ Resources:
                     FormatText:
                       PlainText: Findings per severita
                   ChartConfiguration:
+                    VisualPalette:
+                      ColorMap:
+                        - Element: {FieldId: severity-category, FieldValue: informational}
+                          Color: '#2563EB'
+                        - Element: {FieldId: severity-category, FieldValue: info}
+                          Color: '#16A34A'
+                        - Element: {FieldId: severity-category, FieldValue: low}
+                          Color: '#65A30D'
+                        - Element: {FieldId: severity-category, FieldValue: medium}
+                          Color: '#EAB308'
+                        - Element: {FieldId: severity-category, FieldValue: high}
+                          Color: '#F97316'
+                        - Element: {FieldId: severity-category, FieldValue: critical}
+                          Color: '#DC2626'
                     FieldWells:
                       PieChartAggregatedFieldWells:
                         Category:
