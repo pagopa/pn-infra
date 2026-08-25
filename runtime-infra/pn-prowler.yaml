@@ -644,7 +644,7 @@ Resources:
           - Identifier: ProwlerFindings
             DataSetArn: !GetAtt ProwlerQuickSightDataSet.Arn
         FilterGroups:
-          - FilterGroupId: findings-filters
+          - FilterGroupId: account-filter-group
             CrossDataset: SINGLE_DATASET
             Status: ENABLED
             ScopeConfiguration:
@@ -667,6 +667,21 @@ Resources:
                       MatchOperator: CONTAINS
                       SelectAllOptions: FILTER_ALL_VALUES
                       NullOption: NON_NULLS_ONLY
+          - FilterGroupId: region-filter-group
+            CrossDataset: SINGLE_DATASET
+            Status: ENABLED
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: findings
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - total-findings
+                      - distinct-resources
+                      - findings-by-service
+                      - findings-by-account
+                      - findings-table
+            Filters:
               - CategoryFilter:
                   FilterId: region-filter
                   Column: {DataSetIdentifier: ProwlerFindings, ColumnName: region}
@@ -675,6 +690,21 @@ Resources:
                       MatchOperator: CONTAINS
                       SelectAllOptions: FILTER_ALL_VALUES
                       NullOption: NON_NULLS_ONLY
+          - FilterGroupId: status-filter-group
+            CrossDataset: SINGLE_DATASET
+            Status: ENABLED
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: findings
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - total-findings
+                      - distinct-resources
+                      - findings-by-service
+                      - findings-by-account
+                      - findings-table
+            Filters:
               - CategoryFilter:
                   FilterId: status-filter
                   Column: {DataSetIdentifier: ProwlerFindings, ColumnName: status}
@@ -684,6 +714,21 @@ Resources:
                       CategoryValues:
                         - FAIL
                       NullOption: NON_NULLS_ONLY
+          - FilterGroupId: severity-filter-group
+            CrossDataset: SINGLE_DATASET
+            Status: ENABLED
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: findings
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - total-findings
+                      - distinct-resources
+                      - findings-by-service
+                      - findings-by-account
+                      - findings-table
+            Filters:
               - CategoryFilter:
                   FilterId: severity-filter
                   Column: {DataSetIdentifier: ProwlerFindings, ColumnName: severity}
