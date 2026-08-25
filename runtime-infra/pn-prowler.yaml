@@ -17,6 +17,11 @@ Parameters:
   ProwlerVersion:
     Type: String
     Default: '5.4.0'
+  ProwlerPackageSha256:
+    Type: String
+    Default: 'e1d3dc48597c7bba4e73fb016373cd65fc50c66377c797bdee6370b40bec7759'
+    AllowedPattern: '^[a-f0-9]{64}$'
+    Description: Expected SHA-256 digest of the Prowler wheel downloaded from PyPI.
   ScheduleExpression:
     Type: String
     Default: cron(0 5 1 1,7 ? *)
@@ -33,6 +38,20 @@ Parameters:
     Type: String
     Default: 'true'
     AllowedValues: ['true', 'false']
+  QuickSightServiceRoleName:
+    Type: String
+    Default: aws-quicksight-service-role-v0
+    Description: Existing IAM service role used by QuickSight to access Athena and S3.
+  WarningSNSTopicName:
+    Type: String
+    Default: pn-WarningSnsTopic
+    Description: SNS topic name for routed warning and report events.
+  ReportLinkExpirationSeconds:
+    Type: Number
+    Default: 3600
+    MinValue: 60
+    MaxValue: 3600
+    Description: Lifetime of the temporary HTML report download links sent to Slack.
 
 Rules:
   RequirePeerAccountId:
@@ -123,6 +142,13 @@ Resources:
               Bool:
                 aws:SecureTransport: 'false'
 
+  ProwlerCodeBuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: IsCoreAccount
+    Properties:
+      LogGroupName: /aws/codebuild/pn-prowler
+      RetentionInDays: 14
+
   ProwlerCodeBuildRole:
     Type: AWS::IAM::Role
     Condition: IsCoreAccount
@@ -151,14 +177,18 @@ Resources:
                   - s3:ListBucket
                 Resource: !GetAtt ReportsBucket.Arn
               - Effect: Allow
-                Action: s3:PutObject
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
                 Resource: !Sub ${ReportsBucket.Arn}/*
               - Effect: Allow
+                Action: sns:Publish
+                Resource: !Sub arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}
+              - Effect: Allow
                 Action:
-                  - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: '*'
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/pn-prowler:*
 
   ProwlerCodeBuildProject:
     Type: AWS::CodeBuild::Project
@@ -171,6 +201,10 @@ Resources:
       TimeoutInMinutes: 120
       Artifacts:
         Type: NO_ARTIFACTS
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Ref ProwlerCodeBuildLogGroup
       Source:
         Type: NO_SOURCE
         BuildSpec: |
@@ -180,7 +214,13 @@ Resources:
               runtime-versions:
                 python: 3.12
               commands:
-                - pip install --disable-pip-version-check --no-cache-dir "prowler==${PROWLER_VERSION}"
+                - mkdir -p /tmp/prowler-package
+                - pip download --disable-pip-version-check --no-deps --only-binary=:all: --dest /tmp/prowler-package "prowler==${PROWLER_VERSION}"
+                - PROWLER_WHEEL=$(find /tmp/prowler-package -maxdepth 1 -type f -name '*.whl' -print -quit)
+                - test -n "$PROWLER_WHEEL"
+                - echo "${PROWLER_PACKAGE_SHA256}  ${PROWLER_WHEEL}" | sha256sum --check --strict
+                - pip install --disable-pip-version-check --no-cache-dir "$PROWLER_WHEEL"
+                - pip freeze --all | sort
             build:
               commands:
                 - RUN_DATE=$(date -u +%Y/%m/%d/%H%M%S)
@@ -195,12 +235,90 @@ Resources:
                       --role "arn:${AWS_PARTITION}:iam::${ACCOUNT_ID}:role/pn-prowler-scan-${ENVIRONMENT_TYPE}" \
                       --session-duration 3600 \
                       --output-formats csv json-ocsf html \
-                      --output-directory "reports/${ENVIRONMENT_TYPE}/${RUN_DATE}/${TARGET}" \
+                      --output-directory "output/${TARGET}" \
                       --output-filename "prowler-${TARGET}" \
-                      --output-bucket-no-assume "$REPORTS_BUCKET" \
                       --ignore-exit-code-3 \
                       --no-color
                   done
+                - |
+                  CORE_CSV="output/core/prowler-core.csv"
+                  CONFINFO_CSV="output/confinfo/prowler-confinfo.csv"
+                  CORE_HTML="output/core/prowler-core.html"
+                  CONFINFO_HTML="output/confinfo/prowler-confinfo.html"
+                  for ARTIFACT in "$CORE_CSV" "$CONFINFO_CSV" "$CORE_HTML" "$CONFINFO_HTML"; do
+                    test -s "$ARTIFACT"
+                  done
+                  test "$(head -n 1 "$CORE_CSV")" = "$(head -n 1 "$CONFINFO_CSV")"
+                  mkdir -p output/combined
+                  {
+                    head -n 1 "$CORE_CSV"
+                    tail -n +2 "$CORE_CSV"
+                    tail -n +2 "$CONFINFO_CSV"
+                  } > output/combined/prowler.csv
+                - |
+                  for TARGET in core confinfo; do
+                    aws s3 cp "output/${TARGET}" \
+                      "s3://${REPORTS_BUCKET}/reports/${ENVIRONMENT_TYPE}/${RUN_DATE}/${TARGET}/" \
+                      --recursive
+                    HTML_KEY="reports/${ENVIRONMENT_TYPE}/${RUN_DATE}/${TARGET}/prowler-${TARGET}.html"
+                    HTML_URL=$(aws s3 presign \
+                      "s3://${REPORTS_BUCKET}/${HTML_KEY}" \
+                      --expires-in "$REPORT_LINK_EXPIRATION_SECONDS")
+                    if [[ "$TARGET" == "core" ]]; then
+                      CORE_HTML_URL="$HTML_URL"
+                    else
+                      CONFINFO_HTML_URL="$HTML_URL"
+                    fi
+                  done
+                  FINDINGS_KEY="findings/${ENVIRONMENT_TYPE}/${RUN_DATE}/prowler.csv"
+                  aws s3 cp output/combined/prowler.csv \
+                    "s3://${REPORTS_BUCKET}/${FINDINGS_KEY}"
+                  MANIFEST=$(jq -n -c \
+                    --arg run_date "$RUN_DATE" \
+                    --arg prowler_version "$PROWLER_VERSION" \
+                    --arg findings_key "$FINDINGS_KEY" \
+                    '{
+                      status: "COMPLETED",
+                      runDate: $run_date,
+                      prowlerVersion: $prowler_version,
+                      accounts: ["core", "confinfo"],
+                      findingsKey: $findings_key
+                    }')
+                  aws s3 cp - \
+                    "s3://${REPORTS_BUCKET}/reports/${ENVIRONMENT_TYPE}/${RUN_DATE}/manifest.json" \
+                    --content-type application/json <<< "$MANIFEST"
+                - |
+                  REPORT_EVENT_ID="${CODEBUILD_BUILD_ID:-pn-prowler-${RUN_DATE}}"
+                  REPORT_OCCURRED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+                  REPORT_MESSAGE=$(jq -n -c \
+                    --arg event_id "$REPORT_EVENT_ID" \
+                    --arg occurred_at "$REPORT_OCCURRED_AT" \
+                    --arg environment "$ENVIRONMENT_TYPE" \
+                    --arg core_html "$CORE_HTML_URL" \
+                    --arg confinfo_html "$CONFINFO_HTML_URL" \
+                    '{
+                      schemaVersion: "1.0",
+                      eventId: $event_id,
+                      eventType: "report",
+                      producer: "pn-prowler",
+                      eventName: "prowler-scan-completed",
+                      occurredAt: $occurred_at,
+                      severity: "info",
+                      environment: $environment,
+                      title: "Prowler scan completed",
+                      data: {
+                        metrics: {"Account analizzati": 2},
+                        details: {Core: "Completato", Confinfo: "Completato"}
+                      },
+                      links: {
+                        core_html: $core_html,
+                        confinfo_html: $confinfo_html
+                      }
+                    }')
+                  aws sns publish \
+                    --topic-arn "$WARNING_SNS_TOPIC_ARN" \
+                    --subject "Prowler scan completed - ${ENVIRONMENT_TYPE}" \
+                    --message "$REPORT_MESSAGE"
       Environment:
         ComputeType: BUILD_GENERAL1_MEDIUM
         Type: LINUX_CONTAINER
@@ -209,6 +327,9 @@ Resources:
           - Name: PROWLER_VERSION
             Type: PLAINTEXT
             Value: !Ref ProwlerVersion
+          - Name: PROWLER_PACKAGE_SHA256
+            Type: PLAINTEXT
+            Value: !Ref ProwlerPackageSha256
           - Name: ENVIRONMENT_TYPE
             Type: PLAINTEXT
             Value: !Ref EnvironmentType
@@ -224,6 +345,12 @@ Resources:
           - Name: AWS_PARTITION
             Type: PLAINTEXT
             Value: !Ref AWS::Partition
+          - Name: WARNING_SNS_TOPIC_ARN
+            Type: PLAINTEXT
+            Value: !Sub arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}
+          - Name: REPORT_LINK_EXPIRATION_SECONDS
+            Type: PLAINTEXT
+            Value: !Ref ReportLinkExpirationSeconds
 
   ProwlerScheduleRole:
     Type: AWS::IAM::Role
@@ -284,7 +411,7 @@ Resources:
           classification: csv
           skip.header.line.count: '1'
         StorageDescriptor:
-          Location: !Sub s3://${ReportsBucket}/reports/
+          Location: !Sub s3://${ReportsBucket}/findings/
           InputFormat: org.apache.hadoop.mapred.TextInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
           SerdeInfo:
@@ -350,11 +477,35 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireAthenaQueryResults
+            Status: Enabled
+            ExpirationInDays: 90
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+
+  AthenaResultsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: IsCoreAccount
+    Properties:
+      Bucket: !Ref AthenaResultsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt AthenaResultsBucket.Arn
+              - !Sub ${AthenaResultsBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
 
   ProwlerAthenaWorkGroup:
     Type: AWS::Athena::WorkGroup
@@ -372,26 +523,37 @@ Resources:
     Type: AWS::IAM::RolePolicy
     Condition: CreateQuickSightResources
     Properties:
-      RoleName: aws-quicksight-service-role-v0
+      RoleName: !Ref QuickSightServiceRoleName
       PolicyName: !Sub ProwlerReportsAccess-${EnvironmentType}
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
           - Effect: Allow
-            Action:
-              - s3:GetBucketLocation
-              - s3:ListBucket
+            Action: s3:GetBucketLocation
             Resource:
               - !GetAtt ReportsBucket.Arn
               - !GetAtt AthenaResultsBucket.Arn
+          - Effect: Allow
+            Action: s3:ListBucket
+            Resource: !GetAtt ReportsBucket.Arn
+            Condition:
+              StringLike:
+                s3:prefix: findings/*
+          - Effect: Allow
+            Action: s3:GetObject
+            Resource: !Sub ${ReportsBucket.Arn}/findings/*
+          - Effect: Allow
+            Action: s3:ListBucket
+            Resource: !GetAtt AthenaResultsBucket.Arn
+            Condition:
+              StringLike:
+                s3:prefix: results/*
           - Effect: Allow
             Action:
               - s3:GetObject
               - s3:PutObject
               - s3:AbortMultipartUpload
-            Resource:
-              - !Sub ${ReportsBucket.Arn}/*
-              - !Sub ${AthenaResultsBucket.Arn}/*
+            Resource: !Sub ${AthenaResultsBucket.Arn}/results/*
 
   ProwlerQuickSightDataSource:
     Type: AWS::QuickSight::DataSource
