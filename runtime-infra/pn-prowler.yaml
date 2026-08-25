@@ -22,6 +22,11 @@ Parameters:
     Default: 'e1d3dc48597c7bba4e73fb016373cd65fc50c66377c797bdee6370b40bec7759'
     AllowedPattern: '^[a-f0-9]{64}$'
     Description: Expected SHA-256 digest of the Prowler wheel downloaded from PyPI.
+  ProwlerRegions:
+    Type: String
+    Default: eu-south-1 eu-central-1
+    AllowedPattern: '^[a-z]{2}-[a-z]+-[0-9]+( [a-z]{2}-[a-z]+-[0-9]+)*$'
+    Description: Space-separated AWS regions scanned by Prowler.
   ScheduleExpression:
     Type: String
     Default: cron(0 5 1 1,7 ? *)
@@ -46,12 +51,6 @@ Parameters:
     Type: String
     Default: pn-WarningSnsTopic
     Description: SNS topic name for routed warning and report events.
-  ReportLinkExpirationSeconds:
-    Type: Number
-    Default: 3600
-    MinValue: 60
-    MaxValue: 3600
-    Description: Lifetime of the temporary HTML report download links sent to Slack.
 
 Rules:
   RequirePeerAccountId:
@@ -228,7 +227,7 @@ Resources:
                 - RUN_DATE=$(date -u +%Y/%m/%d/%H%M%S)
                 - |
                   for TARGET in core confinfo; do
-                    if [[ "$TARGET" == "core" ]]; then
+                    if [ "$TARGET" = "core" ]; then
                       ACCOUNT_ID="$CORE_ACCOUNT_ID"
                     else
                       ACCOUNT_ID="$CONFINFO_ACCOUNT_ID"
@@ -236,6 +235,7 @@ Resources:
                     prowler aws \
                       --role "arn:${AWS_PARTITION}:iam::${ACCOUNT_ID}:role/pn-prowler-scan-${ENVIRONMENT_TYPE}" \
                       --session-duration 3600 \
+                      --region $PROWLER_REGIONS \
                       --output-formats csv json-ocsf html \
                       --output-directory "output/${TARGET}" \
                       --output-filename "prowler-${TARGET}" \
@@ -261,16 +261,13 @@ Resources:
                   for TARGET in core confinfo; do
                     aws s3 cp "output/${TARGET}" \
                       "s3://${REPORTS_BUCKET}/reports/${ENVIRONMENT_TYPE}/${RUN_DATE}/${TARGET}/" \
-                      --recursive
+                      --recursive \
+                      --exclude '*.html'
                     HTML_KEY="reports/${ENVIRONMENT_TYPE}/${RUN_DATE}/${TARGET}/prowler-${TARGET}.html"
-                    HTML_URL=$(aws s3 presign \
+                    aws s3 cp "output/${TARGET}/prowler-${TARGET}.html" \
                       "s3://${REPORTS_BUCKET}/${HTML_KEY}" \
-                      --expires-in "$REPORT_LINK_EXPIRATION_SECONDS")
-                    if [[ "$TARGET" == "core" ]]; then
-                      CORE_HTML_URL="$HTML_URL"
-                    else
-                      CONFINFO_HTML_URL="$HTML_URL"
-                    fi
+                      --content-type text/html \
+                      --content-disposition "attachment; filename=\"prowler-${TARGET}.html\""
                   done
                   FINDINGS_KEY="findings/${ENVIRONMENT_TYPE}/${RUN_DATE}/prowler.csv"
                   aws s3 cp output/combined/prowler.csv \
@@ -286,9 +283,9 @@ Resources:
                       accounts: ["core", "confinfo"],
                       findingsKey: $findings_key
                     }')
-                  aws s3 cp - \
+                  printf '%s\n' "$MANIFEST" | aws s3 cp - \
                     "s3://${REPORTS_BUCKET}/reports/${ENVIRONMENT_TYPE}/${RUN_DATE}/manifest.json" \
-                    --content-type application/json <<< "$MANIFEST"
+                    --content-type application/json
                 - |
                   REPORT_EVENT_ID="${CODEBUILD_BUILD_ID:-pn-prowler-${RUN_DATE}}"
                   REPORT_OCCURRED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -296,8 +293,6 @@ Resources:
                     --arg event_id "$REPORT_EVENT_ID" \
                     --arg occurred_at "$REPORT_OCCURRED_AT" \
                     --arg environment "$ENVIRONMENT_TYPE" \
-                    --arg core_html "$CORE_HTML_URL" \
-                    --arg confinfo_html "$CONFINFO_HTML_URL" \
                     '{
                       schemaVersion: "1.0",
                       eventId: $event_id,
@@ -309,12 +304,7 @@ Resources:
                       environment: $environment,
                       title: "Prowler scan completed",
                       data: {
-                        metrics: {"Account analizzati": 2},
-                        details: {Core: "Completato", Confinfo: "Completato"}
-                      },
-                      links: {
-                        core_html: $core_html,
-                        confinfo_html: $confinfo_html
+                        metrics: {"Account analizzati": 2}
                       }
                     }')
                   aws sns publish \
@@ -332,6 +322,9 @@ Resources:
           - Name: PROWLER_PACKAGE_SHA256
             Type: PLAINTEXT
             Value: !Ref ProwlerPackageSha256
+          - Name: PROWLER_REGIONS
+            Type: PLAINTEXT
+            Value: !Ref ProwlerRegions
           - Name: ENVIRONMENT_TYPE
             Type: PLAINTEXT
             Value: !Ref EnvironmentType
@@ -350,9 +343,6 @@ Resources:
           - Name: WARNING_SNS_TOPIC_ARN
             Type: PLAINTEXT
             Value: !Sub arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}
-          - Name: REPORT_LINK_EXPIRATION_SECONDS
-            Type: PLAINTEXT
-            Value: !Ref ReportLinkExpirationSeconds
 
   ProwlerScheduleRole:
     Type: AWS::IAM::Role
@@ -646,7 +636,155 @@ Resources:
         Sheets:
           - SheetId: findings
             Name: Findings
+            Layouts:
+              - Configuration:
+                  GridLayout:
+                    Elements:
+                      - ElementId: total-findings
+                        ElementType: VISUAL
+                        ColumnIndex: 0
+                        ColumnSpan: 18
+                        RowIndex: 0
+                        RowSpan: 4
+                      - ElementId: distinct-resources
+                        ElementType: VISUAL
+                        ColumnIndex: 18
+                        ColumnSpan: 18
+                        RowIndex: 0
+                        RowSpan: 4
+                      - ElementId: findings-by-severity
+                        ElementType: VISUAL
+                        ColumnIndex: 0
+                        ColumnSpan: 18
+                        RowIndex: 4
+                        RowSpan: 8
+                      - ElementId: findings-by-status
+                        ElementType: VISUAL
+                        ColumnIndex: 18
+                        ColumnSpan: 18
+                        RowIndex: 4
+                        RowSpan: 8
+                      - ElementId: findings-by-service
+                        ElementType: VISUAL
+                        ColumnIndex: 0
+                        ColumnSpan: 18
+                        RowIndex: 12
+                        RowSpan: 8
+                      - ElementId: findings-by-account
+                        ElementType: VISUAL
+                        ColumnIndex: 18
+                        ColumnSpan: 18
+                        RowIndex: 12
+                        RowSpan: 8
+                      - ElementId: findings-table
+                        ElementType: VISUAL
+                        ColumnIndex: 0
+                        ColumnSpan: 36
+                        RowIndex: 20
+                        RowSpan: 12
             Visuals:
+              - KPIVisual:
+                  VisualId: total-findings
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText:
+                      PlainText: Findings totali
+                  ChartConfiguration:
+                    FieldWells:
+                      Values:
+                        - CategoricalMeasureField:
+                            FieldId: total-findings-count
+                            Column: {DataSetIdentifier: ProwlerFindings, ColumnName: check_id}
+                            AggregationFunction: COUNT
+              - KPIVisual:
+                  VisualId: distinct-resources
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText:
+                      PlainText: Risorse coinvolte
+                  ChartConfiguration:
+                    FieldWells:
+                      Values:
+                        - CategoricalMeasureField:
+                            FieldId: distinct-resources-count
+                            Column: {DataSetIdentifier: ProwlerFindings, ColumnName: resource_uid}
+                            AggregationFunction: DISTINCT_COUNT
+              - PieChartVisual:
+                  VisualId: findings-by-severity
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText:
+                      PlainText: Findings per severita
+                  ChartConfiguration:
+                    FieldWells:
+                      PieChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: severity-category
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: severity}
+                        Values:
+                          - CategoricalMeasureField:
+                              FieldId: severity-findings-count
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: check_id}
+                              AggregationFunction: COUNT
+              - PieChartVisual:
+                  VisualId: findings-by-status
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText:
+                      PlainText: Findings per stato
+                  ChartConfiguration:
+                    FieldWells:
+                      PieChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: status-category
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: status}
+                        Values:
+                          - CategoricalMeasureField:
+                              FieldId: status-findings-count
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: check_id}
+                              AggregationFunction: COUNT
+              - BarChartVisual:
+                  VisualId: findings-by-service
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText:
+                      PlainText: Findings per servizio
+                  ChartConfiguration:
+                    Orientation: HORIZONTAL
+                    BarsArrangement: CLUSTERED
+                    FieldWells:
+                      BarChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: service-category
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: service_name}
+                        Values:
+                          - CategoricalMeasureField:
+                              FieldId: service-findings-count
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: check_id}
+                              AggregationFunction: COUNT
+              - BarChartVisual:
+                  VisualId: findings-by-account
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText:
+                      PlainText: Findings per account
+                  ChartConfiguration:
+                    Orientation: VERTICAL
+                    BarsArrangement: CLUSTERED
+                    FieldWells:
+                      BarChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: account-category
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_name}
+                        Values:
+                          - CategoricalMeasureField:
+                              FieldId: account-findings-count
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: check_id}
+                              AggregationFunction: COUNT
               - TableVisual:
                   VisualId: findings-table
                   Title:
