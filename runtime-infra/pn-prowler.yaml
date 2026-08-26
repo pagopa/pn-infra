@@ -660,6 +660,10 @@ Resources:
                 severity,
                 resource_type,
                 resource_uid,
+                CASE
+                  WHEN lower(service_name) = 'ecs' THEN regexp_replace(resource_uid, ':[0-9]+$', '')
+                  ELSE resource_uid
+                END AS grouped_resource_uid,
                 resource_name,
                 resource_tags,
                 COALESCE(
@@ -695,6 +699,7 @@ Resources:
               - {Name: severity, Type: STRING}
               - {Name: resource_type, Type: STRING}
               - {Name: resource_uid, Type: STRING}
+              - {Name: grouped_resource_uid, Type: STRING}
               - {Name: resource_name, Type: STRING}
               - {Name: resource_tags, Type: STRING}
               - {Name: microservice_tag, Type: STRING}
@@ -764,6 +769,31 @@ Resources:
               - CategoryFilter:
                   FilterId: region-filter
                   Column: {DataSetIdentifier: ProwlerFindings, ColumnName: region}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      SelectAllOptions: FILTER_ALL_VALUES
+                      NullOption: NON_NULLS_ONLY
+          - FilterGroupId: service-filter-group
+            CrossDataset: SINGLE_DATASET
+            Status: ENABLED
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: findings
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - total-findings
+                      - distinct-resources
+                      - findings-by-severity
+                      - findings-by-status
+                      - findings-by-service
+                      - findings-by-account
+                      - findings-table
+            Filters:
+              - CategoryFilter:
+                  FilterId: service-filter
+                  Column: {DataSetIdentifier: ProwlerFindings, ColumnName: service_name}
                   Configuration:
                     FilterListConfiguration:
                       MatchOperator: CONTAINS
@@ -882,6 +912,12 @@ Resources:
                   Type: MULTI_SELECT
                   CommitMode: AUTO
               - Dropdown:
+                  FilterControlId: service-filter-control
+                  SourceFilterId: service-filter
+                  Title: Service
+                  Type: MULTI_SELECT
+                  CommitMode: AUTO
+              - Dropdown:
                   FilterControlId: status-filter-control
                   SourceFilterId: status-filter
                   Title: Stato
@@ -944,6 +980,12 @@ Resources:
                         ColumnIndex: 6
                         ColumnSpan: 6
                         RowIndex: 2
+                        RowSpan: 1
+                      - ElementId: service-filter-control
+                        ElementType: FILTER_CONTROL
+                        ColumnIndex: 0
+                        ColumnSpan: 6
+                        RowIndex: 3
                         RowSpan: 1
             Layouts:
               - Configuration:
@@ -1153,13 +1195,20 @@ Resources:
                               FieldId: check-title
                               Column: {DataSetIdentifier: ProwlerFindings, ColumnName: check_title}
                           - CategoricalDimensionField:
-                              FieldId: resource-name
-                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: resource_name}
+                              FieldId: grouped-resource-uid
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: grouped_resource_uid}
+                          - CategoricalDimensionField:
+                              FieldId: remediation-recommendation
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: remediation_recommendation_text}
                           - CategoricalDimensionField:
                               FieldId: resource-tags
                               Column: {DataSetIdentifier: ProwlerFindings, ColumnName: resource_tags}
                     FieldOptions:
                       SelectedFieldOptions:
+                        - FieldId: grouped-resource-uid
+                          CustomLabel: Resource
+                        - FieldId: remediation-recommendation
+                          CustomLabel: Remediation
                         - FieldId: resource-tags
                           CustomLabel: Resource Tag
 
