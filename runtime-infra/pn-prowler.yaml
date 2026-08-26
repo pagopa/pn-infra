@@ -27,6 +27,14 @@ Parameters:
     Default: eu-south-1 eu-central-1
     AllowedPattern: '^[a-z]{2}-[a-z]+-[0-9]+( [a-z]{2}-[a-z]+-[0-9]+)*$'
     Description: Space-separated AWS regions scanned by Prowler.
+  PnConfigurationCommitId:
+    Type: String
+    AllowedPattern: '^[a-f0-9]{40}$'
+    Description: Git commit containing the Prowler mutelist in the private pn-configuration repository.
+  GithubTokenName:
+    Type: String
+    AllowedPattern: '^[A-Za-z0-9/_+=.@-]+$'
+    Description: Secrets Manager secret containing a read-only GitHub token.
   ScheduleExpression:
     Type: String
     Default: cron(0 5 1 1,7 ? *)
@@ -181,6 +189,9 @@ Resources:
                   - s3:PutObject
                 Resource: !Sub ${ReportsBucket.Arn}/*
               - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GithubTokenName}-*
+              - Effect: Allow
                 Action: sns:Publish
                 Resource: !Sub arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}
               - Effect: Allow
@@ -226,6 +237,22 @@ Resources:
               commands:
                 - RUN_DATE=$(date -u +%Y/%m/%d/%H%M%S)
                 - |
+                  set -eu
+                  GITHUB_TOKEN=$(aws secretsmanager get-secret-value \
+                    --secret-id "$GITHUB_TOKEN_SECRET_NAME" \
+                    --query SecretString \
+                    --output text)
+                  MUTELIST_PATH="${ENVIRONMENT_TYPE}/_conf/core/prowler-mutelist.yaml"
+                  curl --fail-with-body --silent --show-error \
+                    -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                    -H "Accept: application/vnd.github.raw+json" \
+                    -H "X-GitHub-Api-Version: 2022-11-28" \
+                    "https://api.github.com/repos/pagopa/pn-configuration/contents/${MUTELIST_PATH}?ref=${PN_CONFIGURATION_COMMIT_ID}" \
+                    --output /tmp/prowler-mutelist.yaml
+                  unset GITHUB_TOKEN
+                  test -s /tmp/prowler-mutelist.yaml
+                  MUTELIST_SHA256=$(sha256sum /tmp/prowler-mutelist.yaml | cut -d ' ' -f 1)
+                - |
                   for TARGET in core confinfo; do
                     if [ "$TARGET" = "core" ]; then
                       ACCOUNT_ID="$CORE_ACCOUNT_ID"
@@ -239,6 +266,7 @@ Resources:
                       --output-formats csv json-ocsf html \
                       --output-directory "output/${TARGET}" \
                       --output-filename "prowler-${TARGET}" \
+                      --mutelist-file /tmp/prowler-mutelist.yaml \
                       --ignore-exit-code-3 \
                       --no-color
                   done
@@ -275,11 +303,17 @@ Resources:
                   MANIFEST=$(jq -n -c \
                     --arg run_date "$RUN_DATE" \
                     --arg prowler_version "$PROWLER_VERSION" \
+                    --arg pn_configuration_commit_id "$PN_CONFIGURATION_COMMIT_ID" \
+                    --arg mutelist_path "$MUTELIST_PATH" \
+                    --arg mutelist_sha256 "$MUTELIST_SHA256" \
                     --arg findings_key "$FINDINGS_KEY" \
                     '{
                       status: "COMPLETED",
                       runDate: $run_date,
                       prowlerVersion: $prowler_version,
+                      pnConfigurationCommitId: $pn_configuration_commit_id,
+                      mutelistPath: $mutelist_path,
+                      mutelistSha256: $mutelist_sha256,
                       accounts: ["core", "confinfo"],
                       findingsKey: $findings_key
                     }')
@@ -325,6 +359,12 @@ Resources:
           - Name: PROWLER_REGIONS
             Type: PLAINTEXT
             Value: !Ref ProwlerRegions
+          - Name: PN_CONFIGURATION_COMMIT_ID
+            Type: PLAINTEXT
+            Value: !Ref PnConfigurationCommitId
+          - Name: GITHUB_TOKEN_SECRET_NAME
+            Type: PLAINTEXT
+            Value: !Ref GithubTokenName
           - Name: ENVIRONMENT_TYPE
             Type: PLAINTEXT
             Value: !Ref EnvironmentType
