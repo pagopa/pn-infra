@@ -647,6 +647,10 @@ Resources:
                 check_title,
                 status,
                 status_extended,
+                CASE
+                  WHEN lower(trim(muted)) = 'true' THEN 'MUTED'
+                  ELSE 'NOT MUTED'
+                END AS muted_status,
                 service_name,
                 severity,
                 resource_type,
@@ -675,6 +679,7 @@ Resources:
               - {Name: check_title, Type: STRING}
               - {Name: status, Type: STRING}
               - {Name: status_extended, Type: STRING}
+              - {Name: muted_status, Type: STRING}
               - {Name: service_name, Type: STRING}
               - {Name: severity, Type: STRING}
               - {Name: resource_type, Type: STRING}
@@ -798,6 +803,32 @@ Resources:
                       MatchOperator: CONTAINS
                       SelectAllOptions: FILTER_ALL_VALUES
                       NullOption: NON_NULLS_ONLY
+          - FilterGroupId: muted-filter-group
+            CrossDataset: SINGLE_DATASET
+            Status: ENABLED
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: findings
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - total-findings
+                      - distinct-resources
+                      - findings-by-severity
+                      - findings-by-status
+                      - findings-by-service
+                      - findings-by-account
+                      - findings-table
+            Filters:
+              - CategoryFilter:
+                  FilterId: muted-filter
+                  Column: {DataSetIdentifier: ProwlerFindings, ColumnName: muted_status}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      CategoryValues:
+                        - NOT MUTED
+                      NullOption: NON_NULLS_ONLY
         Sheets:
           - SheetId: findings
             Name: Findings
@@ -824,6 +855,12 @@ Resources:
                   FilterControlId: severity-filter-control
                   SourceFilterId: severity-filter
                   Title: Severity
+                  Type: MULTI_SELECT
+                  CommitMode: AUTO
+              - Dropdown:
+                  FilterControlId: muted-filter-control
+                  SourceFilterId: muted-filter
+                  Title: Muting
                   Type: MULTI_SELECT
                   CommitMode: AUTO
             SheetControlLayouts:
@@ -853,6 +890,12 @@ Resources:
                         ColumnIndex: 6
                         ColumnSpan: 6
                         RowIndex: 1
+                        RowSpan: 1
+                      - ElementId: muted-filter-control
+                        ElementType: FILTER_CONTROL
+                        ColumnIndex: 0
+                        ColumnSpan: 12
+                        RowIndex: 2
                         RowSpan: 1
             Layouts:
               - Configuration:
