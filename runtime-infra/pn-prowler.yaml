@@ -17,6 +17,10 @@ Parameters:
   ProwlerVersion:
     Type: String
     Default: '5.4.0'
+  PythonVersion:
+    Type: String
+    AllowedPattern: '^3\.[0-9]+$'
+    Description: Python runtime used by CodeBuild to run Prowler.
   ProwlerPackageSha256:
     Type: String
     Default: 'e1d3dc48597c7bba4e73fb016373cd65fc50c66377c797bdee6370b40bec7759'
@@ -225,7 +229,7 @@ Resources:
           phases:
             install:
               runtime-versions:
-                python: 3.12
+                python: "$PYTHON_VERSION"
               commands:
                 - mkdir -p /tmp/prowler-package
                 - >-
@@ -306,6 +310,7 @@ Resources:
                   MANIFEST=$(jq -n -c \
                     --arg run_date "$RUN_DATE" \
                     --arg prowler_version "$PROWLER_VERSION" \
+                    --arg python_version "$PYTHON_VERSION" \
                     --arg pn_configuration_commit_id "$PN_CONFIGURATION_COMMIT_ID" \
                     --arg mutelist_path "$MUTELIST_PATH" \
                     --arg mutelist_sha256 "$MUTELIST_SHA256" \
@@ -314,6 +319,7 @@ Resources:
                       status: "COMPLETED",
                       runDate: $run_date,
                       prowlerVersion: $prowler_version,
+                      pythonVersion: $python_version,
                       pnConfigurationCommitId: $pn_configuration_commit_id,
                       mutelistPath: $mutelist_path,
                       mutelistSha256: $mutelist_sha256,
@@ -356,6 +362,9 @@ Resources:
           - Name: PROWLER_VERSION
             Type: PLAINTEXT
             Value: !Ref ProwlerVersion
+          - Name: PYTHON_VERSION
+            Type: PLAINTEXT
+            Value: !Ref PythonVersion
           - Name: PROWLER_PACKAGE_SHA256
             Type: PLAINTEXT
             Value: !Ref ProwlerPackageSha256
