@@ -14,18 +14,10 @@ Parameters:
   ConfidentialInfoAccountId:
     Type: String
     Default: ''
-  ProwlerVersion:
+  ProwlerImageUri:
     Type: String
-    Default: '5.4.0'
-  PythonVersion:
-    Type: String
-    AllowedPattern: '^3\.[0-9]+$'
-    Description: Python runtime used by CodeBuild to run Prowler.
-  ProwlerPackageSha256:
-    Type: String
-    Default: 'e1d3dc48597c7bba4e73fb016373cd65fc50c66377c797bdee6370b40bec7759'
-    AllowedPattern: '^[a-f0-9]{64}$'
-    Description: Expected SHA-256 digest of the Prowler wheel downloaded from PyPI.
+    AllowedPattern: '^public\.ecr\.aws/prowler-cloud/prowler:[0-9]+\.[0-9]+\.[0-9]+@sha256:[a-f0-9]{64}$'
+    Description: Official Prowler image from AWS Public ECR pinned by immutable digest.
   ProwlerRegions:
     Type: String
     Default: eu-south-1 eu-central-1
@@ -228,18 +220,9 @@ Resources:
           version: 0.2
           phases:
             install:
-              runtime-versions:
-                python: "$PYTHON_VERSION"
               commands:
-                - mkdir -p /tmp/prowler-package
-                - >-
-                  pip download --disable-pip-version-check --no-deps --only-binary=:all:
-                  --dest /tmp/prowler-package "prowler==${PROWLER_VERSION}"
-                - PROWLER_WHEEL=$(find /tmp/prowler-package -maxdepth 1 -type f -name '*.whl' -print -quit)
-                - test -n "$PROWLER_WHEEL"
-                - echo "${PROWLER_PACKAGE_SHA256}  ${PROWLER_WHEEL}" | sha256sum --check --strict
-                - pip install --disable-pip-version-check --no-cache-dir "$PROWLER_WHEEL"
-                - pip freeze --all | sort
+                - docker pull "$PROWLER_IMAGE_URI"
+                - docker image inspect "$PROWLER_IMAGE_URI" --format '{{json .RepoDigests}}'
             build:
               commands:
                 - RUN_DATE=$(date -u +%Y/%m/%d/%H%M%S)
@@ -260,23 +243,48 @@ Resources:
                   test -s /tmp/prowler-mutelist.yaml
                   MUTELIST_SHA256=$(sha256sum /tmp/prowler-mutelist.yaml | cut -d ' ' -f 1)
                 - |
+                  cleanup_credentials() {
+                    rm -f /tmp/prowler-*.env /tmp/prowler-*-credentials.json
+                  }
+                  trap cleanup_credentials EXIT
                   for TARGET in core confinfo; do
                     if [ "$TARGET" = "core" ]; then
                       ACCOUNT_ID="$CORE_ACCOUNT_ID"
                     else
                       ACCOUNT_ID="$CONFINFO_ACCOUNT_ID"
                     fi
-                    prowler aws \
-                      --role "arn:${AWS_PARTITION}:iam::${ACCOUNT_ID}:role/pn-prowler-scan-${ENVIRONMENT_TYPE}" \
-                      --session-duration 3600 \
+                    CREDENTIALS_FILE="/tmp/prowler-${TARGET}.env"
+                    umask 077
+                    aws sts assume-role \
+                      --role-arn "arn:${AWS_PARTITION}:iam::${ACCOUNT_ID}:role/pn-prowler-scan-${ENVIRONMENT_TYPE}" \
+                      --role-session-name "pn-prowler-${ENVIRONMENT_TYPE}-${TARGET}" \
+                      --duration-seconds 3600 \
+                      --output json > "/tmp/prowler-${TARGET}-credentials.json"
+                    jq -r \
+                      --arg region "$AWS_REGION" \
+                      '"AWS_ACCESS_KEY_ID=" + .Credentials.AccessKeyId,
+                       "AWS_SECRET_ACCESS_KEY=" + .Credentials.SecretAccessKey,
+                       "AWS_SESSION_TOKEN=" + .Credentials.SessionToken,
+                       "AWS_DEFAULT_REGION=" + $region' \
+                      "/tmp/prowler-${TARGET}-credentials.json" > "$CREDENTIALS_FILE"
+                    rm -f "/tmp/prowler-${TARGET}-credentials.json"
+                    mkdir -p "output/${TARGET}"
+                    chmod 0777 "output/${TARGET}"
+                    docker run --rm \
+                      --env-file "$CREDENTIALS_FILE" \
+                      --volume "$CODEBUILD_SRC_DIR/output/${TARGET}:/home/prowler/output" \
+                      --volume "/tmp/prowler-mutelist.yaml:/home/prowler/prowler-mutelist.yaml:ro" \
+                      "$PROWLER_IMAGE_URI" aws \
                       --region $PROWLER_REGIONS \
                       --output-formats csv json-ocsf html \
-                      --output-directory "output/${TARGET}" \
+                      --output-directory /home/prowler/output \
                       --output-filename "prowler-${TARGET}" \
-                      --mutelist-file /tmp/prowler-mutelist.yaml \
+                      --mutelist-file /home/prowler/prowler-mutelist.yaml \
                       --ignore-exit-code-3 \
                       --no-color
+                    rm -f "$CREDENTIALS_FILE"
                   done
+                  trap - EXIT
                 - |
                   CORE_CSV="output/core/prowler-core.csv"
                   CONFINFO_CSV="output/confinfo/prowler-confinfo.csv"
@@ -309,8 +317,7 @@ Resources:
                     "s3://${REPORTS_BUCKET}/${FINDINGS_KEY}"
                   MANIFEST=$(jq -n -c \
                     --arg run_date "$RUN_DATE" \
-                    --arg prowler_version "$PROWLER_VERSION" \
-                    --arg python_version "$PYTHON_VERSION" \
+                    --arg prowler_image_uri "$PROWLER_IMAGE_URI" \
                     --arg pn_configuration_commit_id "$PN_CONFIGURATION_COMMIT_ID" \
                     --arg mutelist_path "$MUTELIST_PATH" \
                     --arg mutelist_sha256 "$MUTELIST_SHA256" \
@@ -318,8 +325,7 @@ Resources:
                     '{
                       status: "COMPLETED",
                       runDate: $run_date,
-                      prowlerVersion: $prowler_version,
-                      pythonVersion: $python_version,
+                      prowlerImageUri: $prowler_image_uri,
                       pnConfigurationCommitId: $pn_configuration_commit_id,
                       mutelistPath: $mutelist_path,
                       mutelistSha256: $mutelist_sha256,
@@ -356,18 +362,13 @@ Resources:
                     --message "$REPORT_MESSAGE"
       Environment:
         ComputeType: BUILD_GENERAL1_MEDIUM
-        Type: LINUX_CONTAINER
-        Image: aws/codebuild/standard:7.0
+        Type: ARM_CONTAINER
+        Image: aws/codebuild/amazonlinux-aarch64-standard:3.0
+        PrivilegedMode: true
         EnvironmentVariables:
-          - Name: PROWLER_VERSION
+          - Name: PROWLER_IMAGE_URI
             Type: PLAINTEXT
-            Value: !Ref ProwlerVersion
-          - Name: PYTHON_VERSION
-            Type: PLAINTEXT
-            Value: !Ref PythonVersion
-          - Name: PROWLER_PACKAGE_SHA256
-            Type: PLAINTEXT
-            Value: !Ref ProwlerPackageSha256
+            Value: !Ref ProwlerImageUri
           - Name: PROWLER_REGIONS
             Type: PLAINTEXT
             Value: !Ref ProwlerRegions
