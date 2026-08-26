@@ -739,6 +739,8 @@ Resources:
                     VisualIds:
                       - total-findings
                       - distinct-resources
+                      - findings-by-severity
+                      - findings-by-status
                       - findings-by-service
                       - findings-by-account
                       - findings-table
@@ -762,6 +764,8 @@ Resources:
                     VisualIds:
                       - total-findings
                       - distinct-resources
+                      - findings-by-severity
+                      - findings-by-status
                       - findings-by-service
                       - findings-by-account
                       - findings-table
@@ -810,6 +814,8 @@ Resources:
                     VisualIds:
                       - total-findings
                       - distinct-resources
+                      - findings-by-severity
+                      - findings-by-status
                       - findings-by-service
                       - findings-by-account
                       - findings-table
@@ -834,6 +840,8 @@ Resources:
                     VisualIds:
                       - total-findings
                       - distinct-resources
+                      - findings-by-severity
+                      - findings-by-status
                       - findings-by-service
                       - findings-by-account
                       - findings-table
@@ -885,6 +893,8 @@ Resources:
                       - distinct-resources
                       - findings-by-severity
                       - findings-by-status
+                      - findings-by-service
+                      - findings-by-account
                       - findings-table
             Filters:
               - CategoryFilter:
@@ -1198,6 +1208,9 @@ Resources:
                               FieldId: grouped-resource-uid
                               Column: {DataSetIdentifier: ProwlerFindings, ColumnName: grouped_resource_uid}
                           - CategoricalDimensionField:
+                              FieldId: risk
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: risk}
+                          - CategoricalDimensionField:
                               FieldId: remediation-recommendation
                               Column: {DataSetIdentifier: ProwlerFindings, ColumnName: remediation_recommendation_text}
                           - CategoricalDimensionField:
@@ -1207,8 +1220,10 @@ Resources:
                       SelectedFieldOptions:
                         - FieldId: grouped-resource-uid
                           CustomLabel: Resource
+                        - FieldId: risk
+                          CustomLabel: Risk
                         - FieldId: remediation-recommendation
-                          CustomLabel: Remediation
+                          CustomLabel: Recommendation
                         - FieldId: resource-tags
                           CustomLabel: Resource Tag
 
