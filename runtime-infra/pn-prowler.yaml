@@ -35,6 +35,9 @@ Parameters:
     Type: String
     AllowedPattern: '^[A-Za-z0-9/_+=.@-]+$'
     Description: Secrets Manager secret containing a read-only GitHub token.
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: Base URL of the S3 location containing nested runtime infrastructure templates.
   ScheduleExpression:
     Type: String
     Default: cron(0 5 1 1,7 ? *)
@@ -383,6 +386,15 @@ Resources:
           - Name: WARNING_SNS_TOPIC_ARN
             Type: PLAINTEXT
             Value: !Sub arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}
+
+  ProwlerCodeBuildAlarms:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/codebuild-alarms.yaml
+      Parameters:
+        CodeBuildProjectName: !Ref ProwlerCodeBuildProject
+        AlarmSNSTopicArn: !Sub arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}
 
   ProwlerScheduleRole:
     Type: AWS::IAM::Role
