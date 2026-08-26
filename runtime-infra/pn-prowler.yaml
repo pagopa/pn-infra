@@ -651,6 +651,10 @@ Resources:
                   WHEN lower(trim(muted)) = 'true' THEN 'MUTED'
                   ELSE 'NOT MUTED'
                 END AS muted_status,
+                CASE
+                  WHEN lower(trim(muted)) = 'true' THEN 'MUTED'
+                  ELSE status
+                END AS display_status,
                 service_name,
                 severity,
                 resource_type,
@@ -685,6 +689,7 @@ Resources:
               - {Name: status, Type: STRING}
               - {Name: status_extended, Type: STRING}
               - {Name: muted_status, Type: STRING}
+              - {Name: display_status, Type: STRING}
               - {Name: service_name, Type: STRING}
               - {Name: severity, Type: STRING}
               - {Name: resource_type, Type: STRING}
@@ -1055,12 +1060,16 @@ Resources:
                     FormatText:
                       PlainText: Findings per stato
                   ChartConfiguration:
+                    VisualPalette:
+                      ColorMap:
+                        - Element: {FieldId: status-category, FieldValue: MUTED}
+                          Color: '#64748B'
                     FieldWells:
                       PieChartAggregatedFieldWells:
                         Category:
                           - CategoricalDimensionField:
                               FieldId: status-category
-                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: status}
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: display_status}
                         SmallMultiples:
                           - CategoricalDimensionField:
                               FieldId: status-account
