@@ -656,6 +656,11 @@ Resources:
                 resource_type,
                 resource_uid,
                 resource_name,
+                resource_tags,
+                COALESCE(
+                  NULLIF(trim(regexp_extract(resource_tags, '(?i)(?:^| [|] )Microservice=([^|]*)', 1)), ''),
+                  'no tag'
+                ) AS microservice_tag,
                 region,
                 description,
                 risk,
@@ -685,6 +690,8 @@ Resources:
               - {Name: resource_type, Type: STRING}
               - {Name: resource_uid, Type: STRING}
               - {Name: resource_name, Type: STRING}
+              - {Name: resource_tags, Type: STRING}
+              - {Name: microservice_tag, Type: STRING}
               - {Name: region, Type: STRING}
               - {Name: description, Type: STRING}
               - {Name: risk, Type: STRING}
@@ -829,6 +836,27 @@ Resources:
                       CategoryValues:
                         - NOT MUTED
                       NullOption: NON_NULLS_ONLY
+          - FilterGroupId: resource-tag-filter-group
+            CrossDataset: SINGLE_DATASET
+            Status: ENABLED
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: findings
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - findings-by-severity
+                      - findings-by-status
+                      - findings-table
+            Filters:
+              - CategoryFilter:
+                  FilterId: resource-tag-filter
+                  Column: {DataSetIdentifier: ProwlerFindings, ColumnName: microservice_tag}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      SelectAllOptions: FILTER_ALL_VALUES
+                      NullOption: NON_NULLS_ONLY
         Sheets:
           - SheetId: findings
             Name: Findings
@@ -863,6 +891,12 @@ Resources:
                   Title: Muting
                   Type: MULTI_SELECT
                   CommitMode: AUTO
+              - Dropdown:
+                  FilterControlId: resource-tag-filter-control
+                  SourceFilterId: resource-tag-filter
+                  Title: Microservice
+                  Type: MULTI_SELECT
+                  CommitMode: AUTO
             SheetControlLayouts:
               - Configuration:
                   GridLayout:
@@ -894,7 +928,13 @@ Resources:
                       - ElementId: muted-filter-control
                         ElementType: FILTER_CONTROL
                         ColumnIndex: 0
-                        ColumnSpan: 12
+                        ColumnSpan: 6
+                        RowIndex: 2
+                        RowSpan: 1
+                      - ElementId: resource-tag-filter-control
+                        ElementType: FILTER_CONTROL
+                        ColumnIndex: 6
+                        ColumnSpan: 6
                         RowIndex: 2
                         RowSpan: 1
             Layouts:
@@ -1103,6 +1143,13 @@ Resources:
                           - CategoricalDimensionField:
                               FieldId: resource-name
                               Column: {DataSetIdentifier: ProwlerFindings, ColumnName: resource_name}
+                          - CategoricalDimensionField:
+                              FieldId: resource-tags
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: resource_tags}
+                    FieldOptions:
+                      SelectedFieldOptions:
+                        - FieldId: resource-tags
+                          CustomLabel: Resource Tag
 
 Outputs:
   ProwlerScanRoleArn:
