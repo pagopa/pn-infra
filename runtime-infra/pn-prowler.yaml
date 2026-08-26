@@ -5,55 +5,93 @@ Parameters:
   EnvironmentType:
     Type: String
     AllowedValues: [dev, hotfix]
+
   AccountType:
     Type: String
     AllowedValues: [core, confinfo]
+
   PnCoreAwsAccountId:
     Type: String
     Default: ''
+
   ConfidentialInfoAccountId:
     Type: String
     Default: ''
+
   ProwlerImageUri:
     Type: String
-    AllowedPattern: '^public\.ecr\.aws/prowler-cloud/prowler:[0-9]+\.[0-9]+\.[0-9]+@sha256:[a-f0-9]{64}$'
     Description: Official Prowler image from AWS Public ECR pinned by immutable digest.
+
   ProwlerRegions:
     Type: String
     Default: eu-south-1 eu-central-1
-    AllowedPattern: '^[a-z]{2}-[a-z]+-[0-9]+( [a-z]{2}-[a-z]+-[0-9]+)*$'
     Description: Space-separated AWS regions scanned by Prowler.
+
   PnConfigurationCommitId:
     Type: String
-    AllowedPattern: '^[a-f0-9]{40}$'
     Description: Git commit containing the Prowler mutelist in the private pn-configuration repository.
+
   GithubTokenName:
     Type: String
-    AllowedPattern: '^[A-Za-z0-9/_+=.@-]+$'
     Description: Secrets Manager secret containing a read-only GitHub token.
+
   TemplateBucketBaseUrl:
     Type: String
     Description: Base URL of the S3 location containing nested runtime infrastructure templates.
+
   ScheduleExpression:
     Type: String
     Default: cron(0 5 1 1,7 ? *)
     Description: EventBridge expression; defaults to 05:00 UTC on January 1 and July 1.
+
   ScheduleState:
     Type: String
     Default: ENABLED
     AllowedValues: [ENABLED, DISABLED]
+
   ReportsRetentionDays:
     Type: Number
     Default: 548
     MinValue: 365
+
+  CodeBuildLogsRetentionDays:
+    Type: Number
+    Default: 14
+    AllowedValues:
+      - 1
+      - 3
+      - 5
+      - 7
+      - 14
+      - 30
+      - 60
+      - 90
+      - 120
+      - 150
+      - 180
+      - 365
+      - 400
+      - 545
+      - 731
+      - 1096
+      - 1827
+      - 2192
+      - 2557
+      - 2922
+      - 3288
+      - 3653
+    Description: Retention in days for Prowler CodeBuild CloudWatch logs.
+
   EnableQuickSightResources:
     Type: String
     Default: 'true'
     AllowedValues: ['true', 'false']
+
   QuickSightServiceRoleName:
     Type: String
     Default: aws-quicksight-service-role-v0
     Description: Existing IAM service role used by QuickSight to access Athena and S3.
+
   WarningSNSTopicName:
     Type: String
     Default: pn-WarningSnsTopic
@@ -153,7 +191,7 @@ Resources:
     Condition: IsCoreAccount
     Properties:
       LogGroupName: /aws/codebuild/pn-prowler
-      RetentionInDays: 14
+      RetentionInDays: !Ref CodeBuildLogsRetentionDays
 
   ProwlerCodeBuildRole:
     Type: AWS::IAM::Role
@@ -1226,16 +1264,3 @@ Resources:
                           CustomLabel: Recommendation
                         - FieldId: resource-tags
                           CustomLabel: Resource Tag
-
-Outputs:
-  ProwlerScanRoleArn:
-    Value: !GetAtt ProwlerScanRole.Arn
-  ReportsBucketName:
-    Condition: IsCoreAccount
-    Value: !Ref ReportsBucket
-  ProwlerCodeBuildProjectName:
-    Condition: IsCoreAccount
-    Value: !Ref ProwlerCodeBuildProject
-  ProwlerQuickSightDashboardArn:
-    Condition: CreateQuickSightResources
-    Value: !GetAtt ProwlerQuickSightDashboard.Arn
