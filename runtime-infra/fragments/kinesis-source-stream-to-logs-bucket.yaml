@@ -316,7 +316,7 @@ Resources:
             Ref: PreprocessingDeliveryStreamLogGroupS3Destination
 
         Prefix:
-          !Sub '${PreprocessingS3RootPrefix}/!{partitionKeyFromLambda:PROCESSING_LAYER}/TABLE_NAME=!{partitionKeyFromQuery:TABLE_NAME}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
+          !Sub '${PreprocessingS3RootPrefix}/!{partitionKeyFromLambda:PROCESSING_LAYER}/TABLE_NAME_!{partitionKeyFromQuery:TABLE_NAME}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
 
         ErrorOutputPrefix:
           !Sub 'errors/${PreprocessingS3RootPrefix}/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
