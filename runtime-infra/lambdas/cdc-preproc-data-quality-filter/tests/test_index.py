@@ -141,8 +141,8 @@ def test_lambda_handler_ok_flow_uses_dq_result_and_filters(monkeypatch):
     assert index.decode_payload(record["data"]) == {**payload, "filtered": True}
 
 
-# Verify that a record routed to quarantine is logged at ERROR level, since the
-# quarantine CloudWatch alarm's metric filter matches on the ERROR log level.
+# Verify that a record routed to quarantine is logged at WARNING level, since the
+# quarantine CloudWatch alarm's metric filter matches on the WARNING log level.
 # setup_logger installs its own stdout handler, bypassing caplog, so we assert
 # against captured stdout instead.
 def test_lambda_handler_quarantine_logs_at_error_level(monkeypatch, capsys):
@@ -158,11 +158,11 @@ def test_lambda_handler_quarantine_logs_at_error_level(monkeypatch, capsys):
     assert record["metadata"]["partitionKeys"]["PROCESSING_LAYER"] == "quarantine"
 
     log_lines = capsys.readouterr().out.splitlines()
-    # keep only the ERROR-level line(s) emitted for this record.
-    error_lines = [line for line in log_lines if " ERROR " in line]
-    # exactly one ERROR line must be emitted, the one raising the alarm.
-    assert len(error_lines) == 1
-    assert "Record routed to quarantine" in error_lines[0]
+    # keep only the WARNING-level line(s) emitted for this record.
+    warning_lines = [line for line in log_lines if " WARNING " in line]
+    # exactly one WARNING line must be emitted, the one raising the alarm.
+    assert len(warning_lines) == 1
+    assert "Record routed to quarantine" in warning_lines[0]
 
 
 # Verify that an unsupported processing layer returned by DQ results in ProcessingFailed.
