@@ -141,11 +141,11 @@ def test_lambda_handler_ok_flow_uses_dq_result_and_filters(monkeypatch):
     assert index.decode_payload(record["data"]) == {**payload, "filtered": True}
 
 
-# Verify that a record routed to quarantine is logged at WARNING level, since the
-# quarantine CloudWatch alarm's metric filter matches on the WARNING log level.
+# Verify that a record routed to quarantine is logged at WARNING level, so it does not
+# match the lambda-alarms metric filter (which only matches ERROR-level lines).
 # setup_logger installs its own stdout handler, bypassing caplog, so we assert
 # against captured stdout instead.
-def test_lambda_handler_quarantine_logs_at_error_level(monkeypatch, capsys):
+def test_lambda_handler_quarantine_logs_at_warning_level(monkeypatch, capsys):
     _stub_pipeline(monkeypatch, table_config={"filters": []}, processing_layer="quarantine")
 
     payload = {"tableName": "some-table", "dynamodb": {}}
