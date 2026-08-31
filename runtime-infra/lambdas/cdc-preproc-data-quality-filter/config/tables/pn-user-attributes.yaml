@@ -20,6 +20,19 @@ exclusions:
       - "VA#"
       - "VC#"
 
+  - name: excluded_invalid_consents
+    type: conditional
+    when:
+      field: pk
+      operator: starts_with
+      value: "CO#"
+    rules:
+      - type: not_starts_with_any
+        field: sk
+        values:
+          - "TOS#"
+          - "DATAPRIVACY#"
+
 checks:
   - name: check_required_fields
     description: User Attribute technical fields must not be null
@@ -121,21 +134,6 @@ checks:
         fields:
           - accepted
     errorCode: DQ_ACCEPTED_NOT_NULL
-
-  - name: check_invalid_consents
-    description: Consents must be TOS or DATAPRIVACY
-    type: conditional
-    when:
-      field: pk
-      operator: starts_with
-      value: "CO#"
-    rules:
-      - type: starts_with_any
-        field: sk
-        values:
-          - "TOS#"
-          - "DATAPRIVACY#"
-    errorCode: DQ_INVALID_CONSENTS
 
 filters:
   - name: remove_addresshash
