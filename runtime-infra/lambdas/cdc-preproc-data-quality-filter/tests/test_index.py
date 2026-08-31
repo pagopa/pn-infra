@@ -160,7 +160,7 @@ def test_lambda_handler_quarantine_logs_at_warning_level(monkeypatch, capsys):
     log_lines = capsys.readouterr().out.splitlines()
     # keep only the WARNING-level line(s) emitted for this record.
     warning_lines = [line for line in log_lines if " WARNING " in line]
-    # exactly one WARNING line must be emitted, the one raising the alarm.
+    # exactly one WARNING line must be emitted.
     assert len(warning_lines) == 1
     assert "Record routed to quarantine" in warning_lines[0]
 
