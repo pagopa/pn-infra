@@ -41,6 +41,15 @@ def _check_starts_with_any(image, rule):
         and value.startswith(tuple(prefixes))
     )
 
+def _check_not_starts_with_any(image, rule):
+    value = get_value(image, rule.get("field"))
+    prefixes = rule.get("values", [])
+
+    return (
+        isinstance(value, str)
+        and bool(prefixes)
+        and not value.startswith(tuple(prefixes))
+    )
 
 def _check_allowed_values(image, rule):
     value = get_value(image, rule.get("field"))
@@ -64,6 +73,7 @@ CHECK_HANDLERS = {
     "not_null": _check_not_null,
     "starts_with": _check_starts_with,
     "starts_with_any": _check_starts_with_any,
+    "not_starts_with_any": _check_not_starts_with_any,
     "allowed_values": _check_allowed_values,
     "matches_regex": _check_matches_regex,
 }
@@ -96,9 +106,26 @@ def matches_condition(image, condition):
     return execute_rule(image, condition_rule)
 
 
+def execute_exclusion(image, exclusion):
+    condition = exclusion.get("when")
+
+    if condition and not matches_condition(image, condition):
+        return False
+
+    nested_rules = exclusion.get("rules")
+
+    if nested_rules:
+        return all(
+            execute_rule(image, nested_rule)
+            for nested_rule in nested_rules
+        )
+
+    return execute_rule(image, exclusion)
+
+
 def is_excluded(image, exclusions):
     for exclusion in exclusions:
-        if execute_rule(image, exclusion):
+        if execute_exclusion(image, exclusion):
             return True, exclusion.get("name")
 
     return False, None
