@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from athena import build_query
-from manifest import actor_from, merge_records
+from manifest import actor_from, load_manifest, merge_records
 
 
 NOW = datetime(2026, 8, 27, 10, 30, tzinfo=timezone.utc)
@@ -69,3 +71,28 @@ def test_actor_keeps_role_but_drops_sso_session_identity():
     )
 
     assert actor == {"type": "human", "role": "Developer"}
+
+
+def test_missing_manifest_is_an_empty_initial_state():
+    class MissingManifestS3:
+        class exceptions:
+            class NoSuchKey(Exception):
+                pass
+
+        def get_object(self, **kwargs):
+            raise self.exceptions.NoSuchKey()
+
+    assert load_manifest(MissingManifestS3(), "bucket", "manifest.json", 1024) == (None, None)
+
+
+def test_unexpected_manifest_read_error_is_not_hidden():
+    class BrokenS3:
+        class exceptions:
+            class NoSuchKey(Exception):
+                pass
+
+        def get_object(self, **kwargs):
+            raise RuntimeError("S3 unavailable")
+
+    with pytest.raises(RuntimeError, match="S3 unavailable"):
+        load_manifest(BrokenS3(), "bucket", "manifest.json", 1024)

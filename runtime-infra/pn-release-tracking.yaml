@@ -1,6 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: |
-  Release Tracking - Athena Glue Table, QuickSight DataSets and dashboard publisher
+Description: Release tracking resources
 
 Parameters:
   CdArtifactBucketName:
@@ -74,61 +73,61 @@ Parameters:
     Description: Base name for PN resources
   EnvironmentType:
     Type: String
-    Default: ''
     AllowedValues:
-      - ''
       - dev
       - test
       - uat
       - hotfix
       - prod
-    Description: Environment represented by this release tracking stack
+    Description: Deployment environment
   TemplateBucketBaseUrl:
     Type: String
-    Default: ''
-    Description: Base URL for shared CloudFormation fragments
+    Description: CloudFormation template base URL
   LambdasBucketName:
     Type: String
-    Default: unused
-    Description: S3 bucket containing Lambda deployment packages
+    Description: Lambda artifacts bucket name
   LambdasBasePath:
     Type: String
-    Default: ''
-    Description: S3 prefix containing Lambda deployment packages
+    Description: Lambda artifacts base path
   WarningSNSTopicArn:
     Type: String
-    Default: ''
-    Description: Existing warning topic used by standard Lambda alarms
+    Description: Warning SNS topic ARN
   LogRetention:
     Type: Number
-    Description: Log group retention in days propagated by pn-infra
+    Description: Log retention in days
   EnableReleaseDashboardPublisher:
     Type: String
     Default: 'false'
     AllowedValues:
       - 'true'
       - 'false'
-    Description: Enable the incremental release dashboard publisher
+    Description: Enables the release dashboard publisher
   ReleaseDashboardBucketName:
     Type: String
     Default: ''
-    Description: Central pn-cicd bucket receiving the environment manifest
+    Description: Release dashboard bucket name
   ReleaseDashboardPublisherScheduleExpression:
     Type: String
     Default: rate(30 minutes)
-    Description: EventBridge schedule for incremental manifest publication
+    Description: Publisher schedule
   ReleaseDashboardRetentionDays:
     Type: Number
     Default: 180
     MinValue: 1
     MaxValue: 366
-    Description: Rolling manifest retention window
+    Description: Manifest retention in days
   ReleaseDashboardOverlapHours:
     Type: Number
     Default: 24
     MinValue: 1
     MaxValue: 168
-    Description: Overlap applied to incremental Athena queries
+    Description: Athena query overlap in hours
+  ReleaseDashboardAthenaQueryTimeoutSeconds:
+    Type: Number
+    Default: 600
+    MinValue: 1
+    MaxValue: 840
+    Description: Athena query timeout in seconds
 
 Rules:
   ReleaseDashboardPublisherConfigurationRequired:
@@ -136,16 +135,6 @@ Rules:
     Assertions:
       - Assert: !Not [!Equals [!Ref ReleaseDashboardBucketName, '']]
         AssertDescription: ReleaseDashboardBucketName is required when the publisher is enabled
-      - Assert: !Not [!Equals [!Ref EnvironmentType, '']]
-        AssertDescription: EnvironmentType is required when the publisher is enabled
-      - Assert: !Not [!Equals [!Ref TemplateBucketBaseUrl, '']]
-        AssertDescription: TemplateBucketBaseUrl is required when the publisher is enabled
-      - Assert: !Not [!Equals [!Ref LambdasBucketName, unused]]
-        AssertDescription: LambdasBucketName is required when the publisher is enabled
-      - Assert: !Not [!Equals [!Ref LambdasBasePath, '']]
-        AssertDescription: LambdasBasePath is required when the publisher is enabled
-      - Assert: !Not [!Equals [!Ref WarningSNSTopicArn, '']]
-        AssertDescription: WarningSNSTopicArn is required when the publisher is enabled
 
 Conditions:
   CreateQuickSightResources: !Equals [!Ref EnableQuickSightResources, 'true']
@@ -856,7 +845,7 @@ Resources:
     DependsOn: ReleaseEventsUnionViewTable
     Properties:
       FunctionName: !GetAtt ReleaseDashboardPublisherLogGroup.Outputs.LogGroupNameNoPrefix
-      Description: Incrementally publishes release tracking events for the central dashboard
+      Description: Publishes release dashboard data
       Runtime: python3.12
       Handler: index.handler
       MemorySize: 256
@@ -875,8 +864,7 @@ Resources:
           MANIFEST_KEY: !Sub v1/environments/${EnvironmentType}/manifest.json
           RETENTION_DAYS: !Ref ReleaseDashboardRetentionDays
           OVERLAP_HOURS: !Ref ReleaseDashboardOverlapHours
-          QUERY_TIMEOUT_SECONDS: '600'
-          MAX_MANIFEST_BYTES: '5000000'
+          QUERY_TIMEOUT_SECONDS: !Ref ReleaseDashboardAthenaQueryTimeoutSeconds
       LoggingConfig:
         LogGroup: !GetAtt ReleaseDashboardPublisherLogGroup.Outputs.LogGroupName
 
@@ -894,7 +882,7 @@ Resources:
     Condition: CreateReleaseDashboardPublisher
     Properties:
       Name: !Sub ${ProjectName}-release-dashboard-publisher-${EnvironmentType}
-      Description: Publishes the environment release dashboard manifest incrementally
+      Description: Publishes release dashboard data
       ScheduleExpression: !Ref ReleaseDashboardPublisherScheduleExpression
       State: ENABLED
       Targets:

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 
 SCHEMA_VERSION = 1
+MAX_MANIFEST_BYTES = 5_000_000
 
 
 def parse_timestamp(value):
@@ -132,12 +133,8 @@ def sanitize_record(record, environment):
 def load_manifest(s3, bucket, key, max_bytes):
     try:
         response = s3.get_object(Bucket=bucket, Key=key)
-    except Exception as error:
-        response = getattr(error, "response", {})
-        code = str(response.get("Error", {}).get("Code", ""))
-        if code in {"NoSuchKey", "404"}:
-            return None, None
-        raise
+    except s3.exceptions.NoSuchKey:
+        return None, None
 
     if response.get("ContentLength", 0) > max_bytes:
         raise ValueError("existing manifest exceeds size limit")
