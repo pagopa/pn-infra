@@ -1,0 +1,1243 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Scheduled Prowler scans for the core and confinfo accounts, with reports exposed in QuickSight.
+
+Parameters:
+  EnvironmentType:
+    Type: String
+    AllowedValues: [dev, hotfix]
+
+  AccountType:
+    Type: String
+    AllowedValues: [core, confinfo]
+
+  PnCoreAwsAccountId:
+    Type: String
+    Default: ''
+
+  ConfidentialInfoAccountId:
+    Type: String
+    Default: ''
+
+  ProwlerImageUri:
+    Type: String
+    Description: Official Prowler image from AWS Public ECR pinned by immutable digest.
+
+  ProwlerRegions:
+    Type: String
+    Default: eu-south-1 eu-central-1
+    Description: Space-separated AWS regions scanned by Prowler.
+
+  PnConfigurationCommitId:
+    Type: String
+    Description: Git commit containing the Prowler mutelist in the private pn-configuration repository.
+
+  GithubTokenName:
+    Type: String
+    Description: Secrets Manager secret containing a read-only GitHub token.
+
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: Base URL of the S3 location containing nested runtime infrastructure templates.
+
+  ScheduleExpression:
+    Type: String
+    Default: cron(0 5 1 1,7 ? *)
+    Description: EventBridge expression; defaults to 05:00 UTC on January 1 and July 1.
+
+  ScheduleState:
+    Type: String
+    Default: ENABLED
+    AllowedValues: [ENABLED, DISABLED]
+
+  ReportsRetentionDays:
+    Type: Number
+    Default: 548
+    MinValue: 365
+
+  CodeBuildLogsRetentionDays:
+    Type: Number
+    Default: 14
+    Description: Retention in days for Prowler CodeBuild CloudWatch logs.
+
+  EnableQuickSightResources:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+
+  QuickSightServiceRoleName:
+    Type: String
+    Default: aws-quicksight-service-role-v0
+    Description: Existing IAM service role used by QuickSight to access Athena and S3.
+
+  WarningSNSTopicName:
+    Type: String
+    Default: pn-WarningSnsTopic
+    Description: SNS topic name for routed warning and report events.
+
+Rules:
+  RequirePeerAccountId:
+    Assertions:
+      - Assert: !Or
+          - !And
+            - !Equals [!Ref AccountType, core]
+            - !Not [!Equals [!Ref ConfidentialInfoAccountId, '']]
+          - !And
+            - !Equals [!Ref AccountType, confinfo]
+            - !Not [!Equals [!Ref PnCoreAwsAccountId, '']]
+        AssertDescription: Core requires ConfidentialInfoAccountId; confinfo requires PnCoreAwsAccountId.
+
+Conditions:
+  IsCoreAccount: !Equals [!Ref AccountType, core]
+  CreateQuickSightResources: !And
+    - !Condition IsCoreAccount
+    - !Equals [!Ref EnableQuickSightResources, 'true']
+
+Resources:
+  ProwlerScanRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub pn-prowler-scan-${EnvironmentType}
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !If
+                - IsCoreAccount
+                - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
+                - !Sub arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root
+            Action: sts:AssumeRole
+            Condition:
+              ArnEquals:
+                aws:PrincipalArn: !If
+                  - IsCoreAccount
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/pn-prowler-codebuild-${EnvironmentType}
+                  - !Sub arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:role/pn-prowler-codebuild-${EnvironmentType}
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/SecurityAudit
+        - arn:aws:iam::aws:policy/job-function/ViewOnlyAccess
+
+  ReportsBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsCoreAccount
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub pn-prowler-reports-${AWS::Region}-${AWS::AccountId}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: RetainAuditHistory
+            Status: Enabled
+            ExpirationInDays: !Ref ReportsRetentionDays
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+
+  ReportsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: IsCoreAccount
+    Properties:
+      Bucket: !Ref ReportsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt ReportsBucket.Arn
+              - !Sub ${ReportsBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  ProwlerCodeBuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: IsCoreAccount
+    Properties:
+      LogGroupName: /aws/codebuild/pn-prowler
+      RetentionInDays: !Ref CodeBuildLogsRetentionDays
+
+  ProwlerCodeBuildRole:
+    Type: AWS::IAM::Role
+    Condition: IsCoreAccount
+    Properties:
+      RoleName: !Sub pn-prowler-codebuild-${EnvironmentType}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RunProwler
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sts:AssumeRole
+                Resource:
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/pn-prowler-scan-${EnvironmentType}
+                  - !Sub arn:${AWS::Partition}:iam::${ConfidentialInfoAccountId}:role/pn-prowler-scan-${EnvironmentType}
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                Resource: !GetAtt ReportsBucket.Arn
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub ${ReportsBucket.Arn}/*
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GithubTokenName}-*
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !Sub arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/pn-prowler:*
+
+  ProwlerCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Condition: IsCoreAccount
+    Properties:
+      Name: !Sub pn-prowler-${EnvironmentType}
+      Description: !Sub Prowler scan of the ${EnvironmentType} core and confinfo accounts
+      ServiceRole: !GetAtt ProwlerCodeBuildRole.Arn
+      ConcurrentBuildLimit: 1
+      TimeoutInMinutes: 120
+      Artifacts:
+        Type: NO_ARTIFACTS
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Ref ProwlerCodeBuildLogGroup
+      Source:
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              commands:
+                - docker pull "$PROWLER_IMAGE_URI"
+                - docker image inspect "$PROWLER_IMAGE_URI" --format '{{json .RepoDigests}}'
+            build:
+              commands:
+                - RUN_DATE=$(date -u +%Y/%m/%d/%H%M%S)
+                - |
+                  set -eu
+                  GITHUB_TOKEN=$(aws secretsmanager get-secret-value \
+                    --secret-id "$GITHUB_TOKEN_SECRET_NAME" \
+                    --query SecretString \
+                    --output text)
+                  MUTELIST_PATH="${ENVIRONMENT_TYPE}/_conf/core/prowler-mutelist.yaml"
+                  curl --fail-with-body --silent --show-error \
+                    -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                    -H "Accept: application/vnd.github.raw+json" \
+                    -H "X-GitHub-Api-Version: 2022-11-28" \
+                    "https://api.github.com/repos/pagopa/pn-configuration/contents/${MUTELIST_PATH}?ref=${PN_CONFIGURATION_COMMIT_ID}" \
+                    --output /tmp/prowler-mutelist.yaml
+                  unset GITHUB_TOKEN
+                  test -s /tmp/prowler-mutelist.yaml
+                  MUTELIST_SHA256=$(sha256sum /tmp/prowler-mutelist.yaml | cut -d ' ' -f 1)
+                - |
+                  cleanup_credentials() {
+                    rm -f /tmp/prowler-*.env /tmp/prowler-*-credentials.json
+                  }
+                  trap cleanup_credentials EXIT
+                  for TARGET in core confinfo; do
+                    if [ "$TARGET" = "core" ]; then
+                      ACCOUNT_ID="$CORE_ACCOUNT_ID"
+                    else
+                      ACCOUNT_ID="$CONFINFO_ACCOUNT_ID"
+                    fi
+                    CREDENTIALS_FILE="/tmp/prowler-${TARGET}.env"
+                    umask 077
+                    aws sts assume-role \
+                      --role-arn "arn:${AWS_PARTITION}:iam::${ACCOUNT_ID}:role/pn-prowler-scan-${ENVIRONMENT_TYPE}" \
+                      --role-session-name "pn-prowler-${ENVIRONMENT_TYPE}-${TARGET}" \
+                      --duration-seconds 3600 \
+                      --output json > "/tmp/prowler-${TARGET}-credentials.json"
+                    jq -r \
+                      --arg region "$AWS_REGION" \
+                      '"AWS_ACCESS_KEY_ID=" + .Credentials.AccessKeyId,
+                       "AWS_SECRET_ACCESS_KEY=" + .Credentials.SecretAccessKey,
+                       "AWS_SESSION_TOKEN=" + .Credentials.SessionToken,
+                       "AWS_DEFAULT_REGION=" + $region' \
+                      "/tmp/prowler-${TARGET}-credentials.json" > "$CREDENTIALS_FILE"
+                    rm -f "/tmp/prowler-${TARGET}-credentials.json"
+                    mkdir -p "output/${TARGET}"
+                    chmod 0777 "output/${TARGET}"
+                    docker run --rm \
+                      --env-file "$CREDENTIALS_FILE" \
+                      --volume "$CODEBUILD_SRC_DIR/output/${TARGET}:/home/prowler/output" \
+                      --volume "/tmp/prowler-mutelist.yaml:/home/prowler/prowler-mutelist.yaml:ro" \
+                      "$PROWLER_IMAGE_URI" aws \
+                      --region $PROWLER_REGIONS \
+                      --output-formats csv json-ocsf html \
+                      --output-directory /home/prowler/output \
+                      --output-filename "prowler-${TARGET}" \
+                      --mutelist-file /home/prowler/prowler-mutelist.yaml \
+                      --ignore-exit-code-3 \
+                      --no-color
+                    rm -f "$CREDENTIALS_FILE"
+                  done
+                  trap - EXIT
+                - |
+                  CORE_CSV="output/core/prowler-core.csv"
+                  CONFINFO_CSV="output/confinfo/prowler-confinfo.csv"
+                  CORE_HTML="output/core/prowler-core.html"
+                  CONFINFO_HTML="output/confinfo/prowler-confinfo.html"
+                  for ARTIFACT in "$CORE_CSV" "$CONFINFO_CSV" "$CORE_HTML" "$CONFINFO_HTML"; do
+                    test -s "$ARTIFACT"
+                  done
+                  test "$(head -n 1 "$CORE_CSV")" = "$(head -n 1 "$CONFINFO_CSV")"
+                  mkdir -p output/combined
+                  {
+                    head -n 1 "$CORE_CSV"
+                    tail -n +2 "$CORE_CSV"
+                    tail -n +2 "$CONFINFO_CSV"
+                  } > output/combined/prowler.csv
+                - |
+                  for TARGET in core confinfo; do
+                    aws s3 cp "output/${TARGET}" \
+                      "s3://${REPORTS_BUCKET}/reports/${ENVIRONMENT_TYPE}/${RUN_DATE}/${TARGET}/" \
+                      --recursive \
+                      --exclude '*.html'
+                    HTML_KEY="reports/${ENVIRONMENT_TYPE}/${RUN_DATE}/${TARGET}/prowler-${TARGET}.html"
+                    aws s3 cp "output/${TARGET}/prowler-${TARGET}.html" \
+                      "s3://${REPORTS_BUCKET}/${HTML_KEY}" \
+                      --content-type text/html \
+                      --content-disposition "attachment; filename=\"prowler-${TARGET}.html\""
+                  done
+                  FINDINGS_KEY="findings/${ENVIRONMENT_TYPE}/${RUN_DATE}/prowler.csv"
+                  aws s3 cp output/combined/prowler.csv \
+                    "s3://${REPORTS_BUCKET}/${FINDINGS_KEY}"
+                  MANIFEST=$(jq -n -c \
+                    --arg run_date "$RUN_DATE" \
+                    --arg prowler_image_uri "$PROWLER_IMAGE_URI" \
+                    --arg pn_configuration_commit_id "$PN_CONFIGURATION_COMMIT_ID" \
+                    --arg mutelist_path "$MUTELIST_PATH" \
+                    --arg mutelist_sha256 "$MUTELIST_SHA256" \
+                    --arg findings_key "$FINDINGS_KEY" \
+                    '{
+                      status: "COMPLETED",
+                      runDate: $run_date,
+                      prowlerImageUri: $prowler_image_uri,
+                      pnConfigurationCommitId: $pn_configuration_commit_id,
+                      mutelistPath: $mutelist_path,
+                      mutelistSha256: $mutelist_sha256,
+                      accounts: ["core", "confinfo"],
+                      findingsKey: $findings_key
+                    }')
+                  printf '%s\n' "$MANIFEST" | aws s3 cp - \
+                    "s3://${REPORTS_BUCKET}/reports/${ENVIRONMENT_TYPE}/${RUN_DATE}/manifest.json" \
+                    --content-type application/json
+                - |
+                  REPORT_EVENT_ID="${CODEBUILD_BUILD_ID:-pn-prowler-${RUN_DATE}}"
+                  REPORT_OCCURRED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+                  REPORT_MESSAGE=$(jq -n -c \
+                    --arg event_id "$REPORT_EVENT_ID" \
+                    --arg occurred_at "$REPORT_OCCURRED_AT" \
+                    --arg environment "$ENVIRONMENT_TYPE" \
+                    '{
+                      schemaVersion: "1.0",
+                      eventId: $event_id,
+                      eventType: "report",
+                      producer: "pn-prowler",
+                      eventName: "prowler-scan-completed",
+                      occurredAt: $occurred_at,
+                      severity: "info",
+                      environment: $environment,
+                      title: "Prowler scan completed",
+                      data: {
+                        metrics: {"Account analizzati": 2}
+                      }
+                    }')
+                  aws sns publish \
+                    --topic-arn "$WARNING_SNS_TOPIC_ARN" \
+                    --subject "Prowler scan completed - ${ENVIRONMENT_TYPE}" \
+                    --message "$REPORT_MESSAGE"
+      Environment:
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Type: ARM_CONTAINER
+        Image: aws/codebuild/amazonlinux-aarch64-standard:3.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: PROWLER_IMAGE_URI
+            Type: PLAINTEXT
+            Value: !Ref ProwlerImageUri
+          - Name: PROWLER_REGIONS
+            Type: PLAINTEXT
+            Value: !Ref ProwlerRegions
+          - Name: PN_CONFIGURATION_COMMIT_ID
+            Type: PLAINTEXT
+            Value: !Ref PnConfigurationCommitId
+          - Name: GITHUB_TOKEN_SECRET_NAME
+            Type: PLAINTEXT
+            Value: !Ref GithubTokenName
+          - Name: ENVIRONMENT_TYPE
+            Type: PLAINTEXT
+            Value: !Ref EnvironmentType
+          - Name: CORE_ACCOUNT_ID
+            Type: PLAINTEXT
+            Value: !Ref AWS::AccountId
+          - Name: CONFINFO_ACCOUNT_ID
+            Type: PLAINTEXT
+            Value: !Ref ConfidentialInfoAccountId
+          - Name: REPORTS_BUCKET
+            Type: PLAINTEXT
+            Value: !Ref ReportsBucket
+          - Name: AWS_PARTITION
+            Type: PLAINTEXT
+            Value: !Ref AWS::Partition
+          - Name: WARNING_SNS_TOPIC_ARN
+            Type: PLAINTEXT
+            Value: !Sub arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}
+
+  ProwlerCodeBuildAlarms:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/codebuild-alarms.yaml
+      Parameters:
+        CodeBuildProjectName: !Ref ProwlerCodeBuildProject
+        AlarmSNSTopicArn: !Sub arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}
+
+  ProwlerScheduleRole:
+    Type: AWS::IAM::Role
+    Condition: IsCoreAccount
+    Properties:
+      RoleName: !Sub pn-prowler-scheduler-${EnvironmentType}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: StartProwlerBuild
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: codebuild:StartBuild
+                Resource: !GetAtt ProwlerCodeBuildProject.Arn
+
+  ProwlerSchedule:
+    Type: AWS::Events::Rule
+    Condition: IsCoreAccount
+    Properties:
+      Name: !Sub pn-prowler-${EnvironmentType}
+      Description: Starts the scheduled core and confinfo Prowler scan
+      ScheduleExpression: !Ref ScheduleExpression
+      State: !Ref ScheduleState
+      Targets:
+        - Arn: !GetAtt ProwlerCodeBuildProject.Arn
+          Id: ProwlerCodeBuild
+          RoleArn: !GetAtt ProwlerScheduleRole.Arn
+
+  ProwlerDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsCoreAccount
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub pn_prowler_${EnvironmentType}
+        Description: Prowler findings from the core and confinfo accounts
+
+  ProwlerFindingsTable:
+    Type: AWS::Glue::Table
+    Condition: IsCoreAccount
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref ProwlerDatabase
+      TableInput:
+        Name: findings
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          classification: csv
+          skip.header.line.count: '1'
+        StorageDescriptor:
+          Location: !Sub s3://${ReportsBucket}/findings/
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          SerdeInfo:
+            SerializationLibrary: org.apache.hadoop.hive.serde2.OpenCSVSerde
+            Parameters:
+              separatorChar: ';'
+              quoteChar: '"'
+              escapeChar: '\\'
+          Columns:
+            - {Name: auth_method, Type: string}
+            - {Name: finding_timestamp, Type: string}
+            - {Name: account_uid, Type: string}
+            - {Name: account_name, Type: string}
+            - {Name: account_email, Type: string}
+            - {Name: account_organization_uid, Type: string}
+            - {Name: account_organization_name, Type: string}
+            - {Name: account_tags, Type: string}
+            - {Name: finding_uid, Type: string}
+            - {Name: provider, Type: string}
+            - {Name: check_id, Type: string}
+            - {Name: check_title, Type: string}
+            - {Name: check_type, Type: string}
+            - {Name: status, Type: string}
+            - {Name: status_extended, Type: string}
+            - {Name: muted, Type: string}
+            - {Name: service_name, Type: string}
+            - {Name: subservice_name, Type: string}
+            - {Name: severity, Type: string}
+            - {Name: resource_type, Type: string}
+            - {Name: resource_uid, Type: string}
+            - {Name: resource_name, Type: string}
+            - {Name: resource_details, Type: string}
+            - {Name: resource_tags, Type: string}
+            - {Name: partition_name, Type: string}
+            - {Name: region, Type: string}
+            - {Name: description, Type: string}
+            - {Name: risk, Type: string}
+            - {Name: related_url, Type: string}
+            - {Name: remediation_recommendation_text, Type: string}
+            - {Name: remediation_recommendation_url, Type: string}
+            - {Name: remediation_code_nativeiac, Type: string}
+            - {Name: remediation_code_terraform, Type: string}
+            - {Name: remediation_code_cli, Type: string}
+            - {Name: remediation_code_other, Type: string}
+            - {Name: compliance, Type: string}
+            - {Name: categories, Type: string}
+            - {Name: depends_on, Type: string}
+            - {Name: related_to, Type: string}
+            - {Name: notes, Type: string}
+            - {Name: prowler_version, Type: string}
+            - {Name: additional_urls, Type: string}
+            - {Name: account_ou_uid, Type: string}
+            - {Name: account_ou_name, Type: string}
+
+  AthenaResultsBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsCoreAccount
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub pn-prowler-athena-${AWS::Region}-${AWS::AccountId}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireAthenaQueryResults
+            Status: Enabled
+            ExpirationInDays: 90
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  AthenaResultsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: IsCoreAccount
+    Properties:
+      Bucket: !Ref AthenaResultsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt AthenaResultsBucket.Arn
+              - !Sub ${AthenaResultsBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  ProwlerAthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Condition: IsCoreAccount
+    Properties:
+      Name: !Sub pn-prowler-${EnvironmentType}
+      State: ENABLED
+      WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: true
+        PublishCloudWatchMetricsEnabled: true
+        ResultConfiguration:
+          OutputLocation: !Sub s3://${AthenaResultsBucket}/results/
+
+  QuickSightServiceRolePolicy:
+    Type: AWS::IAM::RolePolicy
+    Condition: CreateQuickSightResources
+    Properties:
+      RoleName: !Ref QuickSightServiceRoleName
+      PolicyName: !Sub ProwlerReportsAccess-${EnvironmentType}
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: s3:GetBucketLocation
+            Resource:
+              - !GetAtt ReportsBucket.Arn
+              - !GetAtt AthenaResultsBucket.Arn
+          - Effect: Allow
+            Action: s3:ListBucket
+            Resource: !GetAtt ReportsBucket.Arn
+            Condition:
+              StringLike:
+                s3:prefix: findings/*
+          - Effect: Allow
+            Action: s3:GetObject
+            Resource: !Sub ${ReportsBucket.Arn}/findings/*
+          - Effect: Allow
+            Action: s3:ListBucket
+            Resource: !GetAtt AthenaResultsBucket.Arn
+            Condition:
+              StringLike:
+                s3:prefix: results/*
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:AbortMultipartUpload
+            Resource: !Sub ${AthenaResultsBucket.Arn}/results/*
+
+  ProwlerQuickSightDataSource:
+    Type: AWS::QuickSight::DataSource
+    Condition: CreateQuickSightResources
+    DependsOn: QuickSightServiceRolePolicy
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DataSourceId: !Sub pn-prowler-${EnvironmentType}
+      Name: !Sub Prowler ${EnvironmentType}
+      Type: ATHENA
+      DataSourceParameters:
+        AthenaParameters:
+          WorkGroup: !Ref ProwlerAthenaWorkGroup
+
+  ProwlerQuickSightDataSet:
+    Type: AWS::QuickSight::DataSet
+    Condition: CreateQuickSightResources
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DataSetId: !Sub pn-prowler-findings-${EnvironmentType}
+      Name: !Sub Prowler findings ${EnvironmentType}
+      ImportMode: DIRECT_QUERY
+      PhysicalTableMap:
+        FindingsSql:
+          CustomSql:
+            DataSourceArn: !GetAtt ProwlerQuickSightDataSource.Arn
+            Name: ProwlerFindings
+            SqlQuery: !Sub |
+              SELECT
+                try(from_iso8601_timestamp(finding_timestamp)) AS finding_time,
+                account_uid,
+                CASE
+                  WHEN account_uid = '${AWS::AccountId}' THEN 'core'
+                  WHEN account_uid = '${ConfidentialInfoAccountId}' THEN 'confinfo'
+                  ELSE account_uid
+                END AS account_label,
+                check_id,
+                check_title,
+                status,
+                status_extended,
+                CASE
+                  WHEN lower(trim(muted)) = 'true' THEN 'MUTED'
+                  ELSE 'NOT MUTED'
+                END AS muted_status,
+                CASE
+                  WHEN lower(trim(muted)) = 'true' THEN 'MUTED'
+                  ELSE status
+                END AS display_status,
+                service_name,
+                severity,
+                resource_type,
+                resource_uid,
+                CASE
+                  WHEN lower(service_name) = 'ecs' THEN regexp_replace(resource_uid, ':[0-9]+$', '')
+                  ELSE resource_uid
+                END AS grouped_resource_uid,
+                resource_name,
+                resource_tags,
+                COALESCE(
+                  NULLIF(trim(regexp_extract(resource_tags, '(?i)(?:^| [|] )Microservice=([^|]*)', 1)), ''),
+                  'no tag'
+                ) AS microservice_tag,
+                region,
+                description,
+                risk,
+                remediation_recommendation_text,
+                remediation_recommendation_url,
+                compliance,
+                prowler_version
+              FROM "pn_prowler_${EnvironmentType}"."findings"
+              WHERE provider = 'aws'
+                AND "$path" = (
+                  SELECT max("$path")
+                  FROM "pn_prowler_${EnvironmentType}"."findings"
+                  WHERE provider = 'aws'
+                    AND "$path" LIKE '%/findings/${EnvironmentType}/%/prowler.csv'
+                )
+            Columns:
+              - {Name: finding_time, Type: DATETIME}
+              - {Name: account_uid, Type: STRING}
+              - {Name: account_label, Type: STRING}
+              - {Name: check_id, Type: STRING}
+              - {Name: check_title, Type: STRING}
+              - {Name: status, Type: STRING}
+              - {Name: status_extended, Type: STRING}
+              - {Name: muted_status, Type: STRING}
+              - {Name: display_status, Type: STRING}
+              - {Name: service_name, Type: STRING}
+              - {Name: severity, Type: STRING}
+              - {Name: resource_type, Type: STRING}
+              - {Name: resource_uid, Type: STRING}
+              - {Name: grouped_resource_uid, Type: STRING}
+              - {Name: resource_name, Type: STRING}
+              - {Name: resource_tags, Type: STRING}
+              - {Name: microservice_tag, Type: STRING}
+              - {Name: region, Type: STRING}
+              - {Name: description, Type: STRING}
+              - {Name: risk, Type: STRING}
+              - {Name: remediation_recommendation_text, Type: STRING}
+              - {Name: remediation_recommendation_url, Type: STRING}
+              - {Name: compliance, Type: STRING}
+              - {Name: prowler_version, Type: STRING}
+      LogicalTableMap:
+        Findings:
+          Alias: Prowler findings
+          Source:
+            PhysicalTableId: FindingsSql
+
+  ProwlerQuickSightDashboard:
+    Type: AWS::QuickSight::Dashboard
+    Condition: CreateQuickSightResources
+    Properties:
+      AwsAccountId: !Ref AWS::AccountId
+      DashboardId: !Sub pn-prowler-${EnvironmentType}
+      Name: !Sub Prowler ${EnvironmentType}
+      Definition:
+        DataSetIdentifierDeclarations:
+          - Identifier: ProwlerFindings
+            DataSetArn: !GetAtt ProwlerQuickSightDataSet.Arn
+        FilterGroups:
+          - FilterGroupId: account-filter-group
+            CrossDataset: SINGLE_DATASET
+            Status: ENABLED
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: findings
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - total-findings
+                      - distinct-resources
+                      - findings-by-severity
+                      - findings-by-status
+                      - findings-by-service
+                      - findings-by-account
+                      - findings-table
+            Filters:
+              - CategoryFilter:
+                  FilterId: account-filter
+                  Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_label}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      SelectAllOptions: FILTER_ALL_VALUES
+                      NullOption: NON_NULLS_ONLY
+          - FilterGroupId: region-filter-group
+            CrossDataset: SINGLE_DATASET
+            Status: ENABLED
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: findings
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - total-findings
+                      - distinct-resources
+                      - findings-by-severity
+                      - findings-by-status
+                      - findings-by-service
+                      - findings-by-account
+                      - findings-table
+            Filters:
+              - CategoryFilter:
+                  FilterId: region-filter
+                  Column: {DataSetIdentifier: ProwlerFindings, ColumnName: region}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      SelectAllOptions: FILTER_ALL_VALUES
+                      NullOption: NON_NULLS_ONLY
+          - FilterGroupId: service-filter-group
+            CrossDataset: SINGLE_DATASET
+            Status: ENABLED
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: findings
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - total-findings
+                      - distinct-resources
+                      - findings-by-severity
+                      - findings-by-status
+                      - findings-by-service
+                      - findings-by-account
+                      - findings-table
+            Filters:
+              - CategoryFilter:
+                  FilterId: service-filter
+                  Column: {DataSetIdentifier: ProwlerFindings, ColumnName: service_name}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      SelectAllOptions: FILTER_ALL_VALUES
+                      NullOption: NON_NULLS_ONLY
+          - FilterGroupId: status-filter-group
+            CrossDataset: SINGLE_DATASET
+            Status: ENABLED
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: findings
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - total-findings
+                      - distinct-resources
+                      - findings-by-severity
+                      - findings-by-status
+                      - findings-by-service
+                      - findings-by-account
+                      - findings-table
+            Filters:
+              - CategoryFilter:
+                  FilterId: status-filter
+                  Column: {DataSetIdentifier: ProwlerFindings, ColumnName: status}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      CategoryValues:
+                        - FAIL
+                      NullOption: NON_NULLS_ONLY
+          - FilterGroupId: severity-filter-group
+            CrossDataset: SINGLE_DATASET
+            Status: ENABLED
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: findings
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - total-findings
+                      - distinct-resources
+                      - findings-by-severity
+                      - findings-by-status
+                      - findings-by-service
+                      - findings-by-account
+                      - findings-table
+            Filters:
+              - CategoryFilter:
+                  FilterId: severity-filter
+                  Column: {DataSetIdentifier: ProwlerFindings, ColumnName: severity}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      SelectAllOptions: FILTER_ALL_VALUES
+                      NullOption: NON_NULLS_ONLY
+          - FilterGroupId: muted-filter-group
+            CrossDataset: SINGLE_DATASET
+            Status: ENABLED
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: findings
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - total-findings
+                      - distinct-resources
+                      - findings-by-severity
+                      - findings-by-status
+                      - findings-by-service
+                      - findings-by-account
+                      - findings-table
+            Filters:
+              - CategoryFilter:
+                  FilterId: muted-filter
+                  Column: {DataSetIdentifier: ProwlerFindings, ColumnName: muted_status}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      CategoryValues:
+                        - NOT MUTED
+                      NullOption: NON_NULLS_ONLY
+          - FilterGroupId: resource-tag-filter-group
+            CrossDataset: SINGLE_DATASET
+            Status: ENABLED
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: findings
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - total-findings
+                      - distinct-resources
+                      - findings-by-severity
+                      - findings-by-status
+                      - findings-by-service
+                      - findings-by-account
+                      - findings-table
+            Filters:
+              - CategoryFilter:
+                  FilterId: resource-tag-filter
+                  Column: {DataSetIdentifier: ProwlerFindings, ColumnName: microservice_tag}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      SelectAllOptions: FILTER_ALL_VALUES
+                      NullOption: NON_NULLS_ONLY
+        Sheets:
+          - SheetId: findings
+            Name: Findings
+            FilterControls:
+              - Dropdown:
+                  FilterControlId: account-filter-control
+                  SourceFilterId: account-filter
+                  Title: Account
+                  Type: MULTI_SELECT
+                  CommitMode: AUTO
+              - Dropdown:
+                  FilterControlId: region-filter-control
+                  SourceFilterId: region-filter
+                  Title: Regione
+                  Type: MULTI_SELECT
+                  CommitMode: AUTO
+              - Dropdown:
+                  FilterControlId: service-filter-control
+                  SourceFilterId: service-filter
+                  Title: Service
+                  Type: MULTI_SELECT
+                  CommitMode: AUTO
+              - Dropdown:
+                  FilterControlId: status-filter-control
+                  SourceFilterId: status-filter
+                  Title: Stato
+                  Type: MULTI_SELECT
+                  CommitMode: AUTO
+              - Dropdown:
+                  FilterControlId: severity-filter-control
+                  SourceFilterId: severity-filter
+                  Title: Severity
+                  Type: MULTI_SELECT
+                  CommitMode: AUTO
+              - Dropdown:
+                  FilterControlId: muted-filter-control
+                  SourceFilterId: muted-filter
+                  Title: Muting
+                  Type: MULTI_SELECT
+                  CommitMode: AUTO
+              - Dropdown:
+                  FilterControlId: resource-tag-filter-control
+                  SourceFilterId: resource-tag-filter
+                  Title: Microservice
+                  Type: MULTI_SELECT
+                  CommitMode: AUTO
+            SheetControlLayouts:
+              - Configuration:
+                  GridLayout:
+                    Elements:
+                      - ElementId: account-filter-control
+                        ElementType: FILTER_CONTROL
+                        ColumnIndex: 0
+                        ColumnSpan: 6
+                        RowIndex: 0
+                        RowSpan: 1
+                      - ElementId: region-filter-control
+                        ElementType: FILTER_CONTROL
+                        ColumnIndex: 6
+                        ColumnSpan: 6
+                        RowIndex: 0
+                        RowSpan: 1
+                      - ElementId: status-filter-control
+                        ElementType: FILTER_CONTROL
+                        ColumnIndex: 0
+                        ColumnSpan: 6
+                        RowIndex: 1
+                        RowSpan: 1
+                      - ElementId: severity-filter-control
+                        ElementType: FILTER_CONTROL
+                        ColumnIndex: 6
+                        ColumnSpan: 6
+                        RowIndex: 1
+                        RowSpan: 1
+                      - ElementId: muted-filter-control
+                        ElementType: FILTER_CONTROL
+                        ColumnIndex: 0
+                        ColumnSpan: 6
+                        RowIndex: 2
+                        RowSpan: 1
+                      - ElementId: resource-tag-filter-control
+                        ElementType: FILTER_CONTROL
+                        ColumnIndex: 6
+                        ColumnSpan: 6
+                        RowIndex: 2
+                        RowSpan: 1
+                      - ElementId: service-filter-control
+                        ElementType: FILTER_CONTROL
+                        ColumnIndex: 0
+                        ColumnSpan: 6
+                        RowIndex: 3
+                        RowSpan: 1
+            Layouts:
+              - Configuration:
+                  GridLayout:
+                    Elements:
+                      - ElementId: total-findings
+                        ElementType: VISUAL
+                        ColumnIndex: 0
+                        ColumnSpan: 18
+                        RowIndex: 0
+                        RowSpan: 4
+                      - ElementId: distinct-resources
+                        ElementType: VISUAL
+                        ColumnIndex: 18
+                        ColumnSpan: 18
+                        RowIndex: 0
+                        RowSpan: 4
+                      - ElementId: findings-by-severity
+                        ElementType: VISUAL
+                        ColumnIndex: 0
+                        ColumnSpan: 18
+                        RowIndex: 4
+                        RowSpan: 12
+                      - ElementId: findings-by-status
+                        ElementType: VISUAL
+                        ColumnIndex: 18
+                        ColumnSpan: 18
+                        RowIndex: 4
+                        RowSpan: 12
+                      - ElementId: findings-by-service
+                        ElementType: VISUAL
+                        ColumnIndex: 0
+                        ColumnSpan: 18
+                        RowIndex: 16
+                        RowSpan: 8
+                      - ElementId: findings-by-account
+                        ElementType: VISUAL
+                        ColumnIndex: 18
+                        ColumnSpan: 18
+                        RowIndex: 16
+                        RowSpan: 8
+                      - ElementId: findings-table
+                        ElementType: VISUAL
+                        ColumnIndex: 0
+                        ColumnSpan: 36
+                        RowIndex: 24
+                        RowSpan: 12
+            Visuals:
+              - KPIVisual:
+                  VisualId: total-findings
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText:
+                      PlainText: Findings totali
+                  ChartConfiguration:
+                    FieldWells:
+                      Values:
+                        - CategoricalMeasureField:
+                            FieldId: total-findings-count
+                            Column: {DataSetIdentifier: ProwlerFindings, ColumnName: check_id}
+                            AggregationFunction: COUNT
+              - KPIVisual:
+                  VisualId: distinct-resources
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText:
+                      PlainText: Risorse coinvolte
+                  ChartConfiguration:
+                    FieldWells:
+                      Values:
+                        - CategoricalMeasureField:
+                            FieldId: distinct-resources-count
+                            Column: {DataSetIdentifier: ProwlerFindings, ColumnName: resource_uid}
+                            AggregationFunction: DISTINCT_COUNT
+              - PieChartVisual:
+                  VisualId: findings-by-severity
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText:
+                      PlainText: Findings per severita
+                  ChartConfiguration:
+                    VisualPalette:
+                      ColorMap:
+                        - Element: {FieldId: severity-category, FieldValue: informational}
+                          Color: '#2563EB'
+                        - Element: {FieldId: severity-category, FieldValue: info}
+                          Color: '#16A34A'
+                        - Element: {FieldId: severity-category, FieldValue: low}
+                          Color: '#65A30D'
+                        - Element: {FieldId: severity-category, FieldValue: medium}
+                          Color: '#EAB308'
+                        - Element: {FieldId: severity-category, FieldValue: high}
+                          Color: '#F97316'
+                        - Element: {FieldId: severity-category, FieldValue: critical}
+                          Color: '#DC2626'
+                    FieldWells:
+                      PieChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: severity-category
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: severity}
+                        SmallMultiples:
+                          - CategoricalDimensionField:
+                              FieldId: severity-account
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_label}
+                        Values:
+                          - CategoricalMeasureField:
+                              FieldId: severity-findings-count
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: check_id}
+                              AggregationFunction: COUNT
+              - PieChartVisual:
+                  VisualId: findings-by-status
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText:
+                      PlainText: Findings per stato
+                  ChartConfiguration:
+                    VisualPalette:
+                      ColorMap:
+                        - Element: {FieldId: status-category, FieldValue: MUTED}
+                          Color: '#64748B'
+                    FieldWells:
+                      PieChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: status-category
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: display_status}
+                        SmallMultiples:
+                          - CategoricalDimensionField:
+                              FieldId: status-account
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_label}
+                        Values:
+                          - CategoricalMeasureField:
+                              FieldId: status-findings-count
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: check_id}
+                              AggregationFunction: COUNT
+              - BarChartVisual:
+                  VisualId: findings-by-service
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText:
+                      PlainText: Findings per servizio
+                  ChartConfiguration:
+                    Orientation: HORIZONTAL
+                    BarsArrangement: CLUSTERED
+                    FieldWells:
+                      BarChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: service-category
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: service_name}
+                        Colors:
+                          - CategoricalDimensionField:
+                              FieldId: service-account-color
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_label}
+                        Values:
+                          - CategoricalMeasureField:
+                              FieldId: service-findings-count
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: check_id}
+                              AggregationFunction: COUNT
+              - BarChartVisual:
+                  VisualId: findings-by-account
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText:
+                      PlainText: Findings per account
+                  ChartConfiguration:
+                    Orientation: VERTICAL
+                    BarsArrangement: CLUSTERED
+                    FieldWells:
+                      BarChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: account-category
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_label}
+                        Values:
+                          - CategoricalMeasureField:
+                              FieldId: account-findings-count
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: check_id}
+                              AggregationFunction: COUNT
+              - TableVisual:
+                  VisualId: findings-table
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText:
+                      PlainText: Prowler findings
+                  ChartConfiguration:
+                    FieldWells:
+                      TableAggregatedFieldWells:
+                        GroupBy:
+                          - CategoricalDimensionField:
+                              FieldId: account-name
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_label}
+                          - CategoricalDimensionField:
+                              FieldId: account-uid
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: account_uid}
+                          - CategoricalDimensionField:
+                              FieldId: severity
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: severity}
+                          - CategoricalDimensionField:
+                              FieldId: status
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: status}
+                          - CategoricalDimensionField:
+                              FieldId: service-name
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: service_name}
+                          - CategoricalDimensionField:
+                              FieldId: check-title
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: check_title}
+                          - CategoricalDimensionField:
+                              FieldId: grouped-resource-uid
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: grouped_resource_uid}
+                          - CategoricalDimensionField:
+                              FieldId: risk
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: risk}
+                          - CategoricalDimensionField:
+                              FieldId: remediation-recommendation
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: remediation_recommendation_text}
+                          - CategoricalDimensionField:
+                              FieldId: resource-tags
+                              Column: {DataSetIdentifier: ProwlerFindings, ColumnName: resource_tags}
+                    FieldOptions:
+                      SelectedFieldOptions:
+                        - FieldId: grouped-resource-uid
+                          CustomLabel: Resource
+                        - FieldId: risk
+                          CustomLabel: Risk
+                        - FieldId: remediation-recommendation
+                          CustomLabel: Recommendation
+                        - FieldId: resource-tags
+                          CustomLabel: Resource Tag
