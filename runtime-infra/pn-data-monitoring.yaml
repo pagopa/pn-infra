@@ -1131,32 +1131,32 @@ Resources:
         RoleArn: !GetAtt InformalMonitoringSchedulerRole.Arn
         Input: !Sub |
           {
-            "projectName": "${InformalMonitoringCodeBuildProject}",
-            "environmentVariablesOverride": [
+            "ProjectName": "${InformalMonitoringCodeBuildProject}",
+            "EnvironmentVariablesOverride": [
               {
-                "name": "CSV_S3_PREFIX",
-                "type": "PLAINTEXT",
-                "value": "${InformalMonitoringBasePath}/output"
+                "Name": "CSV_S3_PREFIX",
+                "Type": "PLAINTEXT",
+                "Value": "${InformalMonitoringBasePath}/output"
               },
               {
-                "name": "INPUT_S3_BASE_PATH",
-                "type": "PLAINTEXT",
-                "value": "${InformalMonitoringBasePath}/input"
+                "Name": "INPUT_S3_BASE_PATH",
+                "Type": "PLAINTEXT",
+                "Value": "${InformalMonitoringBasePath}/input"
               },
               {
-                "name": "BATCH_CONFIG_SSM_PARAM",
-                "type": "PLAINTEXT",
-                "value": "${InformalMonitoringConfigSsmParameterName}"
+                "Name": "BATCH_CONFIG_SSM_PARAM",
+                "Type": "PLAINTEXT",
+                "Value": "${InformalMonitoringConfigSsmParameterName}"
               },
               {
-                "name": "INFORMAL_BASE_URL",
-                "type": "PLAINTEXT",
-                "value": "${InformalMonitoringBaseUrl}"
+                "Name": "INFORMAL_BASE_URL",
+                "Type": "PLAINTEXT",
+                "Value": "${InformalMonitoringBaseUrl}"
               },
               {
-                "name": "MAIL_FROM",
-                "type": "PLAINTEXT",
-                "value": "${InformalMonitoringMailFrom}"
+                "Name": "MAIL_FROM",
+                "Type": "PLAINTEXT",
+                "Value": "${InformalMonitoringMailFrom}"
               }
             ]
           }
