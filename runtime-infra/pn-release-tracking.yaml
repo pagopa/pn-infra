@@ -832,6 +832,13 @@ Resources:
                   - s3:GetObject
                   - s3:PutObject
                 Resource: !Sub arn:${AWS::Partition}:s3:::${ReleaseTrackingResultsBucket}/*
+              - Sid: LocateOwnManifest
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ReleaseDashboardBucketName}
+                Condition:
+                  StringEquals:
+                    s3:prefix: !Sub v1/environments/${EnvironmentType}/manifest.json
               - Sid: ReadWriteOwnManifest
                 Effect: Allow
                 Action:
