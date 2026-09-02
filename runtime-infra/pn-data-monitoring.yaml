@@ -843,10 +843,10 @@ Resources:
 
   InformalMonitoringCodeBuildProject:
     Type: AWS::CodeBuild::Project
-    Condition: IsCoreAccount
+    Condition: IsConfinfoAccount
     Properties:
       Name: !Sub pn-informal-csv-export-${EnvironmentType}
-      ServiceRole: !GetAtt InformalCsvCodeBuildServiceRole.Arn
+      ServiceRole: !GetAtt InformalMonitoringCodeBuildServiceRole.Arn
       ConcurrentBuildLimit: 1
       TimeoutInMinutes: 120
       Source:
@@ -1021,11 +1021,11 @@ Resources:
             Type: PLAINTEXT
             Value: !Ref AWS::Region
 
-  InformalCsvCodeBuildServiceRole:
+  InformalMonitoringCodeBuildServiceRole:
     Type: AWS::IAM::Role
     Condition: IsCoreAccount
     Properties:
-      RoleName: !Sub pn-informal-csv-export-codebuild-role-${EnvironmentType}
+      RoleName: !Sub pn-informal-monitoring-codebuild-role-${EnvironmentType}
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -1036,7 +1036,7 @@ Resources:
             Action:
               - sts:AssumeRole
       Policies:
-        - PolicyName: InformalCsvCodeBuildPolicy
+        - PolicyName: InformalMonitoringCodeBuildPolicy
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -1090,11 +1090,11 @@ Resources:
                       - informal-monitoring
                       - informal-monitoring/*
 
-  InformalCsvSchedulerRole:
+  InformalMonitoringSchedulerRole:
     Type: AWS::IAM::Role
     Condition: HasInformalCsvSchedulerInCore
     Properties:
-      RoleName: !Sub pn-informal-csv-export-scheduler-role-${EnvironmentType}
+      RoleName: !Sub pn-informal-monitoring-scheduler-role-${EnvironmentType}
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -1106,7 +1106,7 @@ Resources:
               StringEquals:
                 aws:SourceAccount: !Ref AWS::AccountId
       Policies:
-        - PolicyName: StartInformalCsvCodeBuild
+        - PolicyName: StartInformalMonitoringCodeBuild
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -1115,11 +1115,11 @@ Resources:
                   - codebuild:StartBuild
                 Resource: !GetAtt InformalMonitoringCodeBuildProject.Arn
 
-  InformalCsvScheduledExecution:
+  InformalMonitoringScheduledExecution:
     Type: AWS::Scheduler::Schedule
     Condition: HasInformalCsvSchedulerInCore
     Properties:
-      Name: !Sub pn-informal-monitoring-csv-export-${EnvironmentType}
+      Name: !Sub pn-informal-monitoring-export-${EnvironmentType}
       Description: "Schedule to trigger informal monitoring CSV export CodeBuild (Europe/Rome)"
       ScheduleExpression: !Ref InformalMonitoringSchedulerCronExpression
       ScheduleExpressionTimezone: Europe/Rome
@@ -1128,7 +1128,7 @@ Resources:
         Mode: 'OFF'
       Target:
         Arn: arn:aws:scheduler:::aws-sdk:codebuild:startBuild
-        RoleArn: !GetAtt InformalCsvSchedulerRole.Arn
+        RoleArn: !GetAtt InformalMonitoringSchedulerRole.Arn
         Input: !Sub |
           {
             "ProjectName": "${InformalMonitoringCodeBuildProject}",
