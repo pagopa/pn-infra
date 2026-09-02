@@ -368,7 +368,7 @@ Conditions:
   HasCronExpressionLambdaPnSupportSqsInCoreAccount: !And [!Not [!Equals [!Ref LambdaPnSupportExportSqsCronExpression, '']], !Equals [!Ref PnCoreAwsAccountId, '']]
   HasQuickSightDataImportLambdaScheduleStateEnabled: !And [ !Condition IsCoreAccount, !Equals [!Ref QuickSightDataImportLambdaScheduleState, 'ENABLED' ] ]
   HasInformalMonitoringSchedulerCronExpression: !Not [ !Equals [!Ref InformalMonitoringSchedulerCronExpression, '' ] ]
-  HasInformalCsvSchedulerInCore: !And [ !Condition IsCoreAccount, !Condition HasInformalMonitoringSchedulerCronExpression ]
+  HasInformalMonitoringSchedulerInConfinfo: !And [ !Condition IsConfinfoAccount, !Condition HasInformalMonitoringSchedulerCronExpression ]
   
 Resources:
   
@@ -1092,7 +1092,7 @@ Resources:
 
   InformalMonitoringSchedulerRole:
     Type: AWS::IAM::Role
-    Condition: HasInformalCsvSchedulerInCore
+    Condition: HasInformalMonitoringSchedulerInConfinfo
     Properties:
       RoleName: !Sub pn-informal-monitoring-scheduler-role-${EnvironmentType}
       AssumeRolePolicyDocument:
@@ -1117,9 +1117,9 @@ Resources:
 
   InformalMonitoringScheduledExecution:
     Type: AWS::Scheduler::Schedule
-    Condition: HasInformalCsvSchedulerInCore
+    Condition: HasInformalMonitoringSchedulerInConfinfo
     Properties:
-      Name: !Sub pn-informal-monitoring-export-${EnvironmentType}
+      Name: !Sub pn-informal-monitoring-scheduler-${EnvironmentType}
       Description: "Schedule to trigger informal monitoring CSV export CodeBuild (Europe/Rome)"
       ScheduleExpression: !Ref InformalMonitoringSchedulerCronExpression
       ScheduleExpressionTimezone: Europe/Rome
@@ -2422,11 +2422,11 @@ Outputs:
     Description: Name of the bucket created for the data monitoring
 
   InformalMonitoringCodeBuildProjectName:
-    Condition: IsCoreAccount
+    Condition: IsConfinfoAccount
     Value: !Ref InformalMonitoringCodeBuildProject
     Description: Name of the informal CSV export CodeBuild project
 
-  InformalCsvSchedulerName:
-    Condition: HasInformalCsvSchedulerInCore
-    Value: !Ref InformalCsvScheduledExecution
-    Description: Name of the informal CSV export scheduler
+  InformalMonitoringSchedulerName:
+    Condition: HasInformalMonitoringSchedulerInConfinfo
+    Value: !Ref InformalMonitoringScheduledExecution
+    Description: Name of the informal monitoring export scheduler
