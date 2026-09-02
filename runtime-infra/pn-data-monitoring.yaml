@@ -225,14 +225,6 @@ Parameters:
       - "true"
       - "false"
 
-  CriticalMonitoringNotificationSchedulerState:
-    Type: String
-    Description: State of Critical Monitoring schedulers (ENABLED or DISABLED)
-    Default: 'ENABLED'
-    AllowedValues:
-      - 'ENABLED'
-      - 'DISABLED'
-
   AlarmSNSTopicArn:
     Type: String
 
@@ -321,6 +313,46 @@ Parameters:
       - 'ENABLED'
       - 'DISABLED'
 
+  InformalMonitoringGitBranch:
+    Type: String
+    Description: Git branch or tag for the informal CSV export script
+    Default: 'feature/informal_report_csv'
+
+  InformalMonitoringSchedulerCronExpression:
+    Type: String
+    Description: Cron expression (Europe/Rome timezone) for informal CSV export CodeBuild schedule
+    Default: 'cron(0 7 * * ? *)'
+
+  InformalMonitoringSchedulerState:
+    Type: String
+    Description: State of informal monitoring scheduler (ENABLED or DISABLED)
+    Default: 'DISABLED'
+    AllowedValues:
+      - 'ENABLED'
+      - 'DISABLED'
+
+  InformalMonitoringBasePath:
+    Type: String
+    Description: Base S3 key prefix under DataMonitoringBucket for informal monitoring input/output files
+    Default: 'informal-monitoring'
+    AllowedPattern: '^informal-monitoring(/.*)?$'
+    ConstraintDescription: Must stay under informal-monitoring/
+
+  InformalMonitoringConfigSsmParameterName:
+    Type: String
+    Description: SSM Parameter name containing JSON array config for batch execution
+    Default: '/pn-infra/data-monitoring/informal-monitoring/config'
+
+  InformalMonitoringBaseUrl:
+    Type: String
+    Description: Base URL used by informal CSV export script
+    Default: 'https://replace-me.example.com'
+
+  InformalMonitoringMailFrom:
+    Type: String
+    Description: Sender email for informal CSV notifications
+    Default: 'no-reply@example.com'
+
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
   IsCoreAccount: !Equals [!Ref PnCoreAwsAccountId, '' ]
@@ -335,6 +367,8 @@ Conditions:
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
   HasCronExpressionLambdaPnSupportSqsInCoreAccount: !And [!Not [!Equals [!Ref LambdaPnSupportExportSqsCronExpression, '']], !Equals [!Ref PnCoreAwsAccountId, '']]
   HasQuickSightDataImportLambdaScheduleStateEnabled: !And [ !Condition IsCoreAccount, !Equals [!Ref QuickSightDataImportLambdaScheduleState, 'ENABLED' ] ]
+  HasInformalMonitoringSchedulerCronExpression: !Not [ !Equals [!Ref InformalMonitoringSchedulerCronExpression, '' ] ]
+  HasInformalMonitoringSchedulerInConfinfo: !And [ !Condition IsConfinfoAccount, !Condition HasInformalMonitoringSchedulerCronExpression ]
   
 Resources:
   
@@ -806,6 +840,265 @@ Resources:
             Fn::GetAtt: 
               - "DataMonitoringCodebuildProject"
               - "Arn"
+
+  InformalMonitoringCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Condition: IsConfinfoAccount
+    Properties:
+      Name: !Sub pn-informal-csv-export-${EnvironmentType}
+      ServiceRole: !GetAtt InformalMonitoringCodeBuildServiceRole.Arn
+      ConcurrentBuildLimit: 1
+      TimeoutInMinutes: 120
+      Source:
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                nodejs: 20
+            pre_build:
+              commands:
+                - ROOT_FOLDER=$(pwd)
+                - echo "Cloning repository pn-troubleshooting"
+                - git clone https://github.com/pagopa/pn-troubleshooting.git
+                - cd pn-troubleshooting
+                - git checkout "$REPO_BRANCH"
+            build:
+              commands:
+                - cd "$ROOT_FOLDER/pn-troubleshooting/informal_report_csv"
+                - npm install --omit=dev
+                - BATCH_CONFIG_JSON=$(aws ssm get-parameter --name "$BATCH_CONFIG_SSM_PARAM" --with-decryption --query 'Parameter.Value' --output text)
+                - if ! echo "$BATCH_CONFIG_JSON" | jq -e 'type == "array" and length > 0' >/dev/null; then echo "Batch config in SSM must be a non-empty JSON array" >&2; exit 1; fi
+                - mkdir -p "$ROOT_FOLDER/work/input"
+                - mkdir -p "$ROOT_FOLDER/work/output"
+                - TOTAL_ITEMS=$(echo "$BATCH_CONFIG_JSON" | jq 'length')
+                - echo "Found $TOTAL_ITEMS batch items in parameter $BATCH_CONFIG_SSM_PARAM"
+                - printf '%s' "$BATCH_CONFIG_JSON" | jq -c '.[]' > "$ROOT_FOLDER/work/batch_items.jsonl"
+                - |
+                  while IFS= read -r item_json; do
+                    csv_file=$(echo "$item_json" | jq -r '.csvFile // empty')
+                    secret_name=$(echo "$item_json" | jq -r '.secretName // .secret // empty')
+
+                    if [ -z "$csv_file" ]; then
+                      echo "Batch item without csvFile" >&2
+                      exit 1
+                    fi
+
+                    if [ -z "$secret_name" ]; then
+                      echo "Batch item without secretName for csvFile=$csv_file" >&2
+                      exit 1
+                    fi
+
+                    secret_value=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'SecretString' --output text)
+                    api_key=""
+                    if echo "$secret_value" | jq -e . >/dev/null 2>&1; then
+                      api_key=$(echo "$secret_value" | jq -r '.INFORMAL_API_KEY // .apiKey // .api_key // empty')
+                    else
+                      api_key="$secret_value"
+                    fi
+
+                    if [ -z "$api_key" ]; then
+                      echo "Missing API key in secret $secret_name for csvFile=$csv_file" >&2
+                      exit 1
+                    fi
+
+                    printf '%s\n' \
+                      "INFORMAL_BASE_URL=${INFORMAL_BASE_URL}" \
+                      "INFORMAL_API_KEY=${api_key}" \
+                      "MAIL_PROVIDER=ses" \
+                      "AWS_REGION=${AWS_REGION}" \
+                      "MAIL_FROM=${MAIL_FROM}" > .env
+
+                    mail_target=$(echo "$item_json" | jq -r 'if has("recipient") and (.recipient|type) == "string" and (.recipient|length) > 0 then .recipient elif has("recipients") and (.recipients|type) == "array" and (.recipients|length) > 0 then (.recipients | map(select(type == "string" and length > 0)) | join(",")) elif has("recipients") and (.recipients|type) == "string" and (.recipients|length) > 0 then .recipients else empty end')
+                    if [ -z "$mail_target" ]; then
+                      echo "No recipient configured for csvFile=$csv_file (expected recipient or recipients)" >&2
+                      exit 1
+                    fi
+
+                    export INPUT_FILE_PATH="$ROOT_FOLDER/work/input/$(basename "$csv_file")"
+                    aws s3 cp "s3://${EXPORT_BUCKET_NAME}/${INPUT_S3_BASE_PATH%/}/$csv_file" "$INPUT_FILE_PATH"
+
+                    item_name=$(basename "$csv_file" .csv)
+                    export OUTPUT_DIR="$ROOT_FOLDER/work/output/${item_name}"
+                    mkdir -p "$OUTPUT_DIR"
+
+                    export TARGET_MAIL="$mail_target"
+                    node export_informal_csv.js --input-file "$INPUT_FILE_PATH" --output-dir "$OUTPUT_DIR" --mail "$TARGET_MAIL"
+
+                    aws s3 cp "$OUTPUT_DIR/" "s3://${EXPORT_BUCKET_NAME}/${CSV_S3_PREFIX}/${item_name}/" --recursive --exclude "*" --include "*.csv"
+                  done < "$ROOT_FOLDER/work/batch_items.jsonl"
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Type: LINUX_CONTAINER
+        Image: "aws/codebuild/standard:7.0-24.10.02"
+        EnvironmentVariables:
+          - Name: REPO_BRANCH
+            Type: PLAINTEXT
+            Value: !Ref InformalMonitoringGitBranch
+          - Name: CSV_S3_PREFIX
+            Type: PLAINTEXT
+            Value: !Sub ${InformalMonitoringBasePath}/output
+          - Name: INPUT_S3_BASE_PATH
+            Type: PLAINTEXT
+            Value: !Sub ${InformalMonitoringBasePath}/input
+          - Name: BATCH_CONFIG_SSM_PARAM
+            Type: PLAINTEXT
+            Value: !Ref InformalMonitoringConfigSsmParameterName
+          - Name: INFORMAL_BASE_URL
+            Type: PLAINTEXT
+            Value: !Ref InformalMonitoringBaseUrl
+          - Name: MAIL_FROM
+            Type: PLAINTEXT
+            Value: !Ref InformalMonitoringMailFrom
+          - Name: EXPORT_BUCKET_NAME
+            Type: PLAINTEXT
+            Value: !Ref DataMonitoringBucket
+          - Name: AWS_REGION
+            Type: PLAINTEXT
+            Value: !Ref AWS::Region
+
+  InformalMonitoringCodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Condition: IsConfinfoAccount
+    Properties:
+      RoleName: !Sub pn-informal-monitoring-codebuild-role-${EnvironmentType}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: InformalMonitoringCodeBuildPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:pn-infra/informal-monitoring/*
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource:
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${InformalMonitoringConfigSsmParameterName}
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                  - ses:SendBulkEmail
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::${DataMonitoringBucket}/${InformalMonitoringBasePath}/input/*
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::${DataMonitoringBucket}/${InformalMonitoringBasePath}/output/*
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::${DataMonitoringBucket}
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - informal-monitoring
+                      - informal-monitoring/*
+
+  InformalMonitoringSchedulerRole:
+    Type: AWS::IAM::Role
+    Condition: HasInformalMonitoringSchedulerInConfinfo
+    Properties:
+      RoleName: !Sub pn-informal-monitoring-scheduler-role-${EnvironmentType}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: StartInformalMonitoringCodeBuild
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                Resource: !GetAtt InformalMonitoringCodeBuildProject.Arn
+
+  InformalMonitoringScheduledExecution:
+    Type: AWS::Scheduler::Schedule
+    Condition: HasInformalMonitoringSchedulerInConfinfo
+    Properties:
+      Name: !Sub pn-informal-monitoring-scheduler-${EnvironmentType}
+      Description: "Schedule to trigger informal monitoring CSV export CodeBuild (Europe/Rome)"
+      ScheduleExpression: !Ref InformalMonitoringSchedulerCronExpression
+      ScheduleExpressionTimezone: Europe/Rome
+      State: !Ref InformalMonitoringSchedulerState
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: arn:aws:scheduler:::aws-sdk:codebuild:startBuild
+        RoleArn: !GetAtt InformalMonitoringSchedulerRole.Arn
+        Input: !Sub |
+          {
+            "ProjectName": "${InformalMonitoringCodeBuildProject}",
+            "EnvironmentVariablesOverride": [
+              {
+                "Name": "CSV_S3_PREFIX",
+                "Type": "PLAINTEXT",
+                "Value": "${InformalMonitoringBasePath}/output"
+              },
+              {
+                "Name": "INPUT_S3_BASE_PATH",
+                "Type": "PLAINTEXT",
+                "Value": "${InformalMonitoringBasePath}/input"
+              },
+              {
+                "Name": "BATCH_CONFIG_SSM_PARAM",
+                "Type": "PLAINTEXT",
+                "Value": "${InformalMonitoringConfigSsmParameterName}"
+              },
+              {
+                "Name": "INFORMAL_BASE_URL",
+                "Type": "PLAINTEXT",
+                "Value": "${InformalMonitoringBaseUrl}"
+              },
+              {
+                "Name": "MAIL_FROM",
+                "Type": "PLAINTEXT",
+                "Value": "${InformalMonitoringMailFrom}"
+              }
+            ]
+          }
         
   DynamoDbExportFunction:
     Type: AWS::Lambda::Function
@@ -2066,3 +2359,13 @@ Outputs:
   DataMonitoringBucketName:
     Value: !Ref DataMonitoringBucket
     Description: Name of the bucket created for the data monitoring
+
+  InformalMonitoringCodeBuildProjectName:
+    Condition: IsConfinfoAccount
+    Value: !Ref InformalMonitoringCodeBuildProject
+    Description: Name of the informal CSV export CodeBuild project
+
+  InformalMonitoringSchedulerName:
+    Condition: HasInformalMonitoringSchedulerInConfinfo
+    Value: !Ref InformalMonitoringScheduledExecution
+    Description: Name of the informal monitoring export scheduler
