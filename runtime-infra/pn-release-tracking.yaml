@@ -1,6 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: |
-  Release Tracking - Athena Glue Table + QuickSight DataSource/DataSets
+Description: Release tracking resources
 
 Parameters:
   CdArtifactBucketName:
@@ -68,9 +67,78 @@ Parameters:
       - 'true'
       - 'false'
     Description: Enable/disable QuickSight resources creation
+  ProjectName:
+    Type: String
+    Default: pn
+    Description: Base name for PN resources
+  EnvironmentType:
+    Type: String
+    AllowedValues:
+      - dev
+      - test
+      - uat
+      - hotfix
+      - prod
+    Description: Deployment environment
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: CloudFormation template base URL
+  LambdasBucketName:
+    Type: String
+    Description: Lambda artifacts bucket name
+  LambdasBasePath:
+    Type: String
+    Description: Lambda artifacts base path
+  WarningSNSTopicArn:
+    Type: String
+    Description: Warning SNS topic ARN
+  LogRetention:
+    Type: Number
+    Description: Log retention in days
+  EnableReleaseDashboardPublisher:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enables the release dashboard publisher
+  ReleaseDashboardBucketName:
+    Type: String
+    Default: ''
+    Description: Release dashboard bucket name
+  ReleaseDashboardPublisherScheduleExpression:
+    Type: String
+    Default: rate(30 minutes)
+    Description: Publisher schedule
+  ReleaseDashboardRetentionDays:
+    Type: Number
+    Default: 180
+    MinValue: 1
+    MaxValue: 366
+    Description: Manifest retention in days
+  ReleaseDashboardOverlapHours:
+    Type: Number
+    Default: 24
+    MinValue: 1
+    MaxValue: 168
+    Description: Athena query overlap in hours
+  ReleaseDashboardAthenaQueryTimeoutSeconds:
+    Type: Number
+    Default: 600
+    MinValue: 1
+    MaxValue: 840
+    Description: Athena query timeout in seconds
+
+Rules:
+  ReleaseDashboardPublisherConfigurationRequired:
+    RuleCondition: !Equals [!Ref EnableReleaseDashboardPublisher, 'true']
+    Assertions:
+      - Assert: !Not [!Equals [!Ref ReleaseDashboardBucketName, '']]
+        AssertDescription: ReleaseDashboardBucketName is required when the publisher is enabled
 
 Conditions:
   CreateQuickSightResources: !Equals [!Ref EnableQuickSightResources, 'true']
+  CreateReleaseDashboardPublisher: !Equals [!Ref EnableReleaseDashboardPublisher, 'true']
 
 Resources:
   ReleaseTrackingResultsBucket:
@@ -681,6 +749,163 @@ Resources:
           Source:
             PhysicalTableId: ReleaseSummaryTable
 
+  ReleaseDashboardPublisherLogGroup:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateReleaseDashboardPublisher
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Sub ${ProjectName}-release-dashboard-publisher-${EnvironmentType}
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
+  ReleaseDashboardPublisherRole:
+    Type: AWS::IAM::Role
+    Condition: CreateReleaseDashboardPublisher
+    Properties:
+      RoleName: !Sub ${ProjectName}-release-dashboard-publisher-${EnvironmentType}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ReleaseDashboardPublisher
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadReleaseTrackingCatalog
+                Effect: Allow
+                Action:
+                  - glue:GetDatabase
+                  - glue:GetTable
+                Resource:
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:database/${ReleaseTrackingGlueDatabase}
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:table/${ReleaseTrackingGlueDatabase}/${ReleaseEventsTableName}
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:table/${ReleaseTrackingGlueDatabase}/${ReleaseEventsCoreTableName}
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:table/${ReleaseTrackingGlueDatabase}/${ReleaseEventsConfinfoTableName}
+              - Sid: ExecuteReleaseTrackingQuery
+                Effect: Allow
+                Action:
+                  - athena:StartQueryExecution
+                  - athena:GetQueryExecution
+                  - athena:GetQueryResults
+                  - athena:StopQueryExecution
+                Resource: !Sub arn:${AWS::Partition}:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${ReleaseTrackingAthenaWorkGroup}
+              - Sid: LocateReleaseEventBuckets
+                Effect: Allow
+                Action: s3:GetBucketLocation
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::${CdArtifactBucketName}
+                  - !Sub arn:${AWS::Partition}:s3:::${ConfinfoCdArtifactBucketName}
+              - Sid: ListReleaseEventBuckets
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::${CdArtifactBucketName}
+                  - !Sub arn:${AWS::Partition}:s3:::${ConfinfoCdArtifactBucketName}
+                Condition:
+                  StringLike:
+                    s3:prefix: release-events-raw/*
+              - Sid: ReadReleaseEvents
+                Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::${CdArtifactBucketName}/release-events-raw/*
+                  - !Sub arn:${AWS::Partition}:s3:::${ConfinfoCdArtifactBucketName}/release-events-raw/*
+              - Sid: UseAthenaResultsBucket
+                Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ReleaseTrackingResultsBucket}
+              - Sid: ReadWriteAthenaResults
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ReleaseTrackingResultsBucket}/*
+              - Sid: LocateOwnManifest
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ReleaseDashboardBucketName}
+                Condition:
+                  StringEquals:
+                    s3:prefix: !Sub v1/environments/${EnvironmentType}/manifest.json
+              - Sid: ReadWriteOwnManifest
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ReleaseDashboardBucketName}/v1/environments/${EnvironmentType}/manifest.json
+
+  ReleaseDashboardPublisherFunction:
+    Type: AWS::Lambda::Function
+    Condition: CreateReleaseDashboardPublisher
+    DependsOn: ReleaseEventsUnionViewTable
+    Properties:
+      FunctionName: !GetAtt ReleaseDashboardPublisherLogGroup.Outputs.LogGroupNameNoPrefix
+      Description: Publishes release dashboard data
+      Runtime: python3.12
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 900
+      Role: !GetAtt ReleaseDashboardPublisherRole.Arn
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/release-dashboard-publisher.zip
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentType
+          ATHENA_DATABASE: !Ref ReleaseTrackingGlueDatabase
+          ATHENA_TABLE: !Ref ReleaseEventsTableName
+          ATHENA_WORKGROUP: !Ref ReleaseTrackingAthenaWorkGroup
+          DASHBOARD_BUCKET: !Ref ReleaseDashboardBucketName
+          MANIFEST_KEY: !Sub v1/environments/${EnvironmentType}/manifest.json
+          RETENTION_DAYS: !Ref ReleaseDashboardRetentionDays
+          OVERLAP_HOURS: !Ref ReleaseDashboardOverlapHours
+          QUERY_TIMEOUT_SECONDS: !Ref ReleaseDashboardAthenaQueryTimeoutSeconds
+      LoggingConfig:
+        LogGroup: !GetAtt ReleaseDashboardPublisherLogGroup.Outputs.LogGroupName
+
+  ReleaseDashboardPublisherAlarms:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateReleaseDashboardPublisher
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml
+      Parameters:
+        FunctionName: !Ref ReleaseDashboardPublisherFunction
+        AlarmSNSTopicArn: !Ref WarningSNSTopicArn
+
+  ReleaseDashboardPublisherSchedule:
+    Type: AWS::Events::Rule
+    Condition: CreateReleaseDashboardPublisher
+    Properties:
+      Name: !Sub ${ProjectName}-release-dashboard-publisher-${EnvironmentType}
+      Description: Publishes release dashboard data
+      ScheduleExpression: !Ref ReleaseDashboardPublisherScheduleExpression
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt ReleaseDashboardPublisherFunction.Arn
+          Id: ReleaseDashboardPublisher
+
+  ReleaseDashboardPublisherInvokePermission:
+    Type: AWS::Lambda::Permission
+    Condition: CreateReleaseDashboardPublisher
+    Properties:
+      FunctionName: !Ref ReleaseDashboardPublisherFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ReleaseDashboardPublisherSchedule.Arn
+      SourceAccount: !Ref AWS::AccountId
+
 Outputs:
   ReleaseTrackingResultsBucketName:
     Description: S3 bucket for Athena query results
@@ -706,3 +931,7 @@ Outputs:
     Condition: CreateQuickSightResources
     Description: QuickSight DataSet ARN for release summary
     Value: !GetAtt ReleaseSummaryDataSet.Arn
+  ReleaseDashboardPublisherRoleArn:
+    Condition: CreateReleaseDashboardPublisher
+    Description: Publisher role to authorize on the central pn-cicd bucket
+    Value: !GetAtt ReleaseDashboardPublisherRole.Arn
