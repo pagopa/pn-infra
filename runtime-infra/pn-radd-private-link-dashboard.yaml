@@ -55,7 +55,7 @@ Resources:
                     "metrics": [
                       [
                         {
-                          "expression": "SUM([TIME_SERIES(0),SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"RequestCount\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300)])",
+                          "expression": "SUM([TIME_SERIES(0),SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"RequestCount\" LoadBalancer=\"${AlbDimension}\" TargetGroup=targetgroup/${ProjectName}-rpp-lambda-tg', 'Sum', 300)])",
                           "id": "requests",
                           "label": "Requests",
                           "color": "#1f77b4"
@@ -168,7 +168,7 @@ Resources:
                     "metrics": [
                       [
                         {
-                          "expression": "SUM([TIME_SERIES(0),SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"LambdaInternalError\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300)])",
+                          "expression": "SUM([TIME_SERIES(0),SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"LambdaInternalError\" LoadBalancer=\"${AlbDimension}\" TargetGroup=targetgroup/${ProjectName}-rpp-lambda-tg', 'Sum', 300)])",
                           "id": "internal",
                           "label": "LambdaInternalError",
                           "color": "#d62728"
@@ -176,7 +176,7 @@ Resources:
                       ],
                       [
                         {
-                          "expression": "SUM([TIME_SERIES(0),SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"LambdaUserError\" LoadBalancer=\"${AlbDimension}\" TargetGroup=${ProjectName}-rpp-lambda-tg', 'Sum', 300)])",
+                          "expression": "SUM([TIME_SERIES(0),SEARCH('{AWS/ApplicationELB,LoadBalancer,TargetGroup} MetricName=\"LambdaUserError\" LoadBalancer=\"${AlbDimension}\" TargetGroup=targetgroup/${ProjectName}-rpp-lambda-tg', 'Sum', 300)])",
                           "id": "user",
                           "label": "LambdaUserError",
                           "color": "#9467bd"
