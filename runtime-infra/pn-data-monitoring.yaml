@@ -969,6 +969,9 @@ Resources:
             Principal:
               Service:
                 - codebuild.amazonaws.com
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
             Action:
               - sts:AssumeRole
       Policies:
@@ -1067,8 +1070,8 @@ Resources:
         RoleArn: !GetAtt InformalMonitoringSchedulerRole.Arn
         Input: !Sub |
           {
-            "ProjectName": "${InformalMonitoringCodeBuildProject}",
-            "EnvironmentVariablesOverride": [
+            "projectName": "${InformalMonitoringCodeBuildProject}",
+            "environmentVariablesOverride": [
               {
                 "Name": "CSV_S3_PREFIX",
                 "Type": "PLAINTEXT",
