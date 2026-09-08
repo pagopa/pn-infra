@@ -247,7 +247,7 @@ Per questo motivo l'`aws_request_id` viene iniettato in ogni record di log trami
 Il logger (`logger`) esposto da `config.py` viene utilizzato in `index.py` per tracciare:
 
 - l'avvio dell'elaborazione del batch e il relativo numero di record;
-- il routing di ogni record (`clean`, `excluded` a livello `info`, `quarantine` a livello `error` con gli `errorCode` riscontrati);
+- il routing di ogni record (`clean`, `excluded` a livello `info`, `quarantine` a livello `warning` con gli `errorCode` riscontrati);
 - gli errori tecnici non gestiti, con stacktrace (`logger.exception`) e prefisso `PROCESSING_FAILED`;
 - il riepilogo dei contatori a fine batch (`kept`, `dropped`, `clean`, `quarantine`, `excluded`, `failed`).
 
@@ -259,6 +259,7 @@ Quando un record non supera uno o più controlli:
 - viene restituito a Firehose con risultato `Ok`;
 - gli `errorCode` vengono riportati nei log CloudWatch;
 - il payload CDC non viene arricchito con attributi tecnici aggiuntivi.
+- Il metric filter intercetta esclusivamente i log di livello `ERROR`, associati agli errori tecnici di elaborazione. I record instradati in `quarantine` vengono invece registrati a livello `WARNING`.
 
 Esempio di log:
 
