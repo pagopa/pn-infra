@@ -76,6 +76,10 @@ Parameters:
     Default: ""
     Description: Kinesis stream ARN used to export CloudWatch logs
 
+   PnMetricsCommitId:
+    Type: String
+    Description: Commit ID of pn-metrics used to build the Data Quality configuration Layer
+
 Conditions:
   ExportLogs: !Not [ !Equals [ !Ref LogsBucketName, '' ] ]
 
@@ -245,6 +249,18 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
+  PreprocessingConfigLayer:
+    Condition: CreatePreprocessingFirehose
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: !Sub '${ProjectName}-${PreprocessingStreamNamePrefix}-dq-config'
+      Description: !Sub 'Data Quality configuration from pn-metrics commit ${PnMetricsCommitId}'
+      Content:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub '${LambdasBasePath}/cdc-preproc-data-quality-config/${PnMetricsCommitId}/config-layer.zip'
+      CompatibleRuntimes:
+        - python3.12
+
   PreprocessingFilterLambda:
     Condition: CreatePreprocessingFirehose
     Type: AWS::Lambda::Function
@@ -257,6 +273,11 @@ Resources:
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub '${LambdasBasePath}/cdc-preproc-data-quality-filter.zip'
+      Layers:
+        - !Ref PreprocessingConfigLayer
+      Environment:
+        Variables:
+          CONFIG_PATH: /opt/config
       Role: !GetAtt PreprocessingFilterLambdaRole.Arn
       LoggingConfig:
         LogGroup: !GetAtt PreprocessingLambdaLogGroup.Outputs.LogGroupName
