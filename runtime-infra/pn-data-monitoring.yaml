@@ -870,7 +870,7 @@ Resources:
                 - if echo "$GITHUB_SECRET_VALUE" | jq -e . >/dev/null 2>&1; then GITHUB_TOKEN=$(echo "$GITHUB_SECRET_VALUE" | jq -r '.GITHUB_TOKEN // .githubToken // .github_token // .token // empty'); else GITHUB_TOKEN="$GITHUB_SECRET_VALUE"; fi
                 - if [ -z "$GITHUB_TOKEN" ]; then echo "Missing GitHub token in secret $GITHUB_TOKEN_SECRET_NAME" >&2; exit 1; fi
                 - echo "Cloning repository pn-troubleshooting"
-                - AUTH_HEADER=$(printf 'Authorization: Basic %s' "$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')")
+                - AUTH_HEADER=$(printf 'Authorization:%sBasic %s' ' ' "$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')")
                 - git -c http.https://github.com/.extraheader="$AUTH_HEADER" clone https://github.com/pagopa/pn-troubleshooting.git
                 - unset GITHUB_TOKEN AUTH_HEADER GITHUB_SECRET_VALUE
                 - cd pn-troubleshooting
