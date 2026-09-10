@@ -262,7 +262,12 @@ Resources:
                 "${LogGroupTaskStoppedEvents.Arn}"
               ],
               "Condition": {
-                "ArnEquals": {"AWS:SourceArn": "${EventRule.Arn}"}
+                "ArnEquals": {
+                  "AWS:SourceArn": [
+                    "${EventRule.Arn}",
+                    "${StoppedTaskEventRule.Arn}"
+                  ]
+                }
               }
             }
           ]
@@ -279,6 +284,26 @@ Resources:
         - MetricValue: 1
           MetricNamespace: "OutOfMemoryErrors"
           MetricName: !Sub "${ProjectName}-ECSOutOfMemory"
+
+  AbnormalStoppedTaskAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        MetricName: !Sub "${ProjectName}-ECSAbnormalTaskStopped"
+        MetricNamespace: "ECS/TaskStopped"
+        LogGroupName: !Ref LogGroupTaskStoppedEvents
+        FilterPattern: '{ $.detail.stopCode = "TaskFailedToStart" }'
+        Period: 300
+        Threshold: 1
+        EvaluationPeriods: 1
+        DatapointsToAlarm: 1
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        Statistic: Sum
+        HasOncall: false
+        OncallComparisonOperator: GreaterThanOrEqualToThreshold
+        OncallStatistic: Sum
 
   CloudWatchAlarmOOM:
     Type: AWS::CloudWatch::Alarm
