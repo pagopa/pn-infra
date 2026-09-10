@@ -21,6 +21,18 @@ Parameters:
   AlarmSNSTopicArn:
     Type: String
     Description: ARN of the SNS topic for alarms
+  WarningSNSTopicArn:
+    Type: String
+    Description: ARN of the Warning SNS topic
+  EnvironmentType:
+    Type: String
+    Description: Environment type (dev, test, uat, hotfix, prod)
+    AllowedValues:
+      - dev
+      - test
+      - uat
+      - hotfix
+      - prod
   LambdasBucketName:
     Type: String
     Description: S3 bucket name containing Lambda deployment packages
@@ -68,6 +80,24 @@ Parameters:
     Type: String
     Default: '600'
     Description: Timeout in seconds for Athena reporting and alerts query execution polling.
+  QuarantineReportScheduleExpression:
+    Type: String
+    Default: "cron(0 6 * * ? *)"
+    Description: Schedule expression for CDC quarantine report
+  QuarantineReportScheduleState:
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: State of CDC quarantine report schedule
+  QuarantineReportNotificationsEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Enable CDC quarantine report notifications
 
 Resources:
   GlueServiceRole:
@@ -672,6 +702,26 @@ Resources:
         FunctionName: !Ref DataLakeCountExport
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
+
+  ###############################################################################
+  ###            REPORTING QUARANTINE                                         ###
+  ###############################################################################
+
+  CdcPreprocQuarantineDailyReport:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/cdc-preproc-quarantine-daily-report.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        EnvironmentType: !Ref EnvironmentType
+        LogsBucketName: !Ref LogsBucketName
+        LogsBucketKmsKeyArn: !Ref LogsBucketKmsKeyArn
+        LambdasBucketName: !Ref LambdasBucketName
+        LambdasBasePath: !Ref LambdasBasePath
+        WarningSNSTopicArn: !Ref WarningSNSTopicArn
+        ReportNotificationsEnabled: !Ref QuarantineReportNotificationsEnabled
+        ScheduleExpression: !Ref QuarantineReportScheduleExpression
+        ScheduleState: !Ref QuarantineReportScheduleState
 
 Outputs:
   GlueDatabaseName:
