@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import boto3
 from botocore.config import Config
@@ -42,9 +42,10 @@ def _is_table_folder(prefix):
 
 def lambda_handler(event, context):
     now = datetime.now(timezone.utc)
+    reference_datetime = now - timedelta(days=1)
 
-    reference_date = now.strftime("%Y-%m-%d")
-    day_path = now.strftime("%Y/%m/%d/")
+    reference_date = reference_datetime.strftime("%Y-%m-%d")
+    day_path = reference_datetime.strftime("%Y/%m/%d/")
     generation_time = now.strftime("%Y%m%dT%H%M%SZ")
 
     paginator = s3.get_paginator("list_objects_v2")
