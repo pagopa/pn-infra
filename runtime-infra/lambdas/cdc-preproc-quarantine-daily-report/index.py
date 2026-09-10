@@ -40,8 +40,24 @@ def _is_table_folder(prefix):
     return folder_name.startswith(TABLE_FOLDER_PREFIX)
 
 
+def _count_partition_files(partition_prefix):
+    paginator = s3.get_paginator("list_objects_v2")
+
+    return sum(
+        1
+        for page in paginator.paginate(
+            Bucket=S3_BUCKET,
+            Prefix=partition_prefix,
+        )
+        for obj in page.get("Contents", [])
+        if obj.get("Size", 0) > 0
+    )
+
+
 def lambda_handler(event, context):
     now = datetime.now(timezone.utc)
+
+    # The report processes the complete partitioning of the previous UTC day.
     reference_datetime = now - timedelta(days=1)
 
     reference_date = reference_datetime.strftime("%Y-%m-%d")
@@ -50,6 +66,7 @@ def lambda_handler(event, context):
 
     paginator = s3.get_paginator("list_objects_v2")
 
+    # Retrieve all quarantine folders associated with CDC tables.
     folders = [
         item["Prefix"]
         for page in paginator.paginate(
@@ -64,30 +81,52 @@ def lambda_handler(event, context):
     tables = []
 
     for folder in folders:
-        files_count = 0
-
-        for page in paginator.paginate(
-            Bucket=S3_BUCKET,
-            Prefix=f"{folder}{day_path}",
-        ):
-            files_count += sum(
-                1
-                for obj in page.get("Contents", [])
-                if obj.get("Size", 0) > 0
-            )
-
-        if files_count == 0:
-            continue
-
         table_name = (
             folder[len(QUARANTINE_PREFIX):]
             .rstrip("/")[len(TABLE_FOLDER_PREFIX):]
         )
 
+        day_prefix = f"{folder}{day_path}"
+
+        # Retrieve the hourly partitions available for the reference day.
+        partition_prefixes = [
+            item["Prefix"]
+            for page in paginator.paginate(
+                Bucket=S3_BUCKET,
+                Prefix=day_prefix,
+                Delimiter="/",
+            )
+            for item in page.get("CommonPrefixes", [])
+        ]
+
+        partitions = {}
+
+        for partition_prefix in partition_prefixes:
+            # Example:
+            # 2026/08/13/09
+            partition_path = (
+                partition_prefix[len(folder):]
+                .rstrip("/")
+            )
+
+            files_count = _count_partition_files(
+                partition_prefix
+            )
+
+            if files_count > 0:
+                partitions[partition_path] = files_count
+
+        if not partitions:
+            continue
+
+        partitions = dict(
+            sorted(partitions.items())
+        )
+
         tables.append(
             {
                 "tableName": table_name,
-                "filesCount": files_count,
+                "partitions": partitions,
             }
         )
 
@@ -96,7 +135,7 @@ def lambda_handler(event, context):
     )
 
     total_files = sum(
-        table["filesCount"]
+        sum(table["partitions"].values())
         for table in tables
     )
 
@@ -138,7 +177,9 @@ def lambda_handler(event, context):
 
         if tables:
             details = {
-                table["tableName"]: table["filesCount"]
+                table["tableName"]: sum(
+                    table["partitions"].values()
+                )
                 for table in tables
             }
         else:
