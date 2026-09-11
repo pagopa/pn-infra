@@ -28,7 +28,8 @@ s3 = boto3.client(
     "s3",
     region_name=AWS_REGION,
     config=Config(
-        s3={"addressing_style": "virtual"}
+        signature_version="s3v4",
+        s3={"addressing_style": "virtual"},
     ),
 )
 
@@ -40,24 +41,50 @@ def _is_table_folder(prefix):
     return folder_name.startswith(TABLE_FOLDER_PREFIX)
 
 
-def _count_partition_files(partition_prefix):
+def _extract_table_name(folder):
+    return (
+        folder[len(QUARANTINE_PREFIX):]
+        .rstrip("/")[len(TABLE_FOLDER_PREFIX):]
+    )
+
+
+def _write_daily_records(
+    day_prefix,
+    csv_file,
+):
     paginator = s3.get_paginator("list_objects_v2")
 
-    return sum(
-        1
-        for page in paginator.paginate(
-            Bucket=S3_BUCKET,
-            Prefix=partition_prefix,
-        )
-        for obj in page.get("Contents", [])
-        if obj.get("Size", 0) > 0
-    )
+    record_count = 0
+
+    for page in paginator.paginate(
+        Bucket=S3_BUCKET,
+        Prefix=day_prefix,
+    ):
+        for obj in page.get("Contents", []):
+            if obj.get("Size", 0) <= 0:
+                continue
+
+            response = s3.get_object(
+                Bucket=S3_BUCKET,
+                Key=obj["Key"],
+            )
+
+            for line in response["Body"].iter_lines():
+                if not line.strip():
+                    continue
+
+                csv_file.write(line)
+                csv_file.write(b"\n")
+
+                record_count += 1
+
+    return record_count
 
 
 def lambda_handler(event, context):
     now = datetime.now(timezone.utc)
 
-    # The report processes the complete partitioning of the previous UTC day.
+    # The report processes the complete previous UTC day.
     reference_datetime = now - timedelta(days=1)
 
     reference_date = reference_datetime.strftime("%Y-%m-%d")
@@ -66,7 +93,7 @@ def lambda_handler(event, context):
 
     paginator = s3.get_paginator("list_objects_v2")
 
-    # Retrieve all quarantine folders associated with CDC tables.
+    # Retrieve all CDC table folders available under quarantine.
     folders = [
         item["Prefix"]
         for page in paginator.paginate(
@@ -78,117 +105,123 @@ def lambda_handler(event, context):
         if _is_table_folder(item["Prefix"])
     ]
 
+    report_base_filename = (
+        f"report_quarantine_"
+        f"{reference_date}_"
+        f"{generation_time}"
+    )
+
+    json_filename = f"{report_base_filename}.json"
+    csv_filename = f"{report_base_filename}.csv"
+
+    # Reports are partitioned using the reference date:
+    # quarantine/report/YYYY/MM/DD/
+    report_day_prefix = (
+        f"{REPORT_PREFIX}"
+        f"{day_path}"
+    )
+
+    json_report_key = (
+        f"{report_day_prefix}"
+        f"{json_filename}"
+    )
+
+    csv_report_key = (
+        f"{report_day_prefix}"
+        f"{csv_filename}"
+    )
+
+    csv_path = f"/tmp/{csv_filename}"
+
     tables = []
 
-    for folder in folders:
-        table_name = (
-            folder[len(QUARANTINE_PREFIX):]
-            .rstrip("/")[len(TABLE_FOLDER_PREFIX):]
-        )
+    # Read all records from the reference day and write them
+    # progressively to /tmp to avoid keeping the entire daily
+    # dataset in Lambda memory.
+    with open(csv_path, "wb") as csv_file:
+        for folder in folders:
+            table_name = _extract_table_name(folder)
+            day_prefix = f"{folder}{day_path}"
 
-        day_prefix = f"{folder}{day_path}"
-
-        # Retrieve the hourly partitions available for the reference day.
-        partition_prefixes = [
-            item["Prefix"]
-            for page in paginator.paginate(
-                Bucket=S3_BUCKET,
-                Prefix=day_prefix,
-                Delimiter="/",
-            )
-            for item in page.get("CommonPrefixes", [])
-        ]
-
-        partitions = {}
-
-        for partition_prefix in partition_prefixes:
-            # Example:
-            # 2026/08/13/09
-            partition_path = (
-                partition_prefix[len(folder):]
-                .rstrip("/")
+            record_count = _write_daily_records(
+                day_prefix,
+                csv_file,
             )
 
-            files_count = _count_partition_files(
-                partition_prefix
+            # Tables without quarantine records for the
+            # reference day are excluded from the report.
+            if record_count == 0:
+                continue
+
+            tables.append(
+                {
+                    "tableName": table_name,
+                    "recordCount": record_count,
+                }
             )
-
-            if files_count > 0:
-                partitions[partition_path] = files_count
-
-        if not partitions:
-            continue
-
-        partitions = dict(
-            sorted(partitions.items())
-        )
-
-        tables.append(
-            {
-                "tableName": table_name,
-                "partitions": partitions,
-            }
-        )
 
     tables.sort(
         key=lambda table: table["tableName"]
     )
 
-    total_files = sum(
-        sum(table["partitions"].values())
+    total_records = sum(
+        table["recordCount"]
         for table in tables
     )
 
     report = {
-        "generatedAt": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generatedAt": now.strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        ),
         "referenceDate": reference_date,
         "tables": tables,
     }
 
-    if not tables:
-        report["message"] = "No tables found in quarantine"
-
-    report_key = (
-        f"{REPORT_PREFIX}"
-        f"report_quarantine_"
-        f"{reference_date}_"
-        f"{generation_time}.json"
-    )
-
-    report_bytes = json.dumps(
-        report,
-        ensure_ascii=False,
-        indent=2,
+    json_report_bytes = (
+        json.dumps(
+            report,
+            ensure_ascii=False,
+            indent=2,
+        ) + "\n"
     ).encode("utf-8")
 
+    # Store the JSON summary.
     s3.put_object(
         Bucket=S3_BUCKET,
-        Key=report_key,
-        Body=report_bytes,
+        Key=json_report_key,
+        Body=json_report_bytes,
         ContentType="application/json",
     )
 
+    # Store the original quarantine records.
+    s3.upload_file(
+        csv_path,
+        S3_BUCKET,
+        csv_report_key,
+        ExtraArgs={
+            "ContentType": "text/csv",
+        },
+    )
+
+    csv_size = os.path.getsize(csv_path)
+
+    # Publish the application report only when notifications
+    # are explicitly enabled.
     if REPORT_NOTIFICATIONS_ENABLED and SNS_TOPIC_ARN:
         metrics = {
             "Reference date": reference_date,
             "Tables in quarantine": len(tables),
-            "Files in quarantine": total_files,
+            "Records in quarantine": total_records,
         }
 
-        if tables:
-            details = {
-                table["tableName"]: sum(
-                    table["partitions"].values()
-                )
-                for table in tables
-            }
-        else:
-            details = {
-                "Result": "No tables found in quarantine"
-            }
+        details = {
+            table["tableName"]: table["recordCount"]
+            for table in tables
+        }
 
         publish_warning_report(
             sns_client=sns,
+            s3_client=s3,
             topic_arn=SNS_TOPIC_ARN,
             event_id=context.aws_request_id,
             producer=REPORT_PRODUCER,
@@ -198,8 +231,12 @@ def lambda_handler(event, context):
             title=REPORT_TITLE,
             metrics=metrics,
             details=details,
-            links={
-                "report": f"s3://{S3_BUCKET}/{report_key}"
+            links={},
+            attachment={
+                "bucket": S3_BUCKET,
+                "key": csv_report_key,
+                "filename": csv_filename,
+                "size": csv_size,
             },
         )
 
@@ -207,6 +244,7 @@ def lambda_handler(event, context):
         "status": "ok",
         "referenceDate": reference_date,
         "tablesCount": len(tables),
-        "filesCount": total_files,
-        "reportKey": report_key,
+        "recordCount": total_records,
+        "jsonReportKey": json_report_key,
+        "csvReportKey": csv_report_key,
     }

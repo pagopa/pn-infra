@@ -2,9 +2,9 @@ AWSTemplateFormatVersion: "2010-09-09"
 
 Description: >
   CDC Preproc Quarantine Daily Report.
-  Generates a report of tables with quarantined files,
-  stores the JSON report on S3 and optionally publishes
-  a summary to the Warning SNS topic.
+  Generates a daily report of quarantine record counts aggregated by table,
+  stores the CSV report on S3 and optionally publishes
+  a report to the Warning SNS topic.
 
 Parameters:
 
@@ -89,6 +89,17 @@ Resources:
                     s3:prefix:
                       - "cdcTos3/cdc-preproc/quarantine/*"
 
+        - PolicyName: s3-read-quarantine
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${LogsBucketName}/cdcTos3/cdc-preproc/quarantine/TABLE_NAME_*"
+                  - !Sub "arn:${AWS::Partition}:s3:::${LogsBucketName}/cdcTos3/cdc-preproc/quarantine/report/*"
+
         - PolicyName: s3-write-report
           PolicyDocument:
             Version: "2012-10-17"
@@ -96,6 +107,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - s3:PutObject
+                  - s3:AbortMultipartUpload
                 Resource: !Sub "arn:${AWS::Partition}:s3:::${LogsBucketName}/cdcTos3/cdc-preproc/quarantine/report/*"
 
         - PolicyName: kms

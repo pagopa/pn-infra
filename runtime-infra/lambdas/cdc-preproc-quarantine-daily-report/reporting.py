@@ -6,6 +6,7 @@ import json
 def publish_warning_report(
     *,
     sns_client,
+    s3_client,
     topic_arn,
     event_id,
     producer,
@@ -16,6 +17,8 @@ def publish_warning_report(
     metrics,
     details,
     links,
+    attachment,
+    url_expiration_seconds=3600,
 ):
     if not title:
         raise ValueError("Report title is required")
@@ -24,6 +27,15 @@ def publish_warning_report(
         raise ValueError(
             "Report metrics must be a non-empty dictionary"
         )
+
+    download_url = s3_client.generate_presigned_url(
+        "get_object",
+        Params={
+            "Bucket": attachment["bucket"],
+            "Key": attachment["key"],
+        },
+        ExpiresIn=url_expiration_seconds,
+    )
 
     message = {
         "schemaVersion": "1.0",
@@ -40,6 +52,12 @@ def publish_warning_report(
             "details": details,
         },
         "links": links,
+        "attachment": {
+            "filename": attachment["filename"],
+            "contentType": "text/csv",
+            "size": attachment["size"],
+            "downloadUrl": download_url,
+        },
     }
 
     sns_client.publish(
