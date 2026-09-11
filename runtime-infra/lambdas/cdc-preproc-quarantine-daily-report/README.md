@@ -2,9 +2,9 @@
 
 ## Obiettivo
 
-Realizzare una Lambda per generare un report giornaliero degli elementi presenti nell'area di quarantena del CDC Preprocessor su S3.
+Generare un report giornaliero degli elementi presenti nell'area di quarantena del CDC Preprocessor su S3.
 
-Il report permette di individuare rapidamente quali tabelle presentano elementi in quarantena nella giornata di riferimento e quanti file sono presenti per ciascuna tabella.
+Il report permette di individuare le tabelle con record in quarantena nella giornata di riferimento e il numero di record per ciascuna tabella.
 
 ## Struttura S3
 
@@ -20,75 +20,171 @@ cdcTos3/cdc-preproc/quarantine/
                     └── <file>
 ```
 
-## Definizione dei requisiti
+## Requisiti
 
 La soluzione:
 
 - recupera le cartelle delle tabelle presenti sotto `quarantine/`;
 - considera solamente le cartelle con prefisso `TABLE_NAME_`;
-- verifica la presenza di elementi per la giornata di riferimento;
-- conta il numero di file presenti per ogni tabella;
-- non legge il contenuto dei file;
-- riporta solamente le tabelle con almeno un elemento in quarantena;
-- genera il report anche quando non viene trovato alcun elemento.
+- utilizza come data di riferimento il giorno UTC precedente all'esecuzione;
+- legge tutti i file della partizione giornaliera `YYYY/MM/DD`, senza dettaglio orario;
+- conta i record presenti nei file, considerando ogni riga non vuota come un record;
+- aggrega il conteggio per tabella;
+- include nel summary solamente le tabelle con almeno un record in quarantena;
+- genera il report anche quando non viene trovato alcun record.
 
-### Formato di output
+## Output
 
-Il report viene prodotto in formato JSON e contiene:
+Per ogni esecuzione vengono prodotti un summary JSON e un CSV.
 
-- data e ora UTC di generazione;
-- data di riferimento del check;
-- nome delle tabelle con elementi in quarantena;
-- numero di file per ogni tabella.
+### Summary JSON
+
+Il JSON contiene data e ora UTC di generazione, data di riferimento e conteggio dei record per tabella.
 
 Esempio:
 
 ```json
 {
-  "generatedAt": "2026-09-03T09:00:38Z",
-  "referenceDate": "2026-09-03",
+  "generatedAt": "2026-08-14T07:00:03Z",
+  "referenceDate": "2026-08-13",
   "tables": [
     {
       "tableName": "pn-UserAttributes",
-      "filesCount": 1
+      "recordCount": 5
+    },
+    {
+      "tableName": "pn-Notifications",
+      "recordCount": 12
     }
   ]
 }
 ```
 
-Nel caso in cui non siano presenti elementi in quarantena, il report viene comunque generato con una lista di tabelle vuota e un messaggio esplicativo.
+Se non sono presenti record, `tables` è una lista vuota.
 
-### Salvataggio del report
+### CSV
 
-I report vengono salvati sotto:
+Il CSV contiene i record originali presenti in quarantena nella giornata di riferimento, una riga per record.
+
+Esempio:
 
 ```text
-cdcTos3/cdc-preproc/quarantine/report/
+{"awsRegion":"eu-south-1","eventID":"e54489d8a5","eventName":"INSERT","userIdentity":null,"recordFormat":"application/json","tableName":"pn-Notifications",...}
+{"awsRegion":"eu-south-1","eventID":"e545s1d8a5","eventName":"REMOVE","userIdentity":null,"recordFormat":"application/json","tableName":"pn-UserAttributes",...}
 ```
 
-Il nome del file contiene la data di riferimento del check e la data e ora UTC di generazione.
+Il CSV viene costruito progressivamente in `/tmp` per evitare di mantenere l'intero dataset giornaliero in memoria.
 
-- Formato: `report_quarantine_<reference-date>_<generation-timestamp>.json`
-- Esempio: `report_quarantine_2026-09-03_20260903T090038Z.json`
+## Salvataggio su S3
+
+JSON e CSV vengono salvati nella partizione relativa alla giornata di riferimento:
+
+```text
+cdcTos3/cdc-preproc/quarantine/report/YYYY/MM/DD/
+```
+
+Il nome contiene la data di riferimento e la data e ora UTC di generazione.
+
+```text
+report_quarantine_<reference-date>_<generation-timestamp>.json
+report_quarantine_<reference-date>_<generation-timestamp>.csv
+```
+
+## Esempio degli output prodotti
+
+Per una esecuzione effettuata il `2026-09-11` relativa alla giornata `2026-09-10`:
+
+### JSON su S3
+
+```text
+s3://<LogsBucketName>/cdcTos3/cdc-preproc/quarantine/report/2026/09/10/report_quarantine_2026-09-10_20260911T070003Z.json
+```
+
+```json
+{
+  "generatedAt": "2026-09-11T07:00:03Z",
+  "referenceDate": "2026-09-10",
+  "tables": [
+    {
+      "tableName": "pn-Notifications",
+      "recordCount": 12
+    },
+    {
+      "tableName": "pn-UserAttributes",
+      "recordCount": 5
+    }
+  ]
+}
+```
+
+### CSV su S3
+
+```text
+s3://<LogsBucketName>/cdcTos3/cdc-preproc/quarantine/report/2026/09/10/report_quarantine_2026-09-10_20260911T070003Z.csv
+```
+
+```text
+{"awsRegion":"eu-south-1","eventID":"e54489d8a5","eventName":"INSERT","userIdentity":null,"recordFormat":"application/json","tableName":"pn-Notifications",...}
+{"awsRegion":"eu-south-1","eventID":"e545s1d8a5","eventName":"REMOVE","userIdentity":null,"recordFormat":"application/json","tableName":"pn-UserAttributes",...}
+```
+
+### Report inviato a Warning Notifications
+
+Se `ReportNotificationsEnabled=true`, viene pubblicato sul Warning SNS topic un evento `report` con metriche, dettaglio per tabella e attachment CSV.
+
+Esempio:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "eventId": "<lambda-request-id>",
+  "eventType": "report",
+  "producer": "pn-cdc-quarantine-daily-report",
+  "eventName": "cdc-quarantine-daily-report",
+  "occurredAt": "2026-09-11T07:00:03+00:00",
+  "severity": "info",
+  "environment": "dev",
+  "title": "CDC Preproc quarantine daily report",
+  "data": {
+    "metrics": {
+      "Reference date": "2026-09-10",
+      "Tables in quarantine": 2,
+      "Records in quarantine": 17
+    },
+    "details": {
+      "pn-Notifications": 12,
+      "pn-UserAttributes": 5
+    }
+  },
+  "links": {},
+  "attachment": {
+    "filename": "report_quarantine_2026-09-10_20260911T070003Z.csv",
+    "contentType": "text/csv",
+    "size": 12345,
+    "downloadUrl": "<presigned-url>"
+  }
+}
+```
+
+Con una route in modalità `ATTACHMENT`, il dispatcher utilizza la presigned URL per inviare su Slack il riepilogo e il CSV allegato.
 
 ## Notifica
 
-Al termine dell'elaborazione, la Lambda può pubblicare un riepilogo tramite il sistema centralizzato Warning Notifications.
+La pubblicazione del report è controllata tramite il parametro `ReportNotificationsEnabled`.
 
-La notifica utilizza il formato `eventType: report` e riporta:
+Il producer utilizzato per il routing è:
 
-- data di riferimento;
-- numero di tabelle con elementi in quarantena;
-- numero complessivo di file individuati;
-- dettaglio del numero di file per ciascuna tabella;
-- riferimento al report JSON salvato su S3.
-
-La pubblicazione è controllata tramite il parametro `ReportNotificationsEnabled`.
+```text
+pn-cdc-quarantine-daily-report
+```
 
 ## Scheduling
 
-La Lambda viene eseguita tramite EventBridge Scheduler e utilizza come data di riferimento la giornata UTC di esecuzione.
+La Lambda viene eseguita ogni giorno alle 07:00 UTC tramite EventBridge Scheduler e produce un report relativo alla giornata UTC precedente.
 
-La frequenza di esecuzione è configurabile tramite il parametro `ScheduleExpression`.
+La frequenza di esecuzione è configurata nel file runtime-infra\pn-cdc-analytics-dev-cfg.json tramite il parametro dedicato alla schedulazione, mentre l'attivazione o la disattivazione dello scheduler è controllata dal relativo parametro di stato.
 
-Lo scheduler può essere abilitato o disabilitato tramite il parametro `EnableSchedule`, consentendo di mantenere disattivata l'esecuzione automatica durante le fasi di test.
+**Note**
+- Lo scheduler può essere abilitato o disabilitato tramite configurazione.
+- Il report analizza i record presenti in quarantena nel periodo compreso tra le 00:00:00 e le 23:59:59 UTC del giorno precedente.
+- Eventuali modifiche alla frequenza di esecuzione possono essere effettuate aggiornando la configurazione nel file runtime-infra\pn-cdc-analytics-dev-cfg.json, senza necessità di intervenire sul codice della Lambda.
