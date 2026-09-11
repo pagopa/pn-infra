@@ -9,7 +9,7 @@ from reporting import publish_warning_report
 
 
 QUARANTINE_PREFIX = "cdcTos3/cdc-preproc/quarantine/"
-REPORT_PREFIX = QUARANTINE_PREFIX + "report/"
+REPORT_PREFIX = "reporting/cdcTos3/cdc-preproc/quarantine/"
 TABLE_FOLDER_PREFIX = "TABLE_NAME_"
 
 REPORT_PRODUCER = "pn-cdc-quarantine-daily-report"
@@ -115,7 +115,7 @@ def lambda_handler(event, context):
     csv_filename = f"{report_base_filename}.csv"
 
     # Reports are partitioned using the reference date:
-    # quarantine/report/YYYY/MM/DD/
+    # reporting/cdcTos3/cdc-preproc/quarantine/YYYY/MM/DD/
     report_day_prefix = (
         f"{REPORT_PREFIX}"
         f"{day_path}"
