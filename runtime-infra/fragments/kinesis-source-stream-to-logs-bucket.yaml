@@ -315,8 +315,9 @@ Resources:
           LogStreamName:
             Ref: PreprocessingDeliveryStreamLogGroupS3Destination
 
-        Prefix: 
-          !Sub '${PreprocessingS3RootPrefix}/!{partitionKeyFromLambda:PROCESSING_LAYER}/TABLE_NAME_!{partitionKeyFromLambda:TABLE_NAME}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
+        Prefix:
+          !Sub '${PreprocessingS3RootPrefix}/!{partitionKeyFromLambda:PROCESSING_LAYER}/TABLE_NAME_!{partitionKeyFromQuery:TABLE_NAME}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
+
         ErrorOutputPrefix:
           !Sub 'errors/${PreprocessingS3RootPrefix}/!{firehose:error-output-type}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/'
 
@@ -340,7 +341,14 @@ Resources:
                   ParameterValue: "60"
                 - ParameterName: NumberOfRetries
                   ParameterValue: "3"
-        
+
+            - Type: MetadataExtraction
+              Parameters:
+                - ParameterName: MetadataExtractionQuery
+                  ParameterValue: '{ TABLE_NAME : (if (.dynamodb.NewImage.communicationType.S // .dynamodb.OldImage.communicationType.S) == "INFORMAL" then (.tableName + "_INFORMAL") else .tableName end) }'
+                - ParameterName: JsonParsingEngine
+                  ParameterValue: JQ-1.6
+
             - Type: AppendDelimiterToRecord
               Parameters:
                 - ParameterName: Delimiter
