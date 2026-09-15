@@ -122,10 +122,10 @@ Parameters:
     Type: String
     Default: "CDC Preproc quarantine daily report"
     Description: Title used for Warning Notification reports
-  QuarantineReportLogRetention:
+  LogRetention:
     Type: Number
     Default: 14
-    Description: CloudWatch log retention in days for CDC quarantine report
+    Description: CloudWatch log retention in days
 
 
 Resources:
@@ -750,7 +750,7 @@ Resources:
         WarningSNSTopicArn: !Ref WarningSNSTopicArn
         AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
         TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
-        LogRetention: !Ref QuarantineReportLogRetention
+        LogRetention: !Ref LogRetention
         ReportNotificationsEnabled: !Ref QuarantineReportNotificationsEnabled
         ScheduleExpression: !Ref QuarantineReportScheduleExpression
         ScheduleState: !Ref QuarantineReportScheduleState
