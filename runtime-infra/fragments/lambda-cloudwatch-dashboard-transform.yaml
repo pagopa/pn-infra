@@ -2338,3 +2338,181 @@ Resources:
       Principal: 'cloudformation.amazonaws.com'
       SourceAccount: !Ref AWS::AccountId
       SourceArn: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*
+
+  OerSqsWidgetsMacroV2:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Description: Generate SQS widgets for DLQ and non-DLQ queues from CloudWatch metrics.
+      FunctionName: !GetAtt OerSqsWidgetsFunctionV2.Arn
+      Name: OerSqsWidgetsTransformV2
+
+  OerSqsWidgetsExecutionRoleV2:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: OerSqsWidgetsPolicyV2
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - cloudwatch:ListMetrics
+                Resource: "*"
+
+  OerSqsWidgetsFunctionLogGroupV2:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${OerSqsWidgetsFunctionV2}"
+      RetentionInDays: 14
+
+  OerSqsWidgetsFunctionV2:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+
+          DLQ_TOKEN = "-DLQ"
+
+
+          def _list_queue_names(metric_name):
+              client = boto3.client("cloudwatch")
+              paginator = client.get_paginator("list_metrics")
+              queue_names = set()
+
+              for page in paginator.paginate(Namespace="AWS/SQS", MetricName=metric_name):
+                  for metric in page.get("Metrics", []):
+                      for dimension in metric.get("Dimensions", []):
+                          if dimension.get("Name") == "QueueName" and dimension.get("Value"):
+                              queue_names.add(dimension.get("Value"))
+
+              return sorted(queue_names)
+
+
+          def _build_sqs_widget(region, y_value, title, metric_name, queue_names):
+              if not queue_names:
+                  return None
+
+              metrics = []
+              for idx, queue_name in enumerate(queue_names):
+                  namespace = "AWS/SQS" if idx == 0 else "."
+                  metrics.append([
+                      namespace,
+                      metric_name,
+                      "QueueName",
+                      queue_name,
+                      {
+                          "label": queue_name,
+                          "stat": "Maximum"
+                      }
+                  ])
+
+              return {
+                  "type": "metric",
+                  "x": 0,
+                  "y": y_value,
+                  "width": 24,
+                  "height": 6,
+                  "properties": {
+                      "metrics": metrics,
+                      "view": "timeSeries",
+                      "stacked": False,
+                      "region": region,
+                      "title": title,
+                      "period": 3600,
+                      "stat": "Maximum",
+                      "start": "-PT168H",
+                      "end": "P0D"
+                  }
+              }
+
+
+          def _parse_excluded_queue_names(raw_value):
+              if not raw_value:
+                  return set()
+
+              normalized = str(raw_value).replace(";", ",")
+              return {
+                  item.strip()
+                  for item in normalized.split(",")
+                  if item and item.strip()
+              }
+
+
+          def lambda_handler(event, context):
+              params = event.get("params", {})
+              region = params.get("Region", "eu-south-1")
+              excluded_dlq_names = _parse_excluded_queue_names(params.get("SqsDlqExcludeQueueNames", ""))
+              excluded_queue_names = _parse_excluded_queue_names(params.get("SqsQueueExcludeQueueNames", ""))
+
+              visible_queues = _list_queue_names("ApproximateNumberOfMessagesVisible")
+              dlq_queues = [
+                  name
+                  for name in visible_queues
+                  if DLQ_TOKEN in name and name not in excluded_dlq_names
+              ]
+
+              age_queues = _list_queue_names("ApproximateAgeOfOldestMessage")
+              non_dlq_queues = [
+                  name
+                  for name in age_queues
+                  if DLQ_TOKEN not in name and name not in excluded_queue_names
+              ]
+
+              widgets = []
+              dlq_widget = _build_sqs_widget(
+                  region,
+                  102,
+                  "SQS DLQ - ApproximateNumberOfMessagesVisible (Max / 1h, 7d)",
+                  "ApproximateNumberOfMessagesVisible",
+                  dlq_queues
+              )
+              if dlq_widget:
+                  widgets.append(dlq_widget)
+
+              non_dlq_widget = _build_sqs_widget(
+                  region,
+                  108,
+                  "SQS - ApproximateAgeOfOldestMessage (Max / 1h, 7d)",
+                  "ApproximateAgeOfOldestMessage",
+                  non_dlq_queues
+              )
+              if non_dlq_widget:
+                  widgets.append(non_dlq_widget)
+
+              fragment = ""
+              if widgets:
+                  fragment = "," + ",".join(json.dumps(w, separators=(",", ":")) for w in widgets)
+
+              return {
+                  "requestId": event.get("requestId", ""),
+                  "status": "success",
+                  "fragment": fragment
+              }
+      Handler: index.lambda_handler
+      Runtime: python3.12
+      Role: !GetAtt OerSqsWidgetsExecutionRoleV2.Arn
+
+  OerSqsWidgetsFunctionPermissionsV2:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt OerSqsWidgetsFunctionV2.Arn
+      Principal: 'cloudformation.amazonaws.com'
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*
