@@ -249,16 +249,18 @@ def _generate_report(event, context):
     csv_size = os.path.getsize(csv_path)
 
     logger.info(
-        "Quarantine reports stored. "
+        "Quarantine reports stored in S3. "
         "ReferenceDate=%s, "
         "Tables=%s, "
         "Records=%s, "
-        "JsonReportKey=%s, "
-        "CsvReportKey=%s",
+        "JsonReportPath=s3://%s/%s, "
+        "CsvReportPath=s3://%s/%s",
         reference_date,
         len(tables),
         total_records,
+        S3_BUCKET,
         json_report_key,
+        S3_BUCKET,
         csv_report_key,
     )
 
