@@ -10,7 +10,6 @@ Parameters:
 
   ProjectName:
     Type: String
-
   EnvironmentType:
     Type: String
     AllowedValues:
@@ -19,54 +18,50 @@ Parameters:
       - uat
       - hotfix
       - prod
-
   LogsBucketName:
     Type: String
-
   LogsBucketKmsKeyArn:
     Type: String
-
   LambdasBucketName:
     Type: String
-
   LambdasBasePath:
     Type: String
-
   WarningSNSTopicArn:
     Type: String
-
   ReportNotificationsEnabled:
     Type: String
     AllowedValues:
       - "true"
       - "false"
-
   ScheduleExpression:
     Type: String
-
   ScheduleState:
     Type: String
     AllowedValues:
       - ENABLED
       - DISABLED
-  
   QuarantinePrefix:
     Type: String
-
   ReportPrefix:
     Type: String
-
   TableFolderPrefix:
     Type: String
-
   ReportProducer:
     Type: String
-
   ReportEventName:
     Type: String
-
   ReportTitle:
     Type: String
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: Base URL for CloudFormation fragment templates
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic for Lambda alarms
+  LogRetention:
+    Type: Number
+    Default: 14
+    Description: CloudWatch log retention in days
 
 Resources:
 
@@ -89,7 +84,6 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-cdc-preproc-quarantine-daily-report-${EnvironmentType}:*"
@@ -148,6 +142,17 @@ Resources:
                   - sns:Publish
                 Resource: !Ref WarningSNSTopicArn
 
+  QuarantineDailyReportLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub "${ProjectName}-cdc-preproc-quarantine-daily-report-${EnvironmentType}"
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
   QuarantineDailyReportLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -158,6 +163,8 @@ Resources:
       Timeout: 300
       MemorySize: 256
       ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogGroup: !GetAtt QuarantineDailyReportLogGroup.Outputs.LogGroupName
       Environment:
         Variables:
           S3_BUCKET: !Ref LogsBucketName
@@ -174,6 +181,17 @@ Resources:
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub "${LambdasBasePath}/cdc-preproc-quarantine-daily-report.zip"
+ 
+  QuarantineDailyReportAlarms:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - QuarantineDailyReportLogGroup
+      - QuarantineDailyReportLambda
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref QuarantineDailyReportLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   QuarantineDailyReportSchedulerRole:
     Type: AWS::IAM::Role

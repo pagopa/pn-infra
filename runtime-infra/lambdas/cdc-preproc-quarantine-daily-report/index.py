@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from botocore.config import Config
 
+from config import logger, setup_logger
 from reporting import publish_warning_report
 
 
@@ -82,6 +83,28 @@ def _write_daily_records(
 
 
 def lambda_handler(event, context):
+    setup_logger(context.aws_request_id)
+
+    try:
+        return _generate_report(
+            event,
+            context,
+        )
+
+    except Exception as error:
+        logger.exception(
+            "QUARANTINE_REPORT_FAILED "
+            "Technical error during quarantine report generation. "
+            "ErrorType=%s, "
+            "Error=%s",
+            type(error).__name__,
+            str(error),
+        )
+
+        raise
+
+
+def _generate_report(event, context):
     now = datetime.now(timezone.utc)
 
     # The report processes the complete previous UTC day.
@@ -90,6 +113,12 @@ def lambda_handler(event, context):
     reference_date = reference_datetime.strftime("%Y-%m-%d")
     day_path = reference_datetime.strftime("%Y/%m/%d/")
     generation_time = now.strftime("%Y%m%dT%H%M%SZ")
+
+    logger.info(
+        "Starting CDC quarantine daily report. "
+        "ReferenceDate=%s",
+        reference_date,
+    )
 
     paginator = s3.get_paginator("list_objects_v2")
 
@@ -104,6 +133,12 @@ def lambda_handler(event, context):
         for item in page.get("CommonPrefixes", [])
         if _is_table_folder(item["Prefix"])
     ]
+
+    logger.info(
+        "Quarantine table folders discovered. "
+        "Count=%s",
+        len(folders),
+    )
 
     report_base_filename = (
         f"report_quarantine_"
@@ -160,6 +195,14 @@ def lambda_handler(event, context):
                 }
             )
 
+            logger.info(
+                "Quarantine records found. "
+                "TableName=%s, "
+                "RecordCount=%s",
+                table_name,
+                record_count,
+            )
+
     tables.sort(
         key=lambda table: table["tableName"]
     )
@@ -205,6 +248,20 @@ def lambda_handler(event, context):
 
     csv_size = os.path.getsize(csv_path)
 
+    logger.info(
+        "Quarantine reports stored. "
+        "ReferenceDate=%s, "
+        "Tables=%s, "
+        "Records=%s, "
+        "JsonReportKey=%s, "
+        "CsvReportKey=%s",
+        reference_date,
+        len(tables),
+        total_records,
+        json_report_key,
+        csv_report_key,
+    )
+
     # Publish the application report only when notifications
     # are explicitly enabled.
     if REPORT_NOTIFICATIONS_ENABLED and SNS_TOPIC_ARN:
@@ -239,6 +296,22 @@ def lambda_handler(event, context):
                 "size": csv_size,
             },
         )
+
+        logger.info(
+            "Quarantine report notification published. "
+            "Producer=%s",
+            REPORT_PRODUCER,
+        )
+
+    logger.info(
+        "CDC quarantine daily report completed. "
+        "ReferenceDate=%s, "
+        "Tables=%s, "
+        "Records=%s",
+        reference_date,
+        len(tables),
+        total_records,
+    )
 
     return {
         "status": "ok",

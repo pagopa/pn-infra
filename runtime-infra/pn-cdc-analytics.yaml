@@ -122,6 +122,11 @@ Parameters:
     Type: String
     Default: "CDC Preproc quarantine daily report"
     Description: Title used for Warning Notification reports
+  QuarantineReportLogRetention:
+    Type: Number
+    Default: 14
+    Description: CloudWatch log retention in days for CDC quarantine report
+
 
 Resources:
   GlueServiceRole:
@@ -743,6 +748,9 @@ Resources:
         LambdasBucketName: !Ref LambdasBucketName
         LambdasBasePath: !Ref LambdasBasePath
         WarningSNSTopicArn: !Ref WarningSNSTopicArn
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        TemplateBucketBaseUrl: !Ref TemplateBucketBaseUrl
+        LogRetention: !Ref QuarantineReportLogRetention
         ReportNotificationsEnabled: !Ref QuarantineReportNotificationsEnabled
         ScheduleExpression: !Ref QuarantineReportScheduleExpression
         ScheduleState: !Ref QuarantineReportScheduleState
