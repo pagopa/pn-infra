@@ -1944,17 +1944,22 @@ Resources:
 
               filtered = []
               for api_name in all_api_names:
+                  normalized_api = f"-{api_name.strip('-')}-"
                   for selector in selectors:
                       token = selector.strip()
                       if not token:
                           continue
 
-                      if '-' in token:
-                          # If selector already contains hyphens, match it as-is in the API name.
+                      if token.startswith('-') and token.endswith('-'):
+                          # Selector wrapped in hyphens means exact segment match.
+                          core = token.strip('-')
+                          match = bool(core) and f"-{core}-" in normalized_api
+                      elif '-' in token:
+                          # Selector with internal hyphens keeps substring behavior.
                           match = token in api_name
                       else:
-                          # Otherwise, enforce full segment matching between hyphens.
-                          match = f"-{token}-" in api_name
+                          # Plain selector also matches as a full segment.
+                          match = f"-{token}-" in normalized_api
 
                       if match:
                           filtered.append(api_name)
@@ -2150,6 +2155,186 @@ Resources:
     Properties:
       Action: 'lambda:InvokeFunction'
       FunctionName: !GetAtt OerDashboardApiWidgetsFunctionV2.Arn
+      Principal: 'cloudformation.amazonaws.com'
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*
+
+  OerDownstreamErrorWidgetsMacroV2:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Description: Generate downstream error widgets from CloudWatch metrics.
+      FunctionName: !GetAtt OerDownstreamErrorWidgetsFunctionV2.Arn
+      Name: OerDownstreamErrorWidgetsTransformV2
+
+  OerDownstreamErrorWidgetsExecutionRoleV2:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: OerDownstreamErrorWidgetsLogsV2
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+                
+  OerDownstreamErrorWidgetsFunctionLogGroupV2:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${OerDownstreamErrorWidgetsFunctionV2}"
+      RetentionInDays: 14
+
+  OerDownstreamErrorWidgetsFunctionV2:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import json
+
+          DEFAULT_METRIC_MAP = {}
+
+          DEFAULT_DOWNSTREAM_SUFFIX = "-downstream-detection"
+
+
+          def _parse_metric_map(raw_map):
+              if not raw_map:
+                  return dict(DEFAULT_METRIC_MAP)
+
+              parsed = {}
+              entries = [entry.strip() for entry in raw_map.split(';') if entry.strip()]
+              for entry in entries:
+                  if '=' not in entry:
+                      continue
+                  name, metric = entry.split('=', 1)
+                  ds_name = name.strip()
+                  metric_name = _normalize_metric_name(metric.strip())
+                  if ds_name and metric_name:
+                      parsed[ds_name] = metric_name
+
+              if not parsed:
+                  return dict(DEFAULT_METRIC_MAP)
+              return parsed
+
+
+          def _normalize_metric_name(metric_name):
+              if not metric_name:
+                  return metric_name
+
+              if metric_name.endswith("-downstream-detection") or metric_name.endswith("-payment-error-detection"):
+                  return metric_name
+
+              return f"{metric_name}{DEFAULT_DOWNSTREAM_SUFFIX}"
+
+
+          def _split_microservice_and_downstream(metric_name):
+              base = metric_name
+              for suffix in ["-downstream-detection", "-payment-error-detection"]:
+                  if base.endswith(suffix):
+                      base = base[: -len(suffix)]
+                      break
+
+              parts = [p for p in base.split("-") if p]
+              if len(parts) < 2:
+                  return base, base
+
+              # First token that starts with uppercase usually marks downstream name.
+              split_idx = None
+              for idx, token in enumerate(parts):
+                  if token and token[0].isupper():
+                      split_idx = idx
+                      break
+
+              if split_idx is None or split_idx == 0:
+                  microservice = base
+                  downstream = base
+              else:
+                  microservice = "-".join(parts[:split_idx])
+                  downstream = "-".join(parts[split_idx:])
+
+              return microservice, downstream
+
+
+          def _metric_label(metric_name, fallback_name):
+              microservice, downstream = _split_microservice_and_downstream(metric_name)
+              if not downstream:
+                  downstream = fallback_name
+              if not microservice:
+                  microservice = "-"
+              return f"{downstream} ({microservice})"
+
+
+          def _build_widgets(region, namespace, metric_map):
+              sorted_items = sorted(metric_map.items(), key=lambda item: item[0].lower())
+              if not sorted_items:
+                  return []
+
+              metrics = []
+              for idx, (ds_name, metric_name) in enumerate(sorted_items):
+                  namespace_value = namespace if idx == 0 else "."
+                  metrics.append([
+                      namespace_value,
+                      metric_name,
+                      {
+                          "label": _metric_label(metric_name, ds_name)
+                      }
+                  ])
+
+              return [{
+                  "type": "metric",
+                  "x": 0,
+                  "y": 95,
+                  "width": 24,
+                  "height": 7,
+                  "properties": {
+                      "metrics": metrics,
+                      "sparkline": True,
+                      "view": "singleValue",
+                      "region": region,
+                      "title": "Downstream Errors",
+                      "stat": "Sum",
+                      "period": 86400,
+                      "start": "-PT168H",
+                      "end": "P0D"
+                  }
+              }]
+
+
+          def lambda_handler(event, context):
+              params = event.get("params", {})
+              region = params.get("Region", "eu-south-1")
+              namespace = "AdvancedMetric"
+              metric_map = _parse_metric_map(params.get("DownstreamMetricMap", ""))
+
+              widgets = _build_widgets(region, namespace, metric_map)
+              fragment = ""
+              if widgets:
+                  fragment = "," + ",".join(json.dumps(w, separators=(",", ":")) for w in widgets)
+
+              return {
+                  "requestId": event.get("requestId", ""),
+                  "status": "success",
+                  "fragment": fragment
+              }
+      Handler: index.lambda_handler
+      Runtime: python3.12
+      Role: !GetAtt OerDownstreamErrorWidgetsExecutionRoleV2.Arn
+
+  OerDownstreamErrorWidgetsFunctionPermissionsV1:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt OerDownstreamErrorWidgetsFunctionV2.Arn
       Principal: 'cloudformation.amazonaws.com'
       SourceAccount: !Ref AWS::AccountId
       SourceArn: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*
