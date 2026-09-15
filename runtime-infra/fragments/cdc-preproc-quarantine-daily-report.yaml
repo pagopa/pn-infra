@@ -49,6 +49,24 @@ Parameters:
     AllowedValues:
       - ENABLED
       - DISABLED
+  
+  QuarantinePrefix:
+    Type: String
+
+  ReportPrefix:
+    Type: String
+
+  TableFolderPrefix:
+    Type: String
+
+  ReportProducer:
+    Type: String
+
+  ReportEventName:
+    Type: String
+
+  ReportTitle:
+    Type: String
 
 Resources:
 
@@ -87,7 +105,7 @@ Resources:
                 Condition:
                   StringLike:
                     s3:prefix:
-                      - "cdcTos3/cdc-preproc/quarantine/*"
+                      - !Sub "${QuarantinePrefix}*"
 
         - PolicyName: s3-read-quarantine
           PolicyDocument:
@@ -97,8 +115,8 @@ Resources:
                 Action:
                   - s3:GetObject
                 Resource:
-                  - !Sub "arn:${AWS::Partition}:s3:::${LogsBucketName}/cdcTos3/cdc-preproc/quarantine/TABLE_NAME_*"
-                  - !Sub "arn:${AWS::Partition}:s3:::${LogsBucketName}/reporting/cdcTos3/cdc-preproc/quarantine/*"
+                  - !Sub "arn:${AWS::Partition}:s3:::${LogsBucketName}/${QuarantinePrefix}${TableFolderPrefix}*"
+                  - !Sub "arn:${AWS::Partition}:s3:::${LogsBucketName}/${ReportPrefix}*"
 
         - PolicyName: s3-write-report
           PolicyDocument:
@@ -108,8 +126,8 @@ Resources:
                 Action:
                   - s3:PutObject
                   - s3:AbortMultipartUpload
-                Resource: !Sub "arn:${AWS::Partition}:s3:::${LogsBucketName}/reporting/cdcTos3/cdc-preproc/quarantine/*"
-
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${LogsBucketName}/${ReportPrefix}*"
+                
         - PolicyName: kms
           PolicyDocument:
             Version: "2012-10-17"
@@ -146,6 +164,13 @@ Resources:
           ENVIRONMENT: !Ref EnvironmentType
           SNS_TOPIC_ARN: !Ref WarningSNSTopicArn
           REPORT_NOTIFICATIONS_ENABLED: !Ref ReportNotificationsEnabled
+          QUARANTINE_PREFIX: !Ref QuarantinePrefix
+          REPORT_PREFIX: !Ref ReportPrefix
+          TABLE_FOLDER_PREFIX: !Ref TableFolderPrefix
+          REPORT_PRODUCER: !Ref ReportProducer
+          REPORT_EVENT_NAME: !Ref ReportEventName
+          REPORT_TITLE: !Ref ReportTitle
+
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub "${LambdasBasePath}/cdc-preproc-quarantine-daily-report.zip"

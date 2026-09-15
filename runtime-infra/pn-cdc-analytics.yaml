@@ -98,6 +98,30 @@ Parameters:
       - "true"
       - "false"
     Description: Enable CDC quarantine report notifications
+  QuarantineReportSourcePrefix:
+    Type: String
+    Default: "cdcTos3/cdc-preproc/quarantine/"
+    Description: S3 prefix containing CDC quarantine data
+  QuarantineReportOutputPrefix:
+    Type: String
+    Default: "reporting/cdcTos3/cdc-preproc/quarantine/"
+    Description: S3 prefix containing CDC quarantine reports
+  QuarantineReportTableFolderPrefix:
+    Type: String
+    Default: "TABLE_NAME_"
+    Description: Prefix used to identify CDC table folders
+  QuarantineReportProducer:
+    Type: String
+    Default: "pn-cdc-quarantine-daily-report"
+    Description: Producer used for Warning Notification routing
+  QuarantineReportEventName:
+    Type: String
+    Default: "cdc-quarantine-daily-report"
+    Description: Event name used for Warning Notification reports
+  QuarantineReportTitle:
+    Type: String
+    Default: "CDC Preproc quarantine daily report"
+    Description: Title used for Warning Notification reports
 
 Resources:
   GlueServiceRole:
@@ -722,6 +746,12 @@ Resources:
         ReportNotificationsEnabled: !Ref QuarantineReportNotificationsEnabled
         ScheduleExpression: !Ref QuarantineReportScheduleExpression
         ScheduleState: !Ref QuarantineReportScheduleState
+        QuarantinePrefix: !Ref QuarantineReportSourcePrefix
+        ReportPrefix: !Ref QuarantineReportOutputPrefix
+        TableFolderPrefix: !Ref QuarantineReportTableFolderPrefix
+        ReportProducer: !Ref QuarantineReportProducer
+        ReportEventName: !Ref QuarantineReportEventName
+        ReportTitle: !Ref QuarantineReportTitle
 
 Outputs:
   GlueDatabaseName:

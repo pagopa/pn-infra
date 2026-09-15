@@ -8,13 +8,13 @@ from botocore.config import Config
 from reporting import publish_warning_report
 
 
-QUARANTINE_PREFIX = "cdcTos3/cdc-preproc/quarantine/"
-REPORT_PREFIX = "reporting/cdcTos3/cdc-preproc/quarantine/"
-TABLE_FOLDER_PREFIX = "TABLE_NAME_"
+QUARANTINE_PREFIX = os.environ["QUARANTINE_PREFIX"]
+REPORT_PREFIX = os.environ["REPORT_PREFIX"]
+TABLE_FOLDER_PREFIX = os.environ["TABLE_FOLDER_PREFIX"]
 
-REPORT_PRODUCER = "pn-cdc-quarantine-daily-report"
-REPORT_EVENT_NAME = "cdc-quarantine-daily-report"
-REPORT_TITLE = "CDC Preproc quarantine daily report"
+REPORT_PRODUCER = os.environ["REPORT_PRODUCER"]
+REPORT_EVENT_NAME = os.environ["REPORT_EVENT_NAME"]
+REPORT_TITLE = os.environ["REPORT_TITLE"]
 
 S3_BUCKET = os.environ["S3_BUCKET"]
 ENVIRONMENT = os.environ["ENVIRONMENT"]
