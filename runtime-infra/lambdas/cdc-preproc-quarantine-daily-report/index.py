@@ -236,33 +236,55 @@ def _generate_report(event, context):
         ContentType="application/json",
     )
 
-    # Store the original quarantine records.
-    s3.upload_file(
-        csv_path,
-        S3_BUCKET,
-        csv_report_key,
-        ExtraArgs={
-            "ContentType": "text/csv",
-        },
-    )
+    attachment = None
 
-    csv_size = os.path.getsize(csv_path)
+    if total_records > 0:
+        # Store the original quarantine records only when
+        # the reference day contains quarantine records.
+        s3.upload_file(
+            csv_path,
+            S3_BUCKET,
+            csv_report_key,
+            ExtraArgs={
+                "ContentType": "text/csv",
+            },
+        )
 
-    logger.info(
-        "Quarantine reports stored in S3. "
-        "ReferenceDate=%s, "
-        "Tables=%s, "
-        "Records=%s, "
-        "JsonReportPath=s3://%s/%s, "
-        "CsvReportPath=s3://%s/%s",
-        reference_date,
-        len(tables),
-        total_records,
-        S3_BUCKET,
-        json_report_key,
-        S3_BUCKET,
-        csv_report_key,
-    )
+        csv_size = os.path.getsize(csv_path)
+
+        attachment = {
+            "bucket": S3_BUCKET,
+            "key": csv_report_key,
+            "filename": csv_filename,
+            "size": csv_size,
+        }
+
+        logger.info(
+            "Quarantine reports stored in S3. "
+            "ReferenceDate=%s, "
+            "Tables=%s, "
+            "Records=%s, "
+            "JsonReportPath=s3://%s/%s, "
+            "CsvReportPath=s3://%s/%s",
+            reference_date,
+            len(tables),
+            total_records,
+            S3_BUCKET,
+            json_report_key,
+            S3_BUCKET,
+            csv_report_key,
+        )
+
+    else:
+        logger.info(
+            "No quarantine records found. "
+            "ReferenceDate=%s, "
+            "JsonReportPath=s3://%s/%s. "
+            "The report will be published without attachment.",
+            reference_date,
+            S3_BUCKET,
+            json_report_key,
+        )
 
     # Publish the application report only when notifications
     # are explicitly enabled.
@@ -291,18 +313,15 @@ def _generate_report(event, context):
             metrics=metrics,
             details=details,
             links={},
-            attachment={
-                "bucket": S3_BUCKET,
-                "key": csv_report_key,
-                "filename": csv_filename,
-                "size": csv_size,
-            },
+            attachment=attachment,
         )
 
         logger.info(
             "Quarantine report notification published. "
-            "Producer=%s",
+            "Producer=%s, "
+            "Attachment=%s",
             REPORT_PRODUCER,
+            attachment is not None,
         )
 
     logger.info(
@@ -321,5 +340,9 @@ def _generate_report(event, context):
         "tablesCount": len(tables),
         "recordCount": total_records,
         "jsonReportKey": json_report_key,
-        "csvReportKey": csv_report_key,
+        "csvReportKey": (
+            csv_report_key
+            if total_records > 0
+            else None
+        ),
     }
