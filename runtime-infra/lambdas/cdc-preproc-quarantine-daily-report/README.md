@@ -27,15 +27,18 @@ La soluzione:
 - recupera le cartelle delle tabelle presenti sotto `quarantine/`;
 - considera solamente le cartelle con prefisso `TABLE_NAME_`;
 - utilizza come data di riferimento il giorno UTC precedente all'esecuzione;
-- legge tutti i file della partizione giornaliera `YYYY/MM/DD`, senza dettaglio orario;
+- legge tutti i file della partizione giornaliera `YYYY/MM/DD`, includendo tutte le partizioni orarie;
 - conta i record presenti nei file, considerando ogni riga non vuota come un record;
-- aggrega il conteggio per tabella;
+- aggrega il conteggio sull'intera giornata per tabella, senza dettaglio orario;
 - include nel summary solamente le tabelle con almeno un record in quarantena;
 - genera il report anche quando non viene trovato alcun record.
 
 ## Output
 
-Per ogni esecuzione vengono prodotti un summary JSON e un CSV.
+Per ogni esecuzione vengono prodotti:
+
+- un summary JSON con il conteggio giornaliero dei record per tabella;
+- un file di dettaglio `.csv` contenente i record originali in formato JSON Lines.
 
 ### Summary JSON
 
@@ -62,9 +65,11 @@ Esempio:
 
 Se non sono presenti record, `tables` è una lista vuota.
 
-### CSV
+### File di dettaglio
 
-Il CSV contiene i record originali presenti in quarantena nella giornata di riferimento, una riga per record.
+Il file `.csv` contiene i record originali presenti in quarantena nella giornata di riferimento.
+
+Il contenuto mantiene attualmente il formato JSON Lines, con un record JSON per riga.
 
 Esempio:
 
@@ -73,64 +78,52 @@ Esempio:
 {"awsRegion":"eu-south-1","eventID":"e545s1d8a5","eventName":"REMOVE","userIdentity":null,"recordFormat":"application/json","tableName":"pn-UserAttributes",...}
 ```
 
-Il CSV viene costruito progressivamente in `/tmp` per evitare di mantenere l'intero dataset giornaliero in memoria.
+Il file viene costruito progressivamente in `/tmp` per evitare di mantenere l'intero dataset giornaliero in memoria.
 
 ## Salvataggio su S3
 
-JSON e CSV vengono salvati nella partizione relativa alla giornata di riferimento:
+Il summary JSON e il file di dettaglio vengono salvati sotto il prefix di reporting, nella partizione relativa alla giornata di riferimento:
 
 ```text
-cdcTos3/cdc-preproc/quarantine/report/YYYY/MM/DD/
+reporting/cdcTos3/cdc-preproc/quarantine/YYYY/MM/DD/
 ```
 
-Il nome contiene la data di riferimento e la data e ora UTC di generazione.
+Il nome dei file contiene la data di riferimento e la data e ora UTC di generazione:
 
 ```text
 report_quarantine_<reference-date>_<generation-timestamp>.json
 report_quarantine_<reference-date>_<generation-timestamp>.csv
 ```
 
-## Esempio degli output prodotti
+### Esempio
 
-Per una esecuzione effettuata il `2026-09-11` relativa alla giornata `2026-09-10`:
-
-### JSON su S3
+Per un'esecuzione effettuata il `2026-09-11` relativa alla giornata `2026-09-10`:
 
 ```text
-s3://<LogsBucketName>/cdcTos3/cdc-preproc/quarantine/report/2026/09/10/report_quarantine_2026-09-10_20260911T070003Z.json
-```
-
-```json
-{
-  "generatedAt": "2026-09-11T07:00:03Z",
-  "referenceDate": "2026-09-10",
-  "tables": [
-    {
-      "tableName": "pn-Notifications",
-      "recordCount": 12
-    },
-    {
-      "tableName": "pn-UserAttributes",
-      "recordCount": 5
-    }
-  ]
-}
-```
-
-### CSV su S3
-
-```text
-s3://<LogsBucketName>/cdcTos3/cdc-preproc/quarantine/report/2026/09/10/report_quarantine_2026-09-10_20260911T070003Z.csv
+s3://<LogsBucketName>/reporting/cdcTos3/cdc-preproc/quarantine/2026/09/10/report_quarantine_2026-09-10_20260911T070003Z.json
 ```
 
 ```text
-{"awsRegion":"eu-south-1","eventID":"e54489d8a5","eventName":"INSERT","userIdentity":null,"recordFormat":"application/json","tableName":"pn-Notifications",...}
-{"awsRegion":"eu-south-1","eventID":"e545s1d8a5","eventName":"REMOVE","userIdentity":null,"recordFormat":"application/json","tableName":"pn-UserAttributes",...}
+s3://<LogsBucketName>/reporting/cdcTos3/cdc-preproc/quarantine/2026/09/10/report_quarantine_2026-09-10_20260911T070003Z.csv
 ```
 
-### Report inviato a Warning Notifications
+## Warning Notifications
 
-Se `ReportNotificationsEnabled=true`, viene pubblicato sul Warning SNS topic un evento `report` con metriche, dettaglio per tabella e attachment CSV.
+Se `ReportNotificationsEnabled=true`, la Lambda pubblica sul Warning SNS topic un evento con `eventType=report`.
+
+Il producer utilizzato per il routing è:
+
+```text
+pn-cdc-quarantine-daily-report
+```
+
+L'evento contiene:
+
+- data di riferimento;
+- numero di tabelle con record in quarantena;
+- numero totale di record;
+- conteggio dei record per singola tabella;
+- attachment relativo al file `.csv`, accessibile tramite presigned URL.
 
 Esempio:
 
@@ -166,25 +159,110 @@ Esempio:
 }
 ```
 
-Con una route in modalità `ATTACHMENT`, il dispatcher utilizza la presigned URL per inviare su Slack il riepilogo e il CSV allegato.
+La modalità di consegna verso Slack è configurata nella route del Warning Notification Dispatcher.
 
-## Notifica
+Con una route `ATTACHMENT`, il dispatcher utilizza la presigned URL per recuperare il file e allegarlo alla notifica Slack.
 
-La pubblicazione del report è controllata tramite il parametro `ReportNotificationsEnabled`.
+## Configurazione
 
-Il producer utilizzato per il routing è:
+I principali parametri applicativi sono definiti in `runtime-infra/pn-cdc-analytics.yaml` e propagati alla Lambda tramite CloudFormation.
+
+Sono configurabili:
+
+- prefix S3 della quarantine;
+- prefix S3 dei report;
+- prefix delle cartelle delle tabelle;
+- producer del report;
+- event name;
+- titolo del report;
+- scheduling;
+- stato dello scheduler;
+- abilitazione delle notifiche;
+- retention dei log.
+
+Le configurazioni specifiche di ambiente possono sovrascrivere i relativi valori tramite i file:
 
 ```text
-pn-cdc-quarantine-daily-report
+runtime-infra/pn-cdc-analytics-<env>-cfg.json
 ```
 
 ## Scheduling
 
-La Lambda viene eseguita ogni giorno alle 07:00 UTC tramite EventBridge Scheduler e produce un report relativo alla giornata UTC precedente.
+La Lambda viene eseguita tramite EventBridge Scheduler.
 
-La frequenza di esecuzione è configurata nel file runtime-infra\pn-cdc-analytics-dev-cfg.json tramite il parametro dedicato alla schedulazione, mentre l'attivazione o la disattivazione dello scheduler è controllata dal relativo parametro di stato.
+Ad ogni esecuzione viene elaborata l'intera giornata UTC precedente:
 
-**Note**
+```text
+00:00:00 - 23:59:59 UTC
+```
+
+La schedulazione è configurabile tramite:
+
+```text
+QuarantineReportScheduleExpression
+```
+
+mentre lo stato dello scheduler è controllato tramite:
+
+```text
+QuarantineReportScheduleState
+```
+
+Ad esempio, in DEV la configurazione può essere definita in:
+
+```text
+runtime-infra/pn-cdc-analytics-dev-cfg.json
+```
+
+Eventuali modifiche alla frequenza o allo stato dello scheduler non richiedono modifiche al codice della Lambda.
+
+## Logging
+
+La Lambda utilizza un CloudWatch Log Group dedicato creato tramite:
+
+```text
+fragments/log-group.yaml
+```
+
+Il Log Group viene associato esplicitamente alla Lambda tramite `LoggingConfig`.
+
+La retention utilizza il parametro `LogRetention` fornito dall'infrastruttura e propagato fino a `LogGroupRetention`.
+
+I log applicativi riportano le principali fasi dell'elaborazione:
+
+- avvio del report;
+- numero di cartelle delle tabelle individuate;
+- numero di record trovati per tabella;
+- completamento della scrittura dei report su S3;
+- path S3 del summary JSON e del file di dettaglio;
+- pubblicazione della notifica;
+- completamento dell'elaborazione.
+
+In caso di errore tecnico viene prodotto un log `ERROR` e l'eccezione viene rilanciata in modo che l'invocazione Lambda risulti fallita.
+
+## Allarmi
+
+Gli allarmi tecnici della Lambda vengono creati tramite:
+
+```text
+fragments/lambda-alarms.yaml
+```
+
+Gli allarmi sono relativi ai fallimenti tecnici della Lambda e sono separati dal report applicativo inviato tramite Warning Notifications.
+
+In particolare vengono considerate:
+
+- le righe di log con livello `ERROR`;
+- la metrica nativa `AWS/Lambda Errors`.
+
+Gli allarmi vengono pubblicati sul topic configurato tramite `AlarmSNSTopicArn`.
+
+## Note
+
 - Lo scheduler può essere abilitato o disabilitato tramite configurazione.
-- Il report analizza i record presenti in quarantena nel periodo compreso tra le 00:00:00 e le 23:59:59 UTC del giorno precedente.
-- Eventuali modifiche alla frequenza di esecuzione possono essere effettuate aggiornando la configurazione nel file runtime-infra\pn-cdc-analytics-dev-cfg.json, senza necessità di intervenire sul codice della Lambda.
+- La data di riferimento è sempre il giorno UTC precedente all'esecuzione.
+- Il conteggio viene effettuato sull'intera giornata senza dettaglio orario.
+- Le tabelle senza record in quarantena non vengono incluse nel summary.
+- Il file di dettaglio utilizza attualmente JSON Lines anche se salvato con estensione `.csv`.
+- L'eventuale evoluzione verso un CSV strutturato per colonne può essere gestita separatamente senza modificare il formato del summary.
+- `WarningSNSTopicArn` viene utilizzato per il report applicativo, mentre `AlarmSNSTopicArn` viene utilizzato per gli allarmi tecnici della Lambda.
