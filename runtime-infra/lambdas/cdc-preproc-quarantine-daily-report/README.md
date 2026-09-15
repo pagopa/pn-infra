@@ -31,14 +31,13 @@ La soluzione:
 - conta i record presenti nei file, considerando ogni riga non vuota come un record;
 - aggrega il conteggio sull'intera giornata per tabella, senza dettaglio orario;
 - include nel summary solamente le tabelle con almeno un record in quarantena;
-- genera il report anche quando non viene trovato alcun record.
+- genera il summary anche quando non viene trovato alcun record.
 
 ## Output
 
-Per ogni esecuzione vengono prodotti:
+Per ogni esecuzione viene prodotto un summary JSON con il conteggio giornaliero dei record per tabella.
 
-- un summary JSON con il conteggio giornaliero dei record per tabella;
-- un file di dettaglio `.csv` contenente i record originali in formato JSON Lines.
+Quando sono presenti record in quarantena viene prodotto anche un file di dettaglio `.csv` contenente i record originali in formato JSON Lines.
 
 ### Summary JSON
 
@@ -67,7 +66,7 @@ Se non sono presenti record, `tables` è una lista vuota.
 
 ### File di dettaglio
 
-Il file `.csv` contiene i record originali presenti in quarantena nella giornata di riferimento.
+Il file `.csv` viene prodotto solamente quando nella giornata di riferimento sono presenti record in quarantena.
 
 Il contenuto mantiene attualmente il formato JSON Lines, con un record JSON per riga.
 
@@ -80,13 +79,17 @@ Esempio:
 
 Il file viene costruito progressivamente in `/tmp` per evitare di mantenere l'intero dataset giornaliero in memoria.
 
+Se non vengono trovati record, il file di dettaglio non viene salvato su S3 e il report viene pubblicato senza attachment.
+
 ## Salvataggio su S3
 
-Il summary JSON e il file di dettaglio vengono salvati sotto il prefix di reporting, nella partizione relativa alla giornata di riferimento:
+Il summary JSON viene sempre salvato sotto il prefisso di reporting, nella partizione relativa alla giornata di riferimento:
 
 ```text
 reporting/cdcTos3/cdc-preproc/quarantine/YYYY/MM/DD/
 ```
+
+Quando sono presenti record, nello stesso percorso viene salvato anche il file di dettaglio `.csv`.
 
 Il nome dei file contiene la data di riferimento e la data e ora UTC di generazione:
 
@@ -97,7 +100,7 @@ report_quarantine_<reference-date>_<generation-timestamp>.csv
 
 ### Esempio
 
-Per un'esecuzione effettuata il `2026-09-11` relativa alla giornata `2026-09-10`:
+Per un'esecuzione effettuata il `2026-09-11` relativa alla giornata `2026-09-10`, in presenza di record:
 
 ```text
 s3://<LogsBucketName>/reporting/cdcTos3/cdc-preproc/quarantine/2026/09/10/report_quarantine_2026-09-10_20260911T070003Z.json
@@ -106,6 +109,8 @@ s3://<LogsBucketName>/reporting/cdcTos3/cdc-preproc/quarantine/2026/09/10/report
 ```text
 s3://<LogsBucketName>/reporting/cdcTos3/cdc-preproc/quarantine/2026/09/10/report_quarantine_2026-09-10_20260911T070003Z.csv
 ```
+
+In assenza di record viene salvato solamente il summary JSON.
 
 ## Warning Notifications
 
@@ -123,9 +128,11 @@ L'evento contiene:
 - numero di tabelle con record in quarantena;
 - numero totale di record;
 - conteggio dei record per singola tabella;
-- attachment relativo al file `.csv`, accessibile tramite presigned URL.
+- attachment del file `.csv`, quando sono presenti record in quarantena.
 
-Esempio:
+Quando l'attachment è presente, contiene una presigned URL utilizzata dal Warning Notification Dispatcher per recuperare il file.
+
+Esempio con record presenti:
 
 ```json
 {
@@ -159,9 +166,37 @@ Esempio:
 }
 ```
 
+Se non sono presenti record, l'evento viene pubblicato senza `attachment`, ad esempio:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "eventId": "<lambda-request-id>",
+  "eventType": "report",
+  "producer": "pn-cdc-quarantine-daily-report",
+  "eventName": "cdc-quarantine-daily-report",
+  "occurredAt": "2026-09-11T07:00:03+00:00",
+  "severity": "info",
+  "environment": "dev",
+  "title": "CDC Preproc quarantine daily report",
+  "data": {
+    "metrics": {
+      "Reference date": "2026-09-10",
+      "Tables in quarantine": 0,
+      "Records in quarantine": 0
+    },
+    "details": {}
+  },
+  "links": {}
+}
+```
+
 La modalità di consegna verso Slack è configurata nella route del Warning Notification Dispatcher.
 
-Con una route `ATTACHMENT`, il dispatcher utilizza la presigned URL per recuperare il file e allegarlo alla notifica Slack.
+Con una route `ATTACHMENT`:
+
+- se il report contiene un attachment, il dispatcher recupera il file tramite presigned URL e lo allega alla notifica Slack;
+- se il report non contiene un attachment, il dispatcher invia solamente il summary su Slack.
 
 ## Configurazione
 
@@ -169,9 +204,9 @@ I principali parametri applicativi sono definiti in `runtime-infra/pn-cdc-analyt
 
 Sono configurabili:
 
-- prefix S3 della quarantine;
-- prefix S3 dei report;
-- prefix delle cartelle delle tabelle;
+- prefisso S3 della quarantine;
+- prefisso S3 dei report;
+- prefisso delle cartelle delle tabelle;
 - producer del report;
 - event name;
 - titolo del report;
@@ -190,11 +225,7 @@ runtime-infra/pn-cdc-analytics-<env>-cfg.json
 
 La Lambda viene eseguita tramite EventBridge Scheduler.
 
-Ad ogni esecuzione viene elaborata l'intera giornata UTC precedente:
-
-```text
-00:00:00 - 23:59:59 UTC
-```
+Ad ogni esecuzione vengono elaborati tutti i record presenti nella partizione `YYYY/MM/DD` relativa alla giornata UTC precedente, includendo tutte le partizioni orarie.
 
 La schedulazione è configurabile tramite:
 
@@ -234,7 +265,8 @@ I log applicativi riportano le principali fasi dell'elaborazione:
 - numero di cartelle delle tabelle individuate;
 - numero di record trovati per tabella;
 - completamento della scrittura dei report su S3;
-- path S3 del summary JSON e del file di dettaglio;
+- percorsi S3 degli output generati;
+- assenza di record in quarantena e pubblicazione del report senza attachment;
 - pubblicazione della notifica;
 - completamento dell'elaborazione.
 
@@ -263,6 +295,9 @@ Gli allarmi vengono pubblicati sul topic configurato tramite `AlarmSNSTopicArn`.
 - La data di riferimento è sempre il giorno UTC precedente all'esecuzione.
 - Il conteggio viene effettuato sull'intera giornata senza dettaglio orario.
 - Le tabelle senza record in quarantena non vengono incluse nel summary.
+- Il summary JSON viene generato anche quando non sono presenti record in quarantena.
+- Il file di dettaglio viene salvato su S3 e allegato alla notifica solamente quando sono presenti record.
+- In assenza di record, la notifica contiene solamente il summary con `Tables in quarantine = 0` e `Records in quarantine = 0`.
 - Il file di dettaglio utilizza attualmente JSON Lines anche se salvato con estensione `.csv`.
 - L'eventuale evoluzione verso un CSV strutturato per colonne può essere gestita separatamente senza modificare il formato del summary.
 - `WarningSNSTopicArn` viene utilizzato per il report applicativo, mentre `AlarmSNSTopicArn` viene utilizzato per gli allarmi tecnici della Lambda.
