@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { queryExecutionParallel } = require('./lib/athena');
-const { buildMetricNameFromQueryName, putBusinessMetric } = require('./lib/cloudwatch');
+const { buildMetricNameFromQueryName, putBusinessMetrics } = require('./lib/cloudwatch');
 const { getOrCreateStartTimeParameter, updateStartTimeParameter } = require('./lib/ssm');
 
 function loadQueryFromResources(fileName) {
@@ -148,13 +148,14 @@ const handler = async (event = {}) => {
     console.log(`Result for ${result.name} - queryExecutionId: ${result.queryExecutionId}`);
     console.log(`Rows (${result.rowCount}):`);
 
-    for (const row of result.rows) {
+    const metricValues = result.rows.map((row) => {
       const logRecord = buildInsightsLog(metricName, result.name, result.queryExecutionId, row);
       console.log(JSON.stringify(logRecord));
 
-      const metricValue = toNumberOrNull(row.diff_hours ?? row.diff_hour) ?? 0;
-      await putBusinessMetric(metricName, metricValue);
-    }
+      return toNumberOrNull(row.diff_hours ?? row.diff_hour) ?? 0;
+    });
+
+    await putBusinessMetrics(metricName, metricValues);
 
     if (queryContext && result.rowCount > 0) {
       console.log(`Keeping start-time parameter ${queryContext.parameterName} unchanged (${queryContext.startTime}) because rows were found`);

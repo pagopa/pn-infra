@@ -27,13 +27,7 @@ async function putBusinessMetrics(metricName, metricValues) {
       MetricName: metricName,
       Unit: 'None',
       Value: value,
-      Timestamp: new Date(),
-      Dimensions: [
-        {
-          Name: metricName,
-          Value: metricName,
-        }
-      ]
+      Timestamp: new Date()
     }));
 
     const input = {

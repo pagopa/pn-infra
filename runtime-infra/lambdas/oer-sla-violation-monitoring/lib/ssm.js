@@ -29,7 +29,7 @@ async function getOrCreateStartTimeParameter(metricName) {
       };
     }
 
-    // Parameter exists but is empty: initialize it to previous hour.
+    // Parameter exists but is empty: initialize it to previous two hours ago.
     await ssmClient.send(
       new PutParameterCommand({
         Name: parameterName,
