@@ -1,0 +1,227 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  CDC Preproc Quarantine Daily Report.
+  Generates a daily report of quarantine record counts aggregated by table,
+  stores the JSON and CSV reports on S3 and optionally publishes
+  a report to the Warning SNS topic.
+
+Parameters:
+
+  ProjectName:
+    Type: String
+  EnvironmentType:
+    Type: String
+    AllowedValues:
+      - dev
+      - test
+      - uat
+      - hotfix
+      - prod
+  LogsBucketName:
+    Type: String
+  LogsBucketKmsKeyArn:
+    Type: String
+  LambdasBucketName:
+    Type: String
+  LambdasBasePath:
+    Type: String
+  WarningSNSTopicArn:
+    Type: String
+  ReportNotificationsEnabled:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+  ScheduleExpression:
+    Type: String
+  ScheduleState:
+    Type: String
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+  QuarantinePrefix:
+    Type: String
+  ReportPrefix:
+    Type: String
+  TableFolderPrefix:
+    Type: String
+  ReportProducer:
+    Type: String
+  ReportEventName:
+    Type: String
+  ReportTitle:
+    Type: String
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: Base URL for CloudFormation fragment templates
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic for Lambda alarms
+  LogRetention:
+    Type: Number
+    Default: 14
+    Description: CloudWatch log retention in days
+
+Resources:
+
+  QuarantineDailyReportLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-cdc-preproc-quarantine-daily-report-${EnvironmentType}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-cdc-preproc-quarantine-daily-report-${EnvironmentType}:*"
+
+        - PolicyName: s3-list-quarantine
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${LogsBucketName}"
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - !Sub "${QuarantinePrefix}*"
+
+        - PolicyName: s3-read-quarantine
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${LogsBucketName}/${QuarantinePrefix}${TableFolderPrefix}*"
+                  - !Sub "arn:${AWS::Partition}:s3:::${LogsBucketName}/${ReportPrefix}*"
+
+        - PolicyName: s3-write-report
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:AbortMultipartUpload
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${LogsBucketName}/${ReportPrefix}*"
+                
+        - PolicyName: kms
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:Encrypt
+                  - kms:GenerateDataKey
+                Resource: !Ref LogsBucketKmsKeyArn
+
+        - PolicyName: sns
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref WarningSNSTopicArn
+
+  QuarantineDailyReportLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Sub "${ProjectName}-cdc-preproc-quarantine-daily-report-${EnvironmentType}"
+        LogGroupRetention: !Ref LogRetention
+        LogGroupPrefix: /aws/lambda
+
+  QuarantineDailyReportLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-cdc-preproc-quarantine-daily-report-${EnvironmentType}"
+      Runtime: python3.14
+      Handler: index.lambda_handler
+      Role: !GetAtt QuarantineDailyReportLambdaRole.Arn
+      Timeout: 300
+      MemorySize: 256
+      ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogGroup: !GetAtt QuarantineDailyReportLogGroup.Outputs.LogGroupName
+      Environment:
+        Variables:
+          S3_BUCKET: !Ref LogsBucketName
+          ENVIRONMENT: !Ref EnvironmentType
+          SNS_TOPIC_ARN: !Ref WarningSNSTopicArn
+          REPORT_NOTIFICATIONS_ENABLED: !Ref ReportNotificationsEnabled
+          QUARANTINE_PREFIX: !Ref QuarantinePrefix
+          REPORT_PREFIX: !Ref ReportPrefix
+          TABLE_FOLDER_PREFIX: !Ref TableFolderPrefix
+          REPORT_PRODUCER: !Ref ReportProducer
+          REPORT_EVENT_NAME: !Ref ReportEventName
+          REPORT_TITLE: !Ref ReportTitle
+
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub "${LambdasBasePath}/cdc-preproc-quarantine-daily-report.zip"
+ 
+  QuarantineDailyReportAlarms:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - QuarantineDailyReportLogGroup
+      - QuarantineDailyReportLambda
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+      Parameters:
+        FunctionName: !Ref QuarantineDailyReportLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  QuarantineDailyReportSchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: invoke-lambda
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt QuarantineDailyReportLambda.Arn
+
+  QuarantineDailyReportScheduler:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub "${ProjectName}-cdc-preproc-quarantine-daily-report-${EnvironmentType}"
+      ScheduleExpression: !Ref ScheduleExpression
+      State: !Ref ScheduleState
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      Target:
+        Arn: !GetAtt QuarantineDailyReportLambda.Arn
+        RoleArn: !GetAtt QuarantineDailyReportSchedulerRole.Arn
