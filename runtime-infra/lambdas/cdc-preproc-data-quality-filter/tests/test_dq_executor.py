@@ -84,6 +84,30 @@ def _field(value):
             id="starts_with_any-values-empty",
         ),
         pytest.param(
+            {"sk": _field("INVALID#1")},
+            {"type": "not_starts_with_any", "field": "sk", "values": ["TOS#", "DATAPRIVACY#"]},
+            True,
+            id="not_starts_with_any-no-match",
+        ),
+        pytest.param(
+            {"sk": _field("TOS#1")},
+            {"type": "not_starts_with_any", "field": "sk", "values": ["TOS#", "DATAPRIVACY#"]},
+            False,
+            id="not_starts_with_any-match",
+        ),
+        pytest.param(
+            {"sk": {"BOOL": True}},
+            {"type": "not_starts_with_any", "field": "sk", "values": ["TOS#", "DATAPRIVACY#"]},
+            False,
+            id="not_starts_with_any-value-not-string",
+        ),
+        pytest.param(
+            {"sk": _field("INVALID#1")},
+            {"type": "not_starts_with_any", "field": "sk", "values": []},
+            False,
+            id="not_starts_with_any-values-empty",
+        ),
+        pytest.param(
             {"addresshash": _field("ENABLED")},
             {"type": "allowed_values", "field": "addresshash", "values": ["ENABLED", "DISABLED"]},
             True,
@@ -154,6 +178,70 @@ def test_is_excluded_match_returns_true_and_exclusion_name():
 
     assert excluded is True
     assert name == "excluded_pk_prefix"
+
+
+# Verify that a conditional exclusion is not applied when its "when" condition
+# is not met.
+def test_is_excluded_conditional_when_not_met_returns_false_and_none():
+    image = {
+        "pk": _field("AB#1"),
+        "sk": _field("INVALID#1"),
+    }
+    exclusions = [
+        {
+            "name": "excluded_invalid_consents",
+            "type": "conditional",
+            "when": {
+                "field": "pk",
+                "operator": "starts_with",
+                "value": "CO#",
+            },
+            "rules": [
+                {
+                    "type": "not_starts_with_any",
+                    "field": "sk",
+                    "values": ["TOS#", "DATAPRIVACY#"],
+                }
+            ],
+        }
+    ]
+
+    excluded, name = is_excluded(image, exclusions)
+
+    assert excluded is False
+    assert name is None
+
+
+# Verify that a conditional exclusion is applied when its "when" condition is
+# met and its nested rule matches.
+def test_is_excluded_conditional_match_returns_true_and_exclusion_name():
+    image = {
+        "pk": _field("CO#1"),
+        "sk": _field("INVALID#1"),
+    }
+    exclusions = [
+        {
+            "name": "excluded_invalid_consents",
+            "type": "conditional",
+            "when": {
+                "field": "pk",
+                "operator": "starts_with",
+                "value": "CO#",
+            },
+            "rules": [
+                {
+                    "type": "not_starts_with_any",
+                    "field": "sk",
+                    "values": ["TOS#", "DATAPRIVACY#"],
+                }
+            ],
+        }
+    ]
+
+    excluded, name = is_excluded(image, exclusions)
+
+    assert excluded is True
+    assert name == "excluded_invalid_consents"
 
 
 # Verify that a check with an unmet "when" condition is skipped and counted as passed.

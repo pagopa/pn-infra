@@ -18,6 +18,11 @@ export const handler = async (event) => {
         const bucketName = process.env.BucketName;
         const rolesTable = process.env.USER_ROLES_TABLE;
         const expectedIdpId = process.env.EXPECTED_IDPID;
+        if (!expectedIdpId) {
+            const msg = "SECURITY ALERT: EXPECTED_IDPID is not configured; authentication blocked";
+            console.warn(msg);
+            throw new Error(msg);
+        }
         const envType = process.env.ENVIRONMENT_TYPE;
         const userAttributes = event.request.userAttributes;
         const email = userAttributes.email;
@@ -68,7 +73,6 @@ export const handler = async (event) => {
 
         return event;
     } catch (err) {
-        console.error("Critical Error in Lambda Handler:", err);
-        return event;
+        throw err;
     }
 };

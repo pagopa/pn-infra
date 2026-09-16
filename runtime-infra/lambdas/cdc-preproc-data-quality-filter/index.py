@@ -158,7 +158,7 @@ def lambda_handler(event, context):
                 )
 
             elif processing_layer == "quarantine":
-                logger.error(
+                logger.warning(
                     "Record routed to quarantine. "
                     "EventID=%s, "
                     "Result=Ok, "
