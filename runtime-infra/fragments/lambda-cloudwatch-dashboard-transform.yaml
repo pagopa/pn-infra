@@ -1880,7 +1880,7 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                                    - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*OerDashboardApiWidgetsFunctionV2:*'
+                  - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${OerDashboardApiWidgetsFunctionV2}'
               - Effect: Allow
                 Action:
                   - apigateway:GET
@@ -2152,6 +2152,7 @@ Resources:
               }
       Handler: index.lambda_handler
       Runtime: python3.12
+      FunctionName: pn-OerDashboardApiWidgetsFunctionV2
       Role: !GetAtt OerDashboardApiWidgetsExecutionRoleV2.Arn
 
   OerDashboardApiWidgetsFunctionPermissionsV2:

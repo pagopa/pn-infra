@@ -798,7 +798,7 @@ Resources:
   OERDashboard:
     Type: AWS::CloudWatch::Dashboard
     Properties:
-      DashboardName: pn-oer-dashboard-draft
+      DashboardName: pn-OER-Dashboard-V2
       DashboardBody:
         Fn::Sub:
           - |
@@ -818,7 +818,7 @@ Resources:
                     ],
                     "view": "timeSeries",
                     "stacked": false,
-                    "region": "eu-south-1",
+                    "region": "${AWS::Region}",
                     "title": "Volumi Giornalieri (Settimanale): In validazione vs Accettate/Rifiutate",
                     "period": 86400,
                     "yAxis": {
@@ -839,13 +839,13 @@ Resources:
                 "height": 6,
                 "properties": {
                     "metrics": [
-                        [ "SEND/BusinessMetrics", "ACCEPTED", { "id": "m1", "label": "Approvate (ACCEPTED)", "color": "#2ca02c", "region": "eu-south-1" } ],
-                        [ ".", "REFUSED", { "id": "m2", "label": "Rifiutate (REFUSED)", "color": "#d62728", "region": "eu-south-1" } ],
-                        [ ".", "IN_VALIDATION", { "id": "m3", "label": "Ingressi in Validazione", "color": "#1f77b4", "region": "eu-south-1" } ]
+                        [ "SEND/BusinessMetrics", "ACCEPTED", { "id": "m1", "label": "Approvate (ACCEPTED)", "color": "#2ca02c", "region": "${AWS::Region}" } ],
+                        [ ".", "REFUSED", { "id": "m2", "label": "Rifiutate (REFUSED)", "color": "#d62728", "region": "${AWS::Region}" } ],
+                        [ ".", "IN_VALIDATION", { "id": "m3", "label": "Ingressi in Validazione", "color": "#1f77b4", "region": "${AWS::Region}" } ]
                     ],
                     "view": "bar",
                     "stacked": true,
-                    "region": "eu-south-1",
+                    "region": "${AWS::Region}",
                     "title": "Volumi Giornalieri",
                     "period": 86400,
                     "yAxis": {
@@ -1114,7 +1114,7 @@ Resources:
                     ],
                     "view": "timeSeries",
                     "stacked": false,
-                    "region": "eu-south-1",
+                    "region": "${AWS::Region}",
                     "stat": "Sum",
                     "period": 300,
                     "start": "-PT168H",
@@ -1132,7 +1132,7 @@ Resources:
                         ],
                         "view": "timeSeries",
                         "stacked": false,
-                        "region": "eu-south-1",
+                        "region": "${AWS::Region}",
                         "stat": "Sum",
                         "period": 300,
                         "start": "-PT168H",
@@ -1150,7 +1150,7 @@ Resources:
                         ],
                         "view": "timeSeries",
                         "stacked": false,
-                        "region": "eu-south-1",
+                        "region": "${AWS::Region}",
                         "stat": "Sum",
                         "period": 300,
                         "start": "-PT168H",
@@ -1168,48 +1168,12 @@ Resources:
                         ],
                         "view": "timeSeries",
                         "stacked": false,
-                        "region": "eu-south-1",
+                        "region": "${AWS::Region}",
                         "stat": "Sum",
                         "period": 300,
                         "start": "-PT168H",
                         "end": "P0D",
                         "title": "DynamoDB - Write Throttles"
-                    }
-                },
-                {
-                    "type": "metric",
-                    "width": 12,
-                    "height": 6,
-                    "properties": {
-                        "metrics": [
-                            [ { "expression": "SELECT SUM(ThrottledRequests) FROM \"AWS/SSM\"", "label": "ThrottledRequests", "id": "q1" } ]
-                        ],
-                        "view": "timeSeries",
-                        "stacked": false,
-                        "region": "eu-south-1",
-                        "stat": "Sum",
-                        "period": 300,
-                        "start": "-PT168H",
-                        "end": "P0D",
-                        "title": "Parameter Store - Throttled Requests"
-                    }
-                },
-                {
-                    "type": "metric",
-                    "width": 12,
-                    "height": 6,
-                    "properties": {
-                        "metrics": [
-                            [ { "expression": "SELECT SUM(ThrottledRequests) FROM \"AWS/SecretsManager\"", "label": "ThrottledRequests", "id": "q1" } ]
-                        ],
-                        "view": "timeSeries",
-                        "stacked": false,
-                        "region": "eu-south-1",
-                        "stat": "Sum",
-                        "period": 300,
-                        "start": "-PT168H",
-                        "end": "P0D",
-                        "title": "Secrets Manager - Throttled Requests"
                     }
                 },
                 {
@@ -1222,7 +1186,7 @@ Resources:
                         ],
                         "view": "timeSeries",
                         "stacked": false,
-                        "region": "eu-south-1",
+                        "region": "${AWS::Region}",
                         "stat": "Maximum",
                         "period": 300,
                         "start": "-PT168H",
@@ -1394,22 +1358,47 @@ Resources:
       LogGroupName: !Sub /aws/lambda/${OerEcsTaskDeltaMetricsFunction}
       RetentionInDays: !Ref LogRetention
 
-  OerEcsTaskDeltaMetricsScheduleRule:
-    Type: AWS::Events::Rule
+  OerEcsTaskDeltaMetricsSchedulerRole:
+    Type: AWS::IAM::Role
     Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: InvokeOerEcsTaskDeltaMetricsFunction
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt OerEcsTaskDeltaMetricsFunction.Arn
+
+  OerEcsTaskDeltaMetricsScheduleRule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: pn-oer-ecs-task-delta-metrics-scheduler
       Description: Trigger ECS task delta metrics Lambda every minute.
       ScheduleExpression: rate(1 minute)
       State: !Ref EcsTaskDeltaMetricsScheduleState
-      Targets:
-        - Arn: !GetAtt OerEcsTaskDeltaMetricsFunction.Arn
-          Id: OerEcsTaskDeltaMetricsTarget
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt OerEcsTaskDeltaMetricsFunction.Arn
+        RoleArn: !GetAtt OerEcsTaskDeltaMetricsSchedulerRole.Arn
 
   OerEcsTaskDeltaMetricsInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref OerEcsTaskDeltaMetricsFunction
-      Principal: events.amazonaws.com
+      Principal: scheduler.amazonaws.com
       SourceArn: !GetAtt OerEcsTaskDeltaMetricsScheduleRule.Arn
 
 Outputs:
