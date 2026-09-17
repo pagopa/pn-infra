@@ -1,3 +1,4 @@
+import csv
 import json
 import os
 from datetime import datetime, timedelta, timezone
@@ -25,6 +26,20 @@ REPORT_NOTIFICATIONS_ENABLED = (
     os.environ.get("REPORT_NOTIFICATIONS_ENABLED", "false").lower() == "true"
 )
 
+CSV_HEADER = [
+    "awsRegion",
+    "eventID",
+    "eventName",
+    "tableName",
+    "recordFormat",
+    "eventSource",
+    "approximateCreationDateTime",
+    "keys",
+    "newImage",
+    "oldImage",
+    "sizeBytes",
+]
+
 s3 = boto3.client(
     "s3",
     region_name=AWS_REGION,
@@ -49,9 +64,47 @@ def _extract_table_name(folder):
     )
 
 
+def _write_csv_record(
+    csv_writer,
+    record,
+):
+    dynamodb = record.get("dynamodb", {})
+
+    csv_writer.writerow(
+        [
+            record.get("awsRegion", ""),
+            record.get("eventID", ""),
+            record.get("eventName", ""),
+            record.get("tableName", ""),
+            record.get("recordFormat", ""),
+            record.get("eventSource", ""),
+            dynamodb.get(
+                "ApproximateCreationDateTime",
+                "",
+            ),
+            json.dumps(
+                dynamodb.get("Keys", {}),
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            json.dumps(
+                dynamodb.get("NewImage", {}),
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            json.dumps(
+                dynamodb.get("OldImage", {}),
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            dynamodb.get("SizeBytes", ""),
+        ]
+    )
+
+
 def _write_daily_records(
     day_prefix,
-    csv_file,
+    csv_writer,
 ):
     paginator = s3.get_paginator("list_objects_v2")
 
@@ -74,8 +127,14 @@ def _write_daily_records(
                 if not line.strip():
                     continue
 
-                csv_file.write(line)
-                csv_file.write(b"\n")
+                record = json.loads(
+                    line.decode("utf-8")
+                )
+
+                _write_csv_record(
+                    csv_writer,
+                    record,
+                )
 
                 record_count += 1
 
@@ -169,18 +228,30 @@ def _generate_report(event, context):
     csv_path = f"/tmp/{csv_filename}"
 
     tables = []
+    csv_file = None
+    csv_writer = None
 
-    # Read all records from the reference day and write them
-    # progressively to /tmp to avoid keeping the entire daily
-    # dataset in Lambda memory.
-    with open(csv_path, "wb") as csv_file:
+    try:
         for folder in folders:
             table_name = _extract_table_name(folder)
             day_prefix = f"{folder}{day_path}"
 
+            # Open the CSV only when processing starts.
+            # The file is removed later if no records are found.
+            if csv_file is None:
+                csv_file = open(
+                    csv_path,
+                    "w",
+                    newline="",
+                    encoding="utf-8",
+                )
+
+                csv_writer = csv.writer(csv_file)
+                csv_writer.writerow(CSV_HEADER)
+
             record_count = _write_daily_records(
                 day_prefix,
-                csv_file,
+                csv_writer,
             )
 
             # Tables without quarantine records for the
@@ -203,6 +274,10 @@ def _generate_report(event, context):
                 record_count,
             )
 
+    finally:
+        if csv_file is not None:
+            csv_file.close()
+
     tables.sort(
         key=lambda table: table["tableName"]
     )
@@ -211,6 +286,10 @@ def _generate_report(event, context):
         table["recordCount"]
         for table in tables
     )
+
+    # Remove the temporary CSV when no records were found.
+    if total_records == 0 and os.path.exists(csv_path):
+        os.remove(csv_path)
 
     report = {
         "generatedAt": now.strftime(
@@ -239,8 +318,8 @@ def _generate_report(event, context):
     attachment = None
 
     if total_records > 0:
-        # Store the original quarantine records only when
-        # the reference day contains quarantine records.
+        # Store the tabular CSV only when the reference day
+        # contains quarantine records.
         s3.upload_file(
             csv_path,
             S3_BUCKET,
