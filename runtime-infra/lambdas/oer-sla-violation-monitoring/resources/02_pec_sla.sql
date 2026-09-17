@@ -86,4 +86,4 @@ LEFT JOIN outcomes o
        ON v.iun = o.iun 
       AND v.recindex = o.recindex 
       AND v.attempt = o.attempt
-WHERE o.iun IS NULL;
+WHERE o.iun IS NULL AND date_diff('hour', v.ts_validate, current_timestamp) >= 24;
