@@ -33,7 +33,7 @@ def handle_record(record):
         'alarmName': extract_alarm_name(message),
     })
 
-    routes = parse_routes(os.environ.get('ROUTES', ''))
+    routes = parse_routes(routing_config())
     route = select_route(routes, message)
     if route is None:
         raise ValueError('No route matched the warning message')
@@ -97,25 +97,63 @@ def handle_record(record):
         post_to_slack(output_message)
 
 
+def routing_config():
+    parameter_name = os.environ['ROUTING_PARAMETER_NAME']
+    port = os.environ.get('PARAMETERS_SECRETS_EXTENSION_HTTP_PORT', '2773')
+    query = urllib.parse.urlencode({'name': parameter_name})
+    request = urllib.request.Request(
+        'http://localhost:%s/systemsmanager/parameters/get?%s' % (port, query),
+        headers={
+            'X-Aws-Parameters-Secrets-Token': os.environ['AWS_SESSION_TOKEN'],
+        },
+        method='GET',
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=2) as response:
+            parameter_response = json.loads(response.read().decode('utf-8'))
+    except urllib.error.HTTPError as error:
+        raise RuntimeError('Unable to read routing parameter from cache: HTTP %s' % error.code) from error
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, KeyError) as error:
+        raise RuntimeError('Unable to read routing parameter from cache') from error
+
+    parameter_value = parameter_response.get('Parameter', {}).get('Value')
+    if not parameter_value:
+        raise ValueError('Routing parameter %s has no value' % parameter_name)
+    return parameter_value
+
+
 def parse_routes(routes_config):
     if not routes_config:
-        raise ValueError('ROUTES must contain at least one route')
+        raise ValueError('Routing parameter must contain at least one route')
+
+    try:
+        route_configs = json.loads(routes_config)
+    except json.JSONDecodeError as error:
+        raise ValueError('Routing parameter must be valid JSON') from error
+    if not isinstance(route_configs, list) or not route_configs:
+        raise ValueError('Routing parameter must be a non-empty JSON array')
 
     routes = []
-    for position, route_config in enumerate(routes_config.split(';'), start=1):
-        fields = [field.strip() for field in route_config.split(',')]
-        if len(fields) not in (3, 4) or not all(fields):
-            raise ValueError(
-                'Invalid route at position %s: expected type,match,channel[,deliveryMode]' % position
-            )
+    for position, route_config in enumerate(route_configs, start=1):
+        if not isinstance(route_config, dict):
+            raise ValueError('Invalid route at position %s: expected an object' % position)
 
-        route_type, match, channel = fields[:3]
-        delivery_mode = fields[3] if len(fields) == 4 else None
+        route_type = str(route_config.get('Type', '')).lower()
+        match = route_config.get('StringToRoute')
+        channel = route_config.get('SlackChannel')
+        drop = route_config.get('Drop', False)
+        delivery_mode = route_config.get('DeliveryMode')
         if route_type not in ('alarm', 'report'):
             raise ValueError('Unsupported route type at position %s: %s' % (position, route_type))
-        if re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', match) is None:
+        if not isinstance(match, str) or re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', match) is None:
             raise ValueError('Invalid route match at position %s: %s' % (position, match))
-        if channel != 'DROP' and re.fullmatch(r'C[A-Z0-9]+', channel) is None:
+        if not isinstance(drop, bool):
+            raise ValueError('Drop must be a boolean at position %s' % position)
+        if drop:
+            channel = 'DROP'
+        if channel != 'DROP' and (
+            not isinstance(channel, str) or re.fullmatch(r'C[A-Z0-9]+', channel) is None
+        ):
             raise ValueError('Invalid route destination for match %s' % match)
         if delivery_mode and (route_type != 'report' or channel == 'DROP'):
             raise ValueError('Delivery mode is supported only for report routes to Slack')
