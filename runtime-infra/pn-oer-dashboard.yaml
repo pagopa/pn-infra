@@ -1042,7 +1042,7 @@ Resources:
                 "height": 8,
                 "properties": {
                     "start": "-PT1H",
-                    "query": "SOURCE \"arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/oer-sla-validation-monitoring-lambda\" |\nfields @timestamp, message\n| filter message like /validation_sla/\n| parse message '\"diff_hours\":*}' as diff_hours\n| parse message '\"iun\":\"*\"' as iun\n| stats max(diff_hours) as max_diff_hours by iun\n| sort max_diff_hours desc",
+                    "query": "SOURCE \"arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/oer-sla-monitoring-lambda\" |\nfields @timestamp, message\n| filter message like /validation_sla/\n| parse message '\"diff_hours\":*}' as diff_hours\n| parse message '\"iun\":\"*\"' as iun\n| stats max(diff_hours) as max_diff_hours by iun\n| sort max_diff_hours desc",
                     "region": "${AWS::Region}",
                     "stacked": false,
                     "view": "table",
@@ -1057,7 +1057,7 @@ Resources:
                 "height": 8,
                 "properties": {
                     "start": "-PT1H",
-                    "query": "SOURCE \"arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/oer-sla-validation-monitoring-lambda\" |\nfields @timestamp, message\n| filter message like /pec_sla/\n| parse message '\"requestId\":\"*\"' as requestId\n| parse message '\"diff_hours\":*}' as diff_hours\n| stats max(diff_hours) as max_diff_hours by requestId\n| sort max_diff_hours desc",
+                    "query": "SOURCE \"arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/oer-sla-monitoring-lambda\" |\nfields @timestamp, message\n| filter message like /pec_sla/\n| parse message '\"requestId\":\"*\"' as requestId\n| parse message '\"diff_hours\":*}' as diff_hours\n| stats max(diff_hours) as max_diff_hours by requestId\n| sort max_diff_hours desc",
                     "region": "${AWS::Region}",
                     "stacked": false,
                     "view": "table",
