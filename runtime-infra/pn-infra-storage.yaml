@@ -632,28 +632,29 @@ Resources:
         - !Ref WarningSNSTopic
 
   WarningDispatcherQueue:
-    Type: AWS::SQS::Queue
+    Type: AWS::CloudFormation::Stack
     Properties:
-      QueueName: !Sub '${ProjectName}-${WarningDispatcherName}'
-      RedrivePolicy:
-        deadLetterTargetArn: !GetAtt WarningDispatcherDLQ.Arn
-        maxReceiveCount: !Ref WarningDispatcherMaxReceiveCount
-      DelaySeconds: !Ref WarningDispatcherDelaySeconds
-      MessageRetentionPeriod: !Ref WarningDispatcherMessageRetentionPeriod
-      ReceiveMessageWaitTimeSeconds: 15
-      VisibilityTimeout: !Ref WarningDispatcherVisibilityTimeout
-
-  WarningDispatcherDLQ:
-    Type: AWS::SQS::Queue
-    Properties:
-      QueueName: !Sub '${ProjectName}-${WarningDispatcherName}-DLQ'
-      MessageRetentionPeriod: !Ref WarningDispatcherDeadLetterMessageRetentionPeriod
+      TemplateURL: !Sub '${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml'
+      Parameters:
+        QueueName: !Sub '${ProjectName}-${WarningDispatcherName}-Router'
+        DelaySeconds: !Ref WarningDispatcherDelaySeconds
+        MessageRetentionPeriod: !Ref WarningDispatcherMessageRetentionPeriod
+        DeadLetterMessageRetentionPeriod: !Ref WarningDispatcherDeadLetterMessageRetentionPeriod
+        MaxReceiveCount: !Ref WarningDispatcherMaxReceiveCount
+        VisibilityTimeout: !Ref WarningDispatcherVisibilityTimeout
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+        HasDLQ: 'true'
+        QueueHasAlarm: 'false'
+        OncallDLQLimit: 0
+        OncallQueueDlqOldestAgeLimit: 0
+        OncallDLQIncreasingLimitThreshold: 0
+        OncallQueueOldestAgeLimit: 315360000
 
   WarningDispatcherQueuePolicy:
     Type: AWS::SQS::QueuePolicy
     Properties:
       Queues:
-        - !Ref WarningDispatcherQueue
+        - !GetAtt WarningDispatcherQueue.Outputs.QueueURL
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -662,7 +663,7 @@ Resources:
             Principal:
               Service: sns.amazonaws.com
             Action: sqs:SendMessage
-            Resource: !GetAtt WarningDispatcherQueue.Arn
+            Resource: !GetAtt WarningDispatcherQueue.Outputs.QueueARN
             Condition:
               ArnEquals:
                 aws:SourceArn: !Ref WarningSNSTopic
@@ -671,30 +672,9 @@ Resources:
     Type: AWS::SNS::Subscription
     DependsOn: WarningDispatcherQueuePolicy
     Properties:
-      Endpoint: !GetAtt WarningDispatcherQueue.Arn
+      Endpoint: !GetAtt WarningDispatcherQueue.Outputs.QueueARN
       Protocol: sqs
       TopicArn: !Ref WarningSNSTopic
-
-  WarningDispatcherDLQHasMessagesAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub '${ProjectName}-${WarningDispatcherName}-DLQ-HasMessage'
-      AlarmDescription: Warning notification dispatcher messages moved to the DLQ.
-      Namespace: AWS/SQS
-      MetricName: ApproximateNumberOfMessagesVisible
-      Dimensions:
-        - Name: QueueName
-          Value: !GetAtt WarningDispatcherDLQ.QueueName
-      Statistic: Sum
-      Period: 60
-      Threshold: 1
-      TreatMissingData: notBreaching
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      EvaluationPeriods: 1
-      AlarmActions:
-        - !Ref AlarmSNSTopicArn
-      OKActions:
-        - !Ref AlarmSNSTopicArn
 
 Outputs:
   LogsBucketKmsKeyArn:
@@ -797,5 +777,5 @@ Outputs:
     Description: 'Base name for warning notification dispatcher resources'
 
   WarningDispatcherQueueArn:
-    Value: !GetAtt WarningDispatcherQueue.Arn
+    Value: !GetAtt WarningDispatcherQueue.Outputs.QueueARN
     Description: 'Warning notification dispatcher queue ARN'
