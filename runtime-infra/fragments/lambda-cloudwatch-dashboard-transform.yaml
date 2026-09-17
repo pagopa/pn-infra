@@ -2393,7 +2393,7 @@ Resources:
           import boto3
           import json
 
-          DLQ_TOKEN = "-DLQ"
+          DLQ_TOKENS = ("-DLQ", "_DLQ")
 
 
           def _list_queue_names(metric_name):
@@ -2463,34 +2463,16 @@ Resources:
           def lambda_handler(event, context):
               params = event.get("params", {})
               region = params.get("Region", "eu-south-1")
-              excluded_dlq_names = _parse_excluded_queue_names(params.get("SqsDlqExcludeQueueNames", ""))
               excluded_queue_names = _parse_excluded_queue_names(params.get("SqsQueueExcludeQueueNames", ""))
-
-              visible_queues = _list_queue_names("ApproximateNumberOfMessagesVisible")
-              dlq_queues = [
-                  name
-                  for name in visible_queues
-                  if DLQ_TOKEN in name and name not in excluded_dlq_names
-              ]
 
               age_queues = _list_queue_names("ApproximateAgeOfOldestMessage")
               non_dlq_queues = [
                   name
                   for name in age_queues
-                  if DLQ_TOKEN not in name and name not in excluded_queue_names
+                  if not any(token in name for token in DLQ_TOKENS) and name not in excluded_queue_names
               ]
 
               widgets = []
-              #dlq_widget = _build_sqs_widget(
-              #    region,
-              #    102,
-              #    "SQS DLQ - ApproximateNumberOfMessagesVisible (Max / 1h, 7d)",
-              #    "ApproximateNumberOfMessagesVisible",
-              #    dlq_queues
-              #)
-              #if dlq_widget:
-              #    widgets.append(dlq_widget)
-
               non_dlq_widget = _build_sqs_widget(
                   region,
                   108,
