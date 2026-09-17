@@ -1353,10 +1353,15 @@ Resources:
               }
 
   OerEcsTaskDeltaMetricsLogGroup:
-    Type: AWS::Logs::LogGroup
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
     Properties:
-      LogGroupName: !Sub /aws/lambda/${OerEcsTaskDeltaMetricsFunction}
-      RetentionInDays: !Ref LogRetention
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Ref OerEcsTaskDeltaMetricsFunction
+        LogGroupPrefix: '/aws/lambda'
+        LogGroupRetention: !Ref LogRetention
 
   OerEcsTaskDeltaMetricsSchedulerRole:
     Type: AWS::IAM::Role
