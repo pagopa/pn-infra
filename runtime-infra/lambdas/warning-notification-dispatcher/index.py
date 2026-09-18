@@ -140,41 +140,56 @@ def parse_routes(routes_config):
 
     routes = []
     for position, route_config in enumerate(route_configs, start=1):
-        if not isinstance(route_config, dict):
-            raise ValueError('Invalid route at position %s: expected an object' % position)
-
-        route_type = str(route_config.get('Type', '')).lower()
-        match = route_config.get('StringToRoute')
-        channel = route_config.get('SlackChannel')
-        drop = route_config.get('Drop', False)
-        delivery_mode = route_config.get('DeliveryMode')
-        slack_mentions = parse_slack_mentions(route_config.get('SlackMentions'), position)
-        if route_type not in ('alarm', 'report'):
-            raise ValueError('Unsupported route type at position %s: %s' % (position, route_type))
-        if not isinstance(match, str) or re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', match) is None:
-            raise ValueError('Invalid route match at position %s: %s' % (position, match))
-        if not isinstance(drop, bool):
-            raise ValueError('Drop must be a boolean at position %s' % position)
-        if drop:
-            channel = 'DROP'
-        if channel != 'DROP' and (
-            not isinstance(channel, str) or re.fullmatch(r'C[A-Z0-9]+', channel) is None
-        ):
-            raise ValueError('Invalid route destination for match %s' % match)
-        if delivery_mode and (route_type != 'report' or channel == 'DROP'):
-            raise ValueError('Delivery mode is supported only for report routes to Slack')
-        if delivery_mode and delivery_mode not in REPORT_DELIVERY_MODES:
-            raise ValueError('Unsupported report delivery mode at position %s: %s' % (position, delivery_mode))
-        if route_type == 'report' and channel != 'DROP' and delivery_mode is None:
-            delivery_mode = 'ATTACHMENT'
-
-        route = {'type': route_type, 'match': match, 'channel': channel}
-        if delivery_mode:
-            route['deliveryMode'] = delivery_mode
-        if slack_mentions:
-            route['slackMentions'] = slack_mentions
+        try:
+            route = parse_route(route_config, position)
+        except ValueError as error:
+            print(json.dumps({
+                'action': 'SKIP_INVALID_ROUTE',
+                'position': position,
+                'error': str(error),
+            }, separators=(',', ':')))
+            continue
         routes.append(route)
+    if not routes:
+        raise ValueError('Routing parameter must contain at least one valid route')
     return routes
+
+
+def parse_route(route_config, position):
+    if not isinstance(route_config, dict):
+        raise ValueError('Invalid route at position %s: expected an object' % position)
+
+    route_type = str(route_config.get('Type', '')).lower()
+    match = route_config.get('StringToRoute')
+    channel = route_config.get('SlackChannel')
+    drop = route_config.get('Drop', False)
+    delivery_mode = route_config.get('DeliveryMode')
+    slack_mentions = parse_slack_mentions(route_config.get('SlackMentions'), position)
+    if route_type not in ('alarm', 'report'):
+        raise ValueError('Unsupported route type at position %s: %s' % (position, route_type))
+    if not isinstance(match, str) or re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', match) is None:
+        raise ValueError('Invalid route match at position %s: %s' % (position, match))
+    if not isinstance(drop, bool):
+        raise ValueError('Drop must be a boolean at position %s' % position)
+    if drop:
+        channel = 'DROP'
+    if channel != 'DROP' and (
+        not isinstance(channel, str) or re.fullmatch(r'C[A-Z0-9]+', channel) is None
+    ):
+        raise ValueError('Invalid route destination for match %s' % match)
+    if delivery_mode and (route_type != 'report' or channel == 'DROP'):
+        raise ValueError('Delivery mode is supported only for report routes to Slack')
+    if delivery_mode and delivery_mode not in REPORT_DELIVERY_MODES:
+        raise ValueError('Unsupported report delivery mode at position %s: %s' % (position, delivery_mode))
+    if route_type == 'report' and channel != 'DROP' and delivery_mode is None:
+        delivery_mode = 'ATTACHMENT'
+
+    route = {'type': route_type, 'match': match, 'channel': channel}
+    if delivery_mode:
+        route['deliveryMode'] = delivery_mode
+    if slack_mentions:
+        route['slackMentions'] = slack_mentions
+    return route
 
 
 def parse_slack_mentions(mentions, position):
@@ -201,7 +216,12 @@ def parse_slack_mentions(mentions, position):
             SLACK_MEMBER_ID_PATTERN.fullmatch(mention_id)
             or SLACK_USER_GROUP_ID_PATTERN.fullmatch(mention_id)
         ):
-            raise ValueError('Invalid Slack mention at position %s: %s' % (position, mention_value))
+            print(json.dumps({
+                'action': 'SKIP_INVALID_SLACK_MENTION',
+                'position': position,
+                'mention': mention_value,
+            }, separators=(',', ':')))
+            continue
         if mention_id not in parsed_mentions:
             parsed_mentions.append(mention_id)
     return parsed_mentions
