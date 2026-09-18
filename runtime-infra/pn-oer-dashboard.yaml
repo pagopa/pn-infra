@@ -100,6 +100,11 @@ Parameters:
     Description: Node.js runtime for Lambda functions
     Default: 'nodejs24.x'
 
+  LambdaPythonRuntime:
+    Type: String
+    Description: Python runtime for Lambda functions
+    Default: 'python3.14'
+
   LambdasBucketName:
     Type: String
     Description: S3 bucket name where Lambda code is stored
@@ -237,7 +242,7 @@ Resources:
       Handler: index.handler
       MemorySize: 128
       Role: !GetAtt StorageFunctionIAMRole.Arn
-      Runtime: nodejs22.x
+      Runtime: !Ref LambdaJSRuntime
       Timeout: 60
 
   StorageFunctionIAMRole:
@@ -440,7 +445,7 @@ Resources:
       Handler: index.handler
       MemorySize: 128
       Role: !GetAtt SlaViolationHistoryFunctionIAMRole.Arn
-      Runtime: nodejs22.x
+      Runtime: !Ref LambdaJSRuntime
       Timeout: 60
 
   SlaViolationHistoryFunctionIAMRole:
@@ -1267,7 +1272,7 @@ Resources:
       Description: Collect ECS service desired/running tasks and publish custom delta metrics by task definition family.
       FunctionName: pn-oer-ecs-task-delta-metrics
       Handler: index.lambda_handler
-      Runtime: python3.12
+      Runtime: !Ref LambdaPythonRuntime
       Timeout: 120
       MemorySize: 256
       Role: !GetAtt OerEcsTaskDeltaMetricsRole.Arn
