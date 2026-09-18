@@ -26,9 +26,14 @@ Parameters:
     Description: Deployment environment.
     AllowedValues: [dev, test, uat, hotfix, prod]
 
+  AlarmSNSTopicArn:
+    Type: String
+    Description: ARN of the standard SNS topic for operational alarms.
+
   WarningSNSTopicArn:
     Type: String
-    Description: ARN of the central warning SNS topic owned by pn-infra-storage.
+    Description: ARN of the central warning SNS topic, reserved for warning notifications and integrations.
+    Default: ''
 
   WarningDispatcherQueueArn:
     Type: String
@@ -119,6 +124,7 @@ Resources:
         Variables:
           ROUTING_PARAMETER_NAME: !Ref RoutingParameterName
           ENVIRONMENT_TYPE: !Ref EnvironmentType
+          WARNING_SNS_TOPIC_ARN: !Ref WarningSNSTopicArn
           SLACK_BOT_TOKEN_SECRET_NAME: !Ref SlackBotTokenSecretName
           SECRETS_MANAGER_TTL: !Ref SlackSecretCacheTtlSeconds
           SSM_PARAMETER_STORE_TTL: !Ref RoutingParameterCacheTtlSeconds
@@ -135,7 +141,7 @@ Resources:
       TemplateURL: !Sub '${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml'
       Parameters:
         FunctionName: !Ref WarningNotificationDispatcherLambda
-        AlarmSNSTopicArn: !Ref WarningSNSTopicArn
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
 
   WarningNotificationDispatcherRole:
     Type: AWS::IAM::Role
