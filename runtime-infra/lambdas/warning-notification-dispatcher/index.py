@@ -10,7 +10,8 @@ SLACK_SNIPPET_MAX_BYTES = 1000000
 SLACK_MRKDWN_MAX_CHARS = 3000
 REPORT_DELIVERY_MODES = ('ATTACHMENT', 'SUMMARY', 'LINK')
 REPORT_PRESENTATION_FORMAT = 'slack-mrkdwn'
-SLACK_USER_ID_PATTERN = re.compile(r'[UW][A-Z0-9]+')
+SLACK_MEMBER_ID_PATTERN = re.compile(r'[UW][A-Z0-9]+')
+SLACK_USER_GROUP_ID_PATTERN = re.compile(r'S[A-Z0-9]+')
 SLACK_MANUAL_MENTION_PATTERN = re.compile(r'<(?:@[UW][A-Z0-9]+|![^>]+)>')
 ALARM_STATE_COLORS = {
     'ALARM': '#D13212',
@@ -188,15 +189,21 @@ def parse_slack_mentions(mentions, position):
 
     parsed_mentions = []
     for mention_value in mention_values:
-        user_id = mention_value
+        mention_id = mention_value
         if isinstance(mention_value, str):
-            markup_match = re.fullmatch(r'<@([UW][A-Z0-9]+)>', mention_value)
+            markup_match = re.fullmatch(
+                r'(?:<@([UW][A-Z0-9]+)>|<!subteam\^(S[A-Z0-9]+)>)',
+                mention_value,
+            )
             if markup_match:
-                user_id = markup_match.group(1)
-        if not isinstance(user_id, str) or SLACK_USER_ID_PATTERN.fullmatch(user_id) is None:
+                mention_id = markup_match.group(1) or markup_match.group(2)
+        if not isinstance(mention_id, str) or not (
+            SLACK_MEMBER_ID_PATTERN.fullmatch(mention_id)
+            or SLACK_USER_GROUP_ID_PATTERN.fullmatch(mention_id)
+        ):
             raise ValueError('Invalid Slack mention at position %s: %s' % (position, mention_value))
-        if user_id not in parsed_mentions:
-            parsed_mentions.append(user_id)
+        if mention_id not in parsed_mentions:
+            parsed_mentions.append(mention_id)
     return parsed_mentions
 
 
@@ -348,9 +355,15 @@ def append_route_mentions(blocks, route):
     mentions = route.get('slackMentions') or []
     if mentions:
         blocks.append(mrkdwn_section(
-            '*Referenti:* ' + ' '.join('<@%s>' % user_id for user_id in mentions),
+            '*Referenti:* ' + ' '.join(slack_mention_markup(mention_id) for mention_id in mentions),
             verbatim=True,
         ))
+
+
+def slack_mention_markup(mention_id):
+    if SLACK_USER_GROUP_ID_PATTERN.fullmatch(mention_id):
+        return '<!subteam^%s>' % mention_id
+    return '<@%s>' % mention_id
 
 
 def header_block(text):
