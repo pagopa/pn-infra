@@ -216,7 +216,7 @@ def parse_slack_mentions(mentions, position):
             SLACK_MEMBER_ID_PATTERN.fullmatch(mention_id)
             or SLACK_USER_GROUP_ID_PATTERN.fullmatch(mention_id)
         ):
-            print(json.dumps({
+            print('ERROR ' + json.dumps({
                 'action': 'SKIP_INVALID_SLACK_MENTION',
                 'position': position,
                 'mention': mention_value,
