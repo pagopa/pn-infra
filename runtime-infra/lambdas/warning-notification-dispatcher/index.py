@@ -7,7 +7,11 @@ import urllib.request
 
 SLACK_API_BASE_URL = 'https://slack.com/api/'
 SLACK_SNIPPET_MAX_BYTES = 1000000
+SLACK_MRKDWN_MAX_CHARS = 3000
 REPORT_DELIVERY_MODES = ('ATTACHMENT', 'SUMMARY', 'LINK')
+REPORT_PRESENTATION_FORMAT = 'slack-mrkdwn'
+SLACK_USER_ID_PATTERN = re.compile(r'[UW][A-Z0-9]+')
+SLACK_MANUAL_MENTION_PATTERN = re.compile(r'<(?:@[UW][A-Z0-9]+|![^>]+)>')
 ALARM_STATE_COLORS = {
     'ALARM': '#D13212',
     'OK': '#2EB67D',
@@ -143,6 +147,7 @@ def parse_routes(routes_config):
         channel = route_config.get('SlackChannel')
         drop = route_config.get('Drop', False)
         delivery_mode = route_config.get('DeliveryMode')
+        slack_mentions = parse_slack_mentions(route_config.get('SlackMentions'), position)
         if route_type not in ('alarm', 'report'):
             raise ValueError('Unsupported route type at position %s: %s' % (position, route_type))
         if not isinstance(match, str) or re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', match) is None:
@@ -165,8 +170,34 @@ def parse_routes(routes_config):
         route = {'type': route_type, 'match': match, 'channel': channel}
         if delivery_mode:
             route['deliveryMode'] = delivery_mode
+        if slack_mentions:
+            route['slackMentions'] = slack_mentions
         routes.append(route)
     return routes
+
+
+def parse_slack_mentions(mentions, position):
+    if mentions is None or mentions == '' or mentions == []:
+        return []
+    if isinstance(mentions, str):
+        mention_values = mentions.split()
+    elif isinstance(mentions, list):
+        mention_values = mentions
+    else:
+        raise ValueError('SlackMentions must be a string or an array at position %s' % position)
+
+    parsed_mentions = []
+    for mention_value in mention_values:
+        user_id = mention_value
+        if isinstance(mention_value, str):
+            markup_match = re.fullmatch(r'<@([UW][A-Z0-9]+)>', mention_value)
+            if markup_match:
+                user_id = markup_match.group(1)
+        if not isinstance(user_id, str) or SLACK_USER_ID_PATTERN.fullmatch(user_id) is None:
+            raise ValueError('Invalid Slack mention at position %s: %s' % (position, mention_value))
+        if user_id not in parsed_mentions:
+            parsed_mentions.append(user_id)
+    return parsed_mentions
 
 
 def select_route(routes, message):
@@ -223,6 +254,8 @@ def render_cloudwatch_alarm(route, message, channel_id):
     ]
     if alarm_url:
         alarm_blocks.append(mrkdwn_section('*CloudWatch:* <%s|Apri allarme>' % alarm_url))
+    if str(state).upper() == 'ALARM':
+        append_route_mentions(alarm_blocks, route)
     return {
         'channel': channel_id,
         'attachments': [{
@@ -245,6 +278,7 @@ def render_report(route, message, channel_id):
         raise ValueError('Invalid report: data.details must be an object')
     if not isinstance(links, dict):
         raise ValueError('Invalid report: links must be an object')
+    presentation_body = report_presentation_body(message.get('presentation'))
 
     environment = str(message.get('environment', os.environ.get('ENVIRONMENT_TYPE', 'unknown')))
     fields = [mrkdwn_field('*Env:*\n%s' % environment.upper())]
@@ -254,6 +288,9 @@ def render_report(route, message, channel_id):
         header_block(str(title)),
         {'type': 'section', 'fields': fields},
     ]
+
+    if presentation_body:
+        blocks.append(mrkdwn_section(presentation_body, verbatim=True))
 
     duration_ms = data.get('durationMs')
     if duration_ms is not None:
@@ -273,6 +310,7 @@ def render_report(route, message, channel_id):
             report_links.append('<%s|%s>' % (parsed_url.geturl(), label))
     if report_links:
         blocks.append(mrkdwn_section('*Link:* ' + ' | '.join(report_links)))
+    append_route_mentions(blocks, route)
 
     result = {'channel': channel_id, 'blocks': blocks}
     if route['deliveryMode'] == 'LINK':
@@ -283,6 +321,38 @@ def render_report(route, message, channel_id):
     return result
 
 
+def report_presentation_body(presentation):
+    if presentation is None:
+        return None
+    if not isinstance(presentation, dict):
+        raise ValueError('Invalid report: presentation must be an object')
+
+    presentation_format = presentation.get('format')
+    body = presentation.get('body')
+    if presentation_format is None and body is None:
+        return None
+    if presentation_format != REPORT_PRESENTATION_FORMAT:
+        raise ValueError('Invalid report: unsupported presentation format')
+    if not isinstance(body, str) or not body.strip():
+        raise ValueError('Invalid report: presentation.body must be a non-empty string')
+    if len(body) > SLACK_MRKDWN_MAX_CHARS:
+        raise ValueError(
+            'Invalid report: presentation.body exceeds %s characters' % SLACK_MRKDWN_MAX_CHARS
+        )
+    if SLACK_MANUAL_MENTION_PATTERN.search(body):
+        raise ValueError('Invalid report: Slack mentions must be configured in the routing parameter')
+    return body
+
+
+def append_route_mentions(blocks, route):
+    mentions = route.get('slackMentions') or []
+    if mentions:
+        blocks.append(mrkdwn_section(
+            '*Referenti:* ' + ' '.join('<@%s>' % user_id for user_id in mentions),
+            verbatim=True,
+        ))
+
+
 def header_block(text):
     return {
         'type': 'header',
@@ -290,8 +360,11 @@ def header_block(text):
     }
 
 
-def mrkdwn_section(text):
-    return {'type': 'section', 'text': {'type': 'mrkdwn', 'text': text[:3000]}}
+def mrkdwn_section(text, verbatim=None):
+    text_object = {'type': 'mrkdwn', 'text': text[:SLACK_MRKDWN_MAX_CHARS]}
+    if verbatim is not None:
+        text_object['verbatim'] = verbatim
+    return {'type': 'section', 'text': text_object}
 
 
 def mrkdwn_field(text):
