@@ -631,7 +631,7 @@ Resources:
       Topics:
         - !Ref WarningSNSTopic
 
-  WarningDispatcherQueue:
+  WarningDispatcherQueueStack:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub '${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml'
@@ -654,7 +654,7 @@ Resources:
     Type: AWS::SQS::QueuePolicy
     Properties:
       Queues:
-        - !GetAtt WarningDispatcherQueue.Outputs.QueueURL
+        - !GetAtt WarningDispatcherQueueStack.Outputs.QueueURL
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -663,7 +663,7 @@ Resources:
             Principal:
               Service: sns.amazonaws.com
             Action: sqs:SendMessage
-            Resource: !GetAtt WarningDispatcherQueue.Outputs.QueueARN
+            Resource: !GetAtt WarningDispatcherQueueStack.Outputs.QueueARN
             Condition:
               ArnEquals:
                 aws:SourceArn: !Ref WarningSNSTopic
@@ -672,7 +672,7 @@ Resources:
     Type: AWS::SNS::Subscription
     DependsOn: WarningDispatcherQueuePolicy
     Properties:
-      Endpoint: !GetAtt WarningDispatcherQueue.Outputs.QueueARN
+      Endpoint: !GetAtt WarningDispatcherQueueStack.Outputs.QueueARN
       Protocol: sqs
       TopicArn: !Ref WarningSNSTopic
 
@@ -777,5 +777,5 @@ Outputs:
     Description: 'Base name for warning notification dispatcher resources'
 
   WarningDispatcherQueueArn:
-    Value: !GetAtt WarningDispatcherQueue.Outputs.QueueARN
+    Value: !GetAtt WarningDispatcherQueueStack.Outputs.QueueARN
     Description: 'Warning notification dispatcher queue ARN'
