@@ -8,10 +8,7 @@ MOCK_CONSOLIDATORE_SERVICE_NAME = "mockconsolidatore-ExternalChannelsMicroservic
 
 
 def is_external_channels_mock_service(service_name):
-    return (
-        "pn-external-channels-microsvc-test-ExternalChannelsMicroservice" in service_name
-        or MOCK_CONSOLIDATORE_SERVICE_NAME in service_name
-    )
+    return MOCK_CONSOLIDATORE_SERVICE_NAME in service_name
 
 
 def get_external_channels_mock_desired_count():
