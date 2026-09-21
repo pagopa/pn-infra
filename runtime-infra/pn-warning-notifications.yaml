@@ -56,10 +56,12 @@ Parameters:
     MinValue: 0
     MaxValue: 300
 
-  Routes:
-    Type: String
-    Description: Semicolon-separated routes in type,match,destination[,deliveryMode] format. Report modes are ATTACHMENT, SUMMARY and LINK.
-    AllowedPattern: '^(alarm|report),[A-Za-z0-9][A-Za-z0-9_-]*,(C[A-Z0-9]+|DROP)(,(ATTACHMENT|SUMMARY|LINK))?(;(alarm|report),[A-Za-z0-9][A-Za-z0-9_-]*,(C[A-Z0-9]+|DROP)(,(ATTACHMENT|SUMMARY|LINK))?)*$'
+  RoutingParameterCacheTtlSeconds:
+    Type: Number
+    Description: Seconds before the local Parameters and Secrets Extension cache refreshes the routing parameter.
+    Default: 300
+    MinValue: 0
+    MaxValue: 300
 
   LogRetention:
     Type: Number
@@ -71,6 +73,11 @@ Parameters:
     Description: Maximum CSV attachment size downloaded and uploaded to Slack.
     Default: '5242880'
 
+  LambdaReservedConcurrency:
+    Type: Number
+    Description: Maximum number of concurrent warning dispatcher Lambda executions.
+    Default: 10
+
 Resources:
 
   WarningDispatcherEventSourceMapping:
@@ -81,6 +88,8 @@ Resources:
       BatchSize: 1
       EventSourceArn: !Ref WarningDispatcherQueueArn
       FunctionName: !GetAtt WarningNotificationDispatcherLambda.Arn
+      ScalingConfig:
+        MaximumConcurrency: !Ref LambdaReservedConcurrency
 
   WarningNotificationDispatcherLogGroup:
     Type: AWS::CloudFormation::Stack
@@ -102,16 +111,18 @@ Resources:
       Handler: index.lambda_handler
       Runtime: python3.14
       Timeout: 30
+      ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
       Role: !GetAtt WarningNotificationDispatcherRole.Arn
       LoggingConfig:
         LogGroup: !GetAtt WarningNotificationDispatcherLogGroup.Outputs.LogGroupName
       Environment:
         Variables:
-          ROUTES: !Ref Routes
+          ROUTING_PARAMETER_NAME: 'WarningNotificationRouting'
           ENVIRONMENT_TYPE: !Ref EnvironmentType
           WARNING_SNS_TOPIC_ARN: !Ref WarningSNSTopicArn
           SLACK_BOT_TOKEN_SECRET_NAME: !Ref SlackBotTokenSecretName
           SECRETS_MANAGER_TTL: !Ref SlackSecretCacheTtlSeconds
+          SSM_PARAMETER_STORE_TTL: !Ref RoutingParameterCacheTtlSeconds
           MAX_CSV_ATTACHMENT_BYTES: !Ref MaxCsvAttachmentBytes
       Layers:
         - arn:aws:lambda:eu-south-1:325218067255:layer:AWS-Parameters-and-Secrets-Lambda-Extension:79
@@ -158,6 +169,10 @@ Resources:
             Effect: Allow
             Action: secretsmanager:GetSecretValue
             Resource: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${SlackBotTokenSecretName}*'
+          - Sid: ReadRoutingParameter
+            Effect: Allow
+            Action: ssm:GetParameter
+            Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/WarningNotificationRouting'
           - Sid: AllowSQSAccess
             Effect: Allow
             Action:
