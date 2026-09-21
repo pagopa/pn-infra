@@ -56,12 +56,6 @@ Parameters:
     MinValue: 0
     MaxValue: 300
 
-  RoutingParameterName:
-    Type: String
-    Description: Parameter Store name holding the routing configuration, manually maintained outside CloudFormation.
-    Default: 'WarningNotificationRouting'
-    MinLength: 1
-
   RoutingParameterCacheTtlSeconds:
     Type: Number
     Description: Seconds before the local Parameters and Secrets Extension cache refreshes the routing parameter.
@@ -83,7 +77,6 @@ Parameters:
     Type: Number
     Description: Maximum number of concurrent warning dispatcher Lambda executions.
     Default: 10
-    MinValue: 1
 
 Resources:
 
@@ -95,6 +88,8 @@ Resources:
       BatchSize: 1
       EventSourceArn: !Ref WarningDispatcherQueueArn
       FunctionName: !GetAtt WarningNotificationDispatcherLambda.Arn
+      ScalingConfig:
+        MaximumConcurrency: !Ref LambdaReservedConcurrency
 
   WarningNotificationDispatcherLogGroup:
     Type: AWS::CloudFormation::Stack
@@ -122,7 +117,7 @@ Resources:
         LogGroup: !GetAtt WarningNotificationDispatcherLogGroup.Outputs.LogGroupName
       Environment:
         Variables:
-          ROUTING_PARAMETER_NAME: !Ref RoutingParameterName
+          ROUTING_PARAMETER_NAME: 'WarningNotificationRouting'
           ENVIRONMENT_TYPE: !Ref EnvironmentType
           WARNING_SNS_TOPIC_ARN: !Ref WarningSNSTopicArn
           SLACK_BOT_TOKEN_SECRET_NAME: !Ref SlackBotTokenSecretName
@@ -177,7 +172,7 @@ Resources:
           - Sid: ReadRoutingParameter
             Effect: Allow
             Action: ssm:GetParameter
-            Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${RoutingParameterName}'
+            Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/WarningNotificationRouting'
           - Sid: AllowSQSAccess
             Effect: Allow
             Action:
