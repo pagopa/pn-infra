@@ -19,6 +19,7 @@ def publish_warning_report(
     details,
     links,
     attachment,
+    markdown_body=None,
     url_expiration_seconds=3600,
 ):
     if not title:
@@ -56,6 +57,13 @@ def publish_warning_report(
             "downloadUrl": download_url,
         },
     }
+    if markdown_body is not None:
+        if not isinstance(markdown_body, str) or not markdown_body.strip():
+            raise ValueError("Report markdown body must be a non-empty string")
+        message["presentation"] = {
+            "format": "slack-mrkdwn",
+            "body": markdown_body,
+        }
     sns_client.publish(
         TopicArn=topic_arn,
         Subject=subject[:100],

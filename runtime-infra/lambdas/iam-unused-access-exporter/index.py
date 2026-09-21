@@ -280,6 +280,18 @@ def lambda_handler(event, context):
             f"?region={AWS_REGION}#dashboards/dashboard/{dashboard_name}"
         )
         account_label = f"{ACCOUNT_ROLE}-{ENV_NAME}"
+        if count:
+            markdown_body = (
+                f":warning: Individuati *{count} finding* di accesso IAM inutilizzato "
+                f"nell'account `{ACCOUNT_ROLE}`."
+            )
+        else:
+            markdown_body = (
+                f":white_check_mark: Nessun finding di accesso IAM inutilizzato "
+                f"nell'account `{ACCOUNT_ROLE}`."
+            )
+        if skipped_by_tag:
+            markdown_body += f"\n_Sono stati esclusi {skipped_by_tag} finding tramite tag._"
         try:
             publish_warning_report(
                 sns_client=sns,
@@ -308,6 +320,7 @@ def lambda_handler(event, context):
                     "filename": key.rsplit("/", 1)[-1],
                     "size": len(csv_bytes),
                 },
+                markdown_body=markdown_body,
             )
             log.info(json.dumps({"msg": "sns report sent", "topic": SNS_TOPIC_ARN, "findings": count}))
         except Exception as exc:
