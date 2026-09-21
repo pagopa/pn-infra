@@ -14,6 +14,11 @@ def is_external_channels_mock_service(service_name):
     )
 
 
+def get_external_channels_mock_desired_count():
+    desired_count = os.environ.get('ExternalChannelsMockDesiredCount', '')
+    return int(desired_count) if desired_count else None
+
+
 def get_github_token():
     secret_name = "github-token"
     region_name = os.environ.get('AWS_REGION', 'eu-south-1')
@@ -47,7 +52,7 @@ def get_config_from_github(token, env, service_dir):
         print(f"ERROR: GitHub API error for {service_dir}: {e}")
         raise
 
-def get_official_counts(ecs_client, cluster_name, env_type, github_token, external_channels_mock_desired_count):
+def get_official_counts(ecs_client, cluster_name, env_type, github_token):
     """Recupera i conteggi ufficiali da GitHub per tutti i servizi del cluster."""
     print(f"INFO: Building official counts for cluster {cluster_name} from GitHub")
     if not github_token:
@@ -55,6 +60,7 @@ def get_official_counts(ecs_client, cluster_name, env_type, github_token, extern
         return None
 
     service_counts = {}
+    external_channels_mock_desired_count = get_external_channels_mock_desired_count()
     try:
         services_response = ecs_client.list_services(cluster=cluster_name, maxResults=100)
         for service_arn in services_response['serviceArns']:
@@ -105,12 +111,13 @@ def save_counts_to_s3(s3_client, bucket, cluster_name, account_id, counts):
         print(f"ERROR updating S3: {e}")
         return False
 
-def handle_stop(ecs_client, s3_client, cluster_name, env_type, s3bucket_name, account_id, external_channels_mock_desired_count):
+def handle_stop(ecs_client, s3_client, cluster_name, env_type, s3bucket_name, account_id):
     print(f"==> STOPPING services for cluster: {cluster_name} (Env: {env_type})")
     
     # In DEV, salviamo i valori ATTUALI dei microservizi su S3 prima di spegnere
     if env_type == 'dev':
         service_counts = {}
+        external_channels_mock_desired_count = get_external_channels_mock_desired_count()
         try:
             services_response = ecs_client.list_services(cluster=cluster_name, maxResults=100)
             for service_arn in services_response['serviceArns']:
@@ -151,7 +158,7 @@ def handle_stop(ecs_client, s3_client, cluster_name, env_type, s3bucket_name, ac
         print(f"ERROR during stop execution: {e}")
         return False
 
-def handle_start(ecs_client, s3_client, cluster_name, env_type, s3bucket_name, account_id, github_token, external_channels_mock_desired_count):
+def handle_start(ecs_client, s3_client, cluster_name, env_type, s3bucket_name, account_id, github_token):
     print(f"==> STARTING services for cluster: {cluster_name} (Env: {env_type})")
     service_counts = {}
     
@@ -168,13 +175,7 @@ def handle_start(ecs_client, s3_client, cluster_name, env_type, s3bucket_name, a
             return False
     else:
         # Negli altri ambienti proviamo GitHub con fallback su S3
-        github_counts = get_official_counts(
-            ecs_client,
-            cluster_name,
-            env_type,
-            github_token,
-            external_channels_mock_desired_count
-        )
+        github_counts = get_official_counts(ecs_client, cluster_name, env_type, github_token)
         
         if github_counts:
             service_counts = github_counts
@@ -213,14 +214,6 @@ def lambda_handler(event, context):
     env_type = os.environ.get('EnvironmentType', 'dev')
     s3bucket_name = os.environ.get('EcsDesireCountBucket')
     account_id = os.environ.get('AwsAccountId')
-    external_channels_mock_desired_count_value = os.environ.get(
-        'ExternalChannelsMockDesiredCount', ''
-    )
-    external_channels_mock_desired_count = (
-        int(external_channels_mock_desired_count_value)
-        if external_channels_mock_desired_count_value
-        else None
-    )
 
     ecs_client = boto3.client('ecs')
     s3_client = boto3.client('s3')
@@ -236,26 +229,9 @@ def lambda_handler(event, context):
         if not cluster: continue
         
         if action == 'stop':
-            res = handle_stop(
-                ecs_client,
-                s3_client,
-                cluster,
-                env_type,
-                s3bucket_name,
-                account_id,
-                external_channels_mock_desired_count
-            )
+            res = handle_stop(ecs_client, s3_client, cluster, env_type, s3bucket_name, account_id)
         else:
-            res = handle_start(
-                ecs_client,
-                s3_client,
-                cluster,
-                env_type,
-                s3bucket_name,
-                account_id,
-                github_token,
-                external_channels_mock_desired_count
-            )
+            res = handle_start(ecs_client, s3_client, cluster, env_type, s3bucket_name, account_id, github_token)
         
         if not res: overall_success = False
 
