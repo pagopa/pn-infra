@@ -153,9 +153,8 @@ def lambda_handler(event, context):
     except Exception as error:
         logger.exception(
             "QUARANTINE_REPORT_FAILED "
-            "Technical error during quarantine report generation. "
-            "ErrorType=%s, "
-            "Error=%s",
+            "Technical error during report generation.\n"
+            "ErrorType=%s, Error=%s",
             type(error).__name__,
             str(error),
         )
@@ -175,8 +174,9 @@ def _generate_report(event, context):
 
     logger.info(
         "Starting CDC quarantine daily report. "
-        "ReferenceDate=%s",
+        "ReferenceDate=%s, Environment=%s",
         reference_date,
+        ENVIRONMENT,
     )
 
     paginator = s3.get_paginator("list_objects_v2")
@@ -195,8 +195,12 @@ def _generate_report(event, context):
 
     logger.info(
         "Quarantine table folders discovered. "
-        "Count=%s",
+        "DiscoveredTables=%s, Tables=%s",
         len(folders),
+        ", ".join(
+            _extract_table_name(folder)
+            for folder in folders
+        ) or "none",
     )
 
     report_base_filename = (
@@ -257,6 +261,12 @@ def _generate_report(event, context):
             # Tables without quarantine records for the
             # reference day are excluded from the report.
             if record_count == 0:
+                logger.info(
+                    "NO quarantine records found for table: "
+                    "TableName=%s, ReferenceDate=%s",
+                    table_name,
+                    reference_date,
+                )
                 continue
 
             tables.append(
@@ -267,11 +277,13 @@ def _generate_report(event, context):
             )
 
             logger.info(
-                "Quarantine records found. "
+                "Quarantine records found for table: "
                 "TableName=%s, "
-                "RecordCount=%s",
+                "RecordCount=%s, "
+                "ReferenceDate=%s",
                 table_name,
                 record_count,
+                reference_date,
             )
 
     finally:
@@ -341,25 +353,25 @@ def _generate_report(event, context):
         logger.info(
             "Quarantine reports stored in S3. "
             "ReferenceDate=%s, "
-            "Tables=%s, "
+            "TablesWithQuarantine=%s, "
             "Records=%s, "
-            "JsonReportPath=s3://%s/%s, "
+            "CsvSizeBytes=%s\n"
+            "CSV report generated successfully! You can find it at:\n"
             "CsvReportPath=s3://%s/%s",
             reference_date,
             len(tables),
             total_records,
-            S3_BUCKET,
-            json_report_key,
+            csv_size,
             S3_BUCKET,
             csv_report_key,
         )
 
     else:
         logger.info(
-            "No quarantine records found. "
-            "ReferenceDate=%s, "
-            "JsonReportPath=s3://%s/%s. "
-            "The report will be published without attachment.",
+            "NO quarantine records found for the reference date. "
+            "ReferenceDate=%s.\n"
+            "Attention! Only the JSON report was generated with no CSV attachment.\n"
+            "JsonReportPath=s3://%s/%s",
             reference_date,
             S3_BUCKET,
             json_report_key,
@@ -396,19 +408,20 @@ def _generate_report(event, context):
         )
 
         logger.info(
-            "Quarantine report notification published. "
-            "Producer=%s, "
-            "Attachment=%s",
+            "Quarantine report notification published successfully! "
+            "Producer=%s, CsvAttachmentIncluded=%s",
             REPORT_PRODUCER,
             attachment is not None,
         )
 
     logger.info(
-        "CDC quarantine daily report completed. "
+        "CDC quarantine daily report completed successfully! "
         "ReferenceDate=%s, "
-        "Tables=%s, "
+        "DiscoveredTables=%s, "
+        "TablesWithQuarantine=%s, "
         "Records=%s",
         reference_date,
+        len(folders),
         len(tables),
         total_records,
     )
