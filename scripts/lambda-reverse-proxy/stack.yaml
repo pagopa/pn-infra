@@ -67,15 +67,14 @@ Parameters:
     Default: false
     AllowedValues: [ true, false ]
 
-  CoreAccount:
+  AccountType:
     Type: String
-    Default: false
-    AllowedValues: [ true, false ]
-    Description: Set to true when the stack is deployed in the Core account
+    Default: core
+    AllowedValues: [ core, confinfo ]
+    Description: Account type where the stack is deployed
 
 Conditions:
   IsCnMockEnabled: !Equals [ !Ref CnMockEnabled, true ]
-  IsCoreAccount: !Equals [ !Ref CoreAccount, true ]
 
 Resources:
   ## Mock SQS
@@ -106,19 +105,13 @@ Resources:
         - Key: access_logs.s3.enabled
           Value: !Ref EnableAccessLogsALBReverseProxy
         - Key: access_logs.s3.bucket
-          Value: !If
-            - IsCoreAccount
-            - !Sub "pn-core-alb-logs-${EnvironmentType}-${AWS::Region}-${AWS::AccountId}"
-            - !Sub "pn-confinfo-alb-logs-${EnvironmentType}-${AWS::Region}-${AWS::AccountId}"
+          Value: !Sub "pn-${AccountType}-alb-logs-${EnvironmentType}-${AWS::Region}-${AWS::AccountId}"
         - Key: access_logs.s3.prefix
           Value: "ReverseProxy-access-logs"
         - Key: connection_logs.s3.enabled
           Value: !Ref EnableConnectionLogsALBReverseProxy
         - Key: connection_logs.s3.bucket
-          Value: !If
-            - IsCoreAccount
-            - !Sub "pn-core-alb-logs-${EnvironmentType}-${AWS::Region}-${AWS::AccountId}"
-            - !Sub "pn-confinfo-alb-logs-${EnvironmentType}-${AWS::Region}-${AWS::AccountId}"
+          Value: !Sub "pn-${AccountType}-alb-logs-${EnvironmentType}-${AWS::Region}-${AWS::AccountId}"
         - Key: connection_logs.s3.prefix
           Value: "ReverseProxy-connection-logs"
       Tags:
