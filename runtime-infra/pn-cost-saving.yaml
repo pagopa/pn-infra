@@ -55,6 +55,11 @@ Parameters:
     Description: Core Account ID (leave blank in Core account)
     Default: ''
 
+  ExternalChannelsMockDesiredCount:
+    Type: Number
+    Description: Desired count to preserve for the External Channels mock services in confinfo accounts
+    Default: 4
+
 Conditions:
   IsNotProdAccount: !Not [ !Equals [!Ref EnvironmentType, prod ] ]
   IsNotUatAccount: !Not [ !Equals [!Ref EnvironmentType, uat ] ]
@@ -159,6 +164,11 @@ Resources:
             Ref: EnvironmentType
           AwsAccountId: 
             Fn::Sub: "${AWS::AccountId}"
+          ExternalChannelsMockDesiredCount:
+            Fn::If:
+              - IsConfinfoAccount
+              - Ref: ExternalChannelsMockDesiredCount
+              - ''
           ECSClusterName: 
             Fn::If:
               - IsStopEcsServiceConfinfo

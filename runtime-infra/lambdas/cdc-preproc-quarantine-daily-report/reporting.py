@@ -8,7 +8,6 @@ def publish_warning_report(
     sns_client,
     s3_client,
     topic_arn,
-    subject,
     event_id,
     producer,
     event_name,
@@ -18,23 +17,17 @@ def publish_warning_report(
     metrics,
     details,
     links,
-    attachment,
-    markdown_body=None,
+    attachment=None,
     url_expiration_seconds=3600,
 ):
     if not title:
         raise ValueError("Report title is required")
-    if not isinstance(metrics, dict) or not metrics:
-        raise ValueError("Report metrics must be a non-empty dictionary")
 
-    download_url = s3_client.generate_presigned_url(
-        "get_object",
-        Params={
-            "Bucket": attachment["bucket"],
-            "Key": attachment["key"],
-        },
-        ExpiresIn=url_expiration_seconds,
-    )
+    if not isinstance(metrics, dict) or not metrics:
+        raise ValueError(
+            "Report metrics must be a non-empty dictionary"
+        )
+
     message = {
         "schemaVersion": "1.0",
         "eventId": event_id,
@@ -50,22 +43,30 @@ def publish_warning_report(
             "details": details,
         },
         "links": links,
-        "attachment": {
+    }
+
+    if attachment:
+        download_url = s3_client.generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": attachment["bucket"],
+                "Key": attachment["key"],
+            },
+            ExpiresIn=url_expiration_seconds,
+        )
+
+        message["attachment"] = {
             "filename": attachment["filename"],
             "contentType": "text/csv",
             "size": attachment["size"],
             "downloadUrl": download_url,
-        },
-    }
-    if markdown_body is not None:
-        if not isinstance(markdown_body, str) or not markdown_body.strip():
-            raise ValueError("Report markdown body must be a non-empty string")
-        message["presentation"] = {
-            "format": "slack-mrkdwn",
-            "body": markdown_body,
         }
+
     sns_client.publish(
         TopicArn=topic_arn,
-        Subject=subject[:100],
-        Message=json.dumps(message, separators=(",", ":")),
+        Subject=f"[{environment}] {title}"[:100],
+        Message=json.dumps(
+            message,
+            separators=(",", ":"),
+        ),
     )

@@ -41,6 +41,141 @@ Parameters:
     Default: ''
     Description: 'Logs Bucket Name'
 
+  OERLambdasConfigurationEnabled:
+    Type: String
+    Description: Enable or Disable the configuration of OER Lambdas
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  LambdaOERSlaValidationMonitoringTimeout:
+    Type: Number
+    Description: Timeout in seconds for the Lambda OER SLA Validation Monitoring function
+    Default: 300
+
+  LambdaOERSlaValidationMonitoringMemorySize:
+    Type: Number
+    Description: Memory size for the Lambda OER SLA Validation Monitoring function
+    Default: 256
+
+  LambdaOERSlaValidationMonitoringReservedConcurrentExecutions:
+    Type: Number
+    Description: Reserved concurrent executions for the Lambda OER SLA Validation Monitoring function
+    Default: 5
+
+  LambdaOERSlaMonitoringCronExpression:
+    Type: String
+    Description: Cron expression for OER SLA Monitoring EventBridge Scheduler
+    Default: 'cron(15 * * * ? *)'
+
+  LambdaOERSlaMonitoringScheduleState:
+    Type: String
+    Description: Enable or disable the OER SLA Monitoring scheduler
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+
+  EcsTaskDeltaMetricsScheduleState:
+    Type: String
+    Description: Enable or disable the ECS task delta metrics scheduler
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+
+  AthenaWorkgroup:
+    Type: String
+    Description: Athena Workgroup for OER SLA Validation Monitoring
+    Default: 'cdc_analytics_workgroup'
+
+  AthenaDatabase:
+    Type: String
+    Description: Athena Database for OER SLA Validation Monitoring
+    Default: 'cdc_analytics_database'
+
+  LambdaJSRuntime:
+    Type: String
+    Description: Node.js runtime for Lambda functions
+    Default: 'nodejs24.x'
+
+  LambdaPythonRuntime:
+    Type: String
+    Description: Python runtime for Lambda functions
+    Default: 'python3.14'
+
+  LambdasBucketName:
+    Type: String
+    Description: S3 bucket name where Lambda code is stored
+    
+  LambdasBasePath:
+    Type: String
+    Description: Base path in the S3 bucket where Lambda code is stored
+
+  LogsBucketKmsKeyArn:
+    Type: String
+    Description: KMS Key ARN for the logs bucket
+
+  TemplateBucketBaseUrl:
+    Type: String
+    Description: Base URL for the CloudFormation template bucket
+
+  LogRetention:
+    Type: Number
+    Description: Log retention period in days
+
+  InValidationFilterPattern:
+    Type: String
+    Description: Filter pattern for the "in_validation" metric
+    Default: '{ $.aud_type = "AUD_NT_INSERT" && $.message = "*SUCCESS - sendNewNotification*" }'
+
+  AcceptedFilterPattern:
+    Type: String
+    Description: Filter pattern for the "accepted" metric
+    Default: '{ $.aud_type = "AUD_NT_TIMELINE" && $.message = "*SUCCESS*" && $.message = "*REQUEST_ACCEPTED*" }'
+
+  RefusedFilterPattern:
+    Type: String
+    Description: Filter pattern for the "refused" metric
+    Default: '{ $.aud_type = "AUD_NT_TIMELINE" && $.message = "*SUCCESS*" && $.message = "*REQUEST_REFUSED*" }'
+
+  #AlarmSNSTopicArn:
+  #  Type: String
+  #  Description: SNS Topic ARN for alarms
+
+  OERSlaInputParameters:
+    Type: String
+    Description: Input parameters for the OER SLA Monitoring Lambda function
+    Default: '{"queryFiles":["01_validation_sla.sql","02_pec_sla.sql"]}'
+
+  GatewayApisIntendedUsage:
+    Type: String
+    Default: "-B2B-,-B2BPG-,-WEB-,-IO-"
+
+  MaxAPIGatewayDetailWidgets:
+    Type: Number
+    Default: 0
+    Description: "Maximum number of detailed API widgets to display on the dashboard"
+
+  DownstreamMetricMap:
+    Type: String
+    Default: ""
+    Description: "Semicolon separated mapping DownstreamName=MetricPrefix (suffix -downstream-detection is added automatically when missing)"
+
+  SqsDlqExcludeQueueNames:
+    Type: String
+    Default: ""
+    Description: "Comma separated SQS queue names to exclude from DLQ widget"
+
+  SqsQueueExcludeQueueNames:
+    Type: String
+    Default: ""
+    Description: "Comma separated SQS queue names to exclude from non-DLQ widget"
+
+Conditions:
+  IsOERLambdasConfigurationEnabled: !And [ !Equals [!Ref OERLambdasConfigurationEnabled, 'true' ], !Not [ !Equals [!Ref ConfidentialInfoAccountId, '' ] ] ]
+
 Resources:
 
   StorageFunction:
@@ -107,7 +242,7 @@ Resources:
       Handler: index.handler
       MemorySize: 128
       Role: !GetAtt StorageFunctionIAMRole.Arn
-      Runtime: nodejs22.x
+      Runtime: !Ref LambdaJSRuntime
       Timeout: 60
 
   StorageFunctionIAMRole:
@@ -310,7 +445,7 @@ Resources:
       Handler: index.handler
       MemorySize: 128
       Role: !GetAtt SlaViolationHistoryFunctionIAMRole.Arn
-      Runtime: nodejs22.x
+      Runtime: !Ref LambdaJSRuntime
       Timeout: 60
 
   SlaViolationHistoryFunctionIAMRole:
@@ -461,6 +596,822 @@ Resources:
             SearchSLAViolationWidgetFunction: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:pn-sla-violation-history-function          
             OpenSearchArn: !Ref OpenSearchArn
             LogsBucketName: !Ref LogsBucketName
+
+  OERSlaMonitoringLambda:
+    Type: AWS::Lambda::Function
+    Condition: IsOERLambdasConfigurationEnabled
+    Properties:
+      Runtime: !Ref LambdaJSRuntime
+      Timeout: !Ref LambdaOERSlaValidationMonitoringTimeout
+      MemorySize: !Ref LambdaOERSlaValidationMonitoringMemorySize
+      ReservedConcurrentExecutions: !Ref LambdaOERSlaValidationMonitoringReservedConcurrentExecutions
+      Handler: index.handler
+      FunctionName: oer-sla-monitoring-lambda
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/oer-sla-violation-monitoring.zip
+      Environment:
+        Variables:
+          ATHENA_WORKGROUP: !Ref AthenaWorkgroup
+          ATHENA_DATABASE: !Ref AthenaDatabase
+          ATHENA_OUTPUT_LOCATION: !Sub pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001/
+      Role:
+        Fn::GetAtt:
+          - OERSlaMonitoringLambdaRole
+          - Arn
+      LoggingConfig:
+        LogFormat: JSON
+
+  OERSlaMonitoringLambdaRole:
+    Type: AWS::IAM::Role
+    Condition: IsOERLambdasConfigurationEnabled
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: OERSlaMonitoringLambdaPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                  - s3:GetBucketVersioning
+                Resource:
+                  - !Sub arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001
+                  - !Sub arn:aws:s3:::pn-cdc-analytics-athena-results-${AWS::Region}-${AWS::AccountId}-001/*
+                  - !Sub arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001
+                  - !Sub arn:aws:s3:::pn-logs-bucket-${AWS::Region}-${AWS::AccountId}-001/*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream  
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/oer-sla-monitoring-lambda:*
+              - Effect: Allow
+                Action:
+                  - athena:StartQueryExecution
+                  - athena:GetQueryExecution
+                  - athena:GetQueryResults
+                  - athena:GetWorkGroup
+                Resource:
+                  - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/*
+              - Effect: Allow
+                Action:
+                  - glue:GetDatabase
+                  - glue:GetTable
+                  - glue:GetPartitions
+                Resource:
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/*
+                  - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/*/*
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                Resource:
+                  - !Sub "${LogsBucketKmsKeyArn}"
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:PutParameter
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/pn-infra-monitoring/oer-sla-validation-monitoring/*
+
+
+
+  OERSlaMonitoringLambdaLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: 'oer-sla-monitoring-lambda'
+        LogGroupPrefix: '/aws/lambda'
+        LogGroupRetention: !Ref LogRetention
+
+  #OERSlaMonitoringLambdaAlarms:
+  #  Type: AWS::CloudFormation::Stack
+  #  Properties:
+  #    TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
+  #    Parameters:
+  #      FunctionName: oer-sla-monitoring-lambda
+  #      AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+
+  OERSlaValidationMonitoringSchedulerRole:
+    Type: AWS::IAM::Role
+    Condition: IsOERLambdasConfigurationEnabled
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: InvokeOERSlaMonitoringLambda
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt OERSlaMonitoringLambda.Arn
+
+  OERSlaValidationMonitoringSchedule:
+    Type: AWS::Scheduler::Schedule
+    Condition: IsOERLambdasConfigurationEnabled
+    Properties:
+      Name: pn-oer-sla-monitoring-scheduler
+      Description: "Schedule to trigger OER SLA Monitoring Lambda"
+      ScheduleExpression: !Ref LambdaOERSlaMonitoringCronExpression
+      ScheduleExpressionTimezone: Europe/Rome
+      State: !Ref LambdaOERSlaMonitoringScheduleState
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt OERSlaMonitoringLambda.Arn
+        RoleArn: !GetAtt OERSlaValidationMonitoringSchedulerRole.Arn
+        Input: !Ref OERSlaInputParameters
+
+  InValidationNotificationMetricFilter:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: ''
+        HasAlarm: false
+        HasOncall: false
+        MetricName: 'IN_VALIDATION'
+        MetricNamespace: SEND/BusinessMetrics
+        LogGroupName: "/aws/ecs/pn-delivery"
+        FilterPattern: !Ref InValidationFilterPattern
+        ComparisonOperator: 'GreaterThanOrEqualToThreshold'
+        OncallComparisonOperator: 'GreaterThanOrEqualToThreshold'
+        OncallStatistic: 'Sum'
+        Statistic: 'Sum'
+
+  AcceptedNotificationMetricFilter:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: ''
+        HasAlarm: false
+        HasOncall: false
+        MetricName: 'ACCEPTED'
+        MetricNamespace: SEND/BusinessMetrics
+        LogGroupName: "/aws/ecs/pn-timeline-service"
+        FilterPattern: !Ref AcceptedFilterPattern
+        ComparisonOperator: 'GreaterThanOrEqualToThreshold'
+        OncallComparisonOperator: 'GreaterThanOrEqualToThreshold'
+        OncallStatistic: 'Sum'
+        Statistic: 'Sum'
+
+  RefusedNotificationMetricFilter:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: ''
+        HasAlarm: false
+        HasOncall: false
+        MetricName: 'REFUSED'
+        MetricNamespace: SEND/BusinessMetrics
+        LogGroupName: "/aws/ecs/pn-timeline-service"
+        FilterPattern: !Ref RefusedFilterPattern
+        ComparisonOperator: 'GreaterThanOrEqualToThreshold'
+        OncallComparisonOperator: 'GreaterThanOrEqualToThreshold'
+        OncallStatistic: 'Sum'
+        Statistic: 'Sum'
+
+  OERDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: pn-OER-Dashboard-V2
+      DashboardBody:
+        Fn::Sub:
+          - |
+            {
+              "widgets": [
+            {
+                "type": "metric",
+                "x": 0,
+                "y": 1,
+                "width": 10,
+                "height": 5,
+                "properties": {
+                    "metrics": [
+                        [ "SEND/BusinessMetrics", "ACCEPTED", { "stat": "Sum", "color": "#2ca02c", "label": "Approvate (ACCEPTED)", "id": "m1" } ],
+                        [ ".", "REFUSED", { "stat": "Sum", "color": "#d62728", "label": "Rifiutate (REFUSED)", "id": "m2" } ],
+                        [ ".", "IN_VALIDATION", { "stat": "Sum", "color": "#1f77b4", "label": "Ingressi in Validazione", "id": "m3" } ]
+                    ],
+                    "view": "timeSeries",
+                    "stacked": false,
+                    "region": "${AWS::Region}",
+                    "title": "Volumi Giornalieri (Settimanale): In validazione vs Accettate/Rifiutate",
+                    "period": 86400,
+                    "yAxis": {
+                        "left": {
+                            "showUnits": false,
+                            "label": "Totale Notifiche"
+                        }
+                    },
+                    "start": "-PT168H",
+                    "end": "P0D"
+                }
+            },
+            {
+                "type": "metric",
+                "x": 0,
+                "y": 6,
+                "width": 10,
+                "height": 6,
+                "properties": {
+                    "metrics": [
+                        [ "SEND/BusinessMetrics", "ACCEPTED", { "id": "m1", "label": "Approvate (ACCEPTED)", "color": "#2ca02c", "region": "${AWS::Region}" } ],
+                        [ ".", "REFUSED", { "id": "m2", "label": "Rifiutate (REFUSED)", "color": "#d62728", "region": "${AWS::Region}" } ],
+                        [ ".", "IN_VALIDATION", { "id": "m3", "label": "Ingressi in Validazione", "color": "#1f77b4", "region": "${AWS::Region}" } ]
+                    ],
+                    "view": "bar",
+                    "stacked": true,
+                    "region": "${AWS::Region}",
+                    "title": "Volumi Giornalieri",
+                    "period": 86400,
+                    "yAxis": {
+                        "left": {
+                            "showUnits": false,
+                            "label": "Totale Notifiche"
+                        }
+                    },
+                    "stat": "Sum",
+                    "start": "-PT24H",
+                    "end": "P0D"
+                }
+            },
+            {
+                "type": "metric",
+                "x": 0,
+                "y": 12,
+                "width": 5,
+                "height": 3,
+                "properties": {
+                    "metrics": [
+                        [ { "expression": "m3 - (m1 + m2)", "label": "Notifiche Bloccate / In Lavorazione", "id": "e1", "color": "#ff7f0e" } ],
+                        [ "SEND/BusinessMetrics", "IN_VALIDATION", { "id": "m3", "visible": false, "stat": "Sum" } ],
+                        [ ".", "ACCEPTED", { "id": "m1", "visible": false, "stat": "Sum" } ],
+                        [ ".", "REFUSED", { "id": "m2", "visible": false, "stat": "Sum" } ]
+                    ],
+                    "view": "singleValue",
+                    "region": "${AWS::Region}",
+                    "title": "Disallineamento (Backlog)",
+                    "period": 604800,
+                    "setPeriodToTimeRange": true,
+                    "sparkline": false,
+                    "start": "-PT24H",
+                    "end": "P0D"
+                }
+            },
+            {
+                "type": "metric",
+                "x": 5,
+                "y": 12,
+                "width": 5,
+                "height": 3,
+                "properties": {
+                    "metrics": [
+                        [ { "expression": "100 * m1 / (m1 + m2)", "label": "Approval Rate %", "id": "e2", "color": "#2ca02c" } ],
+                        [ "SEND/BusinessMetrics", "ACCEPTED", { "id": "m1", "visible": false, "stat": "Sum" } ],
+                        [ ".", "REFUSED", { "id": "m2", "visible": false, "stat": "Sum" } ]
+                    ],
+                    "view": "singleValue",
+                    "region": "${AWS::Region}",
+                    "title": "SLA Approvazione %",
+                    "period": 604800,
+                    "setPeriodToTimeRange": true,
+                    "sparkline": false,
+                    "start": "-PT24H",
+                    "end": "P0D"
+                }
+            },
+            {
+                "type": "metric",
+                "x": 10,
+                "y": 1,
+                "width": 7,
+                "height": 6,
+                "properties": {
+                    "metrics": [
+                        [ "SEND/BusinessMetrics", "validation_sla", { "region": "${AWS::Region}", "stat": "Maximum" } ]
+                    ],
+                    "view": "gauge",
+                    "region": "${AWS::Region}",
+                    "title": "SLA Validazione Notifiche (0-24h)",
+                    "period": 60,
+                    "start": "-PT1H",
+                    "yAxis": {
+                        "left": {
+                            "min": 0,
+                            "max": 24
+                        }
+                    },
+                    "annotations": {
+                        "horizontal": [
+                            [
+                                {
+                                    "color": "#69ae34",
+                                    "label": "0h",
+                                    "value": 0
+                                },
+                                {
+                                    "value": 4,
+                                    "label": "4h"
+                                }
+                            ],
+                            [
+                                {
+                                    "color": "#ff7f0e",
+                                    "label": "4h",
+                                    "value": 4
+                                },
+                                {
+                                    "value": 8,
+                                    "label": "8h"
+                                }
+                            ],
+                            [
+                                {
+                                    "color": "#d62728",
+                                    "label": "8h",
+                                    "value": 8
+                                },
+                                {
+                                    "value": 24,
+                                    "label": "24h"
+                                }
+                            ]
+                        ]
+                    },
+                    "singleValueFullPrecision": false,
+                    "liveData": true,
+                    "legend": {
+                        "position": "hidden"
+                    }
+                }
+            },
+            {
+                "type": "metric",
+                "x": 17,
+                "y": 1,
+                "width": 7,
+                "height": 6,
+                "properties": {
+                    "metrics": [
+                        [ "SEND/BusinessMetrics", "pec_sla", { "region": "${AWS::Region}", "stat": "Maximum" } ]
+                    ],
+                    "view": "gauge",
+                    "region": "${AWS::Region}",
+                    "title": "SLA Invio PEC (0-48h)",
+                    "period": 60,
+                    "start": "-PT1H",
+                    "yAxis": {
+                        "left": {
+                            "min": 0,
+                            "max": 48
+                        }
+                    },
+                    "annotations": {
+                        "horizontal": [
+                            [
+                                {
+                                    "color": "#69ae34",
+                                    "label": "0h",
+                                    "value": 0
+                                },
+                                {
+                                    "value": 12,
+                                    "label": "12h"
+                                }
+                            ],
+                            [
+                                {
+                                    "color": "#ff7f0e",
+                                    "label": "12h",
+                                    "value": 12
+                                },
+                                {
+                                    "value": 24,
+                                    "label": "24h"
+                                }
+                            ],
+                            [
+                                {
+                                    "color": "#d62728",
+                                    "label": "24h",
+                                    "value": 24
+                                },
+                                {
+                                    "value": 48,
+                                    "label": "48h"
+                                }
+                            ]
+                        ]
+                    },
+                    "singleValueFullPrecision": false,
+                    "liveData": true,
+                    "legend": {
+                        "position": "hidden"
+                    }
+                }
+            },
+            {
+                "type": "log",
+                "x": 10,
+                "y": 7,
+                "width": 7,
+                "height": 8,
+                "properties": {
+                    "start": "-PT1H",
+                    "query": "SOURCE \"arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/oer-sla-monitoring-lambda\" |\nfields @timestamp, message\n| filter message like /validation_sla/\n| parse message '\"diff_hours\":*}' as diff_hours\n| parse message '\"iun\":\"*\"' as iun\n| stats max(diff_hours) as max_diff_hours by iun\n| sort max_diff_hours desc",
+                    "region": "${AWS::Region}",
+                    "stacked": false,
+                    "view": "table",
+                    "title": "Log group: oer-sla-validation-monitoring-lambda"
+                }
+            },
+            {
+                "type": "log",
+                "x": 17,
+                "y": 7,
+                "width": 7,
+                "height": 8,
+                "properties": {
+                    "start": "-PT1H",
+                    "query": "SOURCE \"arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/oer-sla-monitoring-lambda\" |\nfields @timestamp, message\n| filter message like /pec_sla/\n| parse message '\"requestId\":\"*\"' as requestId\n| parse message '\"diff_hours\":*}' as diff_hours\n| stats max(diff_hours) as max_diff_hours by requestId\n| sort max_diff_hours desc",
+                    "region": "${AWS::Region}",
+                    "stacked": false,
+                    "view": "table",
+                    "title": "Log group: oer-sla-validation-monitoring-lambda"
+                }
+            },
+            {
+                "type": "text",
+                "x": 0,
+                "y": 0,
+                "width": 24,
+                "height": 1,
+                "properties": {
+                    "markdown": "# SEND: Area Business"
+                }
+            },
+            {
+                "type": "text",
+                "x": 0,
+                "y": 15,
+                "width": 24,
+                "height": 1,
+                "properties": {
+                    "markdown": "# SEND: Area Tecnico / Infrastruttura"
+                }
+            },
+            {
+              "type": "text",
+              "x": 0,
+              "y": 16,
+              "width": 24,
+              "height": 1,
+              "properties": {
+                "markdown": "## API Gateway, Downstream e SQS"
+              }
+            }
+            ${GeneratedApiGatewayWidgets}
+            ${GeneratedDownstreamErrorWidgets}
+            ${GeneratedSqsWidgets}
+            ,
+            {
+              "type": "text",
+              "width": 24,
+              "height": 1,
+              "properties": {
+                "markdown": "## SEND: Throttling e Capacity"
+              }
+            },
+            {
+                "type": "metric",
+                "width": 12,
+                "height": 6,
+                "properties": {
+                    "metrics": [
+                        [ { "expression": "SELECT SUM(Throttles) FROM SCHEMA(\"AWS/Lambda\", FunctionName) GROUP BY FunctionName", "label": "Lambda Throttles", "id": "q1" } ]
+                    ],
+                    "view": "timeSeries",
+                    "stacked": false,
+                    "region": "${AWS::Region}",
+                    "stat": "Sum",
+                    "period": 300,
+                    "start": "-PT168H",
+                    "end": "P0D",
+                    "title": "Lambda - Throttles"
+                }
+                },
+                {
+                    "type": "metric",
+                    "width": 12,
+                    "height": 6,
+                    "properties": {
+                        "metrics": [
+                            [ { "expression": "SELECT SUM(ThrottledRules) FROM SCHEMA(\"AWS/Events\", RuleName) GROUP BY RuleName", "label": "Throttled Rules", "id": "q1" } ]
+                        ],
+                        "view": "timeSeries",
+                        "stacked": false,
+                        "region": "${AWS::Region}",
+                        "stat": "Sum",
+                        "period": 300,
+                        "start": "-PT168H",
+                        "end": "P0D",
+                        "title": "EventBridge - Throttled Rules"
+                    }
+                },
+                {
+                    "type": "metric",
+                    "width": 12,
+                    "height": 6,
+                    "properties": {
+                        "metrics": [
+                            [ { "expression": "SELECT SUM(ReadThrottleEvents) FROM SCHEMA(\"AWS/DynamoDB\", TableName) GROUP BY TableName", "label": "ReadThrottleEvents", "id": "q1" } ]
+                        ],
+                        "view": "timeSeries",
+                        "stacked": false,
+                        "region": "${AWS::Region}",
+                        "stat": "Sum",
+                        "period": 300,
+                        "start": "-PT168H",
+                        "end": "P0D",
+                        "title": "DynamoDB - Read Throttles"
+                    }
+                },
+                {
+                    "type": "metric",
+                    "width": 12,
+                    "height": 6,
+                    "properties": {
+                        "metrics": [
+                            [ { "expression": "SELECT SUM(WriteThrottleEvents) FROM SCHEMA(\"AWS/DynamoDB\", TableName) GROUP BY TableName", "label": "WriteThrottleEvents", "id": "q1" } ]
+                        ],
+                        "view": "timeSeries",
+                        "stacked": false,
+                        "region": "${AWS::Region}",
+                        "stat": "Sum",
+                        "period": 300,
+                        "start": "-PT168H",
+                        "end": "P0D",
+                        "title": "DynamoDB - Write Throttles"
+                    }
+                },
+                {
+                    "type": "metric",
+                    "width": 24,
+                    "height": 6,
+                    "properties": {
+                        "metrics": [
+                            [ { "expression": "SELECT MAX(ExtraRunningTasksByTaskFamily) FROM \"OER/ECSCapacity\"", "label": "ExtraRunningTasks", "id": "q1" } ]
+                        ],
+                        "view": "timeSeries",
+                        "stacked": false,
+                        "region": "${AWS::Region}",
+                        "stat": "Maximum",
+                        "period": 300,
+                        "start": "-PT168H",
+                        "end": "P0D",
+                        "title": "ECS Capacity - Extra Running Tasks"
+                    }
+                }
+              ]
+            }
+          - GeneratedApiGatewayWidgets:
+              Fn::Transform:
+                Name: OerDashboardApiWidgetsTransformV2
+                Parameters:
+                  Region: !Sub ${AWS::Region}
+                  GatewayApisIntendedUsage: !Ref GatewayApisIntendedUsage
+                  MaxAPIGatewayDetailWidgets: !Ref MaxAPIGatewayDetailWidgets
+            GeneratedDownstreamErrorWidgets:
+              Fn::Transform:
+                Name: OerDownstreamErrorWidgetsTransformV2
+                Parameters:
+                  Region: !Sub ${AWS::Region}
+                  DownstreamMetricMap: !Ref DownstreamMetricMap
+            GeneratedSqsWidgets:
+              Fn::Transform:
+                Name: OerSqsWidgetsTransformV2
+                Parameters:
+                  Region: !Sub ${AWS::Region}
+                  SqsDlqExcludeQueueNames: !Ref SqsDlqExcludeQueueNames
+                  SqsQueueExcludeQueueNames: !Ref SqsQueueExcludeQueueNames
+
+  OerEcsTaskDeltaMetricsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: OerEcsTaskDeltaMetricsPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/pn-oer-ecs-task-delta-metrics:*
+              - Effect: Allow
+                Action:
+                  - ecs:ListClusters
+                  - ecs:ListServices
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecs:DescribeServices
+                Resource:
+                  - !Sub arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/*
+                  - !Sub arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:service/*
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: OER/ECSCapacity
+
+  OerEcsTaskDeltaMetricsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Collect ECS service desired/running tasks and publish custom delta metrics by task definition family.
+      FunctionName: pn-oer-ecs-task-delta-metrics
+      Handler: index.lambda_handler
+      Runtime: !Ref LambdaPythonRuntime
+      Timeout: 120
+      MemorySize: 256
+      Role: !GetAtt OerEcsTaskDeltaMetricsRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+
+          NAMESPACE = "OER/ECSCapacity"
+
+
+          def _task_family(task_definition_arn):
+              # Example ARN suffix: task-definition/family-name:42
+              suffix = task_definition_arn.split("/")[-1]
+              return suffix.split(":")[0]
+
+
+          def _chunk(items, size):
+              for i in range(0, len(items), size):
+                  yield items[i:i + size]
+
+
+          def lambda_handler(event, context):
+              ecs = boto3.client("ecs")
+              cw = boto3.client("cloudwatch")
+
+              cluster_arns = []
+              paginator = ecs.get_paginator("list_clusters")
+              for page in paginator.paginate():
+                  cluster_arns.extend(page.get("clusterArns", []))
+
+              families = {}
+
+              for cluster_arn in cluster_arns:
+                  service_arns = []
+                  services_paginator = ecs.get_paginator("list_services")
+                  for page in services_paginator.paginate(cluster=cluster_arn):
+                      service_arns.extend(page.get("serviceArns", []))
+
+                  for batch in _chunk(service_arns, 10):
+                      if not batch:
+                          continue
+                      response = ecs.describe_services(cluster=cluster_arn, services=batch)
+
+                      for service in response.get("services", []):
+                          desired = int(service.get("desiredCount", 0))
+                          running = int(service.get("runningCount", 0))
+                          family = _task_family(service.get("taskDefinition", "unknown:0"))
+
+                          bucket = families.setdefault(family, {"desired": 0, "running": 0})
+                          bucket["desired"] += desired
+                          bucket["running"] += running
+
+              metric_data = []
+              for family, counts in families.items():
+                  desired = counts["desired"]
+                  running = counts["running"]
+                  extra = max(0, running - desired)
+                  dimensions = [{"Name": "TaskDefinitionFamily", "Value": family}]
+
+                  metric_data.append({
+                      "MetricName": "MinTasksByTaskFamily",
+                      "Dimensions": dimensions,
+                      "Value": float(desired),
+                      "Unit": "Count"
+                  })
+                  metric_data.append({
+                      "MetricName": "RunningTasksByTaskFamily",
+                      "Dimensions": dimensions,
+                      "Value": float(running),
+                      "Unit": "Count"
+                  })
+                  metric_data.append({
+                      "MetricName": "ExtraRunningTasksByTaskFamily",
+                      "Dimensions": dimensions,
+                      "Value": float(extra),
+                      "Unit": "Count"
+                  })
+
+              for batch in _chunk(metric_data, 20):
+                  cw.put_metric_data(Namespace=NAMESPACE, MetricData=batch)
+
+              return {
+                  "publishedFamilies": len(families),
+                  "publishedMetrics": len(metric_data)
+              }
+
+  OerEcsTaskDeltaMetricsLogGroup:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/log-group.yaml"
+      Parameters:
+        LogGroupName: !Ref OerEcsTaskDeltaMetricsFunction
+        LogGroupPrefix: '/aws/lambda'
+        LogGroupRetention: !Ref LogRetention
+
+  OerEcsTaskDeltaMetricsSchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: InvokeOerEcsTaskDeltaMetricsFunction
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt OerEcsTaskDeltaMetricsFunction.Arn
+
+  OerEcsTaskDeltaMetricsScheduleRule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: pn-oer-ecs-task-delta-metrics-scheduler
+      Description: Trigger ECS task delta metrics Lambda every minute.
+      ScheduleExpression: rate(1 minute)
+      State: !Ref EcsTaskDeltaMetricsScheduleState
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt OerEcsTaskDeltaMetricsFunction.Arn
+        RoleArn: !GetAtt OerEcsTaskDeltaMetricsSchedulerRole.Arn
+
+  OerEcsTaskDeltaMetricsInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OerEcsTaskDeltaMetricsFunction
+      Principal: scheduler.amazonaws.com
+      SourceArn: !GetAtt OerEcsTaskDeltaMetricsScheduleRule.Arn
 
 Outputs:
   Version:

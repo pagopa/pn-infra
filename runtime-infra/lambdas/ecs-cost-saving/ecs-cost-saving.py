@@ -4,6 +4,18 @@ import os
 import re
 import urllib.request
 
+MOCK_CONSOLIDATORE_SERVICE_NAME = "mockconsolidatore-ExternalChannelsMicroservice"
+
+
+def is_external_channels_mock_service(service_name):
+    return MOCK_CONSOLIDATORE_SERVICE_NAME in service_name
+
+
+def get_external_channels_mock_desired_count():
+    desired_count = os.environ.get('ExternalChannelsMockDesiredCount', '')
+    return int(desired_count) if desired_count else None
+
+
 def get_github_token():
     secret_name = "github-token"
     region_name = os.environ.get('AWS_REGION', 'eu-south-1')
@@ -45,13 +57,17 @@ def get_official_counts(ecs_client, cluster_name, env_type, github_token):
         return None
 
     service_counts = {}
+    external_channels_mock_desired_count = get_external_channels_mock_desired_count()
     try:
         services_response = ecs_client.list_services(cluster=cluster_name, maxResults=100)
         for service_arn in services_response['serviceArns']:
             service_name = service_arn.split("/")[-1]
             # Override manuali per servizi specifici
-            if "pn-external-channels-microsvc-test-ExternalChannelsMicroservice" in service_name or "mockconsolidatore-ExternalChannelsMicroservice" in service_name:
-                service_counts[service_name] = 7
+            if (
+                external_channels_mock_desired_count is not None
+                and is_external_channels_mock_service(service_name)
+            ):
+                service_counts[service_name] = external_channels_mock_desired_count
                 continue
             
             # Determina la directory del servizio su GitHub (es. pn-delivery-push)
@@ -98,14 +114,18 @@ def handle_stop(ecs_client, s3_client, cluster_name, env_type, s3bucket_name, ac
     # In DEV, salviamo i valori ATTUALI dei microservizi su S3 prima di spegnere
     if env_type == 'dev':
         service_counts = {}
+        external_channels_mock_desired_count = get_external_channels_mock_desired_count()
         try:
             services_response = ecs_client.list_services(cluster=cluster_name, maxResults=100)
             for service_arn in services_response['serviceArns']:
                 service_name = service_arn.split('/')[-1]
                 desc = ecs_client.describe_services(cluster=cluster_name, services=[service_name])
                 count = desc['services'][0]['desiredCount']
-                if "pn-external-channels-microsvc-test-ExternalChannelsMicroservice" in service_name or "mockconsolidatore-ExternalChannelsMicroservice" in service_name:
-                    count = 7
+                if (
+                    external_channels_mock_desired_count is not None
+                    and is_external_channels_mock_service(service_name)
+                ):
+                    count = external_channels_mock_desired_count
                 service_counts[service_name] = count
             
             if service_counts:
