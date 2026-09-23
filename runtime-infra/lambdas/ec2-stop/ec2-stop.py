@@ -181,7 +181,7 @@ def normalize_instance(instance, now, required_tag_name, required_tag_value):
     instance_type = instance.get("InstanceType", "unknown")
     state = instance.get("State", {}).get("Name", "unknown")
     is_micro = instance_type.endswith(".micro")
-    has_required_tag = tags.get(required_tag_name, "").lower() == required_tag_value.lower()
+    has_required_tag = tags.get(required_tag_name, "") == required_tag_value
     stopped_at = parse_stopped_at(instance.get("StateTransitionReason", ""))
 
     return {
