@@ -156,6 +156,11 @@ Parameters:
     Default: ""
     Description: Root S3 prefix used to isolate CDC preprocessing test data from active paths
 
+  PnMetricsVersion:
+    Type: String
+    Default: ""
+    Description: Version of pn-metrics used to build the Data Quality configuration Layer
+
 
 Conditions:
   HasOpenSearchExport: !Not [ !Equals [ !Ref OpenSearchClusterEndpoint, "" ] ]
@@ -193,7 +198,7 @@ Resources:
         LambdasBasePath: !Ref LambdasBasePath
         PreprocessingEnabled: !Ref PreprocessingEnabled
         PreprocessingS3RootPrefix: !Ref PreprocessingS3RootPrefix
-
+        PnMetricsVersion: !Ref PnMetricsVersion
 
   ###             Export CloudWatch Logs to Log saving bucket             ###
   ###########################################################################
