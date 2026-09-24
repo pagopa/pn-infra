@@ -2535,6 +2535,9 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/S3DashboardBodyTransform:*'
               - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}'
+              - Effect: Allow
                 Action: s3:GetObject
                 Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/dashboard/*'
 

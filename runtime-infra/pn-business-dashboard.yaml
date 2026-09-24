@@ -32,8 +32,9 @@ Resources:
         Fn::Transform:
           Name: S3DashboardBodyTransform
           Parameters:
+            Enabled: !If [IsCoreAccount, 'true', 'false']
             BucketName: !Ref DataMonitoringBucketName
-            TemplateKey: '/dashboard/NationalRegistriesDownstreamHealth.json'
+            TemplateKey: dashboard/NationalRegistriesDownstreamHealth.json
             Region: !Ref AWS::Region
 
 Outputs:
