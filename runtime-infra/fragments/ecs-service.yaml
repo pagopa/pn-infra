@@ -1051,7 +1051,7 @@ Resources:
           Rollback: true
         MinimumHealthyPercent: 100
         MaximumPercent: 200
-      DesiredCount: !Ref MinTasksNumber
+      DesiredCount: !If [AutoscalingEnabled, !Ref AWS::NoValue, !Ref MinTasksNumber]
       # This may need to be adjusted if the container takes a while to start up
       HealthCheckGracePeriodSeconds: !Ref AutoscalingCheckPeriod
       LaunchType: FARGATE
