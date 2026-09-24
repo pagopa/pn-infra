@@ -82,6 +82,12 @@ Parameters:
     AllowedValues: ['true', 'false']
     Description: If true, publish the unused access report event to the warning topic.
 
+  HtmlReportEnabled:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: If true, generate an HTML report alongside the CSV report in S3.
+
   LambdaRuntime:
     Type: String
     Default: python3.14
@@ -298,6 +304,7 @@ Resources:
           ACCOUNT_ROLE: !If [IsConfinfoAccount, 'confinfo', 'core']
           RESOLVE_ROLE_TAGS: !Ref ResolveRoleTagsInExporter
           REPORT_NOTIFICATIONS_ENABLED: !Ref ReportNotificationsEnabled
+          HTML_REPORT_ENABLED: !Ref HtmlReportEnabled
           SNS_TOPIC_ARN: !If
             - IsConfinfoAccount
             - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${WarningSNSTopicName}'
