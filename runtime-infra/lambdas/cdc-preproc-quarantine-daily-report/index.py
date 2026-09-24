@@ -1,3 +1,4 @@
+import csv
 import json
 import os
 from datetime import datetime, timedelta, timezone
@@ -25,6 +26,20 @@ REPORT_NOTIFICATIONS_ENABLED = (
     os.environ.get("REPORT_NOTIFICATIONS_ENABLED", "false").lower() == "true"
 )
 
+CSV_HEADER = [
+    "awsRegion",
+    "eventID",
+    "eventName",
+    "tableName",
+    "recordFormat",
+    "eventSource",
+    "approximateCreationDateTime",
+    "keys",
+    "newImage",
+    "oldImage",
+    "sizeBytes",
+]
+
 s3 = boto3.client(
     "s3",
     region_name=AWS_REGION,
@@ -49,9 +64,47 @@ def _extract_table_name(folder):
     )
 
 
+def _write_csv_record(
+    csv_writer,
+    record,
+):
+    dynamodb = record.get("dynamodb", {})
+
+    csv_writer.writerow(
+        [
+            record.get("awsRegion", ""),
+            record.get("eventID", ""),
+            record.get("eventName", ""),
+            record.get("tableName", ""),
+            record.get("recordFormat", ""),
+            record.get("eventSource", ""),
+            dynamodb.get(
+                "ApproximateCreationDateTime",
+                "",
+            ),
+            json.dumps(
+                dynamodb.get("Keys", {}),
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            json.dumps(
+                dynamodb.get("NewImage", {}),
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            json.dumps(
+                dynamodb.get("OldImage", {}),
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            dynamodb.get("SizeBytes", ""),
+        ]
+    )
+
+
 def _write_daily_records(
     day_prefix,
-    csv_file,
+    csv_writer,
 ):
     paginator = s3.get_paginator("list_objects_v2")
 
@@ -74,8 +127,14 @@ def _write_daily_records(
                 if not line.strip():
                     continue
 
-                csv_file.write(line)
-                csv_file.write(b"\n")
+                record = json.loads(
+                    line.decode("utf-8")
+                )
+
+                _write_csv_record(
+                    csv_writer,
+                    record,
+                )
 
                 record_count += 1
 
@@ -94,9 +153,8 @@ def lambda_handler(event, context):
     except Exception as error:
         logger.exception(
             "QUARANTINE_REPORT_FAILED "
-            "Technical error during quarantine report generation. "
-            "ErrorType=%s, "
-            "Error=%s",
+            "Technical error during report generation.\n"
+            "ErrorType=%s, Error=%s",
             type(error).__name__,
             str(error),
         )
@@ -116,8 +174,9 @@ def _generate_report(event, context):
 
     logger.info(
         "Starting CDC quarantine daily report. "
-        "ReferenceDate=%s",
+        "ReferenceDate=%s, Environment=%s",
         reference_date,
+        ENVIRONMENT,
     )
 
     paginator = s3.get_paginator("list_objects_v2")
@@ -136,8 +195,12 @@ def _generate_report(event, context):
 
     logger.info(
         "Quarantine table folders discovered. "
-        "Count=%s",
+        "DiscoveredTables=%s, Tables=%s",
         len(folders),
+        ", ".join(
+            _extract_table_name(folder)
+            for folder in folders
+        ) or "none",
     )
 
     report_base_filename = (
@@ -169,23 +232,41 @@ def _generate_report(event, context):
     csv_path = f"/tmp/{csv_filename}"
 
     tables = []
+    csv_file = None
+    csv_writer = None
 
-    # Read all records from the reference day and write them
-    # progressively to /tmp to avoid keeping the entire daily
-    # dataset in Lambda memory.
-    with open(csv_path, "wb") as csv_file:
+    try:
         for folder in folders:
             table_name = _extract_table_name(folder)
             day_prefix = f"{folder}{day_path}"
 
+            # Open the CSV only when processing starts.
+            # The file is removed later if no records are found.
+            if csv_file is None:
+                csv_file = open(
+                    csv_path,
+                    "w",
+                    newline="",
+                    encoding="utf-8",
+                )
+
+                csv_writer = csv.writer(csv_file)
+                csv_writer.writerow(CSV_HEADER)
+
             record_count = _write_daily_records(
                 day_prefix,
-                csv_file,
+                csv_writer,
             )
 
             # Tables without quarantine records for the
             # reference day are excluded from the report.
             if record_count == 0:
+                logger.info(
+                    "NO quarantine records found for table: "
+                    "TableName=%s, ReferenceDate=%s",
+                    table_name,
+                    reference_date,
+                )
                 continue
 
             tables.append(
@@ -196,12 +277,18 @@ def _generate_report(event, context):
             )
 
             logger.info(
-                "Quarantine records found. "
+                "Quarantine records found for table: "
                 "TableName=%s, "
-                "RecordCount=%s",
+                "RecordCount=%s, "
+                "ReferenceDate=%s",
                 table_name,
                 record_count,
+                reference_date,
             )
+
+    finally:
+        if csv_file is not None:
+            csv_file.close()
 
     tables.sort(
         key=lambda table: table["tableName"]
@@ -211,6 +298,10 @@ def _generate_report(event, context):
         table["recordCount"]
         for table in tables
     )
+
+    # Remove the temporary CSV when no records were found.
+    if total_records == 0 and os.path.exists(csv_path):
+        os.remove(csv_path)
 
     report = {
         "generatedAt": now.strftime(
@@ -239,8 +330,8 @@ def _generate_report(event, context):
     attachment = None
 
     if total_records > 0:
-        # Store the original quarantine records only when
-        # the reference day contains quarantine records.
+        # Store the tabular CSV only when the reference day
+        # contains quarantine records.
         s3.upload_file(
             csv_path,
             S3_BUCKET,
@@ -262,25 +353,25 @@ def _generate_report(event, context):
         logger.info(
             "Quarantine reports stored in S3. "
             "ReferenceDate=%s, "
-            "Tables=%s, "
+            "TablesWithQuarantine=%s, "
             "Records=%s, "
-            "JsonReportPath=s3://%s/%s, "
+            "CsvSizeBytes=%s\n"
+            "CSV report generated successfully! You can find it at:\n"
             "CsvReportPath=s3://%s/%s",
             reference_date,
             len(tables),
             total_records,
-            S3_BUCKET,
-            json_report_key,
+            csv_size,
             S3_BUCKET,
             csv_report_key,
         )
 
     else:
         logger.info(
-            "No quarantine records found. "
-            "ReferenceDate=%s, "
-            "JsonReportPath=s3://%s/%s. "
-            "The report will be published without attachment.",
+            "NO quarantine records found for the reference date. "
+            "ReferenceDate=%s.\n"
+            "Attention! Only the JSON report was generated with no CSV attachment.\n"
+            "JsonReportPath=s3://%s/%s",
             reference_date,
             S3_BUCKET,
             json_report_key,
@@ -317,19 +408,20 @@ def _generate_report(event, context):
         )
 
         logger.info(
-            "Quarantine report notification published. "
-            "Producer=%s, "
-            "Attachment=%s",
+            "Quarantine report notification published successfully! "
+            "Producer=%s, CsvAttachmentIncluded=%s",
             REPORT_PRODUCER,
             attachment is not None,
         )
 
     logger.info(
-        "CDC quarantine daily report completed. "
+        "CDC quarantine daily report completed successfully! "
         "ReferenceDate=%s, "
-        "Tables=%s, "
+        "DiscoveredTables=%s, "
+        "TablesWithQuarantine=%s, "
         "Records=%s",
         reference_date,
+        len(folders),
         len(tables),
         total_records,
     )
