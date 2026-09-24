@@ -63,6 +63,16 @@ def load_rules(*, ssm_client, parameter_name, logger):
             ):
                 raise ValueError(f"rule {rule_id} contains an invalid trusted service")
 
+            microservices = rule.get("microservices")
+            if microservices is not None:
+                if not isinstance(microservices, list) or not microservices:
+                    raise ValueError(f"rule {rule_id} microservices must be a non-empty array")
+                if any(
+                    not isinstance(microservice, str) or not microservice.strip()
+                    for microservice in microservices
+                ):
+                    raise ValueError(f"rule {rule_id} contains an invalid microservice")
+
             if enabled:
                 rules.append({
                     "id": rule_id,
@@ -70,6 +80,11 @@ def load_rules(*, ssm_client, parameter_name, logger):
                     "trusted_services": {
                         service.strip().casefold() for service in trusted_services
                     },
+                    "microservices": (
+                        {microservice.strip().casefold() for microservice in microservices}
+                        if microservices is not None
+                        else None
+                    ),
                 })
 
         logger.info(json.dumps({
@@ -89,7 +104,8 @@ def load_rules(*, ssm_client, parameter_name, logger):
 
 
 def filter_unused_actions(
-    *, finding, unused_actions, rules, role_trust_cache, iam_client, logger
+    *, finding, unused_actions, rules, microservice, role_trust_cache,
+    iam_client, logger
 ):
     """Split unused actions into reportable and suppressed lists."""
     if not rules or not unused_actions:
@@ -115,12 +131,17 @@ def filter_unused_actions(
     visible_actions = []
     suppressed_actions = []
     matched_rule_ids = set()
+    microservice_key = str(microservice or "").casefold()
     for action in unused_actions:
         action_key = action.casefold()
         matching_rules = [
             rule for rule in rules
             if action_key in rule["actions"]
             and trusted_services.intersection(rule["trusted_services"])
+            and (
+                rule.get("microservices") is None
+                or microservice_key in rule["microservices"]
+            )
         ]
         if matching_rules:
             suppressed_actions.append(action)

@@ -125,7 +125,7 @@ def _collect_actions(node, output):
 
 
 def extract_unused_actions(details):
-    """Extract and deduplicate unused IAM actions from finding details."""
+    """Extract, qualify and deduplicate unused IAM actions from finding details."""
     actions = set()
     if isinstance(details, list):
         for item in details:
@@ -134,10 +134,17 @@ def extract_unused_actions(details):
             permission_details = item.get("unusedPermissionDetails")
             if not isinstance(permission_details, dict):
                 continue
+            service_namespace = permission_details.get("serviceNamespace")
             for action_item in permission_details.get("actions", []):
                 if isinstance(action_item, dict):
                     action_name = action_item.get("action")
                     if isinstance(action_name, str) and action_name:
+                        if (
+                            ":" not in action_name
+                            and isinstance(service_namespace, str)
+                            and service_namespace
+                        ):
+                            action_name = f"{service_namespace}:{action_name}"
                         actions.add(action_name)
     _collect_actions(details, actions)
     return sorted(actions)
