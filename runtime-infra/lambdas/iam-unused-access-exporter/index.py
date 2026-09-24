@@ -23,7 +23,6 @@ from access_analyzer import (
 from botocore.config import Config
 from fine_grained_exclusions import (
     filter_unused_actions as _filter_unused_actions,
-    load_rules as _load_fine_grained_exclusion_rules,
 )
 from html_reporting import export_html_report
 from iam_roles import (
@@ -31,6 +30,7 @@ from iam_roles import (
     parse_role_name as _parse_role_name,
     resolve_microservice_tag as _resolve_microservice_tag,
 )
+from mutelist import load_mutelist as _load_mutelist
 from reporting import publish_warning_report
 
 log = logging.getLogger()
@@ -46,8 +46,15 @@ SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN", "")
 REPORT_NOTIFICATIONS_ENABLED = os.environ.get("REPORT_NOTIFICATIONS_ENABLED", "false").lower() == "true"
 HTML_REPORT_ENABLED = os.environ.get("HTML_REPORT_ENABLED", "false").lower() == "true"
 EXCLUDE_TAG_KEY = os.environ.get("EXCLUDE_TAG_KEY", "")
-FINE_GRAINED_EXCLUSIONS_SSM_PARAMETER = os.environ.get("FINE_GRAINED_EXCLUSIONS_SSM_PARAMETER", "")
-ARCHIVE_RULE_PATTERNS = [p.strip() for p in os.environ.get("ARCHIVE_RULE_PATTERNS", "").split(",") if p.strip()]
+PN_CONFIGURATION_REPOSITORY = os.environ.get(
+    "PN_CONFIGURATION_REPOSITORY", "pagopa/pn-configuration"
+)
+PN_CONFIGURATION_COMMIT_ID = os.environ["PN_CONFIGURATION_COMMIT_ID"]
+GITHUB_TOKEN_NAME = os.environ["GITHUB_TOKEN_NAME"]
+MUTELIST_PATH = os.environ.get(
+    "MUTELIST_PATH",
+    f"{ENV_NAME}/_conf/{ACCOUNT_ROLE}/tools/iam-access-analyzer-mutelist.json",
+)
 
 aa  = boto3.client("accessanalyzer", config=Config(retries={"max_attempts": 10, "mode": "adaptive"}))
 s3  = boto3.client(
@@ -58,7 +65,7 @@ s3  = boto3.client(
 sts = boto3.client("sts")
 iam = boto3.client("iam")
 sns = boto3.client("sns")
-ssm = boto3.client("ssm", config=Config(retries={"max_attempts": 10, "mode": "adaptive"}))
+secretsmanager = boto3.client("secretsmanager")
 
 CSV_HEADER = [
     "finding_id", "finding_type", "resource", "resource_type",
@@ -74,17 +81,26 @@ def lambda_handler(event, context):
     request_id = (context.aws_request_id if context else "local")
     key = f"{ENV_NAME}/{ACCOUNT_ROLE}/{account_id}/{now:%Y-%m-%d}/{account_id}-findings-{now:%H%M%S}-{request_id}.csv"
 
-    _sync_archive_rules(
-        analyzer_client=aa,
-        analyzer_arn=ANALYZER_ARN,
-        patterns=ARCHIVE_RULE_PATTERNS,
+    mutelist = _load_mutelist(
+        secrets_client=secretsmanager,
+        github_token_name=GITHUB_TOKEN_NAME,
+        repository=PN_CONFIGURATION_REPOSITORY,
+        commit_id=PN_CONFIGURATION_COMMIT_ID,
+        path=MUTELIST_PATH,
         logger=log,
     )
-    fine_grained_exclusion_rules = _load_fine_grained_exclusion_rules(
-        ssm_client=ssm,
-        parameter_name=FINE_GRAINED_EXCLUSIONS_SSM_PARAMETER,
-        logger=log,
-    )
+    if mutelist["loaded"]:
+        _sync_archive_rules(
+            analyzer_client=aa,
+            analyzer_arn=ANALYZER_ARN,
+            patterns=mutelist["archive_role_patterns"],
+            logger=log,
+        )
+    else:
+        log.warning(json.dumps({
+            "msg": "archive rule synchronization skipped because mutelist is unavailable",
+        }))
+    fine_grained_exclusion_rules = mutelist["fine_grained_exclusions"]
 
     buf = io.StringIO()
     writer = csv.writer(buf)
