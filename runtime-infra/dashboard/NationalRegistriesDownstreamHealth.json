@@ -1,0 +1,815 @@
+{
+    "widgets": [
+        {
+            "type": "text",
+            "x": 0,
+            "y": 0,
+            "width": 24,
+            "height": 2,
+            "properties": {
+                "markdown": "# National Registries · Downstream Health\nOverview dello stato dei registri nazionali e copertura delle richieste downstream.",
+                "background": "transparent"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 2,
+            "width": 5,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "IF(requested>0,((impresa+persona+professionista)/requested)*100,0)", "id": "response_rate", "label": "Response Rate %" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "INAD", { "id": "requested", "visible": false } ],
+                    [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "INAD", { "id": "impresa", "visible": false } ],
+                    [ "...", "PERSONA_FISICA", ".", "PF", ".", ".", { "id": "persona", "visible": false } ],
+                    [ "...", "PROFESSIONISTA", ".", ".", ".", ".", { "id": "professionista", "visible": false } ]
+                ],
+                "view": "singleValue",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "sparkline": true,
+                "title": "INAD",
+                "yAxis": {
+                    "left": {
+                        "min": 0,
+                        "max": 100
+                    }
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 5,
+            "y": 2,
+            "width": 5,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "IF(requested>0,(impresa/requested)*100,0)", "id": "response_rate", "label": "Response Rate %" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "IPA", { "id": "requested", "visible": false } ],
+                    [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "IPA", { "id": "impresa", "visible": false } ]
+                ],
+                "view": "singleValue",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "sparkline": true,
+                "title": "IPA",
+                "yAxis": {
+                    "left": {
+                        "min": 0,
+                        "max": 100
+                    }
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 10,
+            "y": 2,
+            "width": 5,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "IF(requested>0,(persona/requested)*100,0)", "id": "response_rate", "label": "Response Rate %" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "NotificationScope", "PF", "Registry", "ANPR", { "id": "persona", "visible": false } ],
+                    [ ".", "CF_REQUESTED", "Registry", "ANPR", { "id": "requested", "visible": false } ]
+                ],
+                "view": "singleValue",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "sparkline": true,
+                "title": "ANPR",
+                "yAxis": {
+                    "left": {
+                        "min": 0,
+                        "max": 100
+                    }
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 15,
+            "y": 2,
+            "width": 5,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "IF(requested>0,(impresa/requested)*100,0)", "id": "response_rate", "label": "Response Rate %" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "NotificationScope", "PG", "Registry", "REGISTRO_IMPRESE", { "id": "impresa", "visible": false } ],
+                    [ ".", "CF_REQUESTED", "Registry", "REGISTRO_IMPRESE", { "id": "requested", "visible": false } ]
+                ],
+                "view": "singleValue",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "sparkline": true,
+                "title": "Registro Imprese",
+                "yAxis": {
+                    "left": {
+                        "min": 0,
+                        "max": 100
+                    }
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 20,
+            "y": 2,
+            "width": 4,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "IF(requested>0,((impresa_pf+impresa_pg+professionista_pf+professionista_pg)/requested)*100,0)", "id": "response_rate", "label": "Response Rate %" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PF", "Registry", "INIPEC", { "id": "impresa_pf", "visible": false } ],
+                    [ "...", "PG", ".", ".", { "id": "impresa_pg", "visible": false } ],
+                    [ "...", "PROFESSIONISTA", ".", "PF", ".", ".", { "id": "professionista_pf", "visible": false } ],
+                    [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "PROFESSIONISTA", "NotificationScope", "PG", "Registry", "INIPEC", { "id": "professionista_pg", "visible": false } ],
+                    [ ".", "CF_REQUESTED", "Registry", "INIPEC", { "id": "requested", "visible": false } ]
+                ],
+                "view": "singleValue",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "sparkline": true,
+                "title": "INIPEC",
+                "yAxis": {
+                    "left": {
+                        "min": 0,
+                        "max": 100
+                    }
+                }
+            }
+        },
+        {
+            "type": "text",
+            "x": 0,
+            "y": 7,
+            "width": 24,
+            "height": 1,
+            "properties": {
+                "markdown": "## INAD",
+                "background": "transparent"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 8,
+            "width": 12,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "requested", "id": "e_requested", "label": "Requested: ${SUM}", "color": "#1f77b4" } ],
+                    [ { "expression": "impresa+persona+professionista", "id": "received", "label": "Received: ${SUM}", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-(impresa+persona+professionista)>0,requested-(impresa+persona+professionista),0)", "id": "missing", "label": "No Response: ${SUM}", "color": "#fe6e73" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "INAD", { "id": "requested", "visible": false } ],
+                    [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "INAD", { "id": "impresa", "visible": false } ],
+                    [ "...", "PERSONA_FISICA", ".", "PF", ".", ".", { "id": "persona", "visible": false } ],
+                    [ "...", "PROFESSIONISTA", ".", ".", ".", ".", { "id": "professionista", "visible": false } ]
+                ],
+                "view": "bar",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "title": "Request Coverage",
+                "legend": {
+                    "position": "bottom"
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 12,
+            "y": 8,
+            "width": 6,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "IF(requested>0,((impresa+persona+professionista)/requested)*100,0)", "id": "response_rate", "label": "Response Rate %" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "INAD", { "id": "requested", "visible": false } ],
+                    [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "INAD", { "id": "impresa", "visible": false } ],
+                    [ "...", "PERSONA_FISICA", ".", "PF", ".", ".", { "id": "persona", "visible": false } ],
+                    [ "...", "PROFESSIONISTA", ".", ".", ".", ".", { "id": "professionista", "visible": false } ]
+                ],
+                "view": "singleValue",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "sparkline": true,
+                "title": "Response Rate",
+                "yAxis": {
+                    "left": {
+                        "min": 0,
+                        "max": 100
+                    }
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 18,
+            "y": 8,
+            "width": 6,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "DigitalAddressScope", "PERSONA_FISICA", "NotificationScope", "PF", "Registry", "INAD", { "label": "Persona Fisica" } ],
+                    [ "...", "PROFESSIONISTA", ".", ".", ".", ".", { "label": "Professionista" } ]
+                ],
+                "view": "pie",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "title": "Tipo domicilio ricevuto",
+                "legend": {
+                    "position": "bottom"
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 14,
+            "width": 24,
+            "height": 7,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "requested", "id": "e_requested", "label": "Requested", "color": "#1f77b4" } ],
+                    [ { "expression": "impresa+persona+professionista", "id": "received", "label": "Received", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-(impresa+persona+professionista)>0,requested-(impresa+persona+professionista),0)", "id": "missing", "label": "No Response", "color": "#fe6e73" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "INAD", { "id": "requested", "visible": false } ],
+                    [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "INAD", { "id": "impresa", "visible": false } ],
+                    [ "...", "PERSONA_FISICA", ".", "PF", ".", ".", { "id": "persona", "visible": false } ],
+                    [ "...", "PROFESSIONISTA", ".", ".", ".", ".", { "id": "professionista", "visible": false } ]
+                ],
+                "view": "timeSeries",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "stacked": false,
+                "title": "Request / Response Trend",
+                "legend": {
+                    "position": "bottom"
+                }
+            }
+        },
+        {
+            "type": "text",
+            "x": 0,
+            "y": 21,
+            "width": 24,
+            "height": 1,
+            "properties": {
+                "markdown": "## IPA",
+                "background": "transparent"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 22,
+            "width": 18,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "requested", "id": "e_requested", "label": "Requested: ${SUM}", "color": "#1f77b4" } ],
+                    [ { "expression": "impresa", "id": "received", "label": "Received: ${SUM}", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-impresa>0,requested-impresa,0)", "id": "missing", "label": "No Response: ${SUM}", "color": "#fe6e73" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "IPA", { "id": "requested", "visible": false } ],
+                    [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "IPA", { "id": "impresa", "visible": false } ]
+                ],
+                "view": "bar",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "title": "Requests vs Responses",
+                "legend": {
+                    "position": "bottom"
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 18,
+            "y": 22,
+            "width": 6,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "IF(requested>0,(impresa/requested)*100,0)", "id": "response_rate", "label": "Response Rate %" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "IPA", { "id": "requested", "visible": false } ],
+                    [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "IPA", { "id": "impresa", "visible": false } ]
+                ],
+                "view": "singleValue",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "sparkline": true,
+                "title": "Response Rate",
+                "yAxis": {
+                    "left": {
+                        "min": 0,
+                        "max": 100
+                    }
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 28,
+            "width": 24,
+            "height": 7,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "requested", "id": "e_requested", "label": "Requested", "color": "#1f77b4" } ],
+                    [ { "expression": "impresa", "id": "received", "label": "Received", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-impresa>0,requested-impresa,0)", "id": "missing", "label": "No Response", "color": "#fe6e73" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "IPA", { "id": "requested", "visible": false } ],
+                    [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "IPA", { "id": "impresa", "visible": false } ]
+                ],
+                "view": "timeSeries",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "stacked": false,
+                "title": "Request / Response Trend",
+                "legend": {
+                    "position": "bottom"
+                }
+            }
+        },
+        {
+            "type": "text",
+            "x": 0,
+            "y": 35,
+            "width": 24,
+            "height": 1,
+            "properties": {
+                "markdown": "## ANPR",
+                "background": "transparent"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 36,
+            "width": 18,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "requested", "id": "e_requested", "label": "Requested: ${SUM}", "color": "#1f77b4" } ],
+                    [ { "expression": "persona", "id": "received", "label": "Received: ${SUM}", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-persona>0,requested-persona,0)", "id": "missing", "label": "No Response: ${SUM}", "color": "#fe6e73" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "NotificationScope", "PF", "Registry", "ANPR", { "id": "persona", "visible": false } ],
+                    [ ".", "CF_REQUESTED", "Registry", "ANPR", { "id": "requested", "visible": false } ]
+                ],
+                "view": "bar",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "title": "Requests vs Responses",
+                "legend": {
+                    "position": "bottom"
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 18,
+            "y": 36,
+            "width": 6,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "IF(requested>0,(persona/requested)*100,0)", "id": "response_rate", "label": "Response Rate %" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "NotificationScope", "PF", "Registry", "ANPR", { "id": "persona", "visible": false } ],
+                    [ ".", "CF_REQUESTED", "Registry", "ANPR", { "id": "requested", "visible": false } ]
+                ],
+                "view": "singleValue",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "sparkline": true,
+                "title": "Response Rate",
+                "yAxis": {
+                    "left": {
+                        "min": 0,
+                        "max": 100
+                    }
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 42,
+            "width": 24,
+            "height": 7,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "requested", "id": "e_requested", "label": "Requested", "color": "#1f77b4" } ],
+                    [ { "expression": "persona", "id": "received", "label": "Received", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-persona>0,requested-persona,0)", "id": "missing", "label": "No Response", "color": "#fe6e73" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "NotificationScope", "PF", "Registry", "ANPR", { "id": "persona", "visible": false } ],
+                    [ ".", "CF_REQUESTED", "Registry", "ANPR", { "id": "requested", "visible": false } ]
+                ],
+                "view": "timeSeries",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "stacked": false,
+                "title": "Request / Response Trend",
+                "legend": {
+                    "position": "bottom"
+                }
+            }
+        },
+        {
+            "type": "text",
+            "x": 0,
+            "y": 49,
+            "width": 24,
+            "height": 1,
+            "properties": {
+                "markdown": "## Registro Imprese",
+                "background": "transparent"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 50,
+            "width": 18,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "requested", "id": "e_requested", "label": "Requested: ${SUM}", "color": "#1f77b4" } ],
+                    [ { "expression": "impresa", "id": "received", "label": "Received: ${SUM}", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-impresa>0,requested-impresa,0)", "id": "missing", "label": "No Response: ${SUM}", "color": "#fe6e73" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "NotificationScope", "PG", "Registry", "REGISTRO_IMPRESE", { "id": "impresa", "visible": false } ],
+                    [ ".", "CF_REQUESTED", "Registry", "REGISTRO_IMPRESE", { "id": "requested", "visible": false } ]
+                ],
+                "view": "bar",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "title": "Requests vs Responses",
+                "legend": {
+                    "position": "bottom"
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 18,
+            "y": 50,
+            "width": 6,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "IF(requested>0,(impresa/requested)*100,0)", "id": "response_rate", "label": "Response Rate %" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "NotificationScope", "PG", "Registry", "REGISTRO_IMPRESE", { "id": "impresa", "visible": false } ],
+                    [ ".", "CF_REQUESTED", "Registry", "REGISTRO_IMPRESE", { "id": "requested", "visible": false } ]
+                ],
+                "view": "singleValue",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "sparkline": true,
+                "title": "Response Rate",
+                "yAxis": {
+                    "left": {
+                        "min": 0,
+                        "max": 100
+                    }
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 56,
+            "width": 24,
+            "height": 7,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "requested", "id": "e_requested", "label": "Requested", "color": "#1f77b4" } ],
+                    [ { "expression": "impresa", "id": "received", "label": "Received", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-impresa>0,requested-impresa,0)", "id": "missing", "label": "No Response", "color": "#fe6e73" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "NotificationScope", "PG", "Registry", "REGISTRO_IMPRESE", { "id": "impresa", "visible": false } ],
+                    [ ".", "CF_REQUESTED", "Registry", "REGISTRO_IMPRESE", { "id": "requested", "visible": false } ]
+                ],
+                "view": "timeSeries",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "stacked": false,
+                "title": "Request / Response Trend",
+                "legend": {
+                    "position": "bottom"
+                }
+            }
+        },
+        {
+            "type": "text",
+            "x": 0,
+            "y": 63,
+            "width": 24,
+            "height": 1,
+            "properties": {
+                "markdown": "## INIPEC",
+                "background": "transparent"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 64,
+            "width": 12,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "requested", "id": "e_requested", "label": "Requested: ${SUM}", "color": "#1f77b4" } ],
+                    [ { "expression": "impresa_pf+impresa_pg+professionista_pf+professionista_pg", "id": "received", "label": "Received: ${SUM}", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-(impresa_pf+impresa_pg+professionista_pf+professionista_pg)>0,requested-(impresa_pf+impresa_pg+professionista_pf+professionista_pg),0)", "id": "missing", "label": "No Response: ${SUM}", "color": "#fe6e73" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PF", "Registry", "INIPEC", { "id": "impresa_pf", "visible": false } ],
+                    [ "...", "PG", ".", ".", { "id": "impresa_pg", "visible": false } ],
+                    [ "...", "PROFESSIONISTA", ".", "PF", ".", ".", { "id": "professionista_pf", "visible": false } ],
+                    [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "PROFESSIONISTA", "NotificationScope", "PG", "Registry", "INIPEC", { "id": "professionista_pg", "visible": false } ],
+                    [ ".", "CF_REQUESTED", "Registry", "INIPEC", { "id": "requested", "visible": false } ]
+                ],
+                "view": "bar",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "title": "Requests vs Responses",
+                "legend": {
+                    "position": "bottom"
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 12,
+            "y": 64,
+            "width": 6,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "IF(requested>0,((impresa_pf+impresa_pg+professionista_pf+professionista_pg)/requested)*100,0)", "id": "response_rate", "label": "Response Rate %" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PF", "Registry", "INIPEC", { "id": "impresa_pf", "visible": false } ],
+                    [ "...", "PG", ".", ".", { "id": "impresa_pg", "visible": false } ],
+                    [ "...", "PROFESSIONISTA", ".", "PF", ".", ".", { "id": "professionista_pf", "visible": false } ],
+                    [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "PROFESSIONISTA", "NotificationScope", "PG", "Registry", "INIPEC", { "id": "professionista_pg", "visible": false } ],
+                    [ ".", "CF_REQUESTED", "Registry", "INIPEC", { "id": "requested", "visible": false } ]
+                ],
+                "view": "singleValue",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "sparkline": true,
+                "title": "Response Rate",
+                "yAxis": {
+                    "left": {
+                        "min": 0,
+                        "max": 100
+                    }
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 18,
+            "y": 64,
+            "width": 6,
+            "height": 6,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "SUM([m_pg_impresa,m_pf_impresa])", "label": "Impresa", "id": "e_impresa" } ],
+                    [ { "expression": "SUM([m_pg_professionista,m_pf_professionista])", "label": "Professionista", "id": "e_professionista" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "Registry", "INIPEC", "NotificationScope", "PG", "DigitalAddressScope", "IMPRESA", { "id": "m_pg_impresa", "visible": false } ],
+                    [ "...", "PROFESSIONISTA", { "id": "m_pg_professionista", "visible": false } ],
+                    [ "...", "PF", ".", "IMPRESA", { "id": "m_pf_impresa", "visible": false } ],
+                    [ "...", "PROFESSIONISTA", { "id": "m_pf_professionista", "visible": false } ]
+                ],
+                "view": "pie",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "setPeriodToTimeRange": true,
+                "title": "Tipo domicilio ricevuto",
+                "legend": {
+                    "position": "bottom"
+                },
+                "labels": {
+                    "visible": true
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 70,
+            "width": 24,
+            "height": 7,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "requested", "id": "e_requested", "label": "Requested", "color": "#1f77b4" } ],
+                    [ { "expression": "impresa_pf+impresa_pg+professionista_pf+professionista_pg", "id": "received", "label": "Received", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-(impresa_pf+impresa_pg+professionista_pf+professionista_pg)>0,requested-(impresa_pf+impresa_pg+professionista_pf+professionista_pg),0)", "id": "missing", "label": "No Response", "color": "#fe6e73" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PF", "Registry", "INIPEC", { "id": "impresa_pf", "visible": false } ],
+                    [ "...", "PG", ".", ".", { "id": "impresa_pg", "visible": false } ],
+                    [ "...", "PROFESSIONISTA", ".", "PF", ".", ".", { "id": "professionista_pf", "visible": false } ],
+                    [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "PROFESSIONISTA", "NotificationScope", "PG", "Registry", "INIPEC", { "id": "professionista_pg", "visible": false } ],
+                    [ ".", "CF_REQUESTED", "Registry", "INIPEC", { "id": "requested", "visible": false } ]
+                ],
+                "view": "timeSeries",
+                "region": "eu-south-1",
+                "period": 900,
+                "stat": "Sum",
+                "stacked": false,
+                "title": "Request / Response Trend",
+                "legend": {
+                    "position": "bottom"
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 77,
+            "width": 10,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ "PN-NationalRegistries-Downstream", "BATCH_REQUEST_CREATION", "Status", "FAILURE", { "color": "#d62728", "region": "eu-south-1" } ],
+                    [ "...", "OK", { "color": "#2ca02c", "region": "eu-south-1" } ]
+                ],
+                "view": "timeSeries",
+                "region": "eu-south-1",
+                "period": 300,
+                "stat": "Sum",
+                "title": "INIPEC – Request Invocations",
+                "legend": {
+                    "position": "bottom"
+                }
+            }
+        },
+        {
+            "type": "text",
+            "x": 0,
+            "y": 82,
+            "width": 10,
+            "height": 2,
+            "properties": {
+                "markdown": "📌 **Descrizione:** Numero totale di invocazioni e creazioni di richieste batch verso il servizio INIPEC, distinte per stato (OK o FAILURE). Consente di monitorare il volume di traffico nel tempo e identificare rapidamente picchi anomali o blocchi del servizio."
+            }
+        },
+        {
+            "type": "metric",
+            "x": 10,
+            "y": 77,
+            "width": 10,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ "PN-NationalRegistries-Downstream", "BATCH_SIZE", "Status", "OK", { "region": "eu-south-1" } ],
+                    [ "...", "FAILURE", { "region": "eu-south-1" } ],
+                    [ "...", "OK", { "color": "#98df8a", "stat": "Average", "region": "eu-south-1" } ],
+                    [ "...", "FAILURE", { "color": "#ff9896", "stat": "Average", "region": "eu-south-1" } ]
+                ],
+                "view": "timeSeries",
+                "region": "eu-south-1",
+                "period": 300,
+                "stat": "Maximum",
+                "title": "INIPEC – Batch Size (Avg / Max)"
+            }
+        },
+        {
+            "type": "text",
+            "x": 10,
+            "y": 89,
+            "width": 10,
+            "height": 2,
+            "properties": {
+                "markdown": "📌 **Descrizione:** Numero dei batch elaborati, suddivisa in base all'esito (OK o FAILURE). Utile per monitorare la quanti batch presi in carico falliscono o vengono gestiti correttamente."
+            }
+        },
+        {
+            "type": "metric",
+            "x": 20,
+            "y": 77,
+            "width": 4,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "IF(m5 > 0, (m4 / m5) * 100, 0)", "label": "Error Rate %", "id": "e1", "region": "eu-south-1" } ],
+                    [ { "expression": "IF(m5 > 0, (m6 / m5) * 100, 0)", "label": "Success Rate %", "id": "e2", "region": "eu-south-1" } ],
+                    [ "PN-NationalRegistries-Downstream", "BATCH", "Status", "OK", { "id": "m6", "visible": false, "region": "eu-south-1" } ],
+                    [ "...", "FAILURE", { "id": "m4", "visible": false, "region": "eu-south-1" } ],
+                    [ ".", "BATCH_REQUEST_CREATION", ".", "OK", { "id": "m5", "visible": false, "region": "eu-south-1" } ]
+                ],
+                "view": "pie",
+                "sparkline": true,
+                "region": "eu-south-1",
+                "period": 86400,
+                "title": "INIPEC – Rate (%) 24h",
+                "stat": "Sum",
+                "stacked": false
+            }
+        },
+        {
+            "type": "text",
+            "x": 20,
+            "y": 82,
+            "width": 4,
+            "height": 2,
+            "properties": {
+                "markdown": "📌 **Descrizione:** Tasso percentuale di successo (Success Rate) e di errore (Error Rate) nell'elaborazione dei batch. È un KPI fondamentale per avere un colpo d'occhio immediato sull'affidabilità e la stabilità del servizio."
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 84,
+            "width": 10,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ "PN-NationalRegistries-Downstream", "BATCH_CLOSURE_DURATION", "Status", "OK", { "label": "SUCCESS CLOSURE_DURATION Average", "region": "eu-south-1", "color": "#aec7e8" } ],
+                    [ "...", { "label": "SUCCESS CLOSURE_DURATION Maximum", "region": "eu-south-1", "color": "#1f77b4", "stat": "Maximum" } ],
+                    [ "...", "FAILURE", { "region": "eu-south-1", "color": "#d62728", "label": "FAILURE BATCH_CLOSURE_DURATION Maximum", "stat": "Maximum" } ],
+                    [ "...", { "region": "eu-south-1", "color": "#ff9896", "label": "FAILURE CLOSURE_DURATION Average" } ]
+                ],
+                "view": "timeSeries",
+                "region": "eu-south-1",
+                "period": 300,
+                "title": "INIPEC – Batch Closure Duration (Max / Avg)",
+                "setPeriodToTimeRange": true,
+                "stat": "Average"
+            }
+        },
+        {
+            "type": "text",
+            "x": 0,
+            "y": 89,
+            "width": 10,
+            "height": 2,
+            "properties": {
+                "markdown": "📌 **Descrizione:** Tempo Massimo (Max) e Medio (Avg) impiegato per la chiusura del ciclo di polling di un batch, analizzato sia per le esecuzioni completate che per i fallimenti. Questo indicatore è cruciale per valutare le performance end-to-end e individuare eventuali colli di bottiglia o rallentamenti."
+            }
+        },
+        {
+            "type": "metric",
+            "x": 10,
+            "y": 84,
+            "width": 10,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ "PN-NationalRegistries-Downstream", "BATCH_CLOSURE_DURATION", "Status", "OK", { "label": "SUCCESS CLOSURE COUNT", "region": "eu-south-1", "color": "#1f77b4" } ],
+                    [ "...", "FAILURE", { "region": "eu-south-1", "color": "#d62728", "label": "FAILURE BATCH CLOSURE COUNT" } ]
+                ],
+                "view": "timeSeries",
+                "region": "eu-south-1",
+                "period": 300,
+                "title": "INIPEC – Batch Closure Duration (Max / Avg)",
+                "setPeriodToTimeRange": true,
+                "stat": "SampleCount"
+            }
+        },
+        {
+            "type": "text",
+            "x": 10,
+            "y": 82,
+            "width": 10,
+            "height": 2,
+            "properties": {
+                "markdown": "📌 **Descrizione:** Dimensione Media (Avg) e Massima (Max) dei batch elaborati, suddivisa in base all'esito (OK o FAILURE). Utile per monitorare la quantità di dati per singola richiesta e identificare batch eccessivamente grandi."
+            }
+        }
+    ]
+}
