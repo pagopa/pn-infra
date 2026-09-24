@@ -13,6 +13,7 @@ import logging
 import os
 import re
 from datetime import datetime, timezone
+from urllib.parse import unquote
 
 import boto3
 from botocore.config import Config
@@ -30,6 +31,7 @@ RESOLVE_ROLE_TAGS = os.environ.get("RESOLVE_ROLE_TAGS", "true").lower() == "true
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN", "")
 REPORT_NOTIFICATIONS_ENABLED = os.environ.get("REPORT_NOTIFICATIONS_ENABLED", "false").lower() == "true"
 EXCLUDE_TAG_KEY = os.environ.get("EXCLUDE_TAG_KEY", "")
+FINE_GRAINED_EXCLUSIONS_SSM_PARAMETER = os.environ.get("FINE_GRAINED_EXCLUSIONS_SSM_PARAMETER", "")
 ARCHIVE_RULE_PATTERNS = [p.strip() for p in os.environ.get("ARCHIVE_RULE_PATTERNS", "").split(",") if p.strip()]
 
 aa  = boto3.client("accessanalyzer", config=Config(retries={"max_attempts": 10, "mode": "adaptive"}))
@@ -41,16 +43,88 @@ s3  = boto3.client(
 sts = boto3.client("sts")
 iam = boto3.client("iam")
 sns = boto3.client("sns")
+ssm = boto3.client("ssm", config=Config(retries={"max_attempts": 10, "mode": "adaptive"}))
 
 CSV_HEADER = [
     "finding_id", "finding_type", "resource", "resource_type",
     "status", "created_at", "updated_at", "analyzed_at",
-    "unused_action_count", "unused_actions", "microservice_tag", "details_json"
+    "unused_action_count", "unused_actions", "suppressed_action_count",
+    "suppressed_actions", "suppression_rule_ids", "microservice_tag", "details_json"
 ]
 
 ACTION_PATTERN = re.compile(r"^[a-z0-9-]+:[A-Za-z0-9*]+$")
 
 ARCHIVE_RULE_PREFIX = "auto-exclude-"
+
+def _load_fine_grained_exclusion_rules():
+    """Load and validate the action-level exclusion rules from Parameter Store."""
+    if not FINE_GRAINED_EXCLUSIONS_SSM_PARAMETER:
+        return []
+
+    try:
+        response = ssm.get_parameter(Name=FINE_GRAINED_EXCLUSIONS_SSM_PARAMETER)
+        parameter = response.get("Parameter") or {}
+        document = json.loads(parameter.get("Value", ""))
+        if not isinstance(document, dict):
+            raise ValueError("configuration root must be an object")
+        if document.get("version") != 1:
+            raise ValueError("configuration version must be 1")
+
+        raw_rules = document.get("rules")
+        if not isinstance(raw_rules, list):
+            raise ValueError("rules must be an array")
+
+        rules = []
+        rule_ids = set()
+        for index, rule in enumerate(raw_rules):
+            if not isinstance(rule, dict):
+                raise ValueError(f"rule at index {index} must be an object")
+
+            rule_id = rule.get("id")
+            if not isinstance(rule_id, str) or not rule_id.strip():
+                raise ValueError(f"rule at index {index} must have a non-empty id")
+            rule_id = rule_id.strip()
+            if rule_id in rule_ids:
+                raise ValueError(f"duplicate rule id: {rule_id}")
+            rule_ids.add(rule_id)
+
+            enabled = rule.get("enabled", True)
+            if not isinstance(enabled, bool):
+                raise ValueError(f"rule {rule_id} enabled must be a boolean")
+
+            actions = rule.get("actions")
+            if not isinstance(actions, list) or not actions:
+                raise ValueError(f"rule {rule_id} actions must be a non-empty array")
+            if any(not isinstance(action, str) or not ACTION_PATTERN.fullmatch(action.strip()) for action in actions):
+                raise ValueError(f"rule {rule_id} contains an invalid action")
+
+            trusted_services = rule.get("trustedServices")
+            if not isinstance(trusted_services, list) or not trusted_services:
+                raise ValueError(f"rule {rule_id} trustedServices must be a non-empty array")
+            if any(not isinstance(service, str) or not service.strip() for service in trusted_services):
+                raise ValueError(f"rule {rule_id} contains an invalid trusted service")
+
+            if enabled:
+                rules.append({
+                    "id": rule_id,
+                    "actions": {action.strip().casefold() for action in actions},
+                    "trusted_services": {service.strip().casefold() for service in trusted_services},
+                })
+
+        log.info(json.dumps({
+            "msg": "fine-grained exclusion rules loaded",
+            "parameter": FINE_GRAINED_EXCLUSIONS_SSM_PARAMETER,
+            "parameter_version": parameter.get("Version"),
+            "rules": len(rules),
+        }))
+        return rules
+    except Exception as exc:
+        log.warning(json.dumps({
+            "msg": "fine-grained exclusion rules unavailable; no actions will be suppressed",
+            "parameter": FINE_GRAINED_EXCLUSIONS_SSM_PARAMETER,
+            "error": str(exc),
+        }))
+        return []
 
 def _sync_archive_rules():
     """Create one archive rule per pattern, remove obsolete ones, then apply all."""
@@ -165,6 +239,86 @@ def _parse_role_name(resource):
         return role_part.strip("/").split("/")[-1]
     return ""
 
+def _get_role_trusted_services(role_name, cache):
+    """Return service principals allowed by a role trust policy."""
+    if role_name in cache:
+        return cache[role_name]
+
+    services = set()
+    try:
+        response = iam.get_role(RoleName=role_name)
+        policy = (response.get("Role") or {}).get("AssumeRolePolicyDocument") or {}
+        if isinstance(policy, str):
+            policy = json.loads(unquote(policy))
+        if not isinstance(policy, dict):
+            raise ValueError("AssumeRolePolicyDocument is not an object")
+
+        statements = policy.get("Statement", [])
+        if isinstance(statements, dict):
+            statements = [statements]
+        if not isinstance(statements, list):
+            raise ValueError("trust policy Statement is not an array")
+
+        for statement in statements:
+            if not isinstance(statement, dict) or str(statement.get("Effect", "")).casefold() != "allow":
+                continue
+            principal = statement.get("Principal")
+            if not isinstance(principal, dict):
+                continue
+            service_principals = principal.get("Service", [])
+            if isinstance(service_principals, str):
+                service_principals = [service_principals]
+            if isinstance(service_principals, list):
+                services.update(
+                    service.strip().casefold()
+                    for service in service_principals
+                    if isinstance(service, str) and service.strip()
+                )
+    except Exception as exc:
+        log.warning(json.dumps({
+            "msg": "get_role failed during fine-grained exclusion check",
+            "role_name": role_name,
+            "error": str(exc),
+        }))
+
+    cache[role_name] = services
+    return services
+
+def _filter_unused_actions(finding, unused_actions, rules, role_trust_cache):
+    """Split unused actions into reportable and suppressed lists."""
+    if not rules or not unused_actions:
+        return unused_actions, [], []
+    if finding.get("findingType") != "UnusedPermission":
+        return unused_actions, [], []
+    if finding.get("resourceType") != "AWS::IAM::Role":
+        return unused_actions, [], []
+
+    role_name = _parse_role_name(finding.get("resource"))
+    if not role_name:
+        return unused_actions, [], []
+
+    trusted_services = _get_role_trusted_services(role_name, role_trust_cache)
+    if not trusted_services:
+        return unused_actions, [], []
+
+    visible_actions = []
+    suppressed_actions = []
+    matched_rule_ids = set()
+    for action in unused_actions:
+        action_key = action.casefold()
+        matching_rules = [
+            rule for rule in rules
+            if action_key in rule["actions"]
+            and trusted_services.intersection(rule["trusted_services"])
+        ]
+        if matching_rules:
+            suppressed_actions.append(action)
+            matched_rule_ids.update(rule["id"] for rule in matching_rules)
+        else:
+            visible_actions.append(action)
+
+    return visible_actions, suppressed_actions, sorted(matched_rule_ids)
+
 def _resolve_microservice_tag(resource, cache):
     if not RESOLVE_ROLE_TAGS:
         return "no-tag"
@@ -218,6 +372,7 @@ def lambda_handler(event, context):
     key = f"{ENV_NAME}/{ACCOUNT_ROLE}/{account_id}/{now:%Y-%m-%d}/{account_id}-findings-{now:%H%M%S}-{request_id}.csv"
 
     _sync_archive_rules()
+    fine_grained_exclusion_rules = _load_fine_grained_exclusion_rules()
 
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -225,8 +380,12 @@ def lambda_handler(event, context):
 
     count = 0
     skipped_by_tag = 0
+    fully_suppressed_findings = 0
+    partially_suppressed_findings = 0
+    suppressed_action_count = 0
     finding_type_counts = {}
     role_tag_cache = {}
+    role_trust_cache = {}
     for f in _iter_findings():
         resource = f.get("resource", "")
         # Check if resource has the exclude tag — if so, skip from CSV
@@ -237,6 +396,26 @@ def lambda_handler(event, context):
                 continue
         details = _get_finding_details(f.get("id"))
         unused_actions = _extract_unused_actions(details)
+        unused_actions, suppressed_actions, suppression_rule_ids = _filter_unused_actions(
+            f,
+            unused_actions,
+            fine_grained_exclusion_rules,
+            role_trust_cache,
+        )
+        if suppressed_actions:
+            suppressed_action_count += len(suppressed_actions)
+            log.info(json.dumps({
+                "msg": "unused actions suppressed by fine-grained rules",
+                "finding_id": f.get("id"),
+                "resource": resource,
+                "actions": suppressed_actions,
+                "rules": suppression_rule_ids,
+            }))
+            if not unused_actions:
+                fully_suppressed_findings += 1
+                continue
+            partially_suppressed_findings += 1
+
         microservice_tag = _resolve_microservice_tag(f.get("resource"), role_tag_cache)
         unused_action_count = ""
         if unused_actions:
@@ -260,6 +439,9 @@ def lambda_handler(event, context):
             f.get("analyzedAt").isoformat() if f.get("analyzedAt") else "",
             unused_action_count,
             ";".join(unused_actions),
+            len(suppressed_actions),
+            ";".join(suppressed_actions),
+            ";".join(suppression_rule_ids),
             microservice_tag,
             json.dumps(enriched, default=str, separators=(",", ":")),
         ])
@@ -292,6 +474,12 @@ def lambda_handler(event, context):
             )
         if skipped_by_tag:
             markdown_body += f"\n_Sono stati esclusi {skipped_by_tag} finding tramite tag._"
+        if suppressed_action_count:
+            markdown_body += (
+                f"\n_Sono state ignorate {suppressed_action_count} azioni tramite regole granulari "
+                f"({fully_suppressed_findings} finding esclusi, "
+                f"{partially_suppressed_findings} parzialmente filtrati)._"
+            )
         try:
             publish_warning_report(
                 sns_client=sns,
@@ -308,6 +496,9 @@ def lambda_handler(event, context):
                     "Finding": count,
                     "Ruolo account": ACCOUNT_ROLE,
                     "Esclusi per tag": skipped_by_tag,
+                    "Azioni escluse da regole granulari": suppressed_action_count,
+                    "Finding esclusi da regole granulari": fully_suppressed_findings,
+                    "Finding parzialmente filtrati": partially_suppressed_findings,
                 },
                 details=finding_type_counts,
                 links={
@@ -329,5 +520,16 @@ def lambda_handler(event, context):
 
     log.info(json.dumps({"msg": "export completed", "account_id": account_id,
                          "account_role": ACCOUNT_ROLE, "env": ENV_NAME,
-                         "key": key, "rows": count, "skipped_by_tag": skipped_by_tag}))
-    return {"status": "ok", "rows": count, "skipped_by_tag": skipped_by_tag, "key": key}
+                         "key": key, "rows": count, "skipped_by_tag": skipped_by_tag,
+                         "suppressed_actions": suppressed_action_count,
+                         "fully_suppressed_findings": fully_suppressed_findings,
+                         "partially_suppressed_findings": partially_suppressed_findings}))
+    return {
+        "status": "ok",
+        "rows": count,
+        "skipped_by_tag": skipped_by_tag,
+        "suppressed_actions": suppressed_action_count,
+        "fully_suppressed_findings": fully_suppressed_findings,
+        "partially_suppressed_findings": partially_suppressed_findings,
+        "key": key,
+    }

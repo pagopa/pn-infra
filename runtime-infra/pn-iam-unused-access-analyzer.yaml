@@ -102,6 +102,12 @@ Parameters:
     Default: ''
     Description: Tag key to check on IAM roles. If a role has this tag, its findings are programmatically archived.
 
+  FineGrainedExclusionsSsmParameterName:
+    Type: String
+    Default: /pn-infra/IamAccessAnalyzer/FineGrainedExclusions
+    AllowedPattern: '^/[a-zA-Z0-9_.\-/]+$'
+    Description: Name of the pre-created SSM Advanced String parameter containing fine-grained exclusion rules.
+
 Conditions:
   IsCoreAccount: !Equals [ !Ref PnCoreAwsAccountId, '' ]
   IsConfinfoAccount: !Not [ !Equals [ !Ref PnCoreAwsAccountId, '' ] ]
@@ -239,14 +245,23 @@ Resources:
                   - BucketArn: !GetAtt LocalReportsBucket.Arn
                     Env: !Ref EnvironmentType
                     Role: !If [IsConfinfoAccount, confinfo, core]
-        - PolicyName: iam-role-tags-read
+        - PolicyName: iam-role-metadata-read
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
+                  - iam:GetRole
                   - iam:ListRoleTags
                 Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/*'
+        - PolicyName: ssm-fine-grained-exclusions-read
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${FineGrainedExclusionsSsmParameterName}'
         - PolicyName: sns-publish-iam-access
           PolicyDocument:
             Version: '2012-10-17'
@@ -288,6 +303,7 @@ Resources:
             - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${WarningSNSTopicName}'
             - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}'
           EXCLUDE_TAG_KEY: !Ref ExcludeTagKey
+          FINE_GRAINED_EXCLUSIONS_SSM_PARAMETER: !Ref FineGrainedExclusionsSsmParameterName
           ARCHIVE_RULE_PATTERNS: !Join
             - ','
             - !If
