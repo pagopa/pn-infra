@@ -12,6 +12,7 @@ HTML_REPORT_SCRIPT = r"""
   const typeFilter = document.getElementById("type-filter");
   const statusFilter = document.getElementById("status-filter");
   const microserviceFilter = document.getElementById("microservice-filter");
+  const suppressionFilter = document.getElementById("suppression-filter");
   const pageSize = document.getElementById("page-size");
   const previousPage = document.getElementById("previous-page");
   const nextPage = document.getElementById("next-page");
@@ -19,7 +20,6 @@ HTML_REPORT_SCRIPT = r"""
   const noResults = document.getElementById("no-results");
   const download = document.getElementById("download-csv");
   const reset = document.getElementById("reset-filters");
-  const printReport = document.getElementById("print-report");
   let currentPage = 1;
   let sortColumn = -1;
   let sortAscending = true;
@@ -44,7 +44,12 @@ HTML_REPORT_SCRIPT = r"""
     return (!term || rowText.includes(term))
       && (!typeFilter.value || cellText(row, 1) === typeFilter.value)
       && (!statusFilter.value || cellText(row, 4) === statusFilter.value)
-      && (!microserviceFilter.value || cellText(row, 5) === microserviceFilter.value);
+      && (!microserviceFilter.value || cellText(row, 5) === microserviceFilter.value)
+      && (
+        !suppressionFilter.value
+        || (suppressionFilter.value === "with" && cellText(row, 7) !== "-")
+        || (suppressionFilter.value === "without" && cellText(row, 7) === "-")
+      );
   };
 
   const render = () => {
@@ -104,7 +109,7 @@ HTML_REPORT_SCRIPT = r"""
     });
   });
 
-  [search, typeFilter, statusFilter, microserviceFilter, pageSize].forEach(control => {
+  [search, typeFilter, statusFilter, microserviceFilter, suppressionFilter, pageSize].forEach(control => {
     control.addEventListener(control === search ? "input" : "change", () => {
       currentPage = 1;
       render();
@@ -117,14 +122,11 @@ HTML_REPORT_SCRIPT = r"""
     typeFilter.value = "";
     statusFilter.value = "";
     microserviceFilter.value = "";
+    suppressionFilter.value = "";
     pageSize.value = "25";
     currentPage = 1;
     render();
   });
-  printReport.addEventListener("click", () => window.print());
-  window.addEventListener("beforeprint", () => tbody.replaceChildren(...filteredRows, noResults));
-  window.addEventListener("afterprint", render);
-
   populateFilter(typeFilter, 1);
   populateFilter(statusFilter, 4);
   populateFilter(microserviceFilter, 5);
@@ -183,7 +185,7 @@ def render_html_report(
     .metric {{ min-width: 170px; padding: 14px; border: 1px solid #d8dee9; border-radius: 8px; background: white; }}
     .metric span {{ display: block; color: #526077; font-size: 12px; }}
     .metric strong {{ display: block; margin-top: 6px; font-size: 22px; }}
-    .controls {{ display: grid; grid-template-columns: minmax(220px,2fr) repeat(3,minmax(150px,1fr)); gap: 10px; margin: 20px 0 12px; }}
+    .controls {{ display: grid; grid-template-columns: minmax(220px,2fr) repeat(4,minmax(150px,1fr)); gap: 10px; margin: 20px 0 12px; }}
     .controls label {{ display: grid; gap: 4px; color: #526077; font-size: 12px; }}
     input, select, button {{ font: inherit; padding: 8px 10px; border: 1px solid #aeb8c8; border-radius: 6px; background: white; color: #172033; }}
     button {{ cursor: pointer; }} button:disabled {{ cursor: not-allowed; opacity: .5; }}
@@ -207,7 +209,6 @@ def render_html_report(
     }}
     @media (max-width: 900px) {{ .controls {{ grid-template-columns: 1fr 1fr; }} }}
     @media (max-width: 560px) {{ .controls {{ grid-template-columns: 1fr; }} body {{ padding: 12px; }} }}
-    @media print {{ .controls, .actions, .pagination {{ display: none; }} body {{ padding: 0; }} .table-wrap {{ overflow: visible; }} }}
   </style>
 </head>
 <body>
@@ -222,11 +223,11 @@ def render_html_report(
     <label>Tipo<select id="type-filter"><option value="">Tutti</option></select></label>
     <label>Stato<select id="status-filter"><option value="">Tutti</option></select></label>
     <label>Microservizio<select id="microservice-filter"><option value="">Tutti</option></select></label>
+    <label>Esclusioni granulari<select id="suppression-filter"><option value="">Tutti</option><option value="with">Con azioni ignorate</option><option value="without">Senza azioni ignorate</option></select></label>
   </div>
   <div class="actions">
     <button id="reset-filters" type="button">Azzera filtri</button>
     <button id="download-csv" type="button" data-filename="{escape(download_filename)}">Scarica vista filtrata CSV</button>
-    <button id="print-report" type="button">Stampa / salva PDF</button>
   </div>
   <div class="table-wrap">
     <table>

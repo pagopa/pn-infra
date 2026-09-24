@@ -242,6 +242,7 @@ def lambda_handler(event, context):
             log.exception(json.dumps({"msg": "html report export failed", "error": str(exc)}))
 
     if REPORT_NOTIFICATIONS_ENABLED and SNS_TOPIC_ARN:
+        detected_finding_count = count + skipped_by_tag + fully_suppressed_findings
         dashboard_name = f"pn-iam-unused-access-{ENV_NAME}"
         dashboard_url = (
             f"https://{AWS_REGION}.console.aws.amazon.com/cloudwatch/home"
@@ -250,7 +251,14 @@ def lambda_handler(event, context):
         account_label = f"{ACCOUNT_ROLE}-{ENV_NAME}"
         if count:
             markdown_body = (
-                f":warning: Individuati *{count} finding* di accesso IAM inutilizzato "
+                f":warning: Individuati *{count} finding da verificare* su "
+                f"*{detected_finding_count} rilevati* per accesso IAM inutilizzato "
+                f"nell'account `{ACCOUNT_ROLE}`."
+            )
+        elif detected_finding_count:
+            markdown_body = (
+                f":white_check_mark: Nessun finding da verificare su "
+                f"*{detected_finding_count} rilevati* per accesso IAM inutilizzato "
                 f"nell'account `{ACCOUNT_ROLE}`."
             )
         else:
@@ -263,8 +271,8 @@ def lambda_handler(event, context):
         if suppressed_action_count:
             markdown_body += (
                 f"\n_Sono state ignorate {suppressed_action_count} azioni tramite regole granulari "
-                f"({fully_suppressed_findings} finding esclusi, "
-                f"{partially_suppressed_findings} parzialmente filtrati)._"
+                f"({fully_suppressed_findings} finding completamente esclusi, "
+                f"{partially_suppressed_findings} finding parzialmente filtrati)._"
             )
         try:
             publish_warning_report(
