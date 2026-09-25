@@ -31,7 +31,7 @@ from iam_roles import (
     resolve_microservice_tag as _resolve_microservice_tag,
 )
 from mutelist import load_mutelist as _load_mutelist
-from reporting import publish_warning_report
+from reporting import generate_presigned_report_url, publish_warning_report
 
 log = logging.getLogger()
 log.setLevel(logging.INFO)
@@ -217,6 +217,7 @@ def lambda_handler(event, context):
         ContentType="text/csv",
     )
 
+    html_key = None
     if HTML_REPORT_ENABLED:
         html_metrics = {
             "Finding": count,
@@ -243,11 +244,6 @@ def lambda_handler(event, context):
 
     if REPORT_NOTIFICATIONS_ENABLED and SNS_TOPIC_ARN:
         detected_finding_count = count + skipped_by_tag + fully_suppressed_findings
-        dashboard_name = f"pn-iam-unused-access-{ENV_NAME}"
-        dashboard_url = (
-            f"https://{AWS_REGION}.console.aws.amazon.com/cloudwatch/home"
-            f"?region={AWS_REGION}#dashboards/dashboard/{dashboard_name}"
-        )
         account_label = f"{ACCOUNT_ROLE}-{ENV_NAME}"
         if count:
             markdown_body = (
@@ -275,6 +271,13 @@ def lambda_handler(event, context):
                 f"{partially_suppressed_findings} finding parzialmente filtrati)._"
             )
         try:
+            report_links = {}
+            if html_key:
+                report_links["report_html"] = generate_presigned_report_url(
+                    s3_client=s3,
+                    bucket=BUCKET,
+                    key=html_key,
+                )
             publish_warning_report(
                 sns_client=sns,
                 s3_client=s3,
@@ -295,10 +298,7 @@ def lambda_handler(event, context):
                     "Finding parzialmente filtrati": partially_suppressed_findings,
                 },
                 details=finding_type_counts,
-                links={
-                    "dashboard": dashboard_url,
-                    "report": f"s3://{BUCKET}/{key}",
-                },
+                links=report_links,
                 attachment={
                     "bucket": BUCKET,
                     "key": key,
