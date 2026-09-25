@@ -19,7 +19,7 @@
             "height": 5,
             "properties": {
                 "metrics": [
-                    [ { "expression": "IF(requested>0,((impresa+persona+professionista)/requested)*100,0)", "id": "response_rate", "label": "% Domicili recuperati", "region": "${AWS::Region}", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested>0,((impresa+persona+professionista)/requested)*100,0)", "id": "response_rate", "label": "Risposte con successo %", "region": "${AWS::Region}", "color": "#69ae34" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "INAD", { "id": "requested", "visible": false, "region": "${AWS::Region}" } ],
                     [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "INAD", { "id": "impresa", "visible": false, "region": "${AWS::Region}" } ],
                     [ "...", "PERSONA_FISICA", ".", "PF", ".", ".", { "id": "persona", "visible": false, "region": "${AWS::Region}" } ],
@@ -48,7 +48,7 @@
             "height": 5,
             "properties": {
                 "metrics": [
-                    [ { "expression": "IF(requested>0,(impresa/requested)*100,0)", "id": "response_rate", "label": "% Domicili recuperati", "region": "${AWS::Region}", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested>0,(impresa/requested)*100,0)", "id": "response_rate", "label": "Risposte con successo %", "region": "${AWS::Region}", "color": "#69ae34" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "IPA", { "id": "requested", "visible": false, "region": "${AWS::Region}" } ],
                     [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "IPA", { "id": "impresa", "visible": false, "region": "${AWS::Region}" } ]
                 ],
@@ -75,7 +75,7 @@
             "height": 5,
             "properties": {
                 "metrics": [
-                    [ { "expression": "IF(requested>0,(persona/requested)*100,0)", "id": "response_rate", "label": "% Domicili recuperati", "region": "${AWS::Region}", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested>0,(persona/requested)*100,0)", "id": "response_rate", "label": "Risposte con successo %", "region": "${AWS::Region}", "color": "#69ae34" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "NotificationScope", "PF", "Registry", "ANPR", { "id": "persona", "visible": false, "region": "${AWS::Region}" } ],
                     [ ".", "CF_REQUESTED", "Registry", "ANPR", { "id": "requested", "visible": false, "region": "${AWS::Region}" } ]
                 ],
@@ -102,7 +102,7 @@
             "height": 5,
             "properties": {
                 "metrics": [
-                    [ { "expression": "IF(requested>0,(impresa/requested)*100,0)", "id": "response_rate", "label": "% Domicili recuperati", "region": "${AWS::Region}", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested>0,(impresa/requested)*100,0)", "id": "response_rate", "label": "Risposte con successo %", "region": "${AWS::Region}", "color": "#69ae34" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "NotificationScope", "PG", "Registry", "REGISTRO_IMPRESE", { "id": "impresa", "visible": false, "region": "${AWS::Region}" } ],
                     [ ".", "CF_REQUESTED", "Registry", "REGISTRO_IMPRESE", { "id": "requested", "visible": false, "region": "${AWS::Region}" } ]
                 ],
@@ -129,7 +129,7 @@
             "height": 5,
             "properties": {
                 "metrics": [
-                    [ { "expression": "IF(requested>0,((impresa_pf+impresa_pg+professionista_pf+professionista_pg)/requested)*100,0)", "id": "response_rate", "label": "% Domicili recuperati", "region": "${AWS::Region}", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested>0,((impresa_pf+impresa_pg+professionista_pf+professionista_pg)/requested)*100,0)", "id": "response_rate", "label": "Risposte con successo %", "region": "${AWS::Region}", "color": "#69ae34" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PF", "Registry", "INIPEC", { "id": "impresa_pf", "visible": false, "region": "${AWS::Region}" } ],
                     [ "...", "PG", ".", ".", { "id": "impresa_pg", "visible": false, "region": "${AWS::Region}" } ],
                     [ "...", "PROFESSIONISTA", ".", "PF", ".", ".", { "id": "professionista_pf", "visible": false, "region": "${AWS::Region}" } ],
@@ -197,7 +197,7 @@
             "height": 6,
             "properties": {
                 "metrics": [
-                    [ { "expression": "IF(requested>0,((impresa+persona+professionista)/requested)*100,0)", "id": "response_rate", "label": "% Domicili recuperati", "region": "${AWS::Region}", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested>0,((impresa+persona+professionista)/requested)*100,0)", "id": "response_rate", "label": "Risposte con successo %", "region": "${AWS::Region}", "color": "#69ae34" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "INAD", { "id": "requested", "visible": false, "region": "${AWS::Region}" } ],
                     [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "INAD", { "id": "impresa", "region": "${AWS::Region}", "visible": false } ],
                     [ "...", "PERSONA_FISICA", ".", "PF", ".", ".", { "id": "persona", "visible": false, "region": "${AWS::Region}" } ],
@@ -252,8 +252,8 @@
             "properties": {
                 "metrics": [
                     [ { "expression": "requested", "id": "e_requested", "label": "Richieste", "color": "#1f77b4" } ],
-                    [ { "expression": "impresa+persona+professionista", "id": "received", "label": "Domicili trovati", "color": "#69ae34" } ],
-                    [ { "expression": "IF(requested-(impresa+persona+professionista)>0,requested-(impresa+persona+professionista),0)", "id": "missing", "label": "Domicili non trovati", "color": "#fe6e73" } ],
+                    [ { "expression": "impresa+persona+professionista", "id": "received", "label": "Risposte ricevute", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-(impresa+persona+professionista)>0,requested-(impresa+persona+professionista),0)", "id": "missing", "label": "Senza risposta", "color": "#fe6e73" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "INAD", { "id": "requested", "visible": false } ],
                     [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "INAD", { "id": "impresa", "visible": false } ],
                     [ "...", "PERSONA_FISICA", ".", "PF", ".", ".", { "id": "persona", "visible": false } ],
@@ -314,7 +314,7 @@
             "height": 6,
             "properties": {
                 "metrics": [
-                    [ { "expression": "IF(requested>0,(impresa/requested)*100,0)", "id": "response_rate", "label": "% Domicili recuperati", "region": "${AWS::Region}", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested>0,(impresa/requested)*100,0)", "id": "response_rate", "label": "Risposte con successo %", "region": "${AWS::Region}", "color": "#69ae34" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "IPA", { "id": "requested", "visible": false, "region": "${AWS::Region}" } ],
                     [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "IPA", { "id": "impresa", "visible": false, "region": "${AWS::Region}" } ]
                 ],
@@ -342,8 +342,8 @@
             "properties": {
                 "metrics": [
                     [ { "expression": "requested", "id": "e_requested", "label": "Richieste", "color": "#1f77b4" } ],
-                    [ { "expression": "impresa", "id": "received", "label": "Domicili trovati", "color": "#69ae34" } ],
-                    [ { "expression": "IF(requested-impresa>0,requested-impresa,0)", "id": "missing", "label": "Domicili non trovati", "color": "#fe6e73" } ],
+                    [ { "expression": "impresa", "id": "received", "label": "Risposte ricevute", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-impresa>0,requested-impresa,0)", "id": "missing", "label": "Senza risposta", "color": "#fe6e73" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "IPA", { "id": "requested", "visible": false } ],
                     [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "IPA", { "id": "impresa", "visible": false } ]
                 ],
@@ -402,7 +402,7 @@
             "height": 6,
             "properties": {
                 "metrics": [
-                    [ { "expression": "IF(requested>0,(persona/requested)*100,0)", "id": "response_rate", "label": "% Domicili recuperati", "region": "${AWS::Region}", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested>0,(persona/requested)*100,0)", "id": "response_rate", "label": "Risposte con successo %", "region": "${AWS::Region}", "color": "#69ae34" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "NotificationScope", "PF", "Registry", "ANPR", { "id": "persona", "visible": false, "region": "${AWS::Region}" } ],
                     [ ".", "CF_REQUESTED", "Registry", "ANPR", { "id": "requested", "visible": false, "region": "${AWS::Region}" } ]
                 ],
@@ -430,8 +430,8 @@
             "properties": {
                 "metrics": [
                     [ { "expression": "requested", "id": "e_requested", "label": "Richieste", "color": "#1f77b4" } ],
-                    [ { "expression": "persona", "id": "received", "label": "Domicili trovati", "color": "#69ae34" } ],
-                    [ { "expression": "IF(requested-persona>0,requested-persona,0)", "id": "missing", "label": "Domicili non trovati", "color": "#fe6e73" } ],
+                    [ { "expression": "persona", "id": "received", "label": "Risposte ricevute", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-persona>0,requested-persona,0)", "id": "missing", "label": "Senza risposta", "color": "#fe6e73" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "NotificationScope", "PF", "Registry", "ANPR", { "id": "persona", "visible": false } ],
                     [ ".", "CF_REQUESTED", "Registry", "ANPR", { "id": "requested", "visible": false } ]
                 ],
@@ -490,7 +490,7 @@
             "height": 6,
             "properties": {
                 "metrics": [
-                    [ { "expression": "IF(requested>0,(impresa/requested)*100,0)", "id": "response_rate", "label": "% Domicili recuperati", "region": "${AWS::Region}", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested>0,(impresa/requested)*100,0)", "id": "response_rate", "label": "Risposte con successo %", "region": "${AWS::Region}", "color": "#69ae34" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "NotificationScope", "PG", "Registry", "REGISTRO_IMPRESE", { "id": "impresa", "visible": false, "region": "${AWS::Region}" } ],
                     [ ".", "CF_REQUESTED", "Registry", "REGISTRO_IMPRESE", { "id": "requested", "visible": false, "region": "${AWS::Region}" } ]
                 ],
@@ -518,8 +518,8 @@
             "properties": {
                 "metrics": [
                     [ { "expression": "requested", "id": "e_requested", "label": "Richieste", "color": "#1f77b4" } ],
-                    [ { "expression": "impresa", "id": "received", "label": "Domicili trovati", "color": "#69ae34" } ],
-                    [ { "expression": "IF(requested-impresa>0,requested-impresa,0)", "id": "missing", "label": "Domicili non trovati", "color": "#fe6e73" } ],
+                    [ { "expression": "impresa", "id": "received", "label": "Risposte ricevute", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-impresa>0,requested-impresa,0)", "id": "missing", "label": "Senza risposta", "color": "#fe6e73" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "NotificationScope", "PG", "Registry", "REGISTRO_IMPRESE", { "id": "impresa", "visible": false } ],
                     [ ".", "CF_REQUESTED", "Registry", "REGISTRO_IMPRESE", { "id": "requested", "visible": false } ]
                 ],
@@ -558,12 +558,12 @@
                     [ { "expression": "IF(requested-(with_error_pg+impresa_pf+impresa_pg+professionista_pf+professionista_pg)>0,requested-(with_error_pg+impresa_pf+impresa_pg+professionista_pf+professionista_pg),0)", "id": "missing", "label": "Domicili non trovati: ${SUM}", "color": "#fe6e73", "region": "${AWS::Region}" } ],
                     [ { "expression": "with_error_pg", "id": "errors", "label": "Errori Temporanei: ${SUM}", "region": "${AWS::Region}" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PF", "Registry", "INIPEC", { "id": "impresa_pf", "visible": false, "region": "${AWS::Region}" } ],
-                    [ "...", "PG", ".", ".", { "id": "impresa_pg", "visible": false, "region": "${AWS::Region}" } ],
-                    [ "...", "PROFESSIONISTA", ".", "PF", ".", ".", { "id": "professionista_pf", "visible": false, "region": "${AWS::Region}" } ],
-                    [ "...", "PG", ".", ".", { "id": "professionista_pg", "visible": false, "region": "${AWS::Region}" } ],
-                    [ ".", "CF_REQUESTED", "Registry", "INIPEC", { "id": "requested", "visible": false, "region": "${AWS::Region}" } ],
-                    [ ".", "CF_WITH_ERROR", ".", ".", "NotificationScope", "PG", { "id": "with_error_pg", "visible": false, "region": "${AWS::Region}", "label": "CF_WITH_ERROR" } ],
-                    [ "...", "PF", { "id": "with_error_pf", "visible": false, "region": "${AWS::Region}" } ]
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "INIPEC", { "id": "impresa_pg", "visible": false, "region": "${AWS::Region}" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "DigitalAddressScope", "PROFESSIONISTA", "NotificationScope", "PF", "Registry", "INIPEC", { "id": "professionista_pf", "visible": false, "region": "${AWS::Region}" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "DigitalAddressScope", "PROFESSIONISTA", "NotificationScope", "PG", "Registry", "INIPEC", { "id": "professionista_pg", "visible": false, "region": "${AWS::Region}" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "INIPEC", { "id": "requested", "visible": false, "region": "${AWS::Region}" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ERROR", "Registry", "INIPEC", "NotificationScope", "PG", { "id": "with_error_pg", "visible": false, "region": "${AWS::Region}", "label": "CF_WITH_ERROR" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ERROR", "Registry", "INIPEC", "NotificationScope", "PF", { "id": "with_error_pf", "visible": false, "region": "${AWS::Region}" } ]
                 ],
                 "view": "bar",
                 "region": "${AWS::Region}",
@@ -584,7 +584,7 @@
             "height": 6,
             "properties": {
                 "metrics": [
-                    [ { "expression": "IF(requested-with_error>0,((impresa_pf+impresa_pg+professionista_pf+professionista_pg)/(requested-with_error))*100,0)", "id": "response_rate", "label": "% Domicili recuperati", "region": "${AWS::Region}", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-with_error>0,((impresa_pf+impresa_pg+professionista_pf+professionista_pg)/(requested-with_error))*100,0)", "id": "response_rate", "label": "Risposte con successo %", "region": "${AWS::Region}", "color": "#69ae34" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PF", "Registry", "INIPEC", { "id": "impresa_pf", "visible": false, "region": "${AWS::Region}" } ],
                     [ "...", "PG", ".", ".", { "id": "impresa_pg", "visible": false, "region": "${AWS::Region}" } ],
                     [ "...", "PROFESSIONISTA", ".", "PF", ".", ".", { "id": "professionista_pf", "visible": false, "region": "${AWS::Region}" } ],
@@ -645,8 +645,8 @@
             "properties": {
                 "metrics": [
                     [ { "expression": "requested", "id": "e_requested", "label": "Richieste", "color": "#1f77b4" } ],
-                    [ { "expression": "impresa_pf+impresa_pg+professionista_pf+professionista_pg", "id": "received", "label": "Domicili trovati", "color": "#69ae34" } ],
-                    [ { "expression": "IF(requested-(impresa_pf+impresa_pg+professionista_pf+professionista_pg)>0,requested-(impresa_pf+impresa_pg+professionista_pf+professionista_pg),0)", "id": "missing", "label": "Domicili non trovati", "color": "#fe6e73" } ],
+                    [ { "expression": "impresa_pf+impresa_pg+professionista_pf+professionista_pg", "id": "received", "label": "Risposte ricevute", "color": "#69ae34" } ],
+                    [ { "expression": "IF(requested-(impresa_pf+impresa_pg+professionista_pf+professionista_pg)>0,requested-(impresa_pf+impresa_pg+professionista_pf+professionista_pg),0)", "id": "missing", "label": "Senza risposta", "color": "#fe6e73" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PF", "Registry", "INIPEC", { "id": "impresa_pf", "visible": false } ],
                     [ "...", "PG", ".", ".", { "id": "impresa_pg", "visible": false } ],
                     [ "...", "PROFESSIONISTA", ".", "PF", ".", ".", { "id": "professionista_pf", "visible": false } ],
