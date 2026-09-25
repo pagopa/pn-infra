@@ -1,0 +1,41 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploy the business CloudWatch dashboard from an S3 template
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Project name used as dashboard name prefix
+
+  Version:
+    Type: String
+    Description: Keep track of the deployed project versions
+
+  ConfidentialInfoAccountId:
+    Type: String
+    Default: ''
+    Description: Confidential Info AWS Account ID
+
+  DataMonitoringBucketName:
+    Type: String
+    Description: S3 bucket containing dashboard templates
+
+Conditions:
+  IsCoreAccount: !Not [!Equals [!Ref ConfidentialInfoAccountId, '']]
+
+Resources:
+  BusinessDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Condition: IsCoreAccount
+    Properties:
+      DashboardName: !Sub ${ProjectName}-NationalRegistries-DownstreamHealth
+      DashboardBody:
+        Fn::Transform:
+          Name: S3DashboardBodyTransform
+          Parameters:
+            BucketName: !Ref DataMonitoringBucketName
+            TemplateKey: dashboard/NationalRegistriesDownstreamHealth.json
+            Region: !Ref AWS::Region
+
+Outputs:
+  Version:
+    Value: !Ref Version

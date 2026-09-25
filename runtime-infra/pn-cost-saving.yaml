@@ -14,8 +14,40 @@ Parameters:
 
   StopEc2FunctionTagNameCronExpression:
     Type: String
-    Default: 'cron(0 19 * * ? *)'
+    Default: 'cron(0 20 * * ? *)'
     Description: Cron expression when ec2 stop
+
+  StopEc2FunctionScheduleState:
+    Type: String
+    Default: ENABLED
+    AllowedValues: [ENABLED, DISABLED]
+    Description: State of the EC2 stop scheduled rule
+
+  Ec2MonthlyReportCronExpression:
+    Type: String
+    Default: 'cron(0 10 1 * ? *)'
+    Description: Monthly EC2 report schedule, evaluated in the Europe/Rome timezone
+
+  Ec2MonthlyReportScheduleState:
+    Type: String
+    Default: ENABLED
+    AllowedValues: [ENABLED, DISABLED]
+    Description: State of the monthly EC2 report schedule
+
+  Ec2ReportRequiredTagName:
+    Type: String
+    Default: 'ToStop'
+    Description: Tag required by the monthly report on non-micro EC2 instances
+
+  Ec2ReportRequiredTagValue:
+    Type: String
+    Default: 'true'
+    Description: Required tag value for non-micro EC2 instances
+
+  WarningSNSTopicName:
+    Type: String
+    Default: 'pn-WarningSnsTopic'
+    Description: Name of the central warning topic in the core account
 
   StopEcsCostSavingFunctionCronExpression:
     Type: String
@@ -55,6 +87,11 @@ Parameters:
     Description: Core Account ID (leave blank in Core account)
     Default: ''
 
+  ExternalChannelsMockDesiredCount:
+    Type: Number
+    Description: Desired count to preserve for the External Channels mock services in confinfo accounts
+    Default: 4
+
 Conditions:
   IsNotProdAccount: !Not [ !Equals [!Ref EnvironmentType, prod ] ]
   IsNotUatAccount: !Not [ !Equals [!Ref EnvironmentType, uat ] ]
@@ -70,6 +107,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.14
+      Timeout: 120
       Handler: ec2-stop.lambda_handler
       FunctionName: !Sub 'Lambda-Ec2-stop-${EnvironmentType}'
       Code:
@@ -81,6 +119,18 @@ Resources:
             Ref: StopEc2FunctionTagName
           StopEc2FunctionTagValue:
             Ref: StopEc2FunctionTagValue
+          Ec2ReportRequiredTagName:
+            Ref: Ec2ReportRequiredTagName
+          Ec2ReportRequiredTagValue:
+            Ref: Ec2ReportRequiredTagValue
+          EnvironmentType:
+            Ref: EnvironmentType
+          AwsAccountId: !Ref AWS::AccountId
+          AccountType: !If [IsConfinfoAccount, confinfo, core]
+          WarningSNSTopicArn: !If
+            - IsConfinfoAccount
+            - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${WarningSNSTopicName}'
+            - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}'
       Role:
         Fn::GetAtt:
           - StopEc2FunctionRole
@@ -108,27 +158,31 @@ Resources:
                 Resource: "*"
               - Effect: Allow
                 Action:
+                  - sns:Publish
+                Resource: !If
+                  - IsConfinfoAccount
+                  - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${PnCoreAwsAccountId}:${WarningSNSTopicName}'
+                  - !Sub 'arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:${WarningSNSTopicName}'
+              - Effect: Allow
+                Action:
                   - "logs:CreateLogStream"
                   - "logs:PutLogEvents"
                 Resource: arn:aws:logs:*:*:*
 
-  StopEc2FunctionSchedule:
-    Type: AWS::Events::Rule
+  Ec2FunctionStopSchedule:
+    Type: AWS::Scheduler::Schedule
     Properties:
+      Name: !Sub 'Ec2FunctionStopSchedule-${EnvironmentType}'
+      Description: !Sub 'EC2 cost-saving stop schedule for the ${EnvironmentType} environment'
       ScheduleExpression: !Ref StopEc2FunctionTagNameCronExpression
-      State: ENABLED
-      Targets:
-        - Arn: !GetAtt StopEc2Function.Arn
-          Id: StopEc2Function
-
-  StopEc2FunctionInvokePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref StopEc2Function
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt StopEc2FunctionSchedule.Arn
-      SourceAccount: !Ref AWS::AccountId
+      ScheduleExpressionTimezone: Europe/Rome
+      State: !Ref StopEc2FunctionScheduleState
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt StopEc2Function.Arn
+        RoleArn: !GetAtt Ec2FunctionScheduleRole.Arn
+        Input: '{"action":"stop"}'
 
   StopEc2FunctionLogGroup:
     Type: AWS::Logs::LogGroup
@@ -137,6 +191,40 @@ Resources:
     Properties:
       LogGroupName: !Sub "/aws/lambda/${StopEc2Function}"
       RetentionInDays: 3
+
+  Ec2FunctionScheduleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: Ec2SchedulerInvokePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt StopEc2Function.Arn
+
+  Ec2MonthlyReportSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub 'Ec2MonthlyReportSchedule-${EnvironmentType}'
+      Description: !Sub 'Monthly EC2 inventory for the ${EnvironmentType} environment'
+      ScheduleExpression: !Ref Ec2MonthlyReportCronExpression
+      ScheduleExpressionTimezone: Europe/Rome
+      State: !Ref Ec2MonthlyReportScheduleState
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt StopEc2Function.Arn
+        RoleArn: !GetAtt Ec2FunctionScheduleRole.Arn
+        Input: '{"action":"report"}'
 
 #LAMBDA ECS COST SAVING
 
@@ -159,6 +247,11 @@ Resources:
             Ref: EnvironmentType
           AwsAccountId: 
             Fn::Sub: "${AWS::AccountId}"
+          ExternalChannelsMockDesiredCount:
+            Fn::If:
+              - IsConfinfoAccount
+              - Ref: ExternalChannelsMockDesiredCount
+              - ''
           ECSClusterName: 
             Fn::If:
               - IsStopEcsServiceConfinfo
