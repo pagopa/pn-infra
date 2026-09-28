@@ -136,7 +136,7 @@ def filter_unused_actions(
         action_key = action.casefold()
         matching_rules = [
             rule for rule in rules
-            if action_key in rule["actions"]
+            if any(fnmatchcase(action_key, pattern) for pattern in rule["actions"])
             and (
                 rule["trusted_services"] is None
                 or trusted_services.intersection(rule["trusted_services"])
