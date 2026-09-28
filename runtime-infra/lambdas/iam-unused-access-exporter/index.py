@@ -136,18 +136,25 @@ def lambda_handler(event, context):
             logger=log,
         )
         unused_actions = _extract_unused_actions(details)
-        microservice_tag = _resolve_microservice_tag(
+        needs_microservice_for_exclusions = any(
+            rule.get("microservices") is not None
+            for rule in fine_grained_exclusion_rules
+        )
+        resolved_microservice_tag = _resolve_microservice_tag(
             iam_client=iam,
             resource=f.get("resource"),
             cache=role_tag_cache,
-            enabled=RESOLVE_ROLE_TAGS,
+            enabled=RESOLVE_ROLE_TAGS or needs_microservice_for_exclusions,
             logger=log,
+        )
+        microservice_tag = (
+            resolved_microservice_tag if RESOLVE_ROLE_TAGS else "no-tag"
         )
         unused_actions, suppressed_actions, suppression_rule_ids = _filter_unused_actions(
             finding=f,
             unused_actions=unused_actions,
             rules=fine_grained_exclusion_rules,
-            microservice=microservice_tag,
+            microservice=resolved_microservice_tag,
             role_trust_cache=role_trust_cache,
             iam_client=iam,
             logger=log,
