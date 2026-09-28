@@ -202,7 +202,7 @@ def render_html_report(
     .empty {{ text-align: center; padding: 28px; color: #526077; }}
     @media (prefers-color-scheme: dark) {{
       body {{ background: #111827; color: #e5e7eb; }}
-      .metadata, .metric span, .empty {{ color: #aeb8c8; }}
+      .metadata, .metric span, .controls label, .empty { color: #aeb8c8; }
       .metric, table, input, select, button {{ background: #1f2937; color: #e5e7eb; }}
       .metric, th, td {{ border-color: #445066; }}
       th {{ background: #273449; }}
