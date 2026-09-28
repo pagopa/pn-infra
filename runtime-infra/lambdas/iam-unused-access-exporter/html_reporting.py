@@ -100,10 +100,13 @@ HTML_REPORT_SCRIPT = r"""
       sortColumn = column;
       document.querySelectorAll("button[data-sort-column]").forEach(item => {
         item.removeAttribute("data-direction");
-        item.setAttribute("aria-sort", "none");
+        item.closest("th").setAttribute("aria-sort", "none");
       });
       button.dataset.direction = sortAscending ? "asc" : "desc";
-      button.setAttribute("aria-sort", sortAscending ? "ascending" : "descending");
+      button.closest("th").setAttribute(
+        "aria-sort",
+        sortAscending ? "ascending" : "descending"
+      );
       currentPage = 1;
       render();
     });
@@ -202,7 +205,7 @@ def render_html_report(
     .empty {{ text-align: center; padding: 28px; color: #526077; }}
     @media (prefers-color-scheme: dark) {{
       body {{ background: #111827; color: #e5e7eb; }}
-      .metadata, .metric span, .controls label, .empty { color: #aeb8c8; }
+      .metadata, .metric span, .controls label, .empty {{ color: #aeb8c8; }}
       .metric, table, input, select, button {{ background: #1f2937; color: #e5e7eb; }}
       .metric, th, td {{ border-color: #445066; }}
       th {{ background: #273449; }}
@@ -232,15 +235,15 @@ def render_html_report(
   <div class="table-wrap">
     <table>
       <thead><tr>
-        <th><button class="sort" type="button" data-sort-column="0" aria-sort="none">Finding</button></th>
-        <th><button class="sort" type="button" data-sort-column="1" aria-sort="none">Tipo</button></th>
-        <th><button class="sort" type="button" data-sort-column="2" aria-sort="none">Risorsa</button></th>
-        <th><button class="sort" type="button" data-sort-column="3" aria-sort="none">Tipo risorsa</button></th>
-        <th><button class="sort" type="button" data-sort-column="4" aria-sort="none">Stato</button></th>
-        <th><button class="sort" type="button" data-sort-column="5" aria-sort="none">Microservizio</button></th>
-        <th><button class="sort" type="button" data-sort-column="6" aria-sort="none">Azioni inutilizzate</button></th>
-        <th><button class="sort" type="button" data-sort-column="7" aria-sort="none">Azioni ignorate</button></th>
-        <th><button class="sort" type="button" data-sort-column="8" aria-sort="none">Regole</button></th>
+        <th aria-sort="none"><button class="sort" type="button" data-sort-column="0">Finding</button></th>
+        <th aria-sort="none"><button class="sort" type="button" data-sort-column="1">Tipo</button></th>
+        <th aria-sort="none"><button class="sort" type="button" data-sort-column="2">Risorsa</button></th>
+        <th aria-sort="none"><button class="sort" type="button" data-sort-column="3">Tipo risorsa</button></th>
+        <th aria-sort="none"><button class="sort" type="button" data-sort-column="4">Stato</button></th>
+        <th aria-sort="none"><button class="sort" type="button" data-sort-column="5">Microservizio</button></th>
+        <th aria-sort="none"><button class="sort" type="button" data-sort-column="6">Azioni inutilizzate</button></th>
+        <th aria-sort="none"><button class="sort" type="button" data-sort-column="7">Azioni ignorate</button></th>
+        <th aria-sort="none"><button class="sort" type="button" data-sort-column="8">Regole</button></th>
       </tr></thead>
       <tbody id="report-body">{table_body}<tr id="no-results" hidden><td colspan="9" class="empty">Nessun finding corrisponde ai filtri</td></tr></tbody>
     </table>
