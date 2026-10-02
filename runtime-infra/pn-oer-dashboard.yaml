@@ -41,14 +41,6 @@ Parameters:
     Default: ''
     Description: 'Logs Bucket Name'
 
-  OERLambdasConfigurationEnabled:
-    Type: String
-    Description: Enable or Disable the configuration of OER Lambdas
-    Default: 'true'
-    AllowedValues:
-      - 'true'
-      - 'false'
-
   LambdaOERSlaValidationMonitoringTimeout:
     Type: Number
     Description: Timeout in seconds for the Lambda OER SLA Validation Monitoring function
@@ -174,12 +166,13 @@ Parameters:
     Description: "Comma separated SQS queue names to exclude from non-DLQ widget"
 
 Conditions:
-  IsOERLambdasConfigurationEnabled: !And [ !Equals [!Ref OERLambdasConfigurationEnabled, 'true' ], !Not [ !Equals [!Ref ConfidentialInfoAccountId, '' ] ] ]
-
+  IsCoreAccount: !Not [ !Equals [!Ref ConfidentialInfoAccountId, '' ] ]
+  
 Resources:
 
   StorageFunction:
     Type: AWS::Lambda::Function
+    Condition: IsCoreAccount
     Properties:
       Code:
         ZipFile: |
@@ -246,6 +239,7 @@ Resources:
       Timeout: 60
 
   StorageFunctionIAMRole:
+    Condition: IsCoreAccount
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -279,12 +273,14 @@ Resources:
 
   StorageFunctionLogGroup:
     Type: AWS::Logs::LogGroup
+    Condition: IsCoreAccount
     Properties:
       LogGroupName: !Sub /aws/lambda/${StorageFunction}
       RetentionInDays: 14
 
   SLAViolationHistoryFunction:
     Type: AWS::Lambda::Function
+    Condition: IsCoreAccount
     Properties:
       Code:
         ZipFile: |
@@ -450,6 +446,7 @@ Resources:
 
   SlaViolationHistoryFunctionIAMRole:
     Type: AWS::IAM::Role
+    Condition: IsCoreAccount
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -481,12 +478,14 @@ Resources:
 
   SlaViolationHistoryFunctionLogGroup:
     Type: AWS::Logs::LogGroup
+    Condition: IsCoreAccount
     Properties:
       LogGroupName: !Sub /aws/lambda/${SLAViolationHistoryFunction}
       RetentionInDays: 14
 
   MicroservicesDashboard:
     Type: AWS::CloudWatch::Dashboard
+    Condition: IsCoreAccount
     DependsOn:
       - StorageFunction
     Properties:
@@ -599,7 +598,7 @@ Resources:
 
   OERSlaMonitoringLambda:
     Type: AWS::Lambda::Function
-    Condition: IsOERLambdasConfigurationEnabled
+    Condition: IsCoreAccount
     Properties:
       Runtime: !Ref LambdaJSRuntime
       Timeout: !Ref LambdaOERSlaValidationMonitoringTimeout
@@ -624,7 +623,7 @@ Resources:
 
   OERSlaMonitoringLambdaRole:
     Type: AWS::IAM::Role
-    Condition: IsOERLambdasConfigurationEnabled
+    Condition: IsCoreAccount
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -693,6 +692,7 @@ Resources:
 
   OERSlaMonitoringLambdaLogGroup:
     Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
@@ -712,7 +712,7 @@ Resources:
 
   OERSlaValidationMonitoringSchedulerRole:
     Type: AWS::IAM::Role
-    Condition: IsOERLambdasConfigurationEnabled
+    Condition: IsCoreAccount
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -735,7 +735,7 @@ Resources:
 
   OERSlaValidationMonitoringSchedule:
     Type: AWS::Scheduler::Schedule
-    Condition: IsOERLambdasConfigurationEnabled
+    Condition: IsCoreAccount
     Properties:
       Name: pn-oer-sla-monitoring-scheduler
       Description: "Schedule to trigger OER SLA Monitoring Lambda"
@@ -751,6 +751,7 @@ Resources:
 
   InValidationNotificationMetricFilter:
     Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
@@ -768,6 +769,7 @@ Resources:
 
   AcceptedNotificationMetricFilter:
     Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
@@ -785,6 +787,7 @@ Resources:
 
   RefusedNotificationMetricFilter:
     Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
       Parameters:
@@ -802,6 +805,7 @@ Resources:
 
   OERDashboard:
     Type: AWS::CloudWatch::Dashboard
+    Condition: IsCoreAccount
     Properties:
       DashboardName: pn-OER-Dashboard-V2
       DashboardBody:
@@ -1189,7 +1193,7 @@ Resources:
                     "height": 6,
                     "properties": {
                         "metrics": [
-                            [ { "expression": "SELECT MAX(ExtraRunningTasksByTaskFamily) FROM \"OER/ECSCapacity\"", "label": "ExtraRunningTasks", "id": "q1" } ]
+                          [ { "expression": "SELECT SUM(ExtraRunningTasksByTaskFamily) FROM SCHEMA(\"OER/ECSCapacity\", TaskDefinitionFamily) GROUP BY TaskDefinitionFamily", "label": "ExtraRunningTasksByTaskFamily", "id": "q1" } ]
                         ],
                         "view": "timeSeries",
                         "stacked": false,
