@@ -895,7 +895,7 @@ Resources:
                     "height": 6,
                     "properties": {
                         "metrics": [
-                          [ { "expression": "SELECT SUM(ExtraRunningTasksByTaskFamily) FROM SCHEMA(\"OER/ECSCapacity\", TaskDefinitionFamily) GROUP BY TaskDefinitionFamily", "label": "ExtraRunningTasksByTaskFamily", "id": "q1" } ]
+                          [ { "expression": "SELECT MAX(ExtraRunningTasksByTaskFamily) FROM SCHEMA(\"OER/ECSCapacity\", TaskDefinitionFamily) GROUP BY TaskDefinitionFamily", "label": "ExtraRunningTasksByTaskFamily", "id": "q1" } ]
                         ],
                         "view": "timeSeries",
                         "stacked": false,
