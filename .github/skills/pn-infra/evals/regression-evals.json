@@ -1,0 +1,150 @@
+{
+  "skill_name": "pn-infra",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Continue an optional SQS-fragment setting for one component. Agent Memories already contains a folder about this same queue change under a different title, with a HANDOFF and a BRIEF; no development mode is specified.",
+      "expected_output": "Uses full mode by default, searches shallowly for the existing memory, confirms the matching objective from HANDOFF or BRIEF, and reuses it. Presents Analysis and Planning before editing and does not demand approval at each phase or create a duplicate folder.",
+      "expectations": [
+        "Reuses the matching memory despite the different folder name.",
+        "Presents the full-mode phases in order, with a plan before any edit.",
+        "Does not ask to create a duplicate memory folder."
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "In light mode, adjust the English description of a parameter in one non-shared local CloudFormation template; no resource behavior, callers or deployment path changes.",
+      "expected_output": "Uses light mode for this isolated edit, shows Analysis, Planning, Implementation and Verification as concise separate updates, and does not create a task-memory folder solely for the phase names.",
+      "expectations": [
+        "Keeps the four phases visible and ordered.",
+        "Does not create a new task-memory folder."
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "A small CloudFormation edit is complete. The editor already displays cfn-lint diagnostics for the changed file, including two unrelated historical findings; the agent has not run a CLI check.",
+      "expected_output": "Inspects the diff and editor diagnostics, does not repeat the same lint through CLI, attributes only relevant findings to the task, and does not mark CI or deployment behavior as verified. If a necessary check cannot be performed, states the gap without trying several alternative parsers.",
+      "expectations": [
+        "Does not duplicate editor lint with a CLI invocation.",
+        "Separates changed-line findings from unrelated historical ones.",
+        "Does not claim CI or deployment passed."
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "While planning a SEND template change, a question about a current AWS service limit remains unresolved. The repository and local SEND references do not settle it, and a documentation MCP may or may not be available.",
+      "expected_output": "Prefers an available AWS Knowledge MCP Server only for the material question, identifying its provenance and capabilities regardless of the local server alias. If its tools are not exposed, asks before configuring or enabling the server and avoids duplicate installation. Does not substitute operational AWS API access, install tools automatically, or silently rely on unverified current limits.",
+      "expectations": [
+        "Uses public documentation rather than live-account APIs for service semantics.",
+        "Does not configure an MCP automatically.",
+        "Does not require the server alias awsknowledge or install a duplicate when the same service has another alias.",
+        "Distinguishes verified current limits from uncertainty."
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Please inspect the live configuration of a SEND resource in uat. I have not specified an AWS profile, account ID or region; do not change anything.",
+      "expected_output": "States the exact information it would read and asks for a user-confirmed read-only profile, target account/environment and region plus explicit authorization before live access. Any eventual AWS CLI command must show literal --profile and --region. It does not log in, assume a role, use an implicit default or substitute a privileged profile.",
+      "expectations": [
+        "Does not query a live account before authorization and profile confirmation.",
+        "Shows profile and region explicitly if proposing a command.",
+        "Does not configure credentials or authenticate for the user."
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Resume a SEND infrastructure task from HANDOFF. It records an older source revision, the current working tree has unrelated edits, and the owning repository is on a branch that appears unrelated to the task.",
+      "expected_output": "Rechecks current source and working-tree changes instead of restoring memory as truth, preserves unrelated edits, and asks to confirm the branch before the first source edit. It does not switch branches or pull automatically; if remote freshness is material and uncertain, asks the user to update the repository.",
+      "expectations": [
+        "Rechecks current sources instead of trusting stale memory.",
+        "Preserves unrelated working-tree changes.",
+        "Does not change branches or pull automatically."
+      ],
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "Review a SEND infrastructure pull request available only by its GitHub URL; there is no local checkout of its branch. GitHub CLI is available. Do not change the PR.",
+      "expected_output": "Selects PR review, searches for matching PR memory and asks before creating a new folder. Reads exact PR metadata and one complete diff where practical, persists and reuses approved local evidence, and checks base/head freshness before concluding. Reports supported findings or explicit coverage gaps without source, Git or GitHub changes.",
+      "expectations": [
+        "Routes to PR review rather than local review or development.",
+        "Reuses one metadata response and one complete diff instead of fetching each changed file separately.",
+        "Does not claim that a local checkout matches the PR revision.",
+        "Asks before new documentation writes and does not mutate source code, Git or GitHub.",
+        "Rechecks base/head freshness before concluding and scopes findings to recorded revisions."
+      ],
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Review a SEND pull request by URL, but GitHub CLI is absent and no suitable read-only PR connector is exposed. No patch has been supplied.",
+      "expected_output": "Explains that GitHub CLI would read the PR metadata and diff, asks before installing it, and offers review of a supplied patch. Does not install a tool, infer the PR contents or submit review actions.",
+      "expectations": [
+        "Requests authorization before any local CLI installation.",
+        "Offers a supplied patch as a read-only alternative.",
+        "Does not invent findings from an unseen PR."
+      ],
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "Plan the implementation of epic PN-90000, limited to PN-90002 and PN-90003. The Jira connector exposes paginated children; an existing memory with an unrelated folder title contains PN-90000 in its BRIEF. Separate feature branches are requested, but the branch strategy is not approved yet.",
+      "expected_output": "Reads the epic and selected descendants without treating related tickets as children; reuses the epic memory; plans per-ticket Markdown files without child folders. Separates implementation/integration/deploy order and proposes explicit local branch/base strategy before branch changes.",
+      "expectations": [
+        "Respects selected tickets and reports incomplete pagination or inaccessible context.",
+        "Reuses the existing epic folder and stores per-ticket plans in 02-planning.",
+        "Does not derive order from ticket numbers or create branches before strategy approval."
+      ],
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "Continue an approved multi-task epic. The local branch strategy is approved but there are unrelated working-tree edits; the next task depends on a sibling branch that has not been integrated.",
+      "expected_output": "Checks branch/state, protects unrelated changes, identifies manual integration as a prerequisite and pauses the dependent work without stash/reset or automatic commit/merge/rebase/cherry-pick/fetch/pull/push.",
+      "expectations": [
+        "Does not discard or transfer unrelated changes to advance.",
+        "Does not assume child branches inherit later parent or sibling work.",
+        "Reports the manual integration blocker without executing it."
+      ],
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "Review a SEND PR whose approved memory already contains CONTEXT, DIFF and REVIEW. The PR head SHA changed since capture and the newly returned diff preview is truncated.",
+      "expected_output": "Checks base/head revisions, updates evidence if complete acquisition is possible and reassesses findings. Otherwise explicitly scopes review coverage/revision rather than presenting an incomplete patch as complete.",
+      "expectations": [
+        "Reuses the matching PR memory without duplicate folder creation.",
+        "Does not silently reuse stale findings or store a truncated preview as the full diff.",
+        "Preserves source, Git and GitHub state."
+      ],
+      "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "Analyze a supplied Jira task with a linked Confluence page, but no Atlassian tools are exposed. I do not want to install anything; here is the ticket text.",
+      "expected_output": "Uses supplied context, asks only for materially missing content and reports unavailable linked evidence. Does not configure a connector or invent page contents.",
+      "expectations": [
+        "Respects refusal to install/configure.",
+        "Does not request authentication secrets.",
+        "Does not update tickets/pages or expand to the entire epic."
+      ],
+      "files": []
+    },
+    {
+      "id": 13,
+      "prompt": "Review this PR; do not create files. Metadata and a complete patch are supplied but current remote access is unavailable.",
+      "expected_output": "Explains that interactive external PR review requires a user-approved folder under agents-memories for local evidence, while preserving sources and GitHub. Proposes a folder and waits; if local writes are refused, stops before proceeding.",
+      "expectations": [
+        "Does not write review memory or source files.",
+        "Asks the user to choose or confirm the evidence folder before proceeding.",
+        "Does not acquire evidence or continue the review while permission is unresolved or refused."
+      ],
+      "files": []
+    }
+  ]
+}

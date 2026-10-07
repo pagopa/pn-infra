@@ -1,0 +1,159 @@
+{
+  "skill_name": "pn-infra",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We need an optional alarm setting in a shared CloudFormation fragment for one SEND component. Please implement it in the owning fragment and caller; existing callers must keep their current behavior.",
+      "expected_output": "Locates the authoritative fragment and all affected callers. Reuses the existing configuration path, gives an omitted optional parameter a type-valid default that preserves previous behavior and handles any sentinel explicitly. Changes only the caller that enables the capability, verifies omitted and populated behavior, and does not edit pn-configuration without authorization.",
+      "expectations": [
+        "Identifies the owning fragment rather than editing a historical or generated copy.",
+        "Preserves deployment and behavior for callers that omit the new parameter.",
+        "Does not modify unrelated callers or pn-configuration."
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Review a pn-infra-confinfo Terraform change that adds an environment-specific value by editing generated terraform.tfvars directly, leaves codegen/pn-infra-configurations.yaml unchanged, and renames existing for_each keys as part of a cleanup. Do not edit files.",
+      "expected_output": "Reports that the matrix is the source for environment values and that generated tfvars must be produced by user-run codegen, not hand-edited. Identifies the Terraform state-address risk of renaming for_each keys and distinguishes both confirmed issues from any unverified deployment impact. Makes no edits.",
+      "expectations": [
+        "Points to the configuration matrix instead of treating generated tfvars as source.",
+        "Explains that renaming for_each keys changes Terraform resource identity.",
+        "Does not run codegen or edit pn-configuration."
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Review a new CONFINFO CloudWatch alarm. The proposed template sends AlarmActions to both pn-AllAlarmSnsTopic and pn-WarningSnsTopic; the team wants the warning route and has not shown the CORE topic permission or dispatcher route. Do not modify anything.",
+      "expected_output": "Flags duplicate publication to both topics, traces the selected warning ARN and the CONFINFO-to-CORE publish permission, and treats an unverified dispatcher route as a gap rather than inventing its presence. Explains that the producer must not encode Slack routing and that AlarmActions and OKActions should use the chosen path consistently.",
+      "expectations": [
+        "Identifies the duplicate-notification risk from using both topics.",
+        "Checks cross-account publish permission and warning dispatcher route separately.",
+        "Does not assert that an unseen route or permission is absent."
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "We need two independent SEND consumers to receive every event. A proposal routes EventBridge to Queue A; one Lambda processes Queue A and a second relay Lambda also polls Queue A and copies each message into Queue B for the other consumer. Please assess the design before implementation.",
+      "expected_output": "Identifies that the two Queue A pollers compete, so the relay and the first consumer will not each receive every event. Recommends independent EventBridge targets or another explicit fan-out into distinct queues if the producer contract and filters support it. Separates EventBridge delivery failures from processing failures and their DLQs. Does not claim that every queue-to-queue relay is inherently wrong.",
+      "expectations": [
+        "Explains the competing-consumer defect on Queue A.",
+        "Proposes a concrete fan-out path that gives each responsibility its own queue.",
+        "Distinguishes routing DLQ from consumer-processing DLQs."
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "A new SQS-triggered Lambda A synchronously invokes Lambda B for the same business operation, waits for completion, and ignores B's return value. B is also used elsewhere. Would you implement the direct invocation as proposed?",
+      "expected_output": "Treats direct Lambda-to-Lambda invocation for this relay as a SEND architectural anti-pattern by default. Checks responsibility, timeout, retries, duplicate effects, permissions and whether a response is actually needed. Proposes a shared library, an existing event contract, or an explicit asynchronous handoff when justified; a direct-call exception requires a concrete reason and user agreement. Does not invent a new queue without a concrete need or claim AWS forbids all direct invocations.",
+      "expectations": [
+        "Identifies a concrete risk of synchronous coupling and retry interaction.",
+        "Evaluates whether B's shared responsibility justifies a separate component.",
+        "Challenges direct Lambda-to-Lambda invocation as the default design and requires a justified exception, without speculative infrastructure."
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Review a CloudFormation change that creates a persistent SEND DynamoDB table with DeletionPolicy: Retain but no UpdateReplacePolicy. The table has a fixed physical name, and a later key change may require replacement. Do not modify the template.",
+      "expected_output": "Identifies that stack deletion and update replacement are different lifecycle events. Recommends UpdateReplacePolicy: Retain for this persistent table, discusses retained old resources and fixed-name recreation conflicts, and does not propose explicit Delete as a shortcut.",
+      "expectations": [
+        "Identifies the missing UpdateReplacePolicy on the persistent table.",
+        "Explains replacement impact separately from stack deletion.",
+        "Notes the fixed-name conflict and retained-resource ownership or cost."
+      ],
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "Review a new Lambda Event Source Mapping on a SEND Kinesis stream. The requested behavior is to process new records after activation, but the change sets StartingPosition to TRIM_HORIZON, enables ReportBatchItemFailures while the handler only throws whole-batch errors, and has no stated retry or recovery policy. Do not edit files.",
+      "expected_output": "Separates the starting-position decision from error-handling settings. Explains backlog and replay impact of TRIM_HORIZON versus LATEST and requests explicit approval before changing the mapping's position. Flags the mismatch between ReportBatchItemFailures and handler response, and asks how failed records are retried or recovered; considers IteratorAge monitoring without treating it as an error destination. Does not apply these stream rules to Firehose or SQS by analogy.",
+      "expectations": [
+        "Identifies the TRIM_HORIZON/new-records conflict and the need for a user decision.",
+        "Identifies the unsupported partial-batch response setting.",
+        "Distinguishes retry/recovery from IteratorAge lag monitoring."
+      ],
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Review a pn-infra output rename used by a SEND component deployment. The pn-cicd consumer still reads the old key in an accessible script; a second deployment path is not available in this workspace. This is review-only.",
+      "expected_output": "Traces the available consumer to file and line and reports the concrete impact of the mismatched output key. Gives compatible options: retain the old output, add a parallel key, or coordinate all consumers and release order. States exactly which second path cannot be verified and does not assert a defect there without evidence.",
+      "expectations": [
+        "Cites the real consumer and explains the deployment consequence.",
+        "Provides a compatibility or coordinated-migration option.",
+        "Keeps the unavailable second path as a verification gap, not a confirmed defect.",
+        "Makes no edits."
+      ],
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "A SEND feature is being developed in dev. A proposed patch also changes prod values in pn-configuration and points the production ECS image reference at a mutable tag rather than the validated digest. Review the scope and release path without changing files.",
+      "expected_output": "Keeps the dev implementation separate from authorized promotion to higher environments. Identifies pn-configuration as the higher-environment version/configuration source but not a Terraform-variable source, and explains why the validated image digest should be promoted without rebuilding or using a mutable tag. Does not infer deployed production state from local files or a branch.",
+      "expectations": [
+        "Rejects unauthorized production configuration edits in a dev-only task.",
+        "Distinguishes pn-configuration ownership from Terraform configuration matrices.",
+        "Identifies the mutable-tag versus digest traceability problem."
+      ],
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "A component exposes a new SEND API using the shared OpenAPI API Gateway fragment with IntendedUsage set. The team plans a component-only release and assumes that the intended usage tag automatically attaches the new API stage to its centralized Usage Plan. Review this assumption.",
+      "expected_output": "Explains that IntendedUsage/tagging is not itself proof of Usage Plan association. Traces the relevant pn-cicd Usage Plan update path, checks that the new API ID and unique stage are included in the release, and treats missing pipeline evidence as unverified rather than claiming the plan association occurred.",
+      "expectations": [
+        "Distinguishes IntendedUsage from actual Usage Plan association.",
+        "Checks the component-only release path for the new API and unique stage.",
+        "Does not claim deployment success from template configuration alone."
+      ],
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "Design a CodeBuild project for a new SEND support feature. Another component has a similar build step but produces different artifacts and needs broader permissions. Should this be a shared building block or a dedicated project?",
+      "expected_output": "Compares a dedicated project with a reusable building block using concrete inputs, outputs, permissions, release coupling and operational ownership. Reuses an adopted builder only if its stable responsibility and interface fit both components; otherwise keeps the new project focused and avoids speculative modes or broad shared permissions.",
+      "expectations": [
+        "Evaluates real reuse against permission and artifact differences.",
+        "Avoids speculative configuration modes and unnecessary permission broadening."
+      ],
+      "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "A shared CloudFormation template is deployed in both CORE and CONFINFO. A change adds a String parameter for a CORE-only resource but gives it no Default, does not pass it from CONFINFO, and puts a Condition only on the resource. Review the proposed change without editing files.",
+      "expected_output": "Identifies that the new parameter is required even when the conditional resource is not created, so the CONFINFO path can fail before evaluating that resource. If omission should preserve the old behavior, proposes Default: '' with explicit empty-value handling and verifies both deployment paths. If the value is truly required, identifies every caller that must supply it. Does not add a Rule merely to reassert missing-parameter validation.",
+      "expectations": [
+        "Distinguishes parameter requiredness from resource Conditions.",
+        "Preserves the existing CONFINFO caller when the new behavior is CORE-only.",
+        "Does not add redundant CloudFormation validation."
+      ],
+      "files": []
+    },
+    {
+      "id": 13,
+      "prompt": "Review a Lambda with ReservedConcurrentExecutions: 10 and two SQS Event Source Mappings, each configured with ScalingConfig.MaximumConcurrency: 8. A proposed change increases both mapping limits and calls this harmless because the function has a cap. Do not edit files.",
+      "expected_output": "Distinguishes the per-SQS-mapping maximum from the function-wide reserved concurrency. Notes that the two current mapping caps total 16, already above the reserved 10, and increasing them can worsen throttling; evaluates intended throughput, backlog, downstream protection and any other invocation sources before proposing consistent limits. Does not apply SQS ScalingConfig to Kinesis or DynamoDB Streams or claim that any cap alone guarantees successful processing.",
+      "expectations": [
+        "Detects that the aggregate mapping cap exceeds the function reservation even before the proposed increase.",
+        "Explains the concrete throttling risk and the difference between the two limits.",
+        "Keeps the recommendation specific to SQS mappings and the actual processing demand."
+      ],
+      "files": []
+    },
+    {
+      "id": 14,
+      "prompt": "For the SEND Delivery informal API, a reviewer proposes a new CloudFormation Rule that only asserts InformalServiceApiPathOverrideV2 was supplied. Its parent parameter has no Default and is passed to a conditional nested API stack. The shared API fragment already has a Rule preventing both path overrides from being populated. Decide whether the new Rule adds useful validation, and explain where a Rule would be appropriate. Review only.",
+      "expected_output": "Finds the existing mutual-exclusion Rule in the shared API fragment and identifies it as a real cross-parameter check. Explains that the parent parameter without Default is already required even when the nested stack Condition is false, so the proposed presence-only Rule is redundant. If the design should allow disabling the informal API without passing a path, proposes an optional empty default plus a conditional Rule requiring a nonempty path only when enabled, subject to caller compatibility. Checks actual cfg and pipeline inputs before claiming the current deployment is broken. Distinguishes Rules for parameter relationships, resource Conditions and parameter-level constraints.",
+      "expectations": [
+        "Uses the actual shared-fragment mutual-exclusion Rule as the positive example.",
+        "Rejects the redundant presence-only Rule without declaring an unverified current bug.",
+        "Identifies the conditional enabled-path case in which a Rule could add value."
+      ],
+      "files": []
+    }
+  ]
+}
