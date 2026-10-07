@@ -5,6 +5,14 @@ description: Use for SEND or pn-* infrastructure work, including development, lo
 
 # pn-infra
 
+## Execution context
+
+Development, local review and PR review are interactive workflows used through an agentic development client in the user's workspace. Reviews assist the user in assessing their own changes or another contributor's PR.
+
+GitHub Copilot Code Review on a GitHub PR, including a manually requested review, is a separate service. In that context, apply the relevant SEND references and evidence-based finding criteria using the service's supplied revision, tools and output format. Do not start the interactive workflow, request task-memory folders or installations, or wait for conversational approval. Report unavailable evidence as a verification limit. This does not authorize additional remote mutations through CLI/API.
+
+## Interactive workflow selection
+
 Select the procedure from the user's intent:
 
 - Explanation or analysis: consult the relevant references and local sources; answer directly.
