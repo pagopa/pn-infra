@@ -25,12 +25,13 @@
     },
     {
       "id": 3,
-      "prompt": "Review a new CONFINFO CloudWatch alarm. The proposed template sends AlarmActions to both pn-AllAlarmSnsTopic and pn-WarningSnsTopic; the team wants the warning route and has not shown the CORE topic permission or dispatcher route. Do not modify anything.",
-      "expected_output": "Flags duplicate publication to both topics, traces the selected warning ARN and the CONFINFO-to-CORE publish permission, and treats an unverified dispatcher route as a gap rather than inventing its presence. Explains that the producer must not encode Slack routing and that AlarmActions and OKActions should use the chosen path consistently.",
+      "prompt": "Review a new CONFINFO infrastructure monitoring feature that must notify a specific team through the warning route. The shared alarm fragment accepts a single AlarmSNSTopic, but the caller passes pn-AllAlarmSnsTopic instead of pn-WarningSnsTopic. The CORE topic permission and dispatcher routing configuration are not available in the supplied evidence. Do not modify anything.",
+      "expected_output": "Identifies the mismatch between the requested warning route and the caller's ordinary alarm topic. Recommends selecting the warning topic through the existing fragment parameter, not changing the fragment to publish to two topics. Traces CONFINFO-to-CORE publish permissions and the existing warning dispatcher's destination routing separately; requests missing evidence without declaring an unseen route or permission absent. Proposes a routing configuration change only if needed to reach the requested team, not a new dispatcher. Checks consistent AlarmActions and OKActions and keeps Slack routing out of the producer. Does not assume all infrastructure alarms belong on the warning route.",
       "expectations": [
-        "Identifies the duplicate-notification risk from using both topics.",
-        "Checks cross-account publish permission and warning dispatcher route separately.",
-        "Does not assert that an unseen route or permission is absent."
+        "Identifies the incorrect topic passed by the caller against the explicit warning-routing requirement.",
+        "Uses the existing single-topic fragment interface and existing dispatcher rather than adding duplicate publication or a new dispatcher.",
+        "Checks cross-account publish permission and destination routing separately, treating unavailable evidence as a verification gap.",
+        "Makes no edits and does not generalize warning routing to every infrastructure alarm."
       ],
       "files": []
     },
@@ -59,11 +60,11 @@
     {
       "id": 6,
       "prompt": "Review a CloudFormation change that creates a persistent SEND DynamoDB table with DeletionPolicy: Retain but no UpdateReplacePolicy. The table has a fixed physical name, and a later key change may require replacement. Do not modify the template.",
-      "expected_output": "Identifies that stack deletion and update replacement are different lifecycle events. Recommends UpdateReplacePolicy: Retain for this persistent table, discusses retained old resources and fixed-name recreation conflicts, and does not propose explicit Delete as a shortcut.",
+      "expected_output": "Distinguishes stack deletion from update replacement and recommends UpdateReplacePolicy: Retain for the persistent table. Explains that retaining the old table does not migrate its data or allow a replacement table to reuse the same physical name while it still exists. Identifies the fixed-name replacement conflict without proposing explicit Delete as a shortcut. Makes no edits.",
       "expectations": [
         "Identifies the missing UpdateReplacePolicy on the persistent table.",
         "Explains replacement impact separately from stack deletion.",
-        "Notes the fixed-name conflict and retained-resource ownership or cost."
+        "Identifies the fixed-name replacement conflict and explains that retention alone does not migrate data."
       ],
       "files": []
     },
@@ -92,12 +93,13 @@
     },
     {
       "id": 9,
-      "prompt": "A SEND feature is being developed in dev. A proposed patch also changes prod values in pn-configuration and points the production ECS image reference at a mutable tag rather than the validated digest. Review the scope and release path without changing files.",
-      "expected_output": "Keeps the dev implementation separate from authorized promotion to higher environments. Identifies pn-configuration as the higher-environment version/configuration source but not a Terraform-variable source, and explains why the validated image digest should be promoted without rebuilding or using a mutable tag. Does not infer deployed production state from local files or a branch.",
+      "prompt": "Implement a new configurable feature for a SEND component in dev only. The component repository contains the dev CloudFormation cfg and application environment-variable configuration. pn-configuration is also available and contains versions and configuration for higher environments, but no changes to those environments have been requested.",
+      "expected_output": "Locates the component's dev CloudFormation parameter file and application environment-variable configuration, traces which settings the feature needs, and changes only the relevant dev inputs and implementation. Keeps higher-environment versions and configuration in pn-configuration untouched unless explicitly requested. Considers future production behavior and identifies any later promotion needs without treating them as permission to perform that promotion. Follows the development workflow and its required decisions and approvals.",
       "expectations": [
-        "Rejects unauthorized production configuration edits in a dev-only task.",
-        "Distinguishes pn-configuration ownership from Terraform configuration matrices.",
-        "Identifies the mutable-tag versus digest traceability problem."
+        "Identifies dev CloudFormation parameters and application environment-variable configuration in the component repository.",
+        "Updates only the dev configuration needed by the feature, without inventing unrelated settings.",
+        "Does not change higher-environment versions or configuration in pn-configuration without an explicit request.",
+        "Distinguishes planning for production from authorization to modify or deploy to it."
       ],
       "files": []
     },
@@ -114,11 +116,14 @@
     },
     {
       "id": 11,
-      "prompt": "Design a CodeBuild project for a new SEND support feature. Another component has a similar build step but produces different artifacts and needs broader permissions. Should this be a shared building block or a dedicated project?",
-      "expected_output": "Compares a dedicated project with a reusable building block using concrete inputs, outputs, permissions, release coupling and operational ownership. Reuses an adopted builder only if its stable responsibility and interface fit both components; otherwise keeps the new project focused and avoids speculative modes or broad shared permissions.",
+      "prompt": "Design a CodeBuild project for a new SEND support feature. Another component has a similar build step but produces different artifacts and needs broader permissions. No suitable shared fragment has been identified yet. Should the resources live directly in the component's CloudFormation template, such as microservice.yml, or should we create a reusable fragment in pn-infra? Consider the same ownership and reuse decision for a resource such as an RDS database. Propose the design before implementation.",
+      "expected_output": "First checks adopted fragments and builders rather than assuming none exists. Compares a component-local definition with a new pn-infra fragment using concrete inputs, outputs, permissions, release coupling and ownership. Selects the owning template by resource lifecycle rather than always choosing microservice.yml. Recommends a new fragment only when a stable reusable responsibility is justified; shared definitions need not imply a shared physical resource or broader permissions. Applies the same reasoning to the RDS analogy without claiming a current RDS fragment is missing. Avoids speculative modes, unrelated caller migrations and infrastructure creation during design.",
       "expectations": [
-        "Evaluates real reuse against permission and artifact differences.",
-        "Avoids speculative configuration modes and unnecessary permission broadening."
+        "Checks existing fragments and builders before proposing a new reusable definition.",
+        "Compares component-local resources with a pn-infra fragment using real artifact and permission differences.",
+        "Chooses the owning template according to resource lifecycle rather than always using microservice.yml.",
+        "Distinguishes reusable definitions from shared physical instances and preserves separate permissions where needed.",
+        "Uses the RDS analogy without asserting that an existing fragment is absent, and avoids speculative generalization."
       ],
       "files": []
     },
