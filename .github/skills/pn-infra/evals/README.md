@@ -1,14 +1,24 @@
-# Evaluation notes
+# Evaluation guide
 
-Status: designed, not executed. SEND design, development, and review cases are in [evals.json](evals.json); workflow and permission checks are in [regression-evals.json](regression-evals.json). Preliminary activation checks are in [trigger-evals.json](trigger-evals.json). The comparative run protocol is in [benchmark-plan.md](benchmark-plan.md).
+- [evals.json](evals.json): SEND design, development and review cases.
+- [regression-evals.json](regression-evals.json): workflow and permission checks.
+- [trigger-evals.json](trigger-evals.json): skill activation checks.
+- [fixture-evals.json](fixture-evals.json): cases with supplied input files.
+- [benchmark-plan.md](benchmark-plan.md): comparison protocol.
 
-Use sanitized fixtures or approved local repository snapshots. Keep model, tools, source revision and task identical across variants; use independent sessions and record exact inputs and outputs. Do not treat remembered answers as execution evidence.
+## Run a comparison
 
-The packaged skill includes evaluation files. These are public development tests, not a held-out benchmark. For an unbiased comparison, select unseen tasks and keep their expected results outside the runtime workspace. Cases with `files: []` require an approved local repository snapshot or sanitized fixture. Do not score an unavailable file or deployment path as if it had been inspected.
+Use sanitized fixtures or approved repository snapshots. Keep the task, model, tools and source revision identical across variants, and start an independent session for each run.
 
-## Paired synthetic fixtures
+Provide the task prompt and its inputs to the evaluated agent. Keep expected answers and paired variants outside its accessible context. Cases with `files: []` require a repository snapshot or a separate fixture.
 
-[fixture-evals.json](fixture-evals.json) defines ten cases with explicit input files, arranged in five pairs:
+Record the actual inputs, outputs and assessment results. Treat unavailable files or deployment paths as verification limits. Evaluation definitions and structural checks do not establish that an agent passes a case.
+
+For an unbiased benchmark, use unseen tasks with separate expected results. The included cases are accessible evaluation material and are not automatically executed or loaded as task instructions.
+
+## Paired fixtures
+
+Ten cases cover five scenarios:
 
 | Scenario | What the pair checks |
 | --- | --- |
@@ -16,10 +26,6 @@ The packaged skill includes evaluation files. These are public development tests
 | Output contract | Trace an actual script consumer; distinguish a breaking rename from a retained alias. |
 | CORE/CONFINFO | Distinguish parameter requiredness from resource conditions. |
 | Task memory | Match existing documentation by task content, not just directory name. |
-| SQS concurrency | Compare two simultaneous mapping limits with Lambda reserved concurrency. |
+| SQS concurrency | Compare simultaneous mapping limits with Lambda reserved concurrency. |
 
-Follow the [snapshot and staging instructions](fixtures/README.md). Supply only the selected case inputs to the evaluated agent, not its expected output or the paired case. These fixtures are synthetic review inputs, not deployment templates. No AWS access is needed. Structural checks do not establish that an agent passes the cases.
-
-Additional task-memory checks to develop into concrete test cases: keep a proposed decision unapproved; link a superseded decision; decline promoting a task workaround without user approval; perform read-only review without memory writes. A successful result must preserve the next actionable step and actual verification limitations.
-
-The trigger checks are preliminary and have not been run against Copilot discovery.
+Follow the [snapshot and staging instructions](fixtures/README.md) and supply only the selected case inputs. Fixtures are synthetic review inputs, not deployment packages; no AWS access is required.

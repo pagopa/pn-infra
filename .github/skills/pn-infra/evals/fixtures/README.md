@@ -1,9 +1,11 @@
-# Synthetic repository snapshots
+# Fixture inputs
 
-Each Markdown file bundles one complete fixture workspace. Level-two headings give relative file paths; fenced blocks contain their contents. Five scenarios have two variants each. Use one variant per fresh session.
+Each Markdown file contains one fixture workspace. Level-two headings identify relative file paths; fenced blocks contain file contents. Five scenarios have two variants each. Use one variant per fresh session.
 
-The cases and input paths are listed in [fixture-evals.json](../fixture-evals.json), relative to the evals directory. For a reasoning-only review, supply the selected snapshot as the repository evidence. To evaluate filesystem search or task-memory discovery, first reconstruct its listed files in an isolated test workspace, preserving the paths and contents. Then provide the task prompt and that workspace. A snapshot-only run does not test filesystem discovery.
+Prompts, input paths and assessment criteria are listed in [fixture-evals.json](../fixture-evals.json). Paths are relative to the evals directory.
 
-Do not provide the paired variant or evaluator expectations to the candidate agent. File and line citations refer to the virtual files in the snapshot, or the reconstructed files when staged.
+For a reasoning-only review, provide the selected snapshot as repository evidence. To evaluate filesystem search or task-memory discovery, reconstruct its files in an isolated workspace, preserving paths and contents. Then provide the task prompt and workspace. A snapshot-only run does not test filesystem discovery.
 
-These are synthetic, read-only cases, not deployment packages. Do not execute the embedded scripts or perform AWS operations. They are public regression inputs shipped with the skill; use unseen cases with separate expectations for an unbiased benchmark.
+Do not include the paired variant or expected answers. File and line citations refer to the virtual files in the snapshot or to the reconstructed files.
+
+These are synthetic, read-only inputs. Do not execute embedded scripts, deploy resources or perform AWS operations.
