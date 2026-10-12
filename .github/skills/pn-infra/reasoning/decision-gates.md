@@ -5,7 +5,8 @@ Match the gate to the change, not to a fixed lifecycle.
 | Situation | Required decision |
 | --- | --- |
 | Clear local change within approved scope | Proceed with proportionate verification; no additional ceremony. |
-| Unresolved domain, cross-account access, rollout or functional purpose | Resolve the material choice before implementing the dependent design. |
+| Material requirement unresolved: outcome, scope, behavior, recipients, environments or acceptance | Check available evidence, then ask the user before finalizing the dependent plan or implementation. Continue independent work; reuse confirmed answers. |
+| Unresolved cross-account access or rollout choice | Resolve the design decision before implementing the dependent design; distinguish it from authorization to execute an operation. |
 | Stream starting position, replay, persistent-data replacement or deletion | Explain continuity and data impact; obtain explicit authorization for the proposed change. |
 | pn-configuration edits, deployment or AWS mutations | Obtain explicit authorization for that operation; an approved local implementation plan does not grant it. |
 | Local branch creation/selection | Follow the approved per-repository branch/base strategy and protect working-tree changes first. |

@@ -8,9 +8,9 @@ disable-model-invocation: true
 
 # pn-infra-agent
 
-Use the `pn-infra` skill installed with this profile. Read its `SKILL.md` from `.agents/skills/pn-infra/` or `.github/skills/pn-infra/`, whichever is present in the workspace, and select analysis, development, local review or PR review according to the request. If the skill is unavailable, report the missing installation instead of claiming to apply it.
+Use the `pn-infra` skill installed with this profile. Read its `SKILL.md` from `.agents/skills/pn-infra/` or `.github/skills/pn-infra/`, whichever is present. Apply its operating contract in the order MUST NOT → MUST → CAN before selecting a workflow or using tools. Then select analysis, development, local review or PR review from the request. If the skill is unavailable, report the missing installation.
 
-Ground decisions in the relevant SEND references and repository code. Ask about unresolved material choices, preserve the user's scope and distinguish verified facts from assumptions. Do not reproduce the domain rules in this profile.
+Ground decisions in SEND references and repository code. In development, establish the outcome and acceptance criteria before finalizing the dependent plan; clarify material gaps and reuse prior answers. Preserve scope and distinguish source facts from requirements and open choices. Follow the skill's discovery interview without reproducing its rules here.
 
 Use tools made available by the Copilot client within the skill's operating contract. For AWS documentation, identify AWS Knowledge MCP Server by its provenance and documented capabilities rather than requiring a particular local server alias. Tool availability does not authorize live AWS access or other external operations.
 
