@@ -1,0 +1,135 @@
+{
+  "skill_name": "pn-infra",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Use only the supplied shared-fragment-case-a repository snapshot as the repository evidence. Review the new queue parameter against all three callers. Existing callers must remain unchanged. This is a read-only evaluation; do not run AWS operations.",
+      "expected_output": "Identifies that beta and gamma omit a newly required parameter. Proposes preserving the fragment default rather than editing unrelated callers.",
+      "expectations": [
+        "Identifies that beta and gamma omit a newly required parameter.",
+        "Proposes preserving the fragment default rather than editing unrelated callers.",
+        "Makes no edits and performs no live AWS access."
+      ],
+      "files": [
+        "fixtures/shared-fragment-case-a.md"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Use only the supplied shared-fragment-case-b repository snapshot as the repository evidence. Review the new queue parameter against all three callers. Existing callers must remain unchanged. This is a read-only evaluation; do not run AWS operations.",
+      "expected_output": "Recognizes that Default: 0 preserves the omitted-parameter behavior. Does not invent a required caller migration.",
+      "expectations": [
+        "Recognizes that Default: 0 preserves the omitted-parameter behavior.",
+        "Does not invent a required caller migration.",
+        "Makes no edits and performs no live AWS access."
+      ],
+      "files": [
+        "fixtures/shared-fragment-case-b.md"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Use only the supplied output-contract-case-a repository snapshot as the repository evidence. Trace the producer output and the included deployment consumer; report only a demonstrated contract defect. This is a read-only evaluation; do not run AWS operations.",
+      "expected_output": "Recognizes that the legacy output remains available to the consumer. Does not report a rename break solely because a new output exists.",
+      "expectations": [
+        "Recognizes that the legacy output remains available to the consumer.",
+        "Does not report a rename break solely because a new output exists.",
+        "Makes no edits and performs no live AWS access."
+      ],
+      "files": [
+        "fixtures/output-contract-case-a.md"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Use only the supplied output-contract-case-b repository snapshot as the repository evidence. Trace the producer output and the included deployment consumer; report only a demonstrated contract defect. This is a read-only evaluation; do not run AWS operations.",
+      "expected_output": "Cites the missing LegacyQueueArn and the real jq consumer. Explains that parameter preparation fails on the missing key.",
+      "expectations": [
+        "Cites the missing LegacyQueueArn and the real jq consumer.",
+        "Explains that parameter preparation fails on the missing key.",
+        "Makes no edits and performs no live AWS access."
+      ],
+      "files": [
+        "fixtures/output-contract-case-b.md"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Use only the supplied core-confinfo-case-a repository snapshot as the repository evidence. Review the shared template using both complete parameter sets. This is a read-only evaluation; do not run AWS operations.",
+      "expected_output": "Identifies the required CoreTopicArn missing from CONFINFO. Explains why a resource Condition does not make its parameter optional.",
+      "expectations": [
+        "Identifies the required CoreTopicArn missing from CONFINFO.",
+        "Explains why a resource Condition does not make its parameter optional.",
+        "Makes no edits and performs no live AWS access."
+      ],
+      "files": [
+        "fixtures/core-confinfo-case-a.md"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Use only the supplied core-confinfo-case-b repository snapshot as the repository evidence. Review the shared template using both complete parameter sets. This is a read-only evaluation; do not run AWS operations.",
+      "expected_output": "Recognizes the empty default makes omission valid for CONFINFO. Does not invent a missing-topic defect on the disabled resource.",
+      "expectations": [
+        "Recognizes the empty default makes omission valid for CONFINFO.",
+        "Does not invent a missing-topic defect on the disabled resource.",
+        "Makes no edits and performs no live AWS access."
+      ],
+      "files": [
+        "fixtures/core-confinfo-case-b.md"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Use only the supplied task-memory-case-a repository snapshot as the repository evidence. The task is to enable ten-second long polling on pn-example WorkQueue. Inspect existing Agent Memories and determine whether to reuse a folder or propose a new one. Do not create or edit files. This is a read-only evaluation; do not run AWS operations.",
+      "expected_output": "Reuses queue-consumer-tuning based on the objective and source, despite its different name. Does not propose a duplicate folder.",
+      "expectations": [
+        "Reuses queue-consumer-tuning based on the objective and source, despite its different name.",
+        "Does not propose a duplicate folder.",
+        "Makes no edits and performs no live AWS access."
+      ],
+      "files": [
+        "fixtures/task-memory-case-a.md"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Use only the supplied task-memory-case-b repository snapshot as the repository evidence. The task is to enable ten-second long polling on pn-example WorkQueue. Inspect existing Agent Memories and determine whether to reuse a folder or propose a new one. Do not create or edit files. This is a read-only evaluation; do not run AWS operations.",
+      "expected_output": "Rejects queue-long-polling as unrelated after reading its content. Proposes a new task folder without creating it.",
+      "expectations": [
+        "Rejects queue-long-polling as unrelated after reading its content.",
+        "Proposes a new task folder without creating it.",
+        "Makes no edits and performs no live AWS access."
+      ],
+      "files": [
+        "fixtures/task-memory-case-b.md"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Use only the supplied sqs-concurrency-case-a repository snapshot as the repository evidence. Review the function reservation and both SQS mapping limits against the stated simultaneous demand. This is a read-only evaluation; do not run AWS operations.",
+      "expected_output": "Recognizes that the aggregate cap 16 fits reservation 20 and downstream capacity. Does not report a concurrency-cap mismatch.",
+      "expectations": [
+        "Recognizes that the aggregate cap 16 fits reservation 20 and downstream capacity.",
+        "Does not report a concurrency-cap mismatch.",
+        "Makes no edits and performs no live AWS access."
+      ],
+      "files": [
+        "fixtures/sqs-concurrency-case-a.md"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Use only the supplied sqs-concurrency-case-b repository snapshot as the repository evidence. Review the function reservation and both SQS mapping limits against the stated simultaneous demand. This is a read-only evaluation; do not run AWS operations.",
+      "expected_output": "Identifies aggregate mapping demand 16 exceeding reservation 10. Explains possible throttling under concurrent load, without claiming a guaranteed deployment failure.",
+      "expectations": [
+        "Identifies aggregate mapping demand 16 exceeding reservation 10.",
+        "Explains possible throttling under concurrent load, without claiming a guaranteed deployment failure.",
+        "Makes no edits and performs no live AWS access."
+      ],
+      "files": [
+        "fixtures/sqs-concurrency-case-b.md"
+      ]
+    }
+  ]
+}
