@@ -31,6 +31,10 @@ Parameters:
     Type: String
     Description: Git commit containing the Prowler mutelist in the private pn-configuration repository.
 
+  PnConfigurationMutelistPath:
+    Type: String
+    Description: Mutelist path relative to the _conf directory in pn-configuration.
+
   GithubTokenName:
     Type: String
     Description: Secrets Manager secret containing a read-only GitHub token.
@@ -234,7 +238,7 @@ Resources:
                     --secret-id "$GITHUB_TOKEN_SECRET_NAME" \
                     --query SecretString \
                     --output text)
-                  MUTELIST_PATH="${ENVIRONMENT_TYPE}/_conf/core/prowler-mutelist.yaml"
+                  MUTELIST_PATH="${ENVIRONMENT_TYPE}/_conf/${PN_CONFIGURATION_MUTELIST_PATH}"
                   curl --fail-with-body --silent --show-error \
                     -H "Authorization: Bearer ${GITHUB_TOKEN}" \
                     -H "Accept: application/vnd.github.raw+json" \
@@ -377,6 +381,9 @@ Resources:
           - Name: PN_CONFIGURATION_COMMIT_ID
             Type: PLAINTEXT
             Value: !Ref PnConfigurationCommitId
+          - Name: PN_CONFIGURATION_MUTELIST_PATH
+            Type: PLAINTEXT
+            Value: !Ref PnConfigurationMutelistPath
           - Name: GITHUB_TOKEN_SECRET_NAME
             Type: PLAINTEXT
             Value: !Ref GithubTokenName

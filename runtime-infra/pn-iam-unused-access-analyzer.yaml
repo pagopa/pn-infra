@@ -23,6 +23,14 @@ Parameters:
     AllowedPattern: '^[0-9a-fA-F]{40}$'
     Description: Git commit containing the IAM Access Analyzer mutelist in pn-configuration.
 
+  PnConfigurationCoreMutelistPath:
+    Type: String
+    Description: Core mutelist path relative to the _conf directory in pn-configuration.
+
+  PnConfigurationConfinfoMutelistPath:
+    Type: String
+    Description: Confinfo mutelist path relative to the _conf directory in pn-configuration.
+
   GithubTokenName:
     Type: String
     Default: github-token
@@ -285,8 +293,8 @@ Resources:
           GITHUB_TOKEN_NAME: !Ref GithubTokenName
           MUTELIST_PATH: !If
             - IsConfinfoAccount
-            - !Sub '${EnvironmentType}/_conf/confinfo/tools/iam-access-analyzer-mutelist.json'
-            - !Sub '${EnvironmentType}/_conf/core/tools/iam-access-analyzer-mutelist.json'
+            - !Sub '${EnvironmentType}/_conf/${PnConfigurationConfinfoMutelistPath}'
+            - !Sub '${EnvironmentType}/_conf/${PnConfigurationCoreMutelistPath}'
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/iam-unused-access-exporter.zip
