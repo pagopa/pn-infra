@@ -151,6 +151,58 @@ Parameters:
     Description: 'Bucket name for ESM Kinesis failure notifications'
     Default: ''
 
+  AbnormalStoppedFilterPattern:
+    Type: String
+    Description: 'Filter pattern for abnormal stopped tasks in ECS'
+    Default: '{ $.detail.stopCode = "-" }'
+
+  AbnormalStoppedPeriod:
+    Type: Number
+    Default: 300
+    Description: Period (in seconds) for abnormal stopped tasks in ECS
+
+  AbnormalStoppedThreshold:
+    Type: Number
+    Default: 1
+    Description: Threshold for abnormal stopped tasks in ECS
+
+  AbnormalStoppedEvaluationPeriods:
+    Type: Number
+    Default: 1
+    Description: Evaluation periods for abnormal stopped tasks in ECS
+
+  AbnormalStoppedDatapointsToAlarm:
+    Type: Number
+    Default: 1
+    Description: Datapoints to alarm for abnormal stopped tasks in ECS
+
+  AbnormalStoppedComparisonOperator:
+    Type: String
+    Default: "GreaterThanOrEqualToThreshold"
+    Description: Comparison operator for abnormal stopped tasks in ECS
+
+  AbnormalStoppedStatistic:
+    Type: String
+    Default: "Sum"
+    Description: Statistic for abnormal stopped tasks in ECS
+
+  AbnormalStoppedHasOncall:
+    Type: String
+    Default: 'false'
+    Description: Whether there is an oncall for abnormal stopped tasks in ECS
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+  AbnormalStoppedOncallComparisonOperator:
+    Type: String
+    Default: "GreaterThanOrEqualToThreshold"
+    Description: Oncall comparison operator for abnormal stopped tasks in ECS
+
+  AbnormalStoppedOncallStatistic:
+    Type: String
+    Default: "Sum"
+    Description: Oncall statistic for abnormal stopped tasks in ECS
 
 Conditions:
   SendLogToKinesis: !Not [ !Equals [ !Ref LogsKinesisSourceStreamArn, '' ] ]
@@ -262,7 +314,12 @@ Resources:
                 "${LogGroupTaskStoppedEvents.Arn}"
               ],
               "Condition": {
-                "ArnEquals": {"AWS:SourceArn": "${EventRule.Arn}"}
+                "ArnEquals": {
+                  "AWS:SourceArn": [
+                    "${EventRule.Arn}",
+                    "${StoppedTaskEventRule.Arn}"
+                  ]
+                }
               }
             }
           ]
@@ -279,6 +336,26 @@ Resources:
         - MetricValue: 1
           MetricNamespace: "OutOfMemoryErrors"
           MetricName: !Sub "${ProjectName}-ECSOutOfMemory"
+
+  AbnormalStoppedTaskAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/custom-metric.yaml"
+      Parameters:
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        MetricName: !Sub "${ProjectName}-ECSAbnormalTaskStopped"
+        MetricNamespace: "ECS/TaskStopped"
+        LogGroupName: !Ref LogGroupTaskStoppedEvents
+        FilterPattern: !Ref AbnormalStoppedFilterPattern
+        Period: !Ref AbnormalStoppedPeriod
+        Threshold: !Ref AbnormalStoppedThreshold
+        EvaluationPeriods: !Ref AbnormalStoppedEvaluationPeriods
+        DatapointsToAlarm: !Ref AbnormalStoppedDatapointsToAlarm
+        ComparisonOperator: !Ref AbnormalStoppedComparisonOperator
+        Statistic: !Ref AbnormalStoppedStatistic
+        HasOncall: !Ref AbnormalStoppedHasOncall
+        OncallComparisonOperator: !Ref AbnormalStoppedOncallComparisonOperator
+        OncallStatistic: !Ref AbnormalStoppedOncallStatistic
 
   CloudWatchAlarmOOM:
     Type: AWS::CloudWatch::Alarm

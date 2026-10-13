@@ -4,12 +4,10 @@ from pathlib import Path
 import yaml
 
 
-DEFAULT_CONFIG_PATH = (
-    Path(__file__).resolve().parent.parent / "config"
-)
+DEFAULT_CONFIG_PATH = Path("/opt/config")
 
 CONFIG_PATH = Path(
-    os.environ.get("CONFIG_PATH", str(DEFAULT_CONFIG_PATH))
+    os.getenv("CONFIG_PATH", str(DEFAULT_CONFIG_PATH))
 )
 
 MANIFEST_PATH = CONFIG_PATH / "manifest.yaml"

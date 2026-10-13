@@ -3,6 +3,20 @@
 import json
 
 
+def generate_presigned_report_url(
+    *, s3_client, bucket, key, url_expiration_seconds=3600
+):
+    """Generate a temporary browser URL for a private report stored in S3."""
+    return s3_client.generate_presigned_url(
+        "get_object",
+        Params={
+            "Bucket": bucket,
+            "Key": key,
+        },
+        ExpiresIn=url_expiration_seconds,
+    )
+
+
 def publish_warning_report(
     *,
     sns_client,
@@ -19,6 +33,7 @@ def publish_warning_report(
     details,
     links,
     attachment,
+    markdown_body=None,
     url_expiration_seconds=3600,
 ):
     if not title:
@@ -26,13 +41,11 @@ def publish_warning_report(
     if not isinstance(metrics, dict) or not metrics:
         raise ValueError("Report metrics must be a non-empty dictionary")
 
-    download_url = s3_client.generate_presigned_url(
-        "get_object",
-        Params={
-            "Bucket": attachment["bucket"],
-            "Key": attachment["key"],
-        },
-        ExpiresIn=url_expiration_seconds,
+    download_url = generate_presigned_report_url(
+        s3_client=s3_client,
+        bucket=attachment["bucket"],
+        key=attachment["key"],
+        url_expiration_seconds=url_expiration_seconds,
     )
     message = {
         "schemaVersion": "1.0",
@@ -56,6 +69,13 @@ def publish_warning_report(
             "downloadUrl": download_url,
         },
     }
+    if markdown_body is not None:
+        if not isinstance(markdown_body, str) or not markdown_body.strip():
+            raise ValueError("Report markdown body must be a non-empty string")
+        message["presentation"] = {
+            "format": "slack-mrkdwn",
+            "body": markdown_body,
+        }
     sns_client.publish(
         TopicArn=topic_arn,
         Subject=subject[:100],
