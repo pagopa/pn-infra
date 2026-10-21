@@ -79,6 +79,10 @@ Parameters:
     Default: ''
     Description: 'An ARN of an SNS topic where to send alarm'
 
+  WarningSNSTopicArn:
+    Type: String
+    Description: 'ARN of the central warning SNS topic for OpenSearch alarms'
+
   OOMAlarmArn:
     Type: String
     Default: ''
@@ -120,9 +124,9 @@ Resources:
       Period: 60
       EvaluationPeriods: 1
       OKActions:
-        - !Ref AlarmSNSTopicArn
+        - !Ref WarningSNSTopicArn
       AlarmActions:
-        - !Ref AlarmSNSTopicArn
+        - !Ref WarningSNSTopicArn
 
   ClusterStatusYellowAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -145,9 +149,9 @@ Resources:
       Period: 60
       EvaluationPeriods: 1
       OKActions:
-        - !Ref AlarmSNSTopicArn
+        - !Ref WarningSNSTopicArn
       AlarmActions:
-        - !Ref AlarmSNSTopicArn
+        - !Ref WarningSNSTopicArn
 
   FreeStorageSpaceAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -176,13 +180,13 @@ Resources:
               - OpenSearchEbsSizeValue: !Ref OpenSearchEbsSizeValue  
           Label: !Sub "${ProjectName}-avg free space"
       ComparisonOperator: LessThanOrEqualToThreshold
-      Threshold: 30
+      Threshold: 25
       TreatMissingData: ignore
       EvaluationPeriods: 1
       OKActions:
-        - !Ref AlarmSNSTopicArn
+        - !Ref WarningSNSTopicArn
       AlarmActions:
-        - !Ref AlarmSNSTopicArn
+        - !Ref WarningSNSTopicArn
 
   ClusterIndexWritesBlockedAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -205,9 +209,9 @@ Resources:
       Period: 300
       EvaluationPeriods: 1
       OKActions:
-        - !Ref AlarmSNSTopicArn
+        - !Ref WarningSNSTopicArn
       AlarmActions:
-        - !Ref AlarmSNSTopicArn
+        - !Ref WarningSNSTopicArn
 
   InfraMicroserviceCloudWatchDashboard:
     Type: AWS::CloudFormation::Stack
