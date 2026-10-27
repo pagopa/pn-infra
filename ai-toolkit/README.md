@@ -10,6 +10,8 @@ Open the workspace and select **pn-infra-agent**, or ask the default agent to us
 - **Local review:** provide the local files or diff to review.
 - **PR review:** provide the GitHub pull request URL.
 
+After approved development and successful required verification, the agent creates a local commit for the approved changes, with a subject starting with the Jira task key (for example `PN-21072: ...`). It stops if the key is missing, checks fail or unrelated changes cannot be safely excluded. The preferred message has no `Co-authored-by` trailer unless a higher-priority client rule requires it. Local commits do not authorize integration, remote synchronization or deployment.
+
 Interactive PR reviews require an agreed folder under `agents-memories/` for metadata, the complete diff and review findings. The review does not change source code or publish actions on GitHub.
 
 Copilot Code Review on GitHub uses repository skills and instructions independently of the interactive custom agent.

@@ -18,7 +18,8 @@ Read this contract before selecting a workflow or using tools: **MUST NOT → MU
 ### MUST NOT
 
 - Perform remote Git operations (`push`, `pull`, `fetch`) in these workflows. GitHub API reads do not authorize Git synchronization.
-- Commit, merge, rebase or cherry-pick: these remain manual. Wait for user integration before dependent tasks. Do not automatically stash, reset, destructively restore or clean files.
+- Merge, rebase and cherry-pick remain manual. Wait for user integration before dependent tasks. Do not automatically stash, reset, destructively restore or clean files.
+- Do not create a commit in a review workflow, before the approved development changes pass required verification, without an identified Jira task key, or when unrelated changes cannot be safely excluded.
 - Create or select branches outside the approved strategy. Without specific authorization, do not deploy, invoke state-changing AWS or Terraform operations, install/configure tools, run code generation, modify `pn-configuration` or change files outside scope.
 - Write Jira tickets, worklogs or comments, transition status, or create/update Confluence pages or comments in these workflows; see the exact excluded actions in [Atlassian context](references/atlassian-context.md). Publication/administration requires a separate request outside this workflow.
 - Submit a GitHub review, comment, approval, change request or merge solely because a PR review was requested.
@@ -44,6 +45,7 @@ Read this contract before selecting a workflow or using tools: **MUST NOT → MU
 - For PR review, reuse one metadata response and one complete diff where practical; in interactive reviews persist them in the agreed memory and check base/head revision on resumption and before completion. In automatic review services follow the non-interactive execution context in the PR workflow. Disclose incomplete or redacted evidence; make further reads only for missing context or changed revisions.
 - Respect task/epic subsets, distinguish actual hierarchy from related tickets, and complete pagination before claiming full coverage. Keep one epic memory with per-ticket plans; separate implementation, manual integration and deployment order.
 - Before creating or switching branches, check the current branch and working-tree changes. Stop if unrelated work could be transferred or overwritten; do not stash or discard it to proceed.
+- After an approved development implementation passes its required verification, create a local commit for the approved changes if client permissions allow it. Follow the [local commit procedure](workflows/development.md#local-commit), including the `PN-<number>` subject prefix and protection of unrelated work. If a prerequisite is missing, stop and report it rather than committing.
 
 ### CAN
 
@@ -53,6 +55,7 @@ Read this contract before selecting a workflow or using tools: **MUST NOT → MU
 - Create or update an agreed local task-documentation folder, including PR metadata, complete diff and findings without source edits.
 - Create or select only local branches listed in an approved per-repository strategy, using `feature/PN-<number>` for features and an explicit local base.
 - Edit only local files within the approved task scope after Planning.
+- Create a local commit for approved and verified development work under the local commit procedure; this does not authorize integration or remote synchronization.
 - Run the minimum read-only local checks needed in Verification.
 - Consult approved read-only external knowledge sources when a material AWS question cannot be resolved from local evidence.
 - After explicit user authorization, query live AWS resources with the user-confirmed read-only profile and the target region shown literally in the command, following [live AWS read-only access](references/live-aws-read-only.md).
