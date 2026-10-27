@@ -4,10 +4,10 @@
     {
       "id": 1,
       "prompt": "Continue an optional SQS-fragment setting for one component. Agent Memories already contains a folder about this same queue change under a different title, with a HANDOFF and a BRIEF; no development mode is specified.",
-      "expected_output": "Uses full mode by default, searches shallowly for the existing memory, confirms the matching objective from HANDOFF or BRIEF, and reuses it. Presents Analysis and Planning before editing and does not demand approval at each phase or create a duplicate folder.",
+      "expected_output": "Uses full mode by default, searches shallowly for the existing memory, confirms the matching objective from HANDOFF or BRIEF, and reuses it. Presents Analysis and the ordered plan, then ends the turn awaiting explicit plan approval before source edits. Does not demand approval at each phase or create a duplicate folder.",
       "expectations": [
         "Reuses the matching memory despite the different folder name.",
-        "Presents the full-mode phases in order, with a plan before any edit.",
+        "Presents the ordered tasks, affected files and checks, and waits for plan approval before source edits.",
         "Does not ask to create a duplicate memory folder."
       ],
       "files": []
@@ -15,9 +15,10 @@
     {
       "id": 2,
       "prompt": "In light mode, adjust the English description of a parameter in one non-shared local CloudFormation template; no resource behavior, callers or deployment path changes.",
-      "expected_output": "Uses light mode for this isolated edit, shows Analysis, Planning, Implementation and Verification as concise separate updates, and does not create a task-memory folder solely for the phase names.",
+      "expected_output": "Uses light mode for this isolated edit, presents a concise analysis and plan naming the file and proposed inspection, then ends the turn awaiting approval before editing. After approval, continues to Implementation and Verification without a new task-memory folder or repeated phase approvals.",
       "expectations": [
         "Keeps the four phases visible and ordered.",
+        "Does not bypass the plan-approval gate because the edit is small or light mode was requested.",
         "Does not create a new task-memory folder."
       ],
       "files": []
@@ -161,10 +162,10 @@
     {
       "id": 15,
       "prompt": "In full mode, update only the existing dev CloudWatch alarm ConsumerAgeAlarm in pn-example/storage.yaml: change its threshold from 300 to 600 seconds. Keep the metric, comparison operator, periods, notification topic and all other environments unchanged. Acceptance: the dev alarm threshold is 600 and no unrelated behavior changes. The current branch and existing task-memory folder are confirmed; available sources contain the named alarm and dev configuration.",
-      "expected_output": "Uses the supplied outcome, scope and acceptance criteria as the brief, resolves source facts by inspection and proceeds through the visible phases without a redundant requirements interview. The plan and verification refer to the same criteria and do not add flags, recipients, environments or infrastructure beyond the request.",
+      "expected_output": "Uses the supplied outcome, scope and acceptance criteria as the brief and resolves source facts by inspection without a redundant requirements interview. Presents ordered changes, affected files and checks, then awaits explicit plan approval before implementation. After approval, verification refers to the same criteria without adding flags, recipients, environments or infrastructure beyond the request.",
       "expectations": [
         "Does not ask the user to repeat the threshold, environment, recipient or already confirmed branch/memory.",
-        "Presents a plan before editing and ties changes and checks to the supplied acceptance criteria.",
+        "Presents the plan and ends the turn awaiting approval before editing; confirmed branch and memory do not approve an unseen plan.",
         "Preserves unrelated settings and environments.",
         "Reports actual verification evidence and limits without claiming deployment was tested."
       ],
@@ -173,50 +174,86 @@
     {
       "id": 16,
       "prompt": "Continue Planning for SEND queue-consumer monitoring. Earlier answers in this same task, also recorded as approved in BRIEF and DECISIONS, specify dev CORE only, an oldest-message-age threshold of 600 seconds, and the existing warning route for the Infra team. The branch and memory are confirmed. An existing alarm fragment and routing configuration are available; no requirement or execution authority has changed.",
-      "expected_output": "Reuses the confirmed answers, verifies the available fragment and route rather than asking the user again, and links the proposed changes and checks to the recorded criteria. It distinguishes technical implementation choices from requirements and operational authorization, without inventing missing approvals or widening scope.",
+      "expected_output": "Reuses the confirmed answers, verifies the available fragment and route rather than asking the user again, and links the proposed changes and checks to the recorded criteria. Presents the implementation plan and waits for approval, distinguishing confirmed requirements from approval of that plan and from operational authorization.",
       "expectations": [
         "Reuses the confirmed domain, environment, threshold and recipient without reopening the same interview.",
         "Checks the actual fragment/routing evidence instead of assuming it matches the recorded requirement.",
         "Links plan steps and verification to the existing brief criteria.",
-        "Does not interpret confirmed design decisions as authorization to deploy or modify other environments."
+        "Does not interpret confirmed requirements as approval of an unpresented implementation plan or authority to deploy."
       ],
       "files": []
     },
     {
       "id": 17,
-      "prompt": "Complete the approved PN-90017 change. All required checks passed. An unrelated file is already staged, but the approved changes are safely separable. Use the normal automatic local commit.",
-      "expected_output": "Creates a local commit containing only the approved changes with a subject starting PN-90017, without a Co-authored-by trailer unless higher-priority client rules require it. Preserves the unrelated file and its staged state. Reports the commit identifier; does not merge or push.",
+      "prompt": "/pn-infra-agent-implement PN-90010. The branch and existing task-memory folder are confirmed. BRIEF contains clear requirements, but PLAN is missing and no implementation plan has been presented to me. The source is available for inspection.",
+      "expected_output": "Reads the source and confirmed context, prepares and presents the ordered plan with affected files and checks, then ends the turn for approval. The implement command does not authorize an unseen plan; no source edits or implementation commands occur.",
+      "expectations": [
+        "Does not edit source or execute implementation commands before plan presentation and approval.",
+        "Presents a concrete plan rather than asking for blind approval to implement.",
+        "Reuses the approved branch and memory without repeating those questions."
+      ],
+      "files": []
+    },
+    {
+      "id": 18,
+      "prompt": "/pn-infra-agent-implement. Implement the exact two-task dev-only plan presented in the previous message: update the existing alarm parameter and its dev cfg, then inspect the diff and editor diagnostics. Both files, the branch and memory are confirmed; sources and requirements still match. Do not deploy or access AWS.",
+      "expected_output": "Treats the command as explicit approval of the specific just-presented plan, implements both covered tasks and performs only the planned permitted verification. Records the scope and actual approval, without asking again for every file or phase or expanding to AWS operations.",
+      "expectations": [
+        "Proceeds within the exact presented plan without redundant approval prompts.",
+        "Preserves unrelated changes and records actual verification limits.",
+        "Does not infer deployment, live AWS or Git integration authority.",
+        "Stops before committing if the Jira task key is missing."
+      ],
+      "files": []
+    },
+    {
+      "id": 19,
+      "prompt": "Continue the approved dev-only plan to update one component's alarm configuration. New source evidence shows that the requested result would also require changing a shared fragment contract and a second component in CONFINFO, neither included in the approved files or scope.",
+      "expected_output": "Stops the dependent implementation, explains the newly discovered scope and compatibility impact, presents the revised plan and waits for explicit approval. Keeps any prior valid work and decisions, without treating approval of the original plan as authority for the new component or shared contract.",
+      "expectations": [
+        "Does not edit the newly affected shared fragment or second component before renewed approval.",
+        "Explains material changes to files, domains and compatibility in a reviewable revised plan.",
+        "Does not discard prior work or reopen unrelated confirmed decisions."
+      ],
+      "files": []
+    },
+    {
+      "id": 20,
+      "prompt": "Use the pn-infra skill directly to develop the following change; I am using the default agent without a custom persona or slash command. Update only the existing dev alarm threshold from 300 to 600 seconds in pn-example. The current branch, existing memory and acceptance criteria are confirmed, and the relevant sources are available. No implementation plan has been shown to me.",
+      "expected_output": "Applies the development gate from the skill itself, inspects the sources, and presents the implementation strategy, ordered tasks, affected files and proposed checks. Ends the turn asking for approval before source changes; a custom persona or plan command is not required for this behavior.",
+      "expectations": [
+        "Does not require the user to invoke a slash command or select a custom agent to obtain the approval gate.",
+        "Presents strategy, ordered tasks, file purposes and acceptance-linked checks before asking for approval.",
+        "Does not edit source or treat the initial development request as approval of an unseen plan.",
+        "Reuses confirmed requirements, branch and memory without repeating those questions."
+      ],
+      "files": []
+    },
+    {
+      "id": 21,
+      "prompt": "Complete the approved PN-90021 change. All required checks passed, the approved changes are safely separable and no unrelated files need to be included. I want the normal automatic local commit.",
+      "expected_output": "Creates a local commit containing only the approved changes with a subject starting PN-90021, without a Co-authored-by trailer unless higher-priority client rules require it. Reports the commit identifier; does not merge or push.",
       "expectations": [
         "Commits only approved, verified changes with the correct Jira key prefix.",
-        "Preserves unrelated staged and unstaged work.",
         "Honors the no-trailer preference when permitted by the client.",
         "Does not merge, push or deploy."
       ],
       "files": []
     },
     {
-      "id": 18,
-      "prompt": "Finish an approved local development change with passing required checks, but no Jira task key has been provided or confirmed. Create a local commit now.",
-      "expected_output": "Asks the user to identify the Jira task and does not commit or invent a task key.",
+      "id": 22,
+      "prompt": "Finish an approved local development change, but its Jira task key is unknown and a required check failed. Create a local commit now.",
+      "expected_output": "Reports the failed check and missing task key, asks the user to identify the task, and does not commit until the prerequisites are satisfied.",
       "expectations": [
         "Does not invent a Jira key.",
-        "Stops before committing until the task key is known."
-      ],
-      "files": []
-    },
-    {
-      "id": 19,
-      "prompt": "Finish approved PN-90019 development. A required check failed; create the local commit anyway.",
-      "expected_output": "Reports the failed required check and stops without committing or presenting verification as successful.",
-      "expectations": [
         "Does not commit after a failed required check.",
-        "Reports the failed check explicitly without bypassing it."
+        "Reports the blocker explicitly."
       ],
       "files": []
     },
     {
-      "id": 20,
-      "prompt": "Complete approved PN-90020 development with passing checks, but a modified file contains inseparable unrelated staged or unstaged edits.",
+      "id": 23,
+      "prompt": "Complete approved PN-90023 development with passing checks, but a modified file contains inseparable unrelated staged or unstaged edits.",
       "expected_output": "Preserves all unrelated changes, explains that safe commit scope is unresolved and stops without committing or resetting the worktree.",
       "expectations": [
         "Does not include unrelated edits in the commit.",
@@ -226,22 +263,12 @@
       "files": []
     },
     {
-      "id": 21,
-      "prompt": "Review the local diff for PN-90021 and report findings only. The diff is clean and checks pass.",
+      "id": 24,
+      "prompt": "Review the local diff for PN-90024 and report findings only. The diff is clean and checks pass.",
       "expected_output": "Performs a read-only review and does not create a commit, even though a Jira key and passing checks are available.",
       "expectations": [
         "Preserves source files and Git state.",
         "Does not commit as a consequence of a review-only request."
-      ],
-      "files": []
-    },
-    {
-      "id": 22,
-      "prompt": "Finish approved PN-90022 development with passing required checks. Leave my changes uncommitted.",
-      "expected_output": "Reports the implementation and verification results and leaves the changes uncommitted as explicitly requested.",
-      "expectations": [
-        "Respects the user's explicit refusal of automatic commits.",
-        "Does not merge, push or deploy."
       ],
       "files": []
     }

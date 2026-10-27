@@ -16,6 +16,8 @@ Reuse the same acceptance criteria across BRIEF, PLAN, TASKS and EVIDENCE; use s
 
 Record revision and working-tree metadata only when already available or needed to work correctly. Otherwise mark it as unavailable; these fields do not require additional Git commands.
 
+For development, PLAN presents ordered tasks, affected files and purposes, checks and expected results. Record proposed/approved status, actual user confirmation and the scope it covers in PLAN or the existing decision record; HANDOFF identifies whether implementation is waiting for approval. A material revision returns to proposed status until approved. Reuse existing artifacts instead of adding an approval file. In light mode the presented plan and approval can remain in the conversation.
+
 Candidate learnings use a decision record with type `candidate learning`, applicability and a proposed shared destination. They remain proposed until the user approves promotion.
 
 ## Epic planning additions

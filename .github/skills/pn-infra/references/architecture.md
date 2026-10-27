@@ -91,7 +91,8 @@ This document collects SEND architectural and infrastructure patterns and guidel
 
 #### SEND examples
 
-* Technical alarms for the Warning Notification Dispatcher publish to the warning topic; `pn-send-pdnd-automation` uses the same topic for its alarms.
+* Technical alarms for the Warning Notification Dispatcher publish to the standard topic through `AlarmSNSTopicArn` in `runtime-infra/pn-warning-notifications.yaml`, keeping dispatcher-health alerts independent of the warning dispatcher they monitor.
+* `pn-send-pdnd-automation` uses the warning topic for its alarms.
 
 ## 2. Infrastructure as Code design patterns
 

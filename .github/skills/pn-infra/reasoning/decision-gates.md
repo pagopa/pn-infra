@@ -1,10 +1,12 @@
 # Material decision gates
 
-Match the gate to the change, not to a fixed lifecycle.
+Interactive development always requires approval of the presented plan before source implementation. Apply the other gates only when relevant; do not require repeated approval for every phase or file.
 
 | Situation | Required decision |
 | --- | --- |
-| Clear local change within approved scope | Proceed with proportionate verification; no additional ceremony. |
+| Initial development request, including a clear local change or light mode | Analyze, present the ordered plan with affected files and proposed checks, then end the turn and await explicit approval before source implementation. |
+| Current plan already presented and explicitly approved | Implement the covered tasks and verify proportionately, without asking again for each file or phase. |
+| Material change to the approved plan | Present the revised scope/files, behavior or risks and obtain approval before the affected implementation. |
 | Material requirement unresolved: outcome, scope, behavior, recipients, environments or acceptance | Check available evidence, then ask the user before finalizing the dependent plan or implementation. Continue independent work; reuse confirmed answers. |
 | Unresolved cross-account access or rollout choice | Resolve the design decision before implementing the dependent design; distinguish it from authorization to execute an operation. |
 | Stream starting position, replay, persistent-data replacement or deletion | Explain continuity and data impact; obtain explicit authorization for the proposed change. |

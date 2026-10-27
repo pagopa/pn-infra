@@ -10,6 +10,15 @@
 
 The toolkit combines these references with project-specific operating policies. Repository evidence establishes the current implementation; historical examples are not proof that every component follows a convention.
 
+### Repository checks
+
+- 2026-10-27: The Warning Notification Dispatcher example in the architecture
+  reference was reconciled with
+  [pn-warning-notifications.yaml](../runtime-infra/pn-warning-notifications.yaml).
+  Its technical alarms pass `AlarmSNSTopicArn` to the alarm fragment;
+  `WarningSNSTopicArn` supplies the dispatcher's warning-notification path.
+  This is source-wiring evidence, not deployed-state validation.
+
 ## Skill and workflow design
 
 | Source | Contribution |

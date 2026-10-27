@@ -17,6 +17,7 @@ Read this contract before selecting a workflow or using tools: **MUST NOT → MU
 
 ### MUST NOT
 
+- Begin source implementation before presenting the current plan and receiving explicit user approval of it. An initial request to develop or fix something is not approval of a plan the user has not yet seen.
 - Perform remote Git operations (`push`, `pull`, `fetch`) in these workflows. GitHub API reads do not authorize Git synchronization.
 - Merge, rebase and cherry-pick remain manual. Wait for user integration before dependent tasks. Do not automatically stash, reset, destructively restore or clean files.
 - Do not create a commit in a review workflow, before the approved development changes pass required verification, without an identified Jira task key, or when unrelated changes cannot be safely excluded.
@@ -32,6 +33,7 @@ Read this contract before selecting a workflow or using tools: **MUST NOT → MU
 
 ### MUST
 
+- In interactive development, prepare and present the plan in full and light mode, then end the turn and wait for approval before source edits. Follow the single plan-approval gate in [development.md](workflows/development.md), including ordinary requests without a slash command.
 - Prefer repository code, local SEND references and confirmed task decisions for SEND-specific behavior.
 - Before finalizing a development plan, establish the requested outcome, scope and observable acceptance criteria. Resolve facts from sources; ask about material requirements the evidence cannot settle. Reuse prior answers and pause only the dependent work instead of inventing the missing requirement.
 - Use [external AWS knowledge](references/external-aws-knowledge.md) only for material AWS semantics, current service or regional information, or architectural uncertainty that local sources do not settle; do not invoke it for a simple change already established by code and the skill references. Prefer AWS Knowledge MCP Server, the public, unauthenticated documentation service. Identify its exposed tools independently of the local server alias; it does not access the user's AWS resources.
@@ -54,7 +56,7 @@ Read this contract before selecting a workflow or using tools: **MUST NOT → MU
 - Read supplied Jira tasks/epics and relevant Confluence pages through available Atlassian MCP capabilities, following [Atlassian context](references/atlassian-context.md); otherwise offer consensual setup or user-provided text.
 - Create or update an agreed local task-documentation folder, including PR metadata, complete diff and findings without source edits.
 - Create or select only local branches listed in an approved per-repository strategy, using `feature/PN-<number>` for features and an explicit local base.
-- Edit only local files within the approved task scope after Planning.
+- Edit only local files within the explicitly approved implementation plan and task scope.
 - Create a local commit for approved and verified development work under the local commit procedure; this does not authorize integration or remote synchronization.
 - Run the minimum read-only local checks needed in Verification.
 - Consult approved read-only external knowledge sources when a material AWS question cannot be resolved from local evidence.
@@ -67,7 +69,7 @@ Prefer existing dev configuration where applicable.
 Select the procedure from the user's intent:
 
 - Explanation or analysis: consult the relevant references and local sources; answer directly.
-- Development: read [development.md](workflows/development.md). Its four named phases are mandatory; use `full` by default and `light` only when the user explicitly requests it and the change qualifies.
+- Development: read [development.md](workflows/development.md). Its four named phases and plan approval before implementation are mandatory; use `full` by default and `light` only when the user explicitly requests it and the change qualifies. `/pn-infra-agent-plan` prepares the plan and stops; `/pn-infra-agent-implement` follows the same approval gate rather than bypassing it.
 - Local review of workspace files or a local diff: read [local-review.md](workflows/local-review.md).
 - Review of a GitHub pull request: read [pr-review.md](workflows/pr-review.md), then the shared finding criteria in [local-review.md](workflows/local-review.md). Neither review mode authorizes source edits or requires an implementation interview. Both review modes may write only agreed local review documentation, as described in their workflows.
 

@@ -10,7 +10,7 @@ source_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 repository_dir="$(cd "$source_dir/.." && pwd)"
 workspace="$(cd "$1" && pwd)"
 # Refuse aliases and duplicate installations before changing anything.
-for rel in .github .github/skills .github/agents .github/instructions .agents .agents/skills .pn-infra-toolkit-backups; do
+for rel in .github .github/skills .github/agents .github/instructions .github/prompts .agents .agents/skills .pn-infra-toolkit-backups; do
   if [[ -L "$workspace/$rel" || ( -e "$workspace/$rel" && ! -d "$workspace/$rel" ) ]]; then
     echo "Unsupported directory or symbolic link: $workspace/$rel" >&2
     exit 1
@@ -24,13 +24,23 @@ for rel in .agents/skills/pn-infra .agents/skills/pn-infra-ai-toolkit .github/sk
   fi
 done
 
-sources=(".github/skills/pn-infra" ".github/agents/pn-infra.agent.md" ".github/instructions/pn-infra-ai-toolkit.instructions.md")
-targets=(".github/skills/pn-infra" ".github/agents/pn-infra.agent.md" ".github/instructions/pn-infra-ai-toolkit.instructions.md")
-for i in 0 1 2; do
+sources=(
+  ".github/skills/pn-infra"
+  ".github/agents/pn-infra.agent.md"
+  ".github/instructions/pn-infra-ai-toolkit.instructions.md"
+  ".github/prompts/pn-infra-agent-plan.prompt.md"
+  ".github/prompts/pn-infra-agent-implement.prompt.md"
+)
+targets=("${sources[@]}")
+for i in "${!sources[@]}"; do
   src="$repository_dir/${sources[$i]}"
   dst="$workspace/${targets[$i]}"
   if [[ ! -e "$src" || -L "$src" || -L "$dst" ]]; then
     echo "Missing source or unsupported symbolic link: $src -> $dst" >&2
+    exit 1
+  fi
+  if [[ "$i" == 0 && ! -d "$src" || "$i" != 0 && ! -f "$src" ]]; then
+    echo "Unexpected source type: $src" >&2
     exit 1
   fi
   if [[ -e "$dst" ]]; then
@@ -42,7 +52,7 @@ for i in 0 1 2; do
 done
 
 backup=""
-for i in 0 1 2; do
+for i in "${!sources[@]}"; do
   src="$repository_dir/${sources[$i]}"
   dst="$workspace/${targets[$i]}"
   if [[ -e "$dst" ]] && diff -qr "$src" "$dst" >/dev/null 2>&1; then
@@ -68,8 +78,9 @@ for i in 0 1 2; do
   fi
   echo "Installed: ${targets[$i]}"
 done
-echo "Skill (including evals/fixtures), persona and instructions installed."
+echo "Skill (including evals/fixtures), persona, instructions and both prompt commands installed."
 echo "Open a new Copilot chat and select pn-infra-agent."
+echo "Use /pn-infra-agent-plan to prepare a plan, then /pn-infra-agent-implement after explicit approval."
 
 if [[ "${2:-}" != "--configure-approvals" ]]; then
   exit 0
