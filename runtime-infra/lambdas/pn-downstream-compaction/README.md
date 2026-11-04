@@ -18,6 +18,12 @@ Use Node.js **24.18.0 or newer**, required by the pinned Parquet dependency.
 The infrastructure reuses `LambdaJSRuntime` (default `nodejs24.x`); verify that the
 runtime available in the target environment satisfies this minimum before activation.
 
+Thrift 0.24.0 loads `uuid` with CommonJS `require()`, but its declared uuid 14
+dependency is ESM-only. A scoped npm override pins Thrift's uuid to 11.1.1,
+which provides the required APIs through a CommonJS entry point. Keep the override
+until the upstream dependency supports loading without experimental ESM interop.
+Tests disable `require(esm)` to catch Lambda initialization failures locally.
+
 The complete query, download, consolidation and upload must fit within the Lambda
 timeout. A deadline ten seconds before termination reserves time for cancellation
 and cleanup. The implementation downloads one input file at a time and writes a

@@ -7,7 +7,7 @@
     "node": ">=24.18.0"
   },
   "scripts": {
-    "test": "node --test src/test/*.test.js",
+    "test": "node --no-experimental-require-module --test src/test/*.test.js",
     "test-build": "npm test && npm run build",
     "build": "npm prune --omit=dev && rm -f ./function.zip && zip -rq ./function.zip index.js lib node_modules package.json package-lock.json"
   },
@@ -15,5 +15,10 @@
     "@aws-sdk/client-athena": "3.1079.0",
     "@aws-sdk/client-s3": "3.1079.0",
     "@dsnp/parquetjs": "1.9.4"
+  },
+  "overrides": {
+    "thrift@0.24.0": {
+      "uuid": "11.1.1"
+    }
   }
 }
