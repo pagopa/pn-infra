@@ -25,6 +25,11 @@ const ENV = {
   PARTITION_SETTLE_SECONDS: '120',
 };
 const EVENT = { mode: 'manual', partitionHour: '2026-01-01T10' };
+const SCHEDULED_EVENT = {
+  mode: 'scheduled',
+  scheduleArn: 'arn:aws:scheduler:eu-south-1:123456789012:schedule/default/pn-downstream-compaction',
+  scheduledTime: '2026-01-01T10:05:00Z',
+};
 const context = id => ({ awsRequestId: id, getRemainingTimeInMillis: () => 900000 });
 const etag = buffer => `"${createHash('sha256').update(buffer).digest('hex')}"`;
 
@@ -52,7 +57,10 @@ async function fixture(t) {
     await writer.close();
     buffers.push(await readFile(path));
   }
-  const state = { final: new Map(), queries: [], failure: undefined, empty: false, corrupt: false, puts: [] };
+  const state = {
+    final: new Map(), queries: [], failure: undefined, empty: false, corrupt: false,
+    puts: [], writeAttempts: [], onMissingHead: undefined,
+  };
   mock.method(AthenaClient.prototype, 'send', async command => {
     const input = command.input;
     switch (command.constructor.name) {
@@ -63,7 +71,12 @@ async function fixture(t) {
         assert.equal((input.QueryString.match(/"hour" = '10'/g) || []).length, 2);
         assert.equal(input.ClientRequestToken.length, 64);
         const prefix = input.QueryString.match(/TO 's3:\/\/fixture-monitoring\/([^']+)'/)[1];
-        state.queries.push({ id: `query-${state.queries.length + 1}`, prefix });
+        const existing = state.queries.find(query => query.token === input.ClientRequestToken);
+        if (existing) return { QueryExecutionId: existing.id };
+        state.queries.push({
+          id: `query-${state.queries.length + 1}`, prefix,
+          token: input.ClientRequestToken, empty: state.empty,
+        });
         return { QueryExecutionId: state.queries.at(-1).id };
       }
       case 'GetQueryExecutionCommand':
@@ -72,11 +85,11 @@ async function fixture(t) {
       case 'GetQueryResultsCommand': {
         const query = state.queries.find(candidate => candidate.id === input.QueryExecutionId);
         const index = input.NextToken ? 1 : 0;
-        const rows = state.empty ? [] : [{ Data: [{ VarCharValue: `s3://fixture-monitoring/${query.prefix}${index}.parquet` }] }];
+        const rows = query.empty ? [] : [{ Data: [{ VarCharValue: `s3://fixture-monitoring/${query.prefix}${index}.parquet` }] }];
         if (!input.NextToken) rows.unshift({ Data: [{ VarCharValue: 'file_path' }] });
         return {
           ResultSet: { ResultSetMetadata: { ColumnInfo: [{ Name: 'file_path' }] }, Rows: rows },
-          ...(!state.empty && !input.NextToken ? { NextToken: 'second-file' } : {}),
+          ...(!query.empty && !input.NextToken ? { NextToken: 'second-file' } : {}),
         };
       }
       default: throw new Error(`Unexpected Athena command: ${command.constructor.name}`);
@@ -86,13 +99,23 @@ async function fixture(t) {
     const input = command.input;
     switch (command.constructor.name) {
       case 'HeadObjectCommand': {
-        if (!state.final.has(input.Key)) throw Object.assign(new Error('missing'), { name: 'NotFound' });
+        if (!state.final.has(input.Key)) {
+          state.onMissingHead?.(input.Key);
+          throw Object.assign(new Error('missing'), { name: 'NotFound' });
+        }
         return { ETag: etag(state.final.get(input.Key)) };
       }
       case 'GetObjectCommand':
         return { Body: Readable.from(state.corrupt ? Buffer.from('not parquet') : buffers[Number(input.Key.at(-9))]) };
       case 'PutObjectCommand': {
         const previous = state.final.get(input.Key);
+        state.writeAttempts.push(input);
+        if ((input.IfNoneMatch === '*' && previous)
+            || (input.IfMatch && (!previous || input.IfMatch !== etag(previous)))) {
+          throw Object.assign(new Error('S3 precondition failed'), {
+            name: 'PreconditionFailed', $metadata: { httpStatusCode: 412 },
+          });
+        }
         assert.equal(input.IfMatch, previous ? etag(previous) : undefined);
         assert.equal(input.IfNoneMatch, previous ? undefined : '*');
         const chunks = [];
@@ -161,19 +184,67 @@ test('zero rows replaces an old nonempty file with a valid empty Parquet', async
   assert.equal(second.rows, 0);
 });
 
-test('Scheduler context selects the nominal hour and keeps a stable identity across delivery attempts', async t => {
+test('Scheduler selects the nominal hour and skips duplicate deliveries of an existing output', async t => {
   const state = await fixture(t);
-  const event = {
-    mode: 'scheduled',
-    scheduleArn: 'arn:aws:scheduler:eu-south-1:123456789012:schedule/default/pn-downstream-compaction',
-    scheduledTime: '2026-01-01T10:05:00Z',
-  };
-  const first = await handler(event, context('delivery-1'));
-  const second = await handler(event, context('delivery-2'));
+  const first = await handler(SCHEDULED_EVENT, context('delivery-1'));
+  const second = await handler(SCHEDULED_EVENT, context('delivery-2'));
   assert.equal(first.partitionHour, '2026-01-01T10');
+  assert.equal(first.status, 'published');
+  assert.equal(second.status, 'already_published');
   assert.equal(second.key, first.key);
   assert.equal(state.final.size, 1);
+  assert.equal(state.queries.length, 1);
+  assert.equal(state.puts.length, 1);
+});
+
+test('Scheduler keeps a stable query identity when retrying an unpublished output', async t => {
+  const state = await fixture(t);
+  const first = await handler(SCHEDULED_EVENT, context('delivery-1'));
+  state.final.delete(first.key);
+  await handler(SCHEDULED_EVENT, context('delivery-2'));
+  assert.equal(state.queries.length, 1);
+  assert.equal(state.puts.length, 2);
   assert.equal(state.puts[0].Metadata['compaction-id'], state.puts[1].Metadata['compaction-id']);
+});
+
+test('stale scheduled delivery cannot overwrite a manually refreshed output', async t => {
+  const state = await fixture(t);
+  const first = await handler(SCHEDULED_EVENT, context('scheduled-first'));
+  state.empty = true;
+  const refreshed = await handler(EVENT, context('manual-refresh'));
+  const refreshedBuffer = state.final.get(first.key);
+  assert.equal(refreshed.rows, 0);
+  assert.deepEqual(await readRecords(refreshedBuffer), []);
+  const duplicate = await handler(SCHEDULED_EVENT, context('scheduled-duplicate'));
+  assert.equal(duplicate.status, 'already_published');
+  assert.equal(state.final.get(first.key), refreshedBuffer);
+  assert.equal(state.queries.length, 2);
+  assert.equal(state.puts.length, 2);
+});
+
+test('a scheduled delivery skips output first published manually', async t => {
+  const state = await fixture(t);
+  const first = await handler(EVENT, context('manual-first'));
+  const previous = state.final.get(first.key);
+  const result = await handler(SCHEDULED_EVENT, context('scheduled-late'));
+  assert.equal(result.status, 'already_published');
+  assert.equal(state.final.get(first.key), previous);
+  assert.equal(state.queries.length, 1);
+  assert.equal(state.puts.length, 1);
+});
+
+test('scheduled publication fails if an output appears after the initial absence check', async t => {
+  const state = await fixture(t);
+  const first = await handler(EVENT, context('fixture-output'));
+  const refreshed = state.final.get(first.key);
+  state.final.delete(first.key);
+  state.empty = true;
+  state.onMissingHead = key => state.final.set(key, refreshed);
+  await assert.rejects(handler(SCHEDULED_EVENT, context('scheduled-race')), { name: 'PreconditionFailed' });
+  assert.equal(state.writeAttempts.at(-1).IfNoneMatch, '*');
+  assert.equal(state.writeAttempts.at(-1).IfMatch, undefined);
+  assert.equal(state.final.get(first.key), refreshed);
+  assert.equal(state.puts.length, 1);
 });
 
 test('rejects invalid configuration, overlapping prefixes and implicit manual hours', async t => {

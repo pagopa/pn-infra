@@ -92,6 +92,10 @@ async function run(event, context, controller) {
   const stagingPrefix = `${config.stagingPrefix}/${partition.path}/${runId}/`;
   const key = `${config.outputPrefix}/${partition.path}/data.parquet`;
   const previousETag = await previousObject(config.bucket, key, controller.signal);
+  if (event.mode === 'scheduled' && previousETag) {
+    console.log(`Skipping scheduled compaction for ${partition.hour}: output already exists`);
+    return { status: 'already_published', partitionHour: partition.hour, key };
+  }
   const query = buildQuery(config, partition, stagingPrefix);
   const queryId = await executeQuery(athena, config, query, runId, controller.signal);
   const directory = await mkdtemp(join(tmpdir(), 'downstream-compaction-'));
@@ -124,7 +128,7 @@ async function run(event, context, controller) {
       Key: key,
       ContentType: 'application/vnd.apache.parquet',
       Metadata: { 'compaction-id': runId, 'row-count': String(rows), 'query-id': queryId },
-      ...(previousETag ? { IfMatch: previousETag } : { IfNoneMatch: '*' }),
+      ...(event.mode === 'manual' && previousETag ? { IfMatch: previousETag } : { IfNoneMatch: '*' }),
     }, controller.signal);
     console.log(`Published ${rows} rows (${size} bytes) for ${partition.hour}: s3://${config.bucket}/${key}, query ${queryId}`);
     return { status: 'published', partitionHour: partition.hour, key, rows, bytes: size, queryId };

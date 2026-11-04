@@ -54,6 +54,12 @@ role restricted to invoking this Lambda. Its trust policy is scoped to the curre
 account and default Scheduler schedule group. Schedule ARN plus nominal time form
 the stable request identity, rather than the per-attempt execution ID.
 
+Scheduled mode only creates missing hourly outputs. If the final object already
+exists, it logs a skip and returns `status: already_published` without querying
+Athena or uploading. Only manual mode can replace an existing hourly output.
+This prevents delayed or duplicate scheduled deliveries from republishing an old
+Athena result over a manually refreshed file.
+
 To reprocess an hour, invoke with an explicit local partition hour:
 
 ```json
@@ -92,9 +98,11 @@ The missing spring hour is never synthesized.
    Small files use `PutObject`; larger files use multipart upload completed only
    after every part succeeds. The previous file is not deleted first.
 
-Reserved concurrency is one. Conditional writes also compare the previous ETag,
-or require absence for the initial publication, so a conflicting writer produces
-an error instead of silently replacing a newer result.
+Reserved concurrency is one. Scheduled writes always require object absence
+(`IfNoneMatch: '*'`), including at multipart completion. Manual replacements compare
+the previous ETag, or require absence for initial publication. If an object appears
+or changes after the initial check, the conditional write fails explicitly instead
+of overwriting it; this conflict is not reported as a successful skip.
 
 Failures are logged with `ERROR` and rethrown, allowing the existing Lambda alarm
 fragment to observe invocation errors. Investigate the query ID and error before
