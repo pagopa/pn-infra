@@ -38,6 +38,33 @@ test('multipart upload replaces the same key only on completion and retains the 
   assert.equal(complete.MultipartUpload.Parts.length, 2);
 });
 
+test('create-only multipart completion preserves the absence precondition and aborts on conflict', async t => {
+  const file = await largeFile(t);
+  const commands = [];
+  const conflict = Object.assign(new Error('object already exists'), { name: 'PreconditionFailed' });
+  const client = {
+    async send(command) {
+      commands.push(command.constructor.name);
+      if (command.constructor.name === 'CreateMultipartUploadCommand') return { UploadId: 'upload' };
+      if (command.constructor.name === 'UploadPartCommand') return { ETag: `part-${command.input.PartNumber}` };
+      if (command.constructor.name === 'CompleteMultipartUploadCommand') {
+        assert.equal(command.input.IfNoneMatch, '*');
+        assert.equal(command.input.IfMatch, undefined);
+        throw conflict;
+      }
+      assert.equal(command.constructor.name, 'AbortMultipartUploadCommand');
+      return {};
+    },
+  };
+  await assert.rejects(publishFile(client, file.path, file.size,
+    { Bucket: 'bucket', Key: 'hour.parquet', IfNoneMatch: '*' },
+    new AbortController().signal), error => error === conflict);
+  assert.deepEqual(commands, [
+    'CreateMultipartUploadCommand', 'UploadPartCommand', 'UploadPartCommand',
+    'CompleteMultipartUploadCommand', 'AbortMultipartUploadCommand',
+  ]);
+});
+
 test('failed multipart upload is aborted without completing or deleting the previous object', async t => {
   const file = await largeFile(t);
   const commands = [];

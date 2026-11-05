@@ -10,7 +10,7 @@ s3://<CORE DataMonitoringBucket>/<OUTPUT_PREFIX>/YYYY/MM/DD/HH/data.parquet
 The default published prefix is `downstream-compacted`. Source JSON, intermediate
 Athena files and Athena query metadata use separate prefixes. A rerun replaces the
 same final key; it does not append another file or update a Glue output partition.
-PN-22249 defines the output table and reader permissions independently.
+PN-22249 defines the output table independently, reusing existing reader permissions.
 
 ## Runtime and resources
 
@@ -54,6 +54,12 @@ role restricted to invoking this Lambda. Its trust policy is scoped to the curre
 account and default Scheduler schedule group. Schedule ARN plus nominal time form
 the stable request identity, rather than the per-attempt execution ID.
 
+Scheduled mode only creates missing hourly outputs. If the final object already
+exists, it logs a skip and returns `status: already_published` without querying
+Athena or uploading. Only manual mode can replace an existing hourly output.
+This prevents delayed or duplicate scheduled deliveries from republishing an old
+Athena result over a manually refreshed file.
+
 To reprocess an hour, invoke with an explicit local partition hour:
 
 ```json
@@ -92,9 +98,11 @@ The missing spring hour is never synthesized.
    Small files use `PutObject`; larger files use multipart upload completed only
    after every part succeeds. The previous file is not deleted first.
 
-Reserved concurrency is one. Conditional writes also compare the previous ETag,
-or require absence for the initial publication, so a conflicting writer produces
-an error instead of silently replacing a newer result.
+Reserved concurrency is one. Scheduled writes always require object absence
+(`IfNoneMatch: '*'`), including at multipart completion. Manual replacements compare
+the previous ETag, or require absence for initial publication. If an object appears
+or changes after the initial check, the conditional write fails explicitly instead
+of overwriting it; this conflict is not reported as a successful skip.
 
 Failures are logged with `ERROR` and rethrown, allowing the existing Lambda alarm
 fragment to observe invocation errors. Investigate the query ID and error before
@@ -132,6 +140,98 @@ For promoted environments, apply schedule/configuration through the existing
 `pn-configuration` release process with separate authorization. Keep schema and
 the stable final path aligned with PN-22249; its table must not scan staging or
 query-result prefixes.
+
+## Reading the compacted output (PN-22249)
+
+The CORE data monitoring stack defines `downstream_monitoring_compacted` in the
+existing Glue database selected by `CriticalMonitoringGlueDatabaseName` (default
+`monitoring_database`) and the existing CORE Data Catalog. It does not create
+another database or catalog, and the table is not created in CONFINFO.
+
+The external table reads Parquet with Snappy compression from
+`s3://<DataMonitoringBucket>/<DownstreamCompactionOutputPrefix>/`. It projects
+`year`, `month`, `day` and `hour` onto the `YYYY/MM/DD/HH/` directories, with
+two-digit month/day/hour values and years 2024 through 2099, matching the source
+tables. These are Europe/Rome ingestion partitions, including the shared repeated
+autumn hour, not partitions derived from each record's event timestamp.
+No crawler, partition registration, `MSCK REPAIR TABLE` or Glue update by the
+compaction Lambda is needed when publishing or replacing an hourly file.
+
+The twelve application columns retain the source names and types: `eventType`,
+`timestamp`, `clientName`, `method`, `url`, `host`, `outcome`, `errorType` and
+`errorMessage` are strings; `status` is int, `success` is boolean and `durationMs`
+is bigint. Partition keys are strings and are not stored in the Parquet payload.
+There is no additional origin column. Source JSON, staging and Athena query
+results are outside the table location.
+
+Use the existing readers and workgroup/result location. Readers need Glue read
+access to this table and its database/catalog, S3 read/list access to the published
+prefix, and their existing Athena execution/result permissions. The existing
+QuickSight access is managed manually; this change adds no IAM policy, role,
+QuickSight dataset/dashboard change or cross-account grant. Verify effective
+access using the actual reader before rollout, rather than an administrator.
+The compaction Lambda's existing write permissions are unchanged.
+
+### Environment acceptance queries
+
+These queries are examples, not automated deployment steps. Run them only in an
+authorized environment, after a known hour has been published. Replace the
+database name if configured differently and choose the actual hour to validate.
+Disable Athena query-result reuse for post-replacement checks.
+
+```sql
+SELECT "$path" AS file_path, count(*) AS records
+FROM monitoring_database.downstream_monitoring_compacted
+WHERE year = '2026' AND month = '11' AND day = '04' AND hour = '10'
+GROUP BY "$path";
+```
+
+For a nonempty hour, the only path must be
+`s3://<bucket>/<output-prefix>/2026/11/04/10/data.parquet`. An empty result alone
+does not distinguish an absent file from a valid empty Parquet: confirm successful
+publication and the final object's presence separately.
+
+Compare all records, preserving duplicates, against the two source partitions:
+
+```sql
+WITH source_records AS (
+  SELECT eventType, "timestamp", clientName, method, url, host, status,
+         success, outcome, durationMs, errorType, errorMessage
+  FROM monitoring_database.downstream_monitoring_core
+  WHERE year = '2026' AND month = '11' AND day = '04' AND hour = '10'
+  UNION ALL
+  SELECT eventType, "timestamp", clientName, method, url, host, status,
+         success, outcome, durationMs, errorType, errorMessage
+  FROM monitoring_database.downstream_monitoring_confinfo
+  WHERE year = '2026' AND month = '11' AND day = '04' AND hour = '10'
+),
+record_deltas AS (
+  SELECT eventType, "timestamp", clientName, method, url, host, status,
+         success, outcome, durationMs, errorType, errorMessage, 1 AS delta
+  FROM source_records
+  UNION ALL
+  SELECT eventType, "timestamp", clientName, method, url, host, status,
+         success, outcome, durationMs, errorType, errorMessage, -1 AS delta
+  FROM monitoring_database.downstream_monitoring_compacted
+  WHERE year = '2026' AND month = '11' AND day = '04' AND hour = '10'
+)
+SELECT eventType, "timestamp", clientName, method, url, host, status,
+       success, outcome, durationMs, errorType, errorMessage,
+       sum(delta) AS source_minus_compacted
+FROM record_deltas
+GROUP BY eventType, "timestamp", clientName, method, url, host, status,
+         success, outcome, durationMs, errorType, errorMessage
+HAVING sum(delta) <> 0;
+```
+
+Expected result: no differences for a complete, settled source hour. Use
+distinguishable fixtures from both domains and confirm they are present in the
+source partitions; two empty sources are not evidence of cross-domain ingestion.
+Repeat the path and content checks after an explicitly authorized manual
+recalculation: the key stays the same and only the complete new content is read,
+without appended versions. Also check a known empty published hour and adjacent
+partitions. These live checks, source freshness and peak sizing are not established
+by local tests or static template diagnostics.
 
 ## Local checks and packaging
 
