@@ -243,5 +243,13 @@ npm run test-build
 Tests use the native Node runner and mocked AWS clients; they do not query AWS.
 `test-build` runs tests then builds `function.zip`, including runtime dependencies
 but not tests or documentation. The existing multilambda builder discovers the
-directory automatically. Environment checks are still required to establish
+directory automatically. The direct Athena and S3 clients are development
+dependencies for local tests; the deployed function can use AWS SDK v3 from the
+Node.js Lambda runtime. The S3 client required transitively by Parquet remains a
+production dependency and is not stripped from the ZIP. Module resolution can
+therefore also use that packaged client where available. An extracted ZIP needs
+an external SDK to resolve clients not bundled, such as Athena. Local SDK versions
+do not certify the managed runtime's SDK version or behavior.
+
+Environment checks are still required to establish
 cross-account access, Athena-produced Parquet compatibility and peak throughput.

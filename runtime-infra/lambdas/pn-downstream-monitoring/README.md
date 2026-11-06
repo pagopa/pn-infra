@@ -93,10 +93,14 @@ timestamps or assume an already compacted hour will be updated automatically.
 
 ## Verification and release
 
-Run `npm test` for handler tests and real SDK retry/deadline tests against an
+Run `npm ci --ignore-scripts` followed by `npm test` for handler tests and real SDK retry/deadline tests against an
 in-process HTTP endpoint using dummy credentials, without AWS access. The existing
 `npm run build` packages production dependencies and excludes `src/test`.
-Check that the ZIP loads in isolation without runtime-provided SDK modules.
+The AWS client is a development dependency for local tests, not included in the
+production ZIP. The deployed Lambda uses AWS SDK v3 provided by its Node.js
+runtime. Local checks must supply an external SDK when loading the extracted ZIP,
+and confirm it is not bundled. The runtime's SDK version can differ from the
+locally locked version; verify retry behavior in dev before promotion.
 
 With separate deployment authorization, test both domains in dev: controlled
 asynchronous failure, DLQ delivery, alarm notification and manual recovery.
