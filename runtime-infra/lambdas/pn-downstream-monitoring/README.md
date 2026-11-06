@@ -1,4 +1,4 @@
-# Downstream monitoring
+   # Downstream monitoring
 
 The CloudWatch Logs subscription invokes this Lambda asynchronously. Each non-empty
 batch produces one NDJSON object under
@@ -24,6 +24,9 @@ undo a PUT that S3 has already committed.
 
 An upload may fail before all attempts are used if the budget or SDK retry quota
 is exhausted. Logs report duration and available SDK attempt/delay/error metadata.
+Upload failures and skipped non-JSON records are logged at WARN, not ERROR.
+Upload errors are still thrown: Lambda can emit its own invocation error log and
+increment the native Errors metric. This change does not disable those signals.
 The Lambda log envelope supplies the invocation ID. No additional payload logging
 is introduced.
 
@@ -40,8 +43,10 @@ and a visible-message alarm (threshold 1 by default). The role may only send to
 that queue. The nested stack and queue are retained on removal/replacement;
 messages still expire according to retention.
 
-Existing Lambda Errors/log alarms remain in place. A separate `DeadLetterErrors`
-alarm reports failure to deliver to the DLQ. Both paths use the existing standard
+Existing Lambda Errors/log alarms remain in place. Skipped non-JSON records no
+longer feed the ERROR-log metric; their warning logs remain available for
+investigation. A separate `DeadLetterErrors` alarm reports failure to deliver to
+the DLQ, independently of log severity. Both paths use the existing standard
 alarm topic. The parent exposes the delivery alarm's threshold, period, evaluation
 periods and datapoints to alarm; datapoints must not exceed evaluation periods.
 

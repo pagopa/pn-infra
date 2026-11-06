@@ -65,7 +65,9 @@ test('three SlowDown responses are retried with identical key and body, then suc
     }
 });
 
-test('persistent SlowDown fails after one attempt and three retries', async () => {
+test('persistent SlowDown logs a warning and fails after one attempt and three retries', async t => {
+    const warning = t.mock.method(console, 'warn', () => {});
+    const errorLog = t.mock.method(console, 'error', () => {});
     responses = [503, 503, 503, 503];
     const upload = loadUpload();
     await assert.rejects(upload('test-bucket', 'batch.json', 'data', 60000), error => {
@@ -74,6 +76,11 @@ test('persistent SlowDown fails after one attempt and three retries', async () =
         return true;
     });
     assert.equal(requests.length, 4);
+    assert.equal(warning.mock.callCount(), 1);
+    assert.equal(warning.mock.calls[0].arguments[0], 'S3 upload failed');
+    assert.equal(warning.mock.calls[0].arguments[1].name, 'SlowDown');
+    assert.equal(warning.mock.calls[0].arguments[1].attempts, 4);
+    assert.equal(errorLog.mock.callCount(), 0);
 });
 
 test('zero retries makes exactly one attempt', async () => {

@@ -55,7 +55,7 @@ async function uploadFileToS3(bucket, key, content, remainingTimeMs) {
         });
         return response;
     } catch (error) {
-        console.error("S3 upload failed", {
+        console.warn("S3 upload failed", {
             name: error.name,
             httpStatusCode: error.$metadata?.httpStatusCode,
             attempts: error.$metadata?.attempts,

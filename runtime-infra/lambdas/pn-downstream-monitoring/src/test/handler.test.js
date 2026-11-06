@@ -39,12 +39,17 @@ test('empty batches do not upload', async t => {
     assert.equal(upload.mock.callCount(), 0);
 });
 
-test('invalid JSON retains the existing skip behavior without discarding valid records', async t => {
+test('invalid JSON logs a warning and skips without discarding valid records', async t => {
+    const warning = t.mock.method(console, 'warn', () => {});
+    const errorLog = t.mock.method(console, 'error', () => {});
     const upload = t.mock.method(s3, 'uploadFileToS3', async () => {});
     const valid = { destination: 'valid' };
     await loadHandler()(event(['not-json', JSON.stringify({ message: JSON.stringify(valid) })]), context);
     assert.equal(upload.mock.callCount(), 1);
     assert.equal(upload.mock.calls[0].arguments[2], JSON.stringify(valid));
+    assert.equal(warning.mock.callCount(), 1);
+    assert.equal(warning.mock.calls[0].arguments[0], 'Skipping non-JSON log event:');
+    assert.equal(errorLog.mock.callCount(), 0);
 });
 
 test('upload failures propagate instead of returning success', async t => {
