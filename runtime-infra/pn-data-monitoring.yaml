@@ -2289,17 +2289,6 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
-  PnDownstreamMonitoringLambdaAlarms:
-    DependsOn:
-      - PnDownstreamMonitoringLambdaLogGroup
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
-      Parameters:
-        FunctionName: !Ref PnDownstreamMonitoringLambda
-        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        FilterPattern: "ERROR"
-
   DownstreamMonitoringDeadLetterErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:

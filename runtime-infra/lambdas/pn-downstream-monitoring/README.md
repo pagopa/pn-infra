@@ -43,12 +43,20 @@ and a visible-message alarm (threshold 1 by default). The role may only send to
 that queue. The nested stack and queue are retained on removal/replacement;
 messages still expire according to retention.
 
-Existing Lambda Errors/log alarms remain in place. Skipped non-JSON records no
-longer feed the ERROR-log metric; their warning logs remain available for
-investigation. A separate `DeadLetterErrors` alarm reports failure to deliver to
-the DLQ, independently of log severity. Both paths use the existing standard
+The generic combined Lambda Errors/ERROR-log alarm is deliberately not configured
+for this function: failed attempts can be recovered by asynchronous retries, and
+terminal failures are reported through the DLQ. The log group, native Errors
+metric and runtime error logs remain available for investigation. Skipped
+non-JSON records remain visible as WARN logs, without a dedicated alarm.
+
+A separate `DeadLetterErrors` alarm reports failure to deliver to the DLQ,
+independently of log severity. Both DLQ alarm paths use the existing standard
 alarm topic. The parent exposes the delivery alarm's threshold, period, evaluation
 periods and datapoints to alarm; datapoints must not exceed evaluation periods.
+
+An authorized stack deployment removes the previous function-specific alarm
+nested stack and its ERROR-log metric filter. This local template change does not
+remove deployed alarms until that update runs; other functions' alarms are unchanged.
 
 The three retry layers are independent:
 
