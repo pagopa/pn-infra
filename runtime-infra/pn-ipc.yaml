@@ -599,14 +599,14 @@ Resources:
           Value: "pn-external-registries"
 
   ### Communication FROM pn-kafka-bridge TO pn-notification-cost-service ###
-  PaymentEventsToVerifyQueue:
+  KafkaBridge2NotificationServiceQueue:
     Type: AWS::CloudFormation::Stack
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
       TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
       Parameters:
-        QueueName: !Sub '${ProjectName}-payment-events-to-verify'
+        QueueName: !Sub '${ProjectName}-kafka-bridge_to_notification-service'
         DelaySeconds: 1
         AlarmSNSTopicName: !Ref AlarmSNSTopicName
       Tags:
@@ -1155,21 +1155,21 @@ Outputs:
     Description: pn-kafka-bridge onboarding institutes output queue age alarm ARN
 
   # pn-kafka-bridge TO pn-notification-cost-service payment events
-  PaymentEventsToVerifyQueueName:
-    Value: !GetAtt PaymentEventsToVerifyQueue.Outputs.QueueName
-    Description: Payment events to verify queue name
-  PaymentEventsToVerifyQueueURL:
-    Value: !GetAtt PaymentEventsToVerifyQueue.Outputs.QueueURL
-    Description: Payment events to verify queue URL
-  PaymentEventsToVerifyQueueARN:
-    Value: !GetAtt PaymentEventsToVerifyQueue.Outputs.QueueARN
-    Description: Payment events to verify queue ARN
-  PaymentEventsToVerifyQueueAlarmARN:
-    Value: !GetAtt PaymentEventsToVerifyQueue.Outputs.SqsDLQAlarmArn
-    Description: Payment events to verify queue alarm ARN
-  PaymentEventsToVerifyQueueAgeAlarmARN:
-    Value: !GetAtt PaymentEventsToVerifyQueue.Outputs.SqsAgeAlarmArn
-    Description: Payment events to verify queue age alarm ARN
+  KafkaBridge2NotificationServiceQueueName:
+    Value: !GetAtt KafkaBridge2NotificationServiceQueue.Outputs.QueueName
+    Description: Events from pn-kafka-bridge TO pn-notification-cost-service queue name
+  KafkaBridge2NotificationServiceQueueURL:
+    Value: !GetAtt KafkaBridge2NotificationServiceQueue.Outputs.QueueURL
+    Description: Events from pn-kafka-bridge TO pn-notification-cost-service queue URL
+  KafkaBridge2NotificationServiceQueueARN:
+    Value: !GetAtt KafkaBridge2NotificationServiceQueue.Outputs.QueueARN
+    Description: Events from pn-kafka-bridge TO pn-notification-cost-service queue ARN
+  KafkaBridge2NotificationServiceQueueAlarmARN:
+    Value: !GetAtt KafkaBridge2NotificationServiceQueue.Outputs.SqsDLQAlarmArn
+    Description: Events from pn-kafka-bridge TO pn-notification-cost-service alarm ARN
+  KafkaBridge2NotificationServiceQueueAgeAlarmARN:
+    Value: !GetAtt KafkaBridge2NotificationServiceQueue.Outputs.SqsAgeAlarmArn
+    Description: Events from pn-kafka-bridge TO pn-notification-cost-service age alarm ARN
 
   # Downtime Logs composite alarm queue
   DowntimeLogsAggregateAlarmQueueName:
