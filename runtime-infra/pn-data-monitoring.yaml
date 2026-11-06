@@ -305,6 +305,56 @@ Parameters:
     Description: Reserved concurrent executions for the Lambda Downstream Monitoring function
     Default: 10
 
+  LambdaDownstreamMonitoringS3MaxRetries:
+    Type: Number
+    Description: Maximum S3 retries after the initial upload attempt
+    Default: 3
+    AllowedValues: [0, 1, 2, 3]
+
+  LambdaDownstreamMonitoringS3UploadBudgetSeconds:
+    Type: Number
+    Description: Total S3 upload budget in seconds, also bounded by remaining Lambda time minus 5 seconds
+    Default: 45
+    MinValue: 1
+    MaxValue: 900
+
+  DownstreamMonitoringDLQRetentionSeconds:
+    Type: Number
+    Description: Retention of failed downstream batches in seconds
+    Default: 1209600
+    MinValue: 60
+    MaxValue: 1209600
+
+  DownstreamMonitoringDLQMessageThreshold:
+    Type: Number
+    Description: Visible DLQ messages required to raise the queue alarm
+    Default: 1
+    MinValue: 1
+
+  DownstreamMonitoringDeadLetterErrorsThreshold:
+    Type: Number
+    Description: Failed deliveries to the downstream DLQ required to raise an alarm
+    Default: 1
+    MinValue: 1
+
+  DownstreamMonitoringDeadLetterErrorsPeriodSeconds:
+    Type: Number
+    Description: Evaluation period for downstream DLQ delivery failures in seconds
+    Default: 60
+    AllowedValues: [60, 120, 180, 240, 300, 600, 900, 1800, 3600]
+
+  DownstreamMonitoringDeadLetterErrorsEvaluationPeriods:
+    Type: Number
+    Description: Periods evaluated for downstream DLQ delivery failures
+    Default: 1
+    MinValue: 1
+
+  DownstreamMonitoringDeadLetterErrorsDatapointsToAlarm:
+    Type: Number
+    Description: Breaching datapoints required to raise the downstream DLQ delivery alarm
+    Default: 1
+    MinValue: 1
+
   DownstreamCompactionCronExpression:
     Type: String
     Description: Hourly compaction schedule in Europe/Rome, allowing source uploads to finish
@@ -2152,6 +2202,22 @@ Resources:
       EventSourceArn: !GetAtt CriticalMonitoringNotificationEventsQueue.Outputs.QueueARN
       FunctionName: !Ref PnCriticalMonitoringNotificationAnalyzerLambda
 
+  DownstreamMonitoringDLQ:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-downstream-monitoring-lambda-DLQ'
+        HasDLQ: 'false'
+        QueueHasAlarm: 'true'
+        SqsManagedSseEnabled: 'true'
+        MessageRetentionPeriod: !Ref DownstreamMonitoringDLQRetentionSeconds
+        MessageQueueThreshold: !Ref DownstreamMonitoringDLQMessageThreshold
+        OncallDLQIncreasingLimitThreshold: 0
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
   PnDownstreamMonitoringLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -2161,12 +2227,16 @@ Resources:
       ReservedConcurrentExecutions: !Ref LambdaDownstreamMonitoringReservedConcurrentExecutions
       Handler: index.handler
       FunctionName: pn-downstream-monitoring-lambda
+      DeadLetterConfig:
+        TargetArn: !GetAtt DownstreamMonitoringDLQ.Outputs.QueueARN
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/pn-downstream-monitoring.zip
       Environment:
         Variables:
           MONITORING_BUCKET_NAME: !Sub ${DataMonitoringBucket}/downstream-http-call
+          S3_MAX_RETRIES: !Ref LambdaDownstreamMonitoringS3MaxRetries
+          S3_UPLOAD_BUDGET_SECONDS: !Ref LambdaDownstreamMonitoringS3UploadBudgetSeconds
       Role:
         Fn::GetAtt:
           - PnDownstreamMonitoringLambdaRole
@@ -2187,6 +2257,9 @@ Resources:
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt DownstreamMonitoringDLQ.Outputs.QueueARN
               - Effect: Allow
                 Action:
                   - s3:ListBucket
@@ -2216,16 +2289,27 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
-  PnDownstreamMonitoringLambdaAlarms:
-    DependsOn:
-      - PnDownstreamMonitoringLambdaLogGroup
-    Type: AWS::CloudFormation::Stack
+  DownstreamMonitoringDeadLetterErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
     Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
-      Parameters:
-        FunctionName: !Ref PnDownstreamMonitoringLambda
-        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        FilterPattern: "ERROR"
+      AlarmName: !Sub "${PnDownstreamMonitoringLambda}-DeadLetterErrors"
+      AlarmDescription: Failed delivery of downstream monitoring batches to the DLQ
+      Namespace: AWS/Lambda
+      MetricName: DeadLetterErrors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref PnDownstreamMonitoringLambda
+      Statistic: Sum
+      Period: !Ref DownstreamMonitoringDeadLetterErrorsPeriodSeconds
+      EvaluationPeriods: !Ref DownstreamMonitoringDeadLetterErrorsEvaluationPeriods
+      DatapointsToAlarm: !Ref DownstreamMonitoringDeadLetterErrorsDatapointsToAlarm
+      Threshold: !Ref DownstreamMonitoringDeadLetterErrorsThreshold
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
 
   PnDownstreamMonitoringLambdaInvokePermission:
     Type: AWS::Lambda::Permission
