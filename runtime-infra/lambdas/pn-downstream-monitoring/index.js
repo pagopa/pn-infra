@@ -55,7 +55,7 @@ function buildS3Key(date) {
   return `${prefix}${year}/${month}/${day}/${hour}/${randomUUID()}.json`;
 }
 
-exports.handler = async (event) => {
+exports.handler = async (event, context) => {
   const logData = await decodeLogData(event.awslogs.data);
 
   console.log(`Processing log group: ${logData.logGroup}, stream: ${logData.logStream}, events: ${logData.logEvents.length}`);
@@ -78,6 +78,6 @@ exports.handler = async (event) => {
   const key = buildS3Key(partitionDate);
   const body = records.map(r => JSON.stringify(r)).join('\n');
 
-  await uploadFileToS3(BUCKET_NAME, key, body);
+  await uploadFileToS3(BUCKET_NAME, key, body, context.getRemainingTimeInMillis());
   console.log(`Written ${records.length} record(s) to s3://${BUCKET_NAME}/${key}`);
 };
