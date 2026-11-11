@@ -844,6 +844,8 @@ Resources:
       EventBusName: !Ref PnCoreEventBus
       EventPattern:
         detail-type: [ "ExternalChannelOutcomeEvent" ]
+        source:
+          - anything-but: "PAPER ENRICHER"
         detail:
           clientId: [ !Ref PaperChannelExtChUser ]
           analogMail:
