@@ -304,6 +304,136 @@ Parameters:
     Type: Number
     Description: Reserved concurrent executions for the Lambda Downstream Monitoring function
     Default: 10
+
+  LambdaDownstreamMonitoringS3MaxRetries:
+    Type: Number
+    Description: Maximum S3 retries after the initial upload attempt
+    Default: 3
+    AllowedValues: [0, 1, 2, 3]
+
+  LambdaDownstreamMonitoringS3UploadBudgetSeconds:
+    Type: Number
+    Description: Total S3 upload budget in seconds, also bounded by remaining Lambda time minus 5 seconds
+    Default: 45
+    MinValue: 1
+    MaxValue: 900
+
+  DownstreamMonitoringDLQRetentionSeconds:
+    Type: Number
+    Description: Retention of failed downstream batches in seconds
+    Default: 1209600
+    MinValue: 60
+    MaxValue: 1209600
+
+  DownstreamMonitoringDLQMessageThreshold:
+    Type: Number
+    Description: Visible DLQ messages required to raise the queue alarm
+    Default: 1
+    MinValue: 1
+
+  DownstreamMonitoringDeadLetterErrorsThreshold:
+    Type: Number
+    Description: Failed deliveries to the downstream DLQ required to raise an alarm
+    Default: 1
+    MinValue: 1
+
+  DownstreamMonitoringDeadLetterErrorsPeriodSeconds:
+    Type: Number
+    Description: Evaluation period for downstream DLQ delivery failures in seconds
+    Default: 60
+    AllowedValues: [60, 120, 180, 240, 300, 600, 900, 1800, 3600]
+
+  DownstreamMonitoringDeadLetterErrorsEvaluationPeriods:
+    Type: Number
+    Description: Periods evaluated for downstream DLQ delivery failures
+    Default: 1
+    MinValue: 1
+
+  DownstreamMonitoringDeadLetterErrorsDatapointsToAlarm:
+    Type: Number
+    Description: Breaching datapoints required to raise the downstream DLQ delivery alarm
+    Default: 1
+    MinValue: 1
+
+  DownstreamCompactionCronExpression:
+    Type: String
+    Description: Hourly compaction schedule in Europe/Rome, allowing source uploads to finish
+    Default: 'cron(5 * * * ? *)'
+
+  DownstreamCompactionScheduleState:
+    Type: String
+    Description: State of the hourly downstream compaction schedule
+    Default: DISABLED
+    AllowedValues: [ENABLED, DISABLED]
+
+  DownstreamCompactionMemorySize:
+    Type: Number
+    Description: Memory in MB for downstream Parquet consolidation
+    Default: 1024
+    MinValue: 128
+    MaxValue: 10240
+
+  DownstreamCompactionTimeoutSeconds:
+    Type: Number
+    Description: Maximum duration in seconds including query, consolidation and upload
+    Default: 900
+    MinValue: 30
+    MaxValue: 900
+
+  DownstreamCompactionEphemeralStorageSize:
+    Type: Number
+    Description: Temporary storage in MB for the final file and one input file
+    Default: 4096
+    MinValue: 512
+    MaxValue: 10240
+
+  DownstreamCompactionPartitionSettleSeconds:
+    Type: Number
+    Description: Minimum seconds after the source partition closes before compaction
+    Default: 120
+    MinValue: 0
+
+  DownstreamCompactionAthenaWorkgroup:
+    Type: String
+    Description: Existing Athena workgroup used for downstream compaction
+    Default: primary
+    AllowedPattern: '[a-zA-Z0-9._-]+'
+
+  DownstreamCompactionOutputPrefix:
+    Type: String
+    Description: S3 prefix containing only the published hourly Parquet files
+    Default: downstream-compacted
+    AllowedPattern: '[a-zA-Z0-9][a-zA-Z0-9/_-]*[a-zA-Z0-9_-]'
+
+  DownstreamCompactionStagingPrefix:
+    Type: String
+    Description: Separate S3 prefix for intermediate Athena Parquet files
+    Default: downstream-compaction-staging
+    AllowedPattern: '[a-zA-Z0-9][a-zA-Z0-9/_-]*[a-zA-Z0-9_-]'
+
+  DownstreamCompactionResultsPrefix:
+    Type: String
+    Description: Separate S3 prefix for Athena query metadata and manifests
+    Default: downstream-compaction-query-results
+    AllowedPattern: '[a-zA-Z0-9][a-zA-Z0-9/_-]*[a-zA-Z0-9_-]'
+
+  DownstreamCompactionAlarmPeriodSeconds:
+    Type: Number
+    Description: Alarm evaluation period in seconds
+    Default: 60
+    AllowedValues: [60, 120, 300, 600, 900]
+
+  DownstreamCompactionAlarmEvaluationPeriods:
+    Type: Number
+    Description: Number of periods evaluated by the compaction error alarm
+    Default: 1
+    MinValue: 1
+
+  DownstreamCompactionAlarmDatapointsToAlarm:
+    Type: Number
+    Description: Number of breaching datapoints required for the compaction error alarm
+    Default: 1
+    MinValue: 1
   
   EnableDataMonitoringCodeBuild:
     Type: String
@@ -357,6 +487,13 @@ Parameters:
     Type: String
     Description: Secrets Manager secret name containing GitHub token
     Default: 'github-token'
+
+Rules:
+  RequireConfinfoMonitoringSourceInCore:
+    RuleCondition: !Equals [!Ref PnCoreAwsAccountId, '']
+    Assertions:
+      - Assert: !Not [!Equals [!Ref ConfinfoDynamoDbExportBucketName, '']]
+        AssertDescription: CORE requires the CONFINFO data monitoring bucket for its downstream source table
 
 Conditions:
   IsConfinfoAccount: !Not [ !Equals [!Ref PnCoreAwsAccountId, '' ] ]
@@ -427,6 +564,7 @@ Resources:
               AWS: !Sub "arn:${AWS::Partition}:iam::${PnCoreAwsAccountId}:root"
             Action:
               - "s3:List*"
+              - "s3:GetBucketLocation"
             Resource:
               - !Sub "arn:aws:s3:::${DataMonitoringBucket}"
             Condition:
@@ -2064,6 +2202,22 @@ Resources:
       EventSourceArn: !GetAtt CriticalMonitoringNotificationEventsQueue.Outputs.QueueARN
       FunctionName: !Ref PnCriticalMonitoringNotificationAnalyzerLambda
 
+  DownstreamMonitoringDLQ:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-downstream-monitoring-lambda-DLQ'
+        HasDLQ: 'false'
+        QueueHasAlarm: 'true'
+        SqsManagedSseEnabled: 'true'
+        MessageRetentionPeriod: !Ref DownstreamMonitoringDLQRetentionSeconds
+        MessageQueueThreshold: !Ref DownstreamMonitoringDLQMessageThreshold
+        OncallDLQIncreasingLimitThreshold: 0
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+
   PnDownstreamMonitoringLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -2073,12 +2227,16 @@ Resources:
       ReservedConcurrentExecutions: !Ref LambdaDownstreamMonitoringReservedConcurrentExecutions
       Handler: index.handler
       FunctionName: pn-downstream-monitoring-lambda
+      DeadLetterConfig:
+        TargetArn: !GetAtt DownstreamMonitoringDLQ.Outputs.QueueARN
       Code:
         S3Bucket: !Ref LambdasBucketName
         S3Key: !Sub ${LambdasBasePath}/pn-downstream-monitoring.zip
       Environment:
         Variables:
           MONITORING_BUCKET_NAME: !Sub ${DataMonitoringBucket}/downstream-http-call
+          S3_MAX_RETRIES: !Ref LambdaDownstreamMonitoringS3MaxRetries
+          S3_UPLOAD_BUDGET_SECONDS: !Ref LambdaDownstreamMonitoringS3UploadBudgetSeconds
       Role:
         Fn::GetAtt:
           - PnDownstreamMonitoringLambdaRole
@@ -2099,6 +2257,9 @@ Resources:
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt DownstreamMonitoringDLQ.Outputs.QueueARN
               - Effect: Allow
                 Action:
                   - s3:ListBucket
@@ -2128,16 +2289,27 @@ Resources:
         LogGroupRetention: !Ref LogRetention
         LogGroupPrefix: /aws/lambda
 
-  PnDownstreamMonitoringLambdaAlarms:
-    DependsOn:
-      - PnDownstreamMonitoringLambdaLogGroup
-    Type: AWS::CloudFormation::Stack
+  DownstreamMonitoringDeadLetterErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
     Properties:
-      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml"
-      Parameters:
-        FunctionName: !Ref PnDownstreamMonitoringLambda
-        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
-        FilterPattern: "ERROR"
+      AlarmName: !Sub "${PnDownstreamMonitoringLambda}-DeadLetterErrors"
+      AlarmDescription: Failed delivery of downstream monitoring batches to the DLQ
+      Namespace: AWS/Lambda
+      MetricName: DeadLetterErrors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref PnDownstreamMonitoringLambda
+      Statistic: Sum
+      Period: !Ref DownstreamMonitoringDeadLetterErrorsPeriodSeconds
+      EvaluationPeriods: !Ref DownstreamMonitoringDeadLetterErrorsEvaluationPeriods
+      DatapointsToAlarm: !Ref DownstreamMonitoringDeadLetterErrorsDatapointsToAlarm
+      Threshold: !Ref DownstreamMonitoringDeadLetterErrorsThreshold
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
 
   PnDownstreamMonitoringLambdaInvokePermission:
     Type: AWS::Lambda::Permission
@@ -2147,6 +2319,184 @@ Resources:
       Principal: !Sub "logs.${AWS::Region}.amazonaws.com"
       SourceArn: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*"
       SourceAccount: !Ref AWS::AccountId
+
+  DownstreamCompactionLambda:
+    Type: AWS::Lambda::Function
+    Condition: IsCoreAccount
+    Properties:
+      FunctionName: pn-downstream-compaction
+      Runtime: !Ref LambdaJSRuntime
+      Handler: index.handler
+      Timeout: !Ref DownstreamCompactionTimeoutSeconds
+      MemorySize: !Ref DownstreamCompactionMemorySize
+      EphemeralStorage:
+        Size: !Ref DownstreamCompactionEphemeralStorageSize
+      ReservedConcurrentExecutions: 1
+      Role: !GetAtt DownstreamCompactionLambdaRole.Arn
+      Code:
+        S3Bucket: !Ref LambdasBucketName
+        S3Key: !Sub ${LambdasBasePath}/pn-downstream-compaction.zip
+      Environment:
+        Variables:
+          OUTPUT_BUCKET: !Ref DataMonitoringBucket
+          ATHENA_DATABASE: !Ref CriticalMonitoringGlueDatabaseName
+          CORE_TABLE: !Ref DownstreamMonitoringCoreGlueTable
+          CONFINFO_TABLE: !Ref DownstreamMonitoringConfinfoGlueTable
+          ATHENA_WORKGROUP: !Ref DownstreamCompactionAthenaWorkgroup
+          OUTPUT_PREFIX: !Ref DownstreamCompactionOutputPrefix
+          STAGING_PREFIX: !Ref DownstreamCompactionStagingPrefix
+          RESULTS_PREFIX: !Ref DownstreamCompactionResultsPrefix
+          PARTITION_SETTLE_SECONDS: !Ref DownstreamCompactionPartitionSettleSeconds
+
+  DownstreamCompactionLambdaRole:
+    Type: AWS::IAM::Role
+    Condition: IsCoreAccount
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DownstreamCompaction
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - athena:StartQueryExecution
+                  - athena:GetQueryExecution
+                  - athena:GetQueryResults
+                  - athena:StopQueryExecution
+                  - athena:GetWorkGroup
+                Resource: !Sub arn:${AWS::Partition}:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${DownstreamCompactionAthenaWorkgroup}
+              - Effect: Allow
+                Action:
+                  - glue:GetDatabase
+                  - glue:GetTable
+                  - glue:GetPartitions
+                  - glue:GetPartition
+                Resource:
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:database/${CriticalMonitoringGlueDatabaseName}
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:table/${CriticalMonitoringGlueDatabaseName}/downstream_monitoring_core
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:table/${CriticalMonitoringGlueDatabaseName}/downstream_monitoring_confinfo
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                Resource:
+                  - !GetAtt DataMonitoringBucket.Arn
+                  - !Sub arn:${AWS::Partition}:s3:::${ConfinfoDynamoDbExportBucketName}
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt DataMonitoringBucket.Arn
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ConfinfoDynamoDbExportBucketName}
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - downstream-http-call
+                      - downstream-http-call/*
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  - !Sub ${DataMonitoringBucket.Arn}/downstream-http-call/*
+                  - !Sub arn:${AWS::Partition}:s3:::${ConfinfoDynamoDbExportBucketName}/downstream-http-call/*
+                  - !Sub ${DataMonitoringBucket.Arn}/${DownstreamCompactionStagingPrefix}/*
+                  - !Sub ${DataMonitoringBucket.Arn}/${DownstreamCompactionResultsPrefix}/*
+                  - !Sub ${DataMonitoringBucket.Arn}/${DownstreamCompactionOutputPrefix}/*
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:AbortMultipartUpload
+                Resource:
+                  - !Sub ${DataMonitoringBucket.Arn}/${DownstreamCompactionStagingPrefix}/*
+                  - !Sub ${DataMonitoringBucket.Arn}/${DownstreamCompactionResultsPrefix}/*
+                  - !Sub ${DataMonitoringBucket.Arn}/${DownstreamCompactionOutputPrefix}/*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/pn-downstream-compaction:*
+
+  DownstreamCompactionLogGroup:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/log-group.yaml
+      Parameters:
+        LogGroupName: !Ref DownstreamCompactionLambda
+        LogGroupPrefix: /aws/lambda
+        LogGroupRetention: !Ref LogRetention
+
+  DownstreamCompactionAlarms:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCoreAccount
+    DependsOn: DownstreamCompactionLogGroup
+    Properties:
+      TemplateURL: !Sub ${TemplateBucketBaseUrl}/fragments/lambda-alarms.yaml
+      Parameters:
+        FunctionName: !Ref DownstreamCompactionLambda
+        AlarmSNSTopicArn: !Ref AlarmSNSTopicArn
+        FilterPattern: ERROR
+        Period: !Ref DownstreamCompactionAlarmPeriodSeconds
+        EvaluationPeriods: !Ref DownstreamCompactionAlarmEvaluationPeriods
+        DataPointsToAlarm: !Ref DownstreamCompactionAlarmDatapointsToAlarm
+
+  DownstreamCompactionSchedule:
+    Type: AWS::Scheduler::Schedule
+    Condition: IsCoreAccount
+    Properties:
+      Name: pn-downstream-compaction
+      Description: Compact the last closed downstream hour into one Parquet file
+      ScheduleExpression: !Ref DownstreamCompactionCronExpression
+      ScheduleExpressionTimezone: Europe/Rome
+      State: !Ref DownstreamCompactionScheduleState
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt DownstreamCompactionLambda.Arn
+        RoleArn: !GetAtt DownstreamCompactionSchedulerRole.Arn
+        Input: '{"mode":"scheduled","scheduledTime":"<aws.scheduler.scheduled-time>","scheduleArn":"<aws.scheduler.schedule-arn>"}'
+        RetryPolicy:
+          MaximumRetryAttempts: 0
+          MaximumEventAgeInSeconds: 3600
+
+  DownstreamCompactionSchedulerRole:
+    Type: AWS::IAM::Role
+    Condition: IsCoreAccount
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+                aws:SourceArn: !Sub arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule-group/default
+      Policies:
+        - PolicyName: InvokeDownstreamCompaction
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt DownstreamCompactionLambda.Arn
+
+  DownstreamCompactionAsyncConfig:
+    Type: AWS::Lambda::EventInvokeConfig
+    Condition: IsCoreAccount
+    Properties:
+      FunctionName: !Ref DownstreamCompactionLambda
+      Qualifier: $LATEST
+      MaximumRetryAttempts: 0
+      MaximumEventAgeInSeconds: 3600
 
   CriticalMonitoringGlueDatabase:
     Type: AWS::Glue::Database
@@ -2335,9 +2685,9 @@ Resources:
           projection.hour.type: integer
           projection.hour.range: 0,23
           projection.hour.digits: '2'
-          storage.location.template: !Sub s3://${DataMonitoringBucket}/downstream-http-call/${!year}/${!month}/${!day}/${!hour}/
+          storage.location.template: !Sub s3://${ConfinfoDynamoDbExportBucketName}/downstream-http-call/${!year}/${!month}/${!day}/${!hour}/
         StorageDescriptor:
-          Location: !Sub s3://${DataMonitoringBucket}/downstream-http-call/
+          Location: !Sub s3://${ConfinfoDynamoDbExportBucketName}/downstream-http-call/
           InputFormat: org.apache.hadoop.mapred.TextInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
           Compressed: false
@@ -2347,6 +2697,80 @@ Resources:
             SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
             Parameters:
               paths: eventType,timestamp,clientName,method,url,host,status,success,outcome,durationMs,errorType,errorMessage
+          Columns:
+            - Name: eventType
+              Type: string
+            - Name: timestamp
+              Type: string
+            - Name: clientName
+              Type: string
+            - Name: method
+              Type: string
+            - Name: url
+              Type: string
+            - Name: host
+              Type: string
+            - Name: status
+              Type: int
+            - Name: success
+              Type: boolean
+            - Name: outcome
+              Type: string
+            - Name: durationMs
+              Type: bigint
+            - Name: errorType
+              Type: string
+            - Name: errorMessage
+              Type: string
+
+  DownstreamMonitoringCompactedGlueTable:
+    Type: AWS::Glue::Table
+    Condition: IsCoreAccount
+    DependsOn:
+      - CriticalMonitoringGlueDatabase
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref CriticalMonitoringGlueDatabaseName
+      TableInput:
+        Name: downstream_monitoring_compacted
+        Description: Hourly Parquet records combining CORE and CONFINFO downstream logs
+        TableType: EXTERNAL_TABLE
+        PartitionKeys:
+          - Name: year
+            Type: string
+          - Name: month
+            Type: string
+          - Name: day
+            Type: string
+          - Name: hour
+            Type: string
+        Parameters:
+          EXTERNAL: 'TRUE'
+          classification: parquet
+          compression.type: snappy
+          typeOfData: file
+          projection.enabled: 'true'
+          projection.year.type: integer
+          projection.year.range: 2024,2099
+          projection.month.type: integer
+          projection.month.range: 1,12
+          projection.month.digits: '2'
+          projection.day.type: integer
+          projection.day.range: 1,31
+          projection.day.digits: '2'
+          projection.hour.type: integer
+          projection.hour.range: 0,23
+          projection.hour.digits: '2'
+          storage.location.template: !Sub s3://${DataMonitoringBucket}/${DownstreamCompactionOutputPrefix}/${!year}/${!month}/${!day}/${!hour}/
+        StorageDescriptor:
+          Location: !Sub s3://${DataMonitoringBucket}/${DownstreamCompactionOutputPrefix}/
+          InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat
+          Compressed: true
+          SerdeInfo:
+            SerializationLibrary: org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe
+            Parameters:
+              serialization.format: '1'
           Columns:
             - Name: eventType
               Type: string
