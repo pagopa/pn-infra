@@ -680,6 +680,11 @@ Parameters:
     Type: String
 
 
+  LogAlarmFilterPattern:
+    Type: String
+    Default: ''
+    Description: Log alarm filter pattern override
+
   ErrorFatalLimit:
     Type: Number
     Default: '1'
@@ -800,6 +805,7 @@ Conditions:
   IsEfsMount: !Or [!Equals [ !Ref MountEfs, 'true' ], !Equals [ !Ref WireTapLogActivation, 'true' ]]
   RequiresEfsMount: !And [ !Condition IsEfsMount, !Condition HasEfsFilesystem ]
 
+  HasLogAlarmFilterPattern: !Not [ !Equals [ !Ref LogAlarmFilterPattern, '' ] ]
   LogAlarmErrorFatal: !Equals [ !Ref LogAlarmStrategyV1, 'ERROR_FATAL' ]
   LogAlarmNotNone: !Not [ !Equals [ !Ref LogAlarmStrategyV1, '-' ] ]
   HasLogAlarm: !And [ !Condition HasAlarmTopic, !Condition LogAlarmNotNone ]
@@ -2019,7 +2025,10 @@ Resources:
     Type: AWS::Logs::MetricFilter
     Properties: 
       LogGroupName: !If [ RequiresLogGroupCreation, !Ref LogGroup, !Ref EcsLogGroup ]
-      FilterPattern: !If [ LogAlarmErrorFatal, '{ $.level = "ERROR" || $.level = "FATAL" || ( $.level = "ERROR" && $.message = "* FATAL *" ) || $.message = "*ALLARM!*" }', '{ $.level = "FATAL" || ( $.level = "ERROR" && $.message = "* FATAL *" ) || $.message = "*ALLARM!*" }']
+      FilterPattern: !If
+        - HasLogAlarmFilterPattern
+        - !Ref LogAlarmFilterPattern
+        - !If [ LogAlarmErrorFatal, '{ $.level = "ERROR" || $.level = "FATAL" || ( $.level = "ERROR" && $.message = "* FATAL *" ) || $.message = "*ALLARM!*" }', '{ $.level = "FATAL" || ( $.level = "ERROR" && $.message = "* FATAL *" ) || $.message = "*ALLARM!*" }']
       MetricTransformations: 
         - MetricValue: 1
           MetricNamespace: "ErrorFatalLogs"
