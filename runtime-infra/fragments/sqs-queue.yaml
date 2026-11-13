@@ -122,6 +122,24 @@ Parameters:
     Default: 1
     Description: 'The threshold for the number of visible messages in the DLQ to trigger the alarm'
 
+  DLQHasMessagesAlarmPeriodSeconds:
+    Type: Number
+    Default: 60
+    MinValue: 60
+    Description: 'The DLQ message alarm period in seconds; must be a multiple of 60'
+
+  DLQHasMessagesAlarmDatapointsToAlarm:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    Description: 'The number of breaching datapoints required for the DLQ message alarm; must not exceed EvaluationPeriods'
+
+  DLQHasMessagesAlarmEvaluationPeriods:
+    Type: Number
+    Default: 10
+    MinValue: 1
+    Description: 'The number of periods in the DLQ message alarm evaluation window'
+
 Conditions:
   DlqHasDefaultName: !Equals [ !Ref DeadLetterQueueName, '-' ]
   DlqHasAlarm: !Not [ !Equals [ !Ref AlarmSNSTopicName, '-' ] ]
@@ -287,11 +305,12 @@ Resources:
         - Name: "QueueName"
           Value: !If [ IsNotFifo, !Sub '${DeadLetterQueue.QueueName}', !Sub '${DeadLetterQueueFifo.QueueName}' ]
       Statistic: "Sum"
-      Period: 60  
+      Period: !Ref DLQHasMessagesAlarmPeriodSeconds
       Threshold: !Ref MessageDLQThreshold
       TreatMissingData: "notBreaching"
       ComparisonOperator: "GreaterThanOrEqualToThreshold" 
-      EvaluationPeriods: 1       
+      DatapointsToAlarm: !Ref DLQHasMessagesAlarmDatapointsToAlarm
+      EvaluationPeriods: !Ref DLQHasMessagesAlarmEvaluationPeriods
       AlarmActions:
         - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AlarmSNSTopicName}'
       InsufficientDataActions:
