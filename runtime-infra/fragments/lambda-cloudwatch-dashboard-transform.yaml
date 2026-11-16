@@ -2504,3 +2504,100 @@ Resources:
       Principal: 'cloudformation.amazonaws.com'
       SourceAccount: !Ref AWS::AccountId
       SourceArn: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*
+
+  S3DashboardBodyMacro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Description: Load and parameterize a CloudWatch dashboard body from S3
+      FunctionName: !GetAtt S3DashboardTransformFunction.Arn
+      Name: S3DashboardBodyTransform
+
+  S3DashboardTransformExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: [sts:AssumeRole]
+      Path: /
+      Policies:
+        - PolicyName: S3DashboardBodyTransform
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/S3DashboardBodyTransform:*'
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}'
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::pn-datamonitoring-${AWS::Region}-${AWS::AccountId}/dashboard/*'
+
+  S3DashboardTransformFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${S3DashboardTransformFunction}
+      RetentionInDays: 14
+
+  S3DashboardTransformFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: S3DashboardBodyTransform
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+
+          s3 = boto3.client("s3")
+
+
+          def replace_parameters(value, parameters):
+              if isinstance(value, dict):
+                return {key: replace_parameters(item, parameters) for key, item in value.items()}
+              if isinstance(value, list):
+                  return [replace_parameters(item, parameters) for item in value]
+              if isinstance(value, str):
+                  for key, replacement in parameters.items():
+                      value = value.replace("${" + key + "}", str(replacement))
+              return value
+
+
+          def lambda_handler(event, context):
+              parameters = event["params"]
+              bucket_name = parameters["BucketName"]
+              template_key = parameters["TemplateKey"]
+              replacements = {
+                  key: value
+                  for key, value in parameters.items()
+                  if key not in ("BucketName", "TemplateKey")
+              }
+
+              response = s3.get_object(Bucket=bucket_name, Key=template_key)
+              dashboard = json.loads(response["Body"].read().decode("utf-8"))
+              dashboard = replace_parameters(dashboard, replacements)
+
+              return {
+                  "requestId": event["requestId"],
+                  "status": "success",
+                  "fragment": json.dumps(dashboard)
+              }
+      Handler: index.lambda_handler
+      Runtime: python3.12
+      Role: !GetAtt S3DashboardTransformExecutionRole.Arn
+
+  S3DashboardTransformFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt S3DashboardTransformFunction.Arn
+      Principal: cloudformation.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*'

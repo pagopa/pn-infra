@@ -271,6 +271,7 @@ export async function publishWarningReport({
             details: report.details,
             durationMs,
         },
+        presentation: report.presentation,
         links: report.links,
         attachment: storedReport.attachment,
     };

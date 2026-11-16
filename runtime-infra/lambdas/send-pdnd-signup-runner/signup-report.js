@@ -7,17 +7,18 @@ function createCsv(report) {
     const header = [
         'category', 'id', 'consumerId', 'tenant', 'tenantKind', 'title',
         'eService', 'institution', 'reason', 'note',
+        'categoryLabel',
     ];
     const sections = [
-        ['agreementsToReview', report.agreementsToReview],
-        ['agreementsActivated', report.agreementsActivated],
-        ['agreementsNotActivated', report.agreementsNotActivated],
-        ['purposesActivated', report.purposesActivated],
-        ['purposesNotActivated', report.purposesNotActivated],
+        ['agreementsToReview', report.agreementsToReview, 'Fruizioni generiche SEND da verificare'],
+        ['agreementsActivated', report.agreementsActivated, 'Fruizioni con e-service SEND attivate'],
+        ['agreementsNotActivated', report.agreementsNotActivated, 'Fruizioni con e-service SEND non attivate'],
+        ['purposesActivated', report.purposesActivated, 'Finalita SEND attivate'],
+        ['purposesNotActivated', report.purposesNotActivated, 'Finalita SEND non attivate'],
     ];
     const rows = [header];
 
-    for (const [category, items] of sections) {
+    for (const [category, items, categoryLabel] of sections) {
         for (const item of items || []) {
             rows.push([
                 category,
@@ -30,6 +31,7 @@ function createCsv(report) {
                 item.institution,
                 item.reason,
                 item.metadataError,
+                categoryLabel,
             ]);
         }
     }
@@ -43,13 +45,22 @@ export function buildSignupReport(result) {
         filename: 'send-pdnd-signup.csv',
         csv: createCsv(result),
         metrics: {
-            'Accordi pending': pending.producerTotal || 0,
-            'Accordi SEND': pending.sendTotal || 0,
-            'Da verificare': pending.toReviewTotal || 0,
-            'Fruizioni attivate': result.agreementsActivated?.length || 0,
-            'Fruizioni non attivate': result.agreementsNotActivated?.length || 0,
-            'Finalita attivate': result.purposesActivated?.length || 0,
-            'Finalita non attivate': result.purposesNotActivated?.length || 0,
+            'Tutte le fruizioni SEND pending': pending.producerTotal || 0,
+            'Fruizioni con e-service SEND pending': pending.sendTotal || 0,
+            'Fruizioni generiche SEND da verificare': pending.toReviewTotal || 0,
+            'Fruizioni con e-service SEND attivate': result.agreementsActivated?.length || 0,
+            'Fruizioni con e-service SEND non attivate': result.agreementsNotActivated?.length || 0,
+            'Finalita SEND attivate': result.purposesActivated?.length || 0,
+            'Finalita SEND non attivate': result.purposesNotActivated?.length || 0,
+        },
+        presentation: {
+            format: 'slack-mrkdwn',
+            body: '*Fruizioni da verificare*\n' +
+                'Riguardano e-service diversi da quello SEND configurato e sono escluse ' +
+                'dall\'approvazione automatica.\n' +
+                '*Dettaglio enti nel CSV*\n' +
+                'Include gli enti da verificare e gli esiti delle fruizioni e delle finalita, ' +
+                'con identificativi, motivi delle mancate attivazioni e note sui metadati non disponibili.',
         },
     };
 }

@@ -1,5 +1,9 @@
 {
   "type": "module",
+  "scripts": {
+    "test-build": "npm run-script build",
+    "build": "npm --silent prune --production && rm -f ./function.zip && zip -q -r ./function.zip . -x './src/test/*' -x '*.md' -x '*.env' -x '*.gitignore'"
+  },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.972.0",
     "@aws-sdk/client-dynamodb": "^3.972.0",

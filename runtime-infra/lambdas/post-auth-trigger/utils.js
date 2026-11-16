@@ -1,4 +1,4 @@
-import md5 from 'crypto-js';
+import { createHash } from 'node:crypto';
 import { PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 
 export const putObjectToS3 = async (s3Client, bucket, key, data, md5Hash) => {
@@ -28,6 +28,5 @@ export const checkIfUserExists = async (s3Client, bucket, key) => {
 };
 
 export const getMD5HashFromFile = async (file) => {
-    const hash = md5.MD5(file);
-    return hash.toString(md5.enc.Base64);
+    return createHash('md5').update(file).digest('base64');
 };

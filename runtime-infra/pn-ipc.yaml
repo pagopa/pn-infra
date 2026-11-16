@@ -200,6 +200,9 @@ Parameters:
   PortalePaCertificateArn:
     Type: String
     Default: '-'
+  PortalePtCertificateArn:
+    Type: String
+    Default: '-'
   PortalePfCertificateArn:
     Type: String
     Default: '-'    
@@ -221,6 +224,9 @@ Parameters:
   PortalePaDomain:
     Type: String
     Default: '-' 
+  PortalePtDomain:
+    Type: String
+    Default: '-'
   PortalePfDomain:
     Type: String
     Default: '-' 
@@ -591,6 +597,21 @@ Resources:
       Tags:
         - Key: "Microservice"
           Value: "pn-external-registries"
+
+  ### Communication FROM pn-kafka-bridge TO pn-notification-cost-service ###
+  KafkaBridge2NotificationCostServiceQueue:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: !Sub "${TemplateBucketBaseUrl}/fragments/sqs-queue.yaml"
+      Parameters:
+        QueueName: !Sub '${ProjectName}-kafka-bridge_to_notification-cost-service'
+        DelaySeconds: 1
+        AlarmSNSTopicName: !Ref AlarmSNSTopicName
+      Tags:
+        - Key: "Microservice"
+          Value: "pn-notification-cost-service"
 
   ### Queue that receive composite alarm information for DOWNTIME LOGS ###
   CompositeAlarmQueue:
@@ -1133,6 +1154,23 @@ Outputs:
     Value: !GetAtt KafkaBridgeOnboardingQueue.Outputs.SqsAgeAlarmArn
     Description: pn-kafka-bridge onboarding institutes output queue age alarm ARN
 
+  # pn-kafka-bridge TO pn-notification-cost-service payment events
+  KafkaBridge2NotificationCostServiceQueueName:
+    Value: !GetAtt KafkaBridge2NotificationCostServiceQueue.Outputs.QueueName
+    Description: Events from pn-kafka-bridge TO pn-notification-cost-service queue name
+  KafkaBridge2NotificationCostServiceQueueURL:
+    Value: !GetAtt KafkaBridge2NotificationCostServiceQueue.Outputs.QueueURL
+    Description: Events from pn-kafka-bridge TO pn-notification-cost-service queue URL
+  KafkaBridge2NotificationCostServiceQueueARN:
+    Value: !GetAtt KafkaBridge2NotificationCostServiceQueue.Outputs.QueueARN
+    Description: Events from pn-kafka-bridge TO pn-notification-cost-service queue ARN
+  KafkaBridge2NotificationCostServiceQueueAlarmARN:
+    Value: !GetAtt KafkaBridge2NotificationCostServiceQueue.Outputs.SqsDLQAlarmArn
+    Description: Events from pn-kafka-bridge TO pn-notification-cost-service alarm ARN
+  KafkaBridge2NotificationCostServiceQueueAgeAlarmARN:
+    Value: !GetAtt KafkaBridge2NotificationCostServiceQueue.Outputs.SqsAgeAlarmArn
+    Description: Events from pn-kafka-bridge TO pn-notification-cost-service age alarm ARN
+
   # Downtime Logs composite alarm queue
   DowntimeLogsAggregateAlarmQueueName:
     Value: !GetAtt CompositeAlarmQueue.Outputs.QueueName
@@ -1551,6 +1589,8 @@ Outputs:
     Value: !Ref CdnZoneId
   PortalePaCertificateArn:
     Value: !Ref PortalePaCertificateArn
+  PortalePtCertificateArn:
+    Value: !Ref PortalePtCertificateArn
   PortalePfCertificateArn:
     Value: !Ref PortalePfCertificateArn
   PortalePfLoginCertificateArn:
@@ -1565,6 +1605,8 @@ Outputs:
     Value: !Ref PortaleHelpdeskCertificateArn
   PortalePaDomain:
     Value: !Ref PortalePaDomain
+  PortalePtDomain:
+    Value: !Ref PortalePtDomain
   PortalePfDomain:
     Value: !Ref PortalePfDomain
   PortalePfLoginDomain:

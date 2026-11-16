@@ -37,7 +37,7 @@ La soluzione:
 
 Per ogni esecuzione viene prodotto un summary JSON con il conteggio giornaliero dei record per tabella.
 
-Quando sono presenti record in quarantena viene prodotto anche un file di dettaglio `.csv` contenente i record originali in formato JSON Lines.
+Quando sono presenti record in quarantena viene prodotto anche un file di dettaglio `.csv` in formato tabellare, con un record di quarantena per riga.
 
 ### Summary JSON
 
@@ -68,13 +68,28 @@ Se non sono presenti record, `tables` è una lista vuota.
 
 Il file `.csv` viene prodotto solamente quando nella giornata di riferimento sono presenti record in quarantena.
 
-Il contenuto mantiene attualmente il formato JSON Lines, con un record JSON per riga.
+Il contenuto è organizzato in formato tabellare, con un record di quarantena per riga e le seguenti colonne:
+
+- `awsRegion`;
+- `eventID`;
+- `eventName`;
+- `tableName`;
+- `recordFormat`;
+- `eventSource`;
+- `approximateCreationDateTime`;
+- `keys`;
+- `newImage`;
+- `oldImage`;
+- `sizeBytes`.
+
+I campi strutturati DynamoDB `keys`, `newImage` e `oldImage` vengono mantenuti in formato JSON all'interno delle rispettive celle.
 
 Esempio:
 
 ```text
-{"awsRegion":"eu-south-1","eventID":"e54489d8a5","eventName":"INSERT","userIdentity":null,"recordFormat":"application/json","tableName":"pn-Notifications",...}
-{"awsRegion":"eu-south-1","eventID":"e545s1d8a5","eventName":"REMOVE","userIdentity":null,"recordFormat":"application/json","tableName":"pn-UserAttributes",...}
+awsRegion,eventID,eventName,tableName,recordFormat,eventSource,approximateCreationDateTime,keys,newImage,oldImage,sizeBytes
+eu-south-1,e54489d8a5,INSERT,pn-Notifications,application/json,aws:dynamodb,1787928785362,"{""pk"":{""S"":""AB#PF-...""}}","{""created"":{""S"":""2026-06-04T10:00:01Z""}}",{},284
+eu-south-1,e545s1d8a5,REMOVE,pn-UserAttributes,application/json,aws:dynamodb,1787929123456,"{""pk"":{""S"":""AB#PF-...""}}",{},"{""created"":{""S"":""2026-06-04T10:00:01Z""}}",288
 ```
 
 Il file viene costruito progressivamente in `/tmp` per evitare di mantenere l'intero dataset giornaliero in memoria.
@@ -298,6 +313,6 @@ Gli allarmi vengono pubblicati sul topic configurato tramite `AlarmSNSTopicArn`.
 - Il summary JSON viene generato anche quando non sono presenti record in quarantena.
 - Il file di dettaglio viene salvato su S3 e allegato alla notifica solamente quando sono presenti record.
 - In assenza di record, la notifica contiene solamente il summary con `Tables in quarantine = 0` e `Records in quarantine = 0`.
-- Il file di dettaglio utilizza attualmente JSON Lines anche se salvato con estensione `.csv`.
-- L'eventuale evoluzione verso un CSV strutturato per colonne può essere gestita separatamente senza modificare il formato del summary.
+- Il file di dettaglio utilizza un formato CSV tabellare con un record di quarantena per riga.
+- I campi DynamoDB strutturati `keys`, `newImage` e `oldImage` vengono serializzati in formato JSON nelle rispettive celle.
 - `WarningSNSTopicArn` viene utilizzato per il report applicativo, mentre `AlarmSNSTopicArn` viene utilizzato per gli allarmi tecnici della Lambda.
