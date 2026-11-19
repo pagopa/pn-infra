@@ -550,6 +550,163 @@ Parameters:
     Type: Number
     Default: 1
 
+  PaymentEventMetricNamespace:
+    Type: String
+    Default: pn-kafka-bridge
+
+  PaymentEventAgeMetricName:
+    Type: String
+    Default: payment_event_age
+
+  PaymentEventAgeMetricUnit:
+    Type: String
+    Default: Seconds
+    AllowedValues:
+      - Seconds
+      - Milliseconds
+
+  PaymentEventAgeHighAlarmPeriod:
+    Type: Number
+    Default: 300
+
+  PaymentEventAgeHighAlarmThreshold:
+    Type: Number
+    Default: 2147483647
+
+  PaymentEventAgeHighAlarmEvaluationPeriods:
+    Type: Number
+    Default: 11
+
+  PaymentEventAgeHighAlarmDatapointsToAlarm:
+    Type: Number
+    Default: 11
+
+  PaymentEventAgeHighAlarmStatistic:
+    Type: String
+    Default: Maximum
+    AllowedValues:
+      - SampleCount
+      - Average
+      - Sum
+      - Minimum
+      - Maximum
+
+  PaymentEventAgeHighAlarmComparisonOperator:
+    Type: String
+    Default: GreaterThanThreshold
+    AllowedValues:
+      - GreaterThanOrEqualToThreshold
+      - GreaterThanThreshold
+      - LessThanThreshold
+      - LessThanOrEqualToThreshold
+
+  PaymentEventAgeHighAlarmTreatMissingData:
+    Type: String
+    Default: notBreaching
+    AllowedValues:
+      - breaching
+      - notBreaching
+      - ignore
+      - missing
+
+  PaymentEventAgeMissingAlarmPeriod:
+    Type: Number
+    Default: 3600
+
+  PaymentEventAgeMissingAlarmThreshold:
+    Type: Number
+    Default: -1
+
+  PaymentEventAgeMissingAlarmEvaluationPeriods:
+    Type: Number
+    Default: 1
+
+  PaymentEventAgeMissingAlarmDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  PaymentEventAgeMissingAlarmStatistic:
+    Type: String
+    Default: Maximum
+    AllowedValues:
+      - SampleCount
+      - Average
+      - Sum
+      - Minimum
+      - Maximum
+
+  PaymentEventAgeMissingAlarmComparisonOperator:
+    Type: String
+    Default: LessThanThreshold
+    AllowedValues:
+      - GreaterThanOrEqualToThreshold
+      - GreaterThanThreshold
+      - LessThanThreshold
+      - LessThanOrEqualToThreshold
+
+  PaymentEventAgeMissingAlarmTreatMissingData:
+    Type: String
+    Default: notBreaching
+    AllowedValues:
+      - breaching
+      - notBreaching
+      - ignore
+      - missing
+
+  PaymentEventConsecutiveEmptyWindowsMetricName:
+    Type: String
+    Default: payment_event_consecutive_empty_windows
+
+  PaymentEventConsecutiveEmptyWindowsMetricUnit:
+    Type: String
+    Default: Count
+    AllowedValues:
+      - Count
+
+  PaymentEventConsecutiveEmptyWindowsAlarmPeriod:
+    Type: Number
+    Default: 300
+
+  PaymentEventConsecutiveEmptyWindowsAlarmThreshold:
+    Type: Number
+    Default: 2147483647
+
+  PaymentEventConsecutiveEmptyWindowsAlarmEvaluationPeriods:
+    Type: Number
+    Default: 1
+
+  PaymentEventConsecutiveEmptyWindowsAlarmDatapointsToAlarm:
+    Type: Number
+    Default: 1
+
+  PaymentEventConsecutiveEmptyWindowsAlarmStatistic:
+    Type: String
+    Default: Maximum
+    AllowedValues:
+      - SampleCount
+      - Average
+      - Sum
+      - Minimum
+      - Maximum
+
+  PaymentEventConsecutiveEmptyWindowsAlarmComparisonOperator:
+    Type: String
+    Default: GreaterThanThreshold
+    AllowedValues:
+      - GreaterThanOrEqualToThreshold
+      - GreaterThanThreshold
+      - LessThanThreshold
+      - LessThanOrEqualToThreshold
+
+  PaymentEventConsecutiveEmptyWindowsAlarmTreatMissingData:
+    Type: String
+    Default: notBreaching
+    AllowedValues:
+      - breaching
+      - notBreaching
+      - ignore
+      - missing
+
 Mappings:
   DownstreamAlarms:
     EMD:
@@ -928,6 +1085,66 @@ Resources:
         ComparisonOperator: GreaterThanOrEqualToThreshold
         HasOncall: False
         HasAlarm: False  
+
+  PaymentEventAgeHighAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${PaymentEventAgeMetricName}-High-Age-Alarm"
+      AlarmDescription: !Sub "Alert when ${PaymentEventAgeMetricName} exceeds the configured age threshold."
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref PaymentEventAgeHighAlarmDatapointsToAlarm
+      MetricName: !Ref PaymentEventAgeMetricName
+      Namespace: !Ref PaymentEventMetricNamespace
+      Unit: !Ref PaymentEventAgeMetricUnit
+      ComparisonOperator: !Ref PaymentEventAgeHighAlarmComparisonOperator
+      EvaluationPeriods: !Ref PaymentEventAgeHighAlarmEvaluationPeriods
+      Period: !Ref PaymentEventAgeHighAlarmPeriod
+      Statistic: !Ref PaymentEventAgeHighAlarmStatistic
+      Threshold: !Ref PaymentEventAgeHighAlarmThreshold
+      TreatMissingData: !Ref PaymentEventAgeHighAlarmTreatMissingData
+
+  PaymentEventAgeMissingAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${PaymentEventAgeMetricName}-Missing-Data-Alarm"
+      AlarmDescription: !Sub "Alert when ${PaymentEventAgeMetricName} is not published for the configured period."
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref PaymentEventAgeMissingAlarmDatapointsToAlarm
+      MetricName: !Ref PaymentEventAgeMetricName
+      Namespace: !Ref PaymentEventMetricNamespace
+      Unit: !Ref PaymentEventAgeMetricUnit
+      ComparisonOperator: !Ref PaymentEventAgeMissingAlarmComparisonOperator
+      EvaluationPeriods: !Ref PaymentEventAgeMissingAlarmEvaluationPeriods
+      Period: !Ref PaymentEventAgeMissingAlarmPeriod
+      Statistic: !Ref PaymentEventAgeMissingAlarmStatistic
+      Threshold: !Ref PaymentEventAgeMissingAlarmThreshold
+      TreatMissingData: !Ref PaymentEventAgeMissingAlarmTreatMissingData
+
+  PaymentEventConsecutiveEmptyWindowsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${PaymentEventConsecutiveEmptyWindowsMetricName}-Alarm"
+      AlarmDescription: !Sub "Alert when ${PaymentEventConsecutiveEmptyWindowsMetricName} exceeds the configured threshold."
+      AlarmActions:
+        - !Ref AlarmSNSTopicArn
+      OKActions:
+        - !Ref AlarmSNSTopicArn
+      DatapointsToAlarm: !Ref PaymentEventConsecutiveEmptyWindowsAlarmDatapointsToAlarm
+      MetricName: !Ref PaymentEventConsecutiveEmptyWindowsMetricName
+      Namespace: !Ref PaymentEventMetricNamespace
+      Unit: !Ref PaymentEventConsecutiveEmptyWindowsMetricUnit
+      ComparisonOperator: !Ref PaymentEventConsecutiveEmptyWindowsAlarmComparisonOperator
+      EvaluationPeriods: !Ref PaymentEventConsecutiveEmptyWindowsAlarmEvaluationPeriods
+      Period: !Ref PaymentEventConsecutiveEmptyWindowsAlarmPeriod
+      Statistic: !Ref PaymentEventConsecutiveEmptyWindowsAlarmStatistic
+      Threshold: !Ref PaymentEventConsecutiveEmptyWindowsAlarmThreshold
+      TreatMissingData: !Ref PaymentEventConsecutiveEmptyWindowsAlarmTreatMissingData
 
 Outputs:
   Version:
