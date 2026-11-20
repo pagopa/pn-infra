@@ -22,7 +22,7 @@
                     [ { "expression": "IF(requested>0,((impresa+persona+professionista)/requested)*100,0)", "id": "response_rate", "label": "Risposte con successo %", "region": "eu-south-1", "color": "#69ae34" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "INAD", { "id": "requested", "visible": false, "region": "eu-south-1" } ],
                     [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "INAD", { "id": "impresa", "visible": false, "region": "eu-south-1" } ],
-                    [ "...", "PERSONA_FISICA", ".", "PF", ".", ".", { "id": "persona", "visible": false, "region": "eu-south-1" } ],
+                    [ "...", "PERSONALE", ".", "PF", ".", ".", { "id": "persona", "visible": false, "region": "eu-south-1" } ],
                     [ "...", "PROFESSIONISTA", ".", ".", ".", ".", { "id": "professionista", "visible": false, "region": "eu-south-1" } ]
                 ],
                 "view": "singleValue",
@@ -175,7 +175,7 @@
                     [ { "expression": "IF(requested-(impresa+persona+professionista)>0,requested-(impresa+persona+professionista),0)", "id": "missing", "label": "Domicili non trovati: ${SUM}", "color": "#fe6e73" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "INAD", { "id": "requested", "visible": false } ],
                     [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "INAD", { "id": "impresa", "visible": false } ],
-                    [ "...", "PERSONA_FISICA", ".", "PF", ".", ".", { "id": "persona", "visible": false } ],
+                    [ "...", "PERSONALE", ".", "PF", ".", ".", { "id": "persona", "visible": false } ],
                     [ "...", "PROFESSIONISTA", ".", ".", ".", ".", { "id": "professionista", "visible": false } ]
                 ],
                 "view": "bar",
@@ -200,7 +200,7 @@
                     [ { "expression": "IF(requested>0,((impresa+persona+professionista)/requested)*100,0)", "id": "response_rate", "label": "Risposte con successo %", "region": "eu-south-1", "color": "#69ae34" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "INAD", { "id": "requested", "visible": false, "region": "eu-south-1" } ],
                     [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "INAD", { "id": "impresa", "region": "eu-south-1", "visible": false } ],
-                    [ "...", "PERSONA_FISICA", ".", "PF", ".", ".", { "id": "persona", "visible": false, "region": "eu-south-1" } ],
+                    [ "...", "PERSONALE", ".", "PF", ".", ".", { "id": "persona", "visible": false, "region": "eu-south-1" } ],
                     [ "...", "PROFESSIONISTA", ".", ".", ".", ".", { "id": "professionista", "visible": false, "region": "eu-south-1" } ]
                 ],
                 "view": "singleValue",
@@ -226,7 +226,7 @@
             "height": 6,
             "properties": {
                 "metrics": [
-                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "DigitalAddressScope", "PERSONA_FISICA", "NotificationScope", "PF", "Registry", "INAD", { "label": "Personale", "region": "eu-south-1" } ],
+                    [ "PN-NationalRegistries-Downstream", "CF_WITH_ADDRESS", "DigitalAddressScope", "PERSONALE", "NotificationScope", "PF", "Registry", "INAD", { "label": "Personale", "region": "eu-south-1" } ],
                     [ "...", "PROFESSIONISTA", ".", ".", ".", ".", { "label": "Professionista", "region": "eu-south-1" } ]
                 ],
                 "view": "pie",
@@ -256,7 +256,7 @@
                     [ { "expression": "IF(requested-(impresa+persona+professionista)>0,requested-(impresa+persona+professionista),0)", "id": "missing", "label": "Senza risposta", "color": "#fe6e73" } ],
                     [ "PN-NationalRegistries-Downstream", "CF_REQUESTED", "Registry", "INAD", { "id": "requested", "visible": false } ],
                     [ ".", "CF_WITH_ADDRESS", "DigitalAddressScope", "IMPRESA", "NotificationScope", "PG", "Registry", "INAD", { "id": "impresa", "visible": false } ],
-                    [ "...", "PERSONA_FISICA", ".", "PF", ".", ".", { "id": "persona", "visible": false } ],
+                    [ "...", "PERSONALE", ".", "PF", ".", ".", { "id": "persona", "visible": false } ],
                     [ "...", "PROFESSIONISTA", ".", ".", ".", ".", { "id": "professionista", "visible": false } ]
                 ],
                 "view": "timeSeries",
@@ -273,7 +273,7 @@
         {
             "type": "text",
             "x": 0,
-            "y": 21,
+            "y": 35,
             "width": 24,
             "height": 1,
             "properties": {
@@ -284,7 +284,7 @@
         {
             "type": "metric",
             "x": 0,
-            "y": 22,
+            "y": 36,
             "width": 18,
             "height": 6,
             "properties": {
@@ -309,7 +309,7 @@
         {
             "type": "metric",
             "x": 18,
-            "y": 22,
+            "y": 36,
             "width": 6,
             "height": 6,
             "properties": {
@@ -336,7 +336,7 @@
         {
             "type": "metric",
             "x": 0,
-            "y": 28,
+            "y": 42,
             "width": 24,
             "height": 7,
             "properties": {
@@ -361,7 +361,7 @@
         {
             "type": "text",
             "x": 0,
-            "y": 35,
+            "y": 49,
             "width": 24,
             "height": 1,
             "properties": {
@@ -372,7 +372,7 @@
         {
             "type": "metric",
             "x": 0,
-            "y": 36,
+            "y": 50,
             "width": 18,
             "height": 6,
             "properties": {
@@ -397,7 +397,7 @@
         {
             "type": "metric",
             "x": 18,
-            "y": 36,
+            "y": 50,
             "width": 6,
             "height": 6,
             "properties": {
@@ -424,7 +424,7 @@
         {
             "type": "metric",
             "x": 0,
-            "y": 42,
+            "y": 56,
             "width": 24,
             "height": 7,
             "properties": {
@@ -449,7 +449,7 @@
         {
             "type": "text",
             "x": 0,
-            "y": 49,
+            "y": 63,
             "width": 24,
             "height": 1,
             "properties": {
@@ -460,7 +460,7 @@
         {
             "type": "metric",
             "x": 0,
-            "y": 50,
+            "y": 64,
             "width": 18,
             "height": 6,
             "properties": {
@@ -485,7 +485,7 @@
         {
             "type": "metric",
             "x": 18,
-            "y": 50,
+            "y": 64,
             "width": 6,
             "height": 6,
             "properties": {
@@ -512,7 +512,7 @@
         {
             "type": "metric",
             "x": 0,
-            "y": 56,
+            "y": 70,
             "width": 24,
             "height": 7,
             "properties": {
@@ -537,7 +537,7 @@
         {
             "type": "text",
             "x": 0,
-            "y": 63,
+            "y": 77,
             "width": 24,
             "height": 1,
             "properties": {
@@ -548,7 +548,7 @@
         {
             "type": "metric",
             "x": 0,
-            "y": 64,
+            "y": 78,
             "width": 12,
             "height": 6,
             "properties": {
@@ -579,7 +579,7 @@
         {
             "type": "metric",
             "x": 12,
-            "y": 64,
+            "y": 78,
             "width": 6,
             "height": 6,
             "properties": {
@@ -610,7 +610,7 @@
         {
             "type": "metric",
             "x": 18,
-            "y": 64,
+            "y": 78,
             "width": 6,
             "height": 6,
             "properties": {
@@ -639,7 +639,7 @@
         {
             "type": "metric",
             "x": 0,
-            "y": 70,
+            "y": 84,
             "width": 24,
             "height": 7,
             "properties": {
@@ -667,7 +667,7 @@
         {
             "type": "metric",
             "x": 0,
-            "y": 77,
+            "y": 91,
             "width": 10,
             "height": 5,
             "properties": {
@@ -688,7 +688,7 @@
         {
             "type": "text",
             "x": 0,
-            "y": 82,
+            "y": 96,
             "width": 10,
             "height": 2,
             "properties": {
@@ -698,7 +698,7 @@
         {
             "type": "metric",
             "x": 10,
-            "y": 77,
+            "y": 91,
             "width": 10,
             "height": 5,
             "properties": {
@@ -718,7 +718,7 @@
         {
             "type": "text",
             "x": 10,
-            "y": 89,
+            "y": 103,
             "width": 10,
             "height": 2,
             "properties": {
@@ -728,7 +728,7 @@
         {
             "type": "metric",
             "x": 20,
-            "y": 77,
+            "y": 91,
             "width": 4,
             "height": 5,
             "properties": {
@@ -745,15 +745,17 @@
                 "period": 86400,
                 "title": "INIPEC – Tassi (%) ultime 24h",
                 "stat": "Sum",
-                "stacked": false
+                "stacked": false,
+                "start": "-PT24H",
+                "end": "P0D"
             }
         },
         {
             "type": "text",
             "x": 20,
-            "y": 82,
+            "y": 96,
             "width": 4,
-            "height": 2,
+            "height": 3,
             "properties": {
                 "markdown": "📌 **Descrizione:** Tasso percentuale di successo e di errore nell'elaborazione dei batch. È un KPI fondamentale per avere un colpo d'occhio immediato sull'affidabilità e sulla stabilità del servizio."
             }
@@ -761,7 +763,7 @@
         {
             "type": "metric",
             "x": 0,
-            "y": 84,
+            "y": 98,
             "width": 10,
             "height": 5,
             "properties": {
@@ -782,7 +784,7 @@
         {
             "type": "text",
             "x": 0,
-            "y": 89,
+            "y": 103,
             "width": 10,
             "height": 2,
             "properties": {
@@ -792,7 +794,7 @@
         {
             "type": "metric",
             "x": 10,
-            "y": 84,
+            "y": 98,
             "width": 10,
             "height": 5,
             "properties": {
@@ -811,11 +813,167 @@
         {
             "type": "text",
             "x": 10,
-            "y": 82,
+            "y": 96,
             "width": 10,
             "height": 2,
             "properties": {
                 "markdown": "📌 **Descrizione:** Dimensione media e massima dei batch elaborati, suddivisa in base all'esito (completati o falliti). Utile per monitorare la quantità di dati per singola richiesta e identificare batch eccessivamente grandi."
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 21,
+            "width": 10,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ "PN-NationalRegistries-Downstream", "BATCH_REQUEST_CREATION", "Status", "FAILURE", "Registry", "INAD", { "color": "#d62728", "region": "eu-south-1", "label": "Fallite" } ],
+                    [ "...", "OK", ".", ".", { "color": "#2ca02c", "region": "eu-south-1", "label": "Completate" } ]
+                ],
+                "view": "timeSeries",
+                "region": "eu-south-1",
+                "period": 300,
+                "stat": "Sum",
+                "title": "INAD – Invocazioni richieste",
+                "legend": {
+                    "position": "bottom"
+                }
+            }
+        },
+        {
+            "type": "metric",
+            "x": 10,
+            "y": 21,
+            "width": 10,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ "PN-NationalRegistries-Downstream", "BATCH_SIZE", "Status", "OK", "Registry", "INAD", { "region": "eu-south-1", "label": "Completati - Massimo" } ],
+                    [ "...", "FAILURE", ".", ".", { "region": "eu-south-1", "label": "Falliti - Massimo" } ],
+                    [ "...", "OK", ".", ".", { "color": "#98df8a", "stat": "Average", "region": "eu-south-1", "label": "Completati - Media" } ],
+                    [ "...", "FAILURE", ".", ".", { "color": "#ff9896", "stat": "Average", "region": "eu-south-1", "label": "Falliti - Media" } ]
+                ],
+                "view": "timeSeries",
+                "region": "eu-south-1",
+                "period": 300,
+                "stat": "Maximum",
+                "title": "INAD – Dimensione batch (Media / Massimo)"
+            }
+        },
+        {
+            "type": "text",
+            "x": 0,
+            "y": 26,
+            "width": 10,
+            "height": 2,
+            "properties": {
+                "markdown": "📌 **Descrizione:** Numero totale di invocazioni e creazioni di richieste batch verso il servizio INIPEC, distinte per stato (completate o fallite). Consente di monitorare il volume di traffico nel tempo e identificare rapidamente picchi anomali o blocchi del servizio."
+            }
+        },
+        {
+            "type": "metric",
+            "x": 10,
+            "y": 28,
+            "width": 10,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ "PN-NationalRegistries-Downstream", "BATCH_CLOSURE_DURATION", "Status", "OK", "Registry", "INAD", { "label": "Chiusure completate", "region": "eu-south-1", "color": "#1f77b4" } ],
+                    [ "...", "FAILURE", ".", ".", { "region": "eu-south-1", "color": "#d62728", "label": "Chiusure fallite" } ]
+                ],
+                "view": "timeSeries",
+                "region": "eu-south-1",
+                "period": 300,
+                "title": "INAD – Numero chiusure batch",
+                "setPeriodToTimeRange": true,
+                "stat": "SampleCount"
+            }
+        },
+        {
+            "type": "text",
+            "x": 10,
+            "y": 26,
+            "width": 10,
+            "height": 2,
+            "properties": {
+                "markdown": "📌 **Descrizione:** Dimensione media e massima dei batch elaborati, suddivisa in base all'esito (completati o falliti). Utile per monitorare la quantità di dati per singola richiesta e identificare batch eccessivamente grandi."
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 28,
+            "width": 10,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ "PN-NationalRegistries-Downstream", "BATCH_CLOSURE_DURATION", "Status", "OK", "Registry", "INAD", { "label": "Durata media chiusura completata", "region": "eu-south-1", "color": "#aec7e8" } ],
+                    [ "...", { "label": "Durata massima chiusura completata", "region": "eu-south-1", "color": "#1f77b4", "stat": "Maximum" } ],
+                    [ "...", "FAILURE", ".", ".", { "region": "eu-south-1", "color": "#d62728", "label": "Durata massima chiusura fallita", "stat": "Maximum" } ],
+                    [ "...", { "region": "eu-south-1", "color": "#ff9896", "label": "Durata media chiusura fallita" } ]
+                ],
+                "view": "timeSeries",
+                "region": "eu-south-1",
+                "period": 300,
+                "title": "INAD – Durata chiusura batch (Massimo / Media)",
+                "setPeriodToTimeRange": true,
+                "stat": "Average"
+            }
+        },
+        {
+            "type": "text",
+            "x": 0,
+            "y": 33,
+            "width": 10,
+            "height": 2,
+            "properties": {
+                "markdown": "📌 **Descrizione:** Numero totale di invocazioni e creazioni di richieste batch verso il servizio INIPEC, distinte per stato (completate o fallite). Consente di monitorare il volume di traffico nel tempo e identificare rapidamente picchi anomali o blocchi del servizio."
+            }
+        },
+        {
+            "type": "text",
+            "x": 10,
+            "y": 33,
+            "width": 10,
+            "height": 2,
+            "properties": {
+                "markdown": "📌 **Descrizione:** Dimensione media e massima dei batch elaborati, suddivisa in base all'esito (completati o falliti). Utile per monitorare la quantità di dati per singola richiesta e identificare batch eccessivamente grandi."
+            }
+        },
+        {
+            "type": "metric",
+            "x": 20,
+            "y": 21,
+            "width": 4,
+            "height": 5,
+            "properties": {
+                "metrics": [
+                    [ { "expression": "IF(m5 > 0, (m4 / m5) * 100, 0)", "label": "Tasso di errore %", "id": "e1", "region": "eu-south-1" } ],
+                    [ { "expression": "IF(m5 > 0, (m6 / m5) * 100, 0)", "label": "Tasso di successo %", "id": "e2", "region": "eu-south-1" } ],
+                    [ "PN-NationalRegistries-Downstream", "BATCH", "Status", "OK", "Registry", "INAD", { "id": "m6", "visible": false, "region": "eu-south-1" } ],
+                    [ "...", "FAILURE", ".", ".", { "id": "m4", "visible": false, "region": "eu-south-1" } ],
+                    [ ".", "BATCH_REQUEST_CREATION", ".", "OK", ".", ".", { "id": "m5", "visible": false, "region": "eu-south-1" } ]
+                ],
+                "view": "pie",
+                "sparkline": true,
+                "region": "eu-south-1",
+                "period": 86400,
+                "title": "INAD – Tassi (%) ultime 24h",
+                "stat": "Sum",
+                "stacked": false,
+                "start": "-PT24H",
+                "end": "P0D"
+            }
+        },
+        {
+            "type": "text",
+            "x": 20,
+            "y": 26,
+            "width": 4,
+            "height": 3,
+            "properties": {
+                "markdown": "📌 **Descrizione:** Tasso percentuale di successo e di errore nell'elaborazione dei batch. È un KPI fondamentale per avere un colpo d'occhio immediato sull'affidabilità e sulla stabilità del servizio."
             }
         }
     ]
