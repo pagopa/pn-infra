@@ -642,13 +642,18 @@ Resources:
             - Sid: AllowDataLakeNifiRead
               Effect: Allow
               Principal:
-                AWS: !Ref DataLakeNifiUserArn
+                AWS: !Sub
+                  - "arn:${AWS::Partition}:iam::${NifiAccountId}:root"
+                  - NifiAccountId: !Select [4, !Split [":", !Ref DataLakeNifiUserArn]]
               Action:
                 - s3:ListBucket
                 - s3:GetObject
               Resource:
                 - !GetAtt DataMonitoringBucket.Arn
                 - !Sub "${DataMonitoringBucket.Arn}/*"
+              Condition:
+                ArnEquals:
+                  aws:PrincipalArn: !Ref DataLakeNifiUserArn
             - !Ref AWS::NoValue
 
   DataMonitoringBucketPolicyCore:
