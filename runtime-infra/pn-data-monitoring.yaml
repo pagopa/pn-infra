@@ -80,6 +80,12 @@ Parameters:
     Type: String
     Description: Datalake account id 2 role name
     Default: '-'
+
+  DataLakeNifiUserArn:
+    Type: String
+    Description: IAM user ARN for direct Data Lake NiFi read access to the CONFINFO bucket
+    Default: ''
+    AllowedPattern: '^(-|arn:[a-z0-9-]+:iam::[0-9]{12}:user/([A-Za-z0-9+=,.@_-]+/)*[A-Za-z0-9+=,.@_-]+)?$'
   
   DataAnalysisSlackEmail:
     Type: String
@@ -368,6 +374,7 @@ Conditions:
   IsDatalakeAccount2RoleName: !And [ !Condition IsDatalakeAccount2, !Not [ !Equals [!Ref DataLakeAccountId2RoleName, '' ] ], !Not [ !Equals [!Ref DataLakeAccountId2RoleName, '-' ] ] ]
   IsDatalakeAccount2InCore: !And [ !Condition IsDatalakeAccount2RoleName, !Condition IsCoreAccount ]
   IsDatalakeAccountAnyInCore: !Or [ !Condition IsDatalakeAccountInCore, !Condition IsDatalakeAccount2InCore ]
+  HasDataLakeNifiUserArn: !And [ !Not [ !Equals [ !Ref DataLakeNifiUserArn, '' ] ], !Not [ !Equals [ !Ref DataLakeNifiUserArn, '-' ] ] ]
   HasCronExpression: !Not [ !Equals [!Ref DataMonitoringIndexCronExpression, '' ] ]
   HasDynamoDbExportTableNames: !Not [ !Equals [!Ref DynamoDbExportTableNames, '' ] ]
   HasCronExpressionLambdaPnSupportSqsInCoreAccount: !And [!Not [!Equals [!Ref LambdaPnSupportExportSqsCronExpression, '']], !Equals [!Ref PnCoreAwsAccountId, '']]
@@ -491,6 +498,24 @@ Resources:
                 ArnLike:
                   aws:PrincipalArn:
                     - !Sub "arn:${AWS::Partition}:iam::${DataLakeAccountId2}:role/${DataLakeAccountId2RoleName}"
+            - !Ref AWS::NoValue
+          - Fn::If:
+            - HasDataLakeNifiUserArn
+            - Sid: AllowDataLakeNifiRead
+              Effect: Allow
+              Principal:
+                AWS: !Sub
+                  - "arn:${AWS::Partition}:iam::${NifiAccountId}:root"
+                  - NifiAccountId: !Select [4, !Split [":", !Ref DataLakeNifiUserArn]]
+              Action:
+                - s3:ListBucket
+                - s3:GetObject
+              Resource:
+                - !GetAtt DataMonitoringBucket.Arn
+                - !Sub "${DataMonitoringBucket.Arn}/*"
+              Condition:
+                ArnEquals:
+                  aws:PrincipalArn: !Ref DataLakeNifiUserArn
             - !Ref AWS::NoValue
 
   DataMonitoringBucketPolicyCore:
