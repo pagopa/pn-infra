@@ -151,6 +151,60 @@ Parameters:
   AutoscalingThreshold:
     Default: 0
     Type: String
+
+  # Percentage of AutoscalingThreshold at which REST-API scale-out is triggered.
+  # Kept at 60 to preserve the previous scale-out behaviour.
+  AutoscalingScaleOutThreshold:
+    Default: 60
+    Type: Number
+    MinValue: 1
+    MaxValue: 100
+    Description: normalized REST load percentage that triggers scale-out
+
+  # Separate lower threshold for scale-in to introduce hysteresis and avoid
+  # immediately scaling in as soon as the scale-out alarm returns to OK.
+  AutoscalingScaleInThreshold:
+    Default: 30
+    Type: Number
+    MinValue: 0
+    MaxValue: 100
+    Description: normalized REST load percentage below which scale-in can start
+
+  # Scale-in must be sustained for N out of M datapoints. With the default
+  # 60-second period this means 5 consecutive minutes below the low threshold.
+  AutoscalingScaleInDataPointN:
+    Default: 5
+    Type: Number
+    MinValue: 1
+
+  AutoscalingScaleInDataPointM:
+    Default: 5
+    Type: Number
+    MinValue: 1
+
+  # Longer scale-in cooldown than scale-out cooldown to avoid rapid task churn.
+  AutoscalingScaleInCooldown:
+    Default: 600
+    Type: Number
+    MinValue: 0
+    Description: seconds during which further scale-in actions are blocked
+
+  # Give the application more time than Spring's default 30-second graceful
+  # shutdown phase before ECS sends SIGKILL. Fargate accepts 2-120 seconds.
+  ContainerStopTimeout:
+    Default: 60
+    Type: Number
+    MinValue: 2
+    MaxValue: 120
+    Description: seconds ECS waits after SIGTERM before forcefully killing the main container
+
+  # ALB connection draining period. Parameterized instead of hard-coded.
+  DeregistrationDelaySeconds:
+    Default: 60
+    Type: Number
+    MinValue: 0
+    MaxValue: 3600
+    Description: ALB target deregistration delay in seconds
   
   AutoscalingQueueName:
     Default: ''
@@ -1142,6 +1196,9 @@ Resources:
       ContainerDefinitions:
         - Name: !Sub '${MicroServiceUniqueName}'
           Image: !Ref ContainerImageURI
+          # ECS sends SIGTERM first and waits this long before SIGKILL.
+          # Keep this larger than the application's graceful shutdown budget.
+          StopTimeout: !Ref ContainerStopTimeout
           Memory: 
             'Fn::If':
               - HasOtelXRayDisable
@@ -1993,7 +2050,7 @@ Resources:
         HttpCode: 200
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
-          Value: 60 # default is 300
+          Value: !Ref DeregistrationDelaySeconds
         - Key: load_balancing.algorithm.type
           Value: !Ref LoadBalancingAlgorithm
       VpcId: !Ref VpcId
@@ -2116,7 +2173,8 @@ Resources:
           - MetricIntervalLowerBound: 75
             ScalingAdjustment: 200
 
-  #### Scaling Down Policy
+  #### Existing generic Scaling Down Policy
+  # Kept unchanged for SQS/CUSTOM consumers of this shared fragment.
   ScaleDownPolicy:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Condition: AutoscalingEnabled
@@ -2137,24 +2195,43 @@ Resources:
             ScalingAdjustment: -1
           - MetricIntervalUpperBound: -50
             ScalingAdjustment: -2
+
+  #### Conservative REST-API Scaling Down Policy
+  # REST APIs are latency-sensitive: remove at most one task per scale-in action
+  # and wait longer before another scale-in. SQS/CUSTOM behaviour is unaffected.
+  RestApiScaleDownPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Condition: AutoscalingByRestApi
+    Properties:
+      PolicyName: !Sub '${MicroServiceUniqueName}-RestApiScaleDownPolicy'
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      StepScalingPolicyConfiguration:
+        AdjustmentType: ChangeInCapacity
+        Cooldown: !Ref AutoscalingScaleInCooldown
+        MetricAggregationType: Average
+        StepAdjustments:
+          - MetricIntervalUpperBound: 0
+            ScalingAdjustment: -1
   
-  #### Alarm for Rest-API metric Autoscaling
+  #### REST-API scale-out alarm
+  # Scale-out and scale-in use separate alarms to create hysteresis. The previous
+  # implementation used the OKAction of this alarm for scale-in, so a small drop
+  # below the scale-out threshold could immediately start removing capacity.
   AlarmHighRequests:
     Type: AWS::CloudWatch::Alarm
     Condition: AutoscalingByRestApi
     Properties:
-      AlarmName: !Sub "${MicroServiceUniqueName}-autoscaling-rest"
-      AlarmDescription: "Trigger scaling based on APIs"
+      AlarmName: !Sub "${MicroServiceUniqueName}-autoscaling-rest-high"
+      AlarmDescription: "Scale out when normalized ALB requests per target are high"
       ActionsEnabled: TRUE
       ComparisonOperator: GreaterThanThreshold
       DatapointsToAlarm: !Ref AutoscalingDataPointN
       EvaluationPeriods: !Ref AutoscalingDataPointM
-      Threshold: 60
+      Threshold: !Ref AutoscalingScaleOutThreshold
       TreatMissingData: ignore
       AlarmActions:
         - !Ref ScaleUpPolicy
-      OKActions:
-        - !Ref ScaleDownPolicy
       Metrics:
         - Id: rpt
           MetricStat:
@@ -2170,10 +2247,41 @@ Resources:
         - Id: req_per_targ
           Expression: !Sub "(100 * rpt) / ${AutoscalingThreshold}"
           Label: !Sub "${MicroServiceUniqueName}-api-autoscale-metric"
-      
+          ReturnData: True
 
-      
-      
+  #### REST-API scale-in alarm
+  # Require sustained low load before removing one task. With the defaults this
+  # means 5/5 one-minute datapoints below 30% of AutoscalingThreshold.
+  AlarmLowRequests:
+    Type: AWS::CloudWatch::Alarm
+    Condition: AutoscalingByRestApi
+    Properties:
+      AlarmName: !Sub "${MicroServiceUniqueName}-autoscaling-rest-low"
+      AlarmDescription: "Scale in after sustained low normalized ALB requests per target"
+      ActionsEnabled: TRUE
+      ComparisonOperator: LessThanThreshold
+      DatapointsToAlarm: !Ref AutoscalingScaleInDataPointN
+      EvaluationPeriods: !Ref AutoscalingScaleInDataPointM
+      Threshold: !Ref AutoscalingScaleInThreshold
+      TreatMissingData: ignore
+      AlarmActions:
+        - !Ref RestApiScaleDownPolicy
+      Metrics:
+        - Id: rpt
+          MetricStat:
+            Metric:
+              Namespace: AWS/ApplicationELB
+              MetricName: RequestCountPerTarget
+              Dimensions:
+                - Name: TargetGroup
+                  Value: !GetAtt TargetGroup.TargetGroupFullName
+            Period: !Ref AutoscalingCheckPeriod
+            Stat: Sum
+          ReturnData: False
+        - Id: req_per_targ
+          Expression: !Sub "(100 * rpt) / ${AutoscalingThreshold}"
+          Label: !Sub "${MicroServiceUniqueName}-api-autoscale-metric"
+          ReturnData: True
 
   #### Alarm for SQS metric Autoscaling
   AlarmSQS:
@@ -2232,6 +2340,21 @@ Outputs:
         - !Ref ScaleDownPolicy
         - ''
         
+  RestApiScaleDownPolicy:
+    Value:
+      !If
+        - AutoscalingByRestApi
+        - !Ref RestApiScaleDownPolicy
+        - ''
+
+  RestApiScaleInAlarmArn:
+    Description: ARN of the conservative REST scale-in alarm
+    Value:
+      !If
+        - AutoscalingByRestApi
+        - !GetAtt AlarmLowRequests.Arn
+        - ''
+
   AutoScalingAlarmArn:
     Description: ARN of the autoscaling alarm
     Value:
